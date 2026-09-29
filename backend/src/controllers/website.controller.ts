@@ -214,11 +214,13 @@ export async function getWebsiteRolesHandler(
 
     // Using default service to import
     const { getWebsiteRoles } = await import("../services/website.service.js");
-    const roles = await getWebsiteRoles(websiteId, user.id);
+    const rolesData = await getWebsiteRoles(websiteId, user.id);
 
     return res.status(200).json({
       success: true,
-      roles,
+      roles: rolesData.members,
+      members: rolesData.members,
+      invitations: rolesData.invitations || [],
     });
   } catch (error) {
     next(error);

@@ -101,24 +101,32 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({ websiteId, w
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || "Failed to fetch");
 
-            if (data.roles) {
-                setMembers(data.roles);
-                setInvitations(data.invitations || []);
-            } else if (data.members) {
-                setMembers(data.members);
-                setInvitations(data.invitations || []);
-            }
+            const memberList = Array.isArray(data.roles)
+                ? data.roles
+                : Array.isArray(data.roles?.members)
+                ? data.roles.members
+                : Array.isArray(data.members)
+                ? data.members
+                : [];
+            const invitationList = Array.isArray(data.invitations)
+                ? data.invitations
+                : Array.isArray(data.roles?.invitations)
+                ? data.roles.invitations
+                : [];
+
+            setMembers(memberList);
+            setInvitations(invitationList);
 
             if (view === "PERMISSIONS") {
                 const pRes = await fetch(`${apiUrl}/api/websites/${websiteId}/permissions`, { credentials: "include" });
                 const pData = await pRes.json();
                 if (pRes.ok) {
-                    setGranular(pData.permissions || []);
+                    setGranular(Array.isArray(pData.permissions) ? pData.permissions : []);
                 }
 
                 // Select first valid member by default
-                if (!selectedMember && members.length > 0) {
-                    const nonOwner = members.find(m => m.role !== "OWNER");
+                if (!selectedMember && memberList.length > 0) {
+                    const nonOwner = memberList.find(m => m.role !== "OWNER");
                     if (nonOwner) setSelectedMember(nonOwner.id);
                 }
             }
