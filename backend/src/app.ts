@@ -65,6 +65,12 @@ import platformAuthRoutes from "./routes/platform-auth.routes.js";
 import organizationFileRoutes from "./modules/files/http/routes.js";
 import connectorCredentialRoutes from "./platform/integrations/connector-credential.routes.js";
 import { rateLimit } from "express-rate-limit";
+import saasOrganizationBillingRoutes, { billingWebhookRouter } from "./services/billing/billing.routes.js";
+import governedFileRoutes from "./services/files/file.routes.js";
+import integrationSecretRoutes from "./services/integrations/secret-reference.routes.js";
+import saasPlatformControlRoutes from "./services/control/control.routes.js";
+import tenantCapabilityRoutes from "./services/capabilities/tenant-capabilities.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -106,6 +112,8 @@ app.use(
 // Billing provider signatures are calculated over exact raw bytes. Mount this
 // route before any JSON parser; successful verification never trusts a body-supplied tenant alone.
 app.use("/api/v1/billing/webhooks/stripe", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRoutes);
+// SaaS qualification ingress remains available on its versioned legacy path.
+app.use("/api/v1/billing/webhooks", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRouter);
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "10mb";
 app.use(["/api/v1/auth", "/api/auth"], (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
@@ -122,7 +130,6 @@ app.get("/api/v1/health", (_req: Request, res: Response) => {
     message: "API is healthy",
   });
 });
-
 
 // Auth & Session Rate Limiting (F-439)
 app.use("/api/v1/auth/login", authRateLimiter);
@@ -142,6 +149,12 @@ app.use("/api/v1/auth", meRoutes);
 // Organization-scoped commercial SaaS boundary. Legacy user subscriptions remain
 // available during migration but cannot be used to bypass verified provider state.
 app.use("/api/v1/organizations/:organizationId/billing", organizationBillingRoutes);
+
+// SaaS foundation routes that do not overlap the consolidated billing module.
+app.use("/api/v1/organizations", integrationSecretRoutes);
+app.use("/api/v1/organizations", tenantCapabilityRoutes);
+app.use("/api/v1/files", governedFileRoutes);
+app.use("/platform/v1", saasPlatformControlRoutes);
 
 // Platform-control session upgrade uses a distinct cookie/audience and requires
 // recent phishing-resistant OIDC from an already authenticated privileged user.
@@ -267,6 +280,8 @@ app.use("/api/v1/websites", designSystemRoutes);
 app.use("/api/websites", designSystemRoutes);
 app.use("/api/v1/websites", aiHostingRoutes);
 app.use("/api/websites", aiHostingRoutes);
+app.use("/api/v1/ai", aiRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Elementor Cloud Managed Hosting Bundles (X-804)
 app.use("/api/v1/elementor-cloud", elementorCloudRoutes);

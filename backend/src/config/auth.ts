@@ -1,5 +1,6 @@
 export const AUTH_COOKIE_NAME = process.env.NODE_ENV === "production" ? "__Host-forge_session" : "forge_session";
 export const AUTH_CHALLENGE_COOKIE = process.env.NODE_ENV === "production" ? "__Host-forge_challenge" : "forge_challenge";
+export const PLATFORM_AUTH_COOKIE_NAME = process.env.NODE_ENV === "production" ? "__Host-forge_platform_session" : "forge_platform_session";
 export const AUTH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",

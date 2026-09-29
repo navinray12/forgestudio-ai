@@ -30,6 +30,7 @@ export interface LoginChallenge {
 export interface NewIdentitySession {
   userId: string; tokenHash: string; expiresAt: Date; authEpoch: number;
   authMethod: string; authTime: Date; assurance: string; mfaVerifiedAt: Date | null;
+  audience?: "TENANT" | "PLATFORM";
 }
 export interface AccountSessionSummary {
   id: string; createdAt: Date; expiresAt: Date; lastUsedAt: Date | null; authMethod: string;

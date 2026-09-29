@@ -11,9 +11,9 @@ export class OidcAuthentication {
   constructor(private readonly store: IdentityStorePort, private readonly provider: IdentityProviderPort,
     private readonly now: () => Date = () => new Date()) {}
   get callbackUrl() { return this.provider.callbackUrl; }
-  async begin(link?: { userId: string; sessionId: string }) {
+  async begin(link?: { userId: string; sessionId: string }, audience: "TENANT" | "PLATFORM" = "TENANT") {
     const secret = opaqueToken(); const now = this.now();
-    const row: LoginChallenge = { id: randomUUID(), userId: link?.userId ?? null, kind: "OIDC",
+    const row: LoginChallenge = { id: randomUUID(), userId: link?.userId ?? null, kind: audience === "PLATFORM" ? "OIDC_PLATFORM" : "OIDC",
       secretHash: digest(secret), status: "PENDING", authEpoch: 0, email: null, otpHash: null,
       attempts: 0, expiresAt: new Date(now.getTime() + 5 * 60_000), lastSentAt: null, createdAt: now,
       providerKey: this.provider.key, initiatingSessionId: link?.sessionId ?? null };
@@ -32,7 +32,8 @@ export class OidcAuthentication {
     if (typeof secretInput !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(secretInput)) throw invalidAuthentication();
     const secret = secretInput;
     const row = await this.store.findChallenge(digest(secret));
-    if (!row || row.kind !== "OIDC" || row.providerKey !== this.provider.key) throw invalidAuthentication();
+    if (!row || !["OIDC", "OIDC_PLATFORM"].includes(row.kind) || row.providerKey !== this.provider.key) throw invalidAuthentication();
+    const audience: "TENANT" | "PLATFORM" = row.kind === "OIDC_PLATFORM" ? "PLATFORM" : "TENANT";
     const proof = authorizationProof(secret, row.id);
     if (callback.searchParams.getAll("state").length !== 1 || !safeEqual(callback.searchParams.get("state") ?? "", proof.state) ||
         callback.searchParams.getAll("code").length !== 1 || (callback.searchParams.get("code")?.length ?? 0) > 4096) throw invalidAuthentication();
@@ -69,8 +70,11 @@ export class OidcAuthentication {
         actor = await tx.createManagedUser({ email: identity.email, fullName: identity.name });
       }
       const privileged = actor.role !== "USER" || await tx.hasAdministrationAuthority(actor.id);
+      if (audience === "PLATFORM" && !["SUPER_ADMIN", "PLATFORM_ADMIN"].includes(actor.role)) {
+        throw new AppError("Platform control access is not permitted.", 403, "PLATFORM_ACCESS_DENIED");
+      }
       if (privileged && identity.assurance === "none") throw new AppError("An approved MFA context is required.", 403, "MFA_REQUIRED");
-      if (actor.role !== "USER" && identity.assurance !== "phishing-resistant") {
+      if ((actor.role !== "USER" || audience === "PLATFORM") && identity.assurance !== "phishing-resistant") {
         throw new AppError("Phishing-resistant authentication is required.", 403, "STRONG_MFA_REQUIRED");
       }
       if (!binding) {
@@ -79,10 +83,10 @@ export class OidcAuthentication {
       }
       await tx.createSession({ userId: actor.id, tokenHash: digest(token), expiresAt, authEpoch: actor.authEpoch,
         authMethod: "oidc", authTime: identity.authenticatedAt, assurance: identity.assurance,
-        mfaVerifiedAt: identity.assurance === "none" ? null : identity.authenticatedAt });
+        mfaVerifiedAt: identity.assurance === "none" ? null : identity.authenticatedAt, audience });
       await tx.audit(actor.id, "IDENTITY_LOGIN_COMPLETED", `challenge:${row.id}`, { method: "oidc", assurance: identity.assurance });
       return publicUser(actor);
     });
-    return { token, expiresAt, user };
+    return { token, expiresAt, user, audience };
   }
 }

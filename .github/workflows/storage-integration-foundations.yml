@@ -6,6 +6,9 @@ on:
       - 'backend/src/platform/storage/**'
       - 'backend/src/platform/integrations/**'
       - 'backend/src/modules/files/**'
+      - 'backend/src/platform/secrets/**'
+      - 'backend/src/services/destinations/sftp.publisher.ts'
+      - 'backend/prisma/migrations/20260929111500_integration_credentials/**'
       - 'backend/src/workers/platform-worker.ts'
       - 'backend/src/tests/storage-integration-foundations.test.ts'
       - '.github/workflows/storage-integration-foundations.yml'
@@ -38,4 +41,5 @@ jobs:
       - run: npm run build --prefix backend
       - run: cd backend && npx --no-install prisma db push
       - run: psql -h 127.0.0.1 -U postgres -d forge_storage -v ON_ERROR_STOP=1 -f backend/prisma/migrations/20260929093000_platform_foundations/migration.sql
+      - run: psql -h 127.0.0.1 -U postgres -d forge_storage -v ON_ERROR_STOP=1 -f backend/prisma/migrations/20260929111500_integration_credentials/migration.sql
       - run: cd backend && node --test dist/tests/storage-integration-foundations.test.js

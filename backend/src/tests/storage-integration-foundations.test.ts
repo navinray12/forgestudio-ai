@@ -6,6 +6,7 @@ import { authorizeFileUpload } from "../modules/files/file.service.js";
 import { presignS3 } from "../platform/storage/s3-sigv4.js";
 import { resolveSafeDestination } from "../platform/integrations/safe-egress.js";
 import { registerConnectorCredential } from "../platform/integrations/connector-credentials.js";
+import { resolveSecretReference } from "../platform/secrets/secret-provider.js";
 
 const id=()=>crypto.randomUUID();
 
@@ -61,10 +62,22 @@ test("authorized upload creates tenant-scoped quarantine object",async()=>{
 
 test("connector credential persistence stores reference metadata, not secret material",async()=>{
   const f=await fixture();
-  const result=await registerConnectorCredential({organizationId:f.org,workspaceId:f.workspace,websiteId:f.website,actorId:f.user,provider:"wordpress",secretRef:"secretsmanager:forge/wordpress/fixture",scopes:["publish"]});
-  assert.equal(result.provider,"wordpress");
-  const row=await pgPool.query(`SELECT "secretRef",scopes,status FROM connector_credentials WHERE id=$1::uuid`,[result.id]);
-  assert.equal(row.rows[0].secretRef,"secretsmanager:forge/wordpress/fixture");
+  const result=await registerConnectorCredential({organizationId:f.org,workspaceId:f.workspace,websiteId:f.website,actorId:f.user,provider:"sftp",secretRef:"secretsmanager:forge/sftp/fixture",scopes:["publish"],metadata:{hostKeySha256:"a".repeat(64)}});
+  assert.equal(result.provider,"sftp");
+  const row=await pgPool.query(`SELECT "secretRef",scopes,metadata,status FROM connector_credentials WHERE id=$1::uuid`,[result.id]);
+  assert.equal(row.rows[0].secretRef,"secretsmanager:forge/sftp/fixture");
   assert.deepEqual(row.rows[0].scopes,["publish"]);
+  assert.equal(row.rows[0].metadata.hostKeySha256,"a".repeat(64));
   assert.equal(row.rows[0].status,"ACTIVE");
+});
+
+
+test("development env secret references resolve without exposing a production fallback",async()=>{
+  const previous=process.env.FORGE_TEST_CONNECTOR_SECRET;
+  process.env.FORGE_TEST_CONNECTOR_SECRET=JSON.stringify({password:"fixture-password"});
+  try {
+    assert.equal(await resolveSecretReference("env:FORGE_TEST_CONNECTOR_SECRET"),JSON.stringify({password:"fixture-password"}));
+  } finally {
+    if(previous===undefined) delete process.env.FORGE_TEST_CONNECTOR_SECRET; else process.env.FORGE_TEST_CONNECTOR_SECRET=previous;
+  }
 });

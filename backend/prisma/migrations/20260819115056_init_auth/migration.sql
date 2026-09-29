@@ -83,6 +83,21 @@ CREATE TABLE "password_reset_tokens" (
     CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY ("id")
 );
 
+-- Websites are the original application root aggregate. This baseline table
+-- must exist before later revision, collaboration and deployment migrations.
+CREATE TABLE "websites" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
+    "name" VARCHAR(255) NOT NULL,
+    "slug" VARCHAR(255) NOT NULL,
+    "status" VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    "editorData" JSONB NOT NULL DEFAULT '{"version":1,"elements":[]}'::jsonb,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "websites_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX "idx_websites_user_id" ON "websites"("userId");
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
@@ -139,3 +154,5 @@ ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userI
 
 -- AddForeignKey
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "websites" ADD CONSTRAINT "websites_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

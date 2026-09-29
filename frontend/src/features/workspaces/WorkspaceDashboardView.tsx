@@ -1,4 +1,5 @@
 import { WorkspaceAdministration } from "./WorkspaceAdministration";
+import { OrganizationBillingPanel } from "../billing/OrganizationBillingPanel";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { workspaceRequest } from "./workspace-api";
@@ -69,6 +70,7 @@ export function WorkspaceDashboardView({ apiUrl, workspaceId, onOpenWebsite }: P
         <p className="w-full text-xs text-slate-500">Only active members of the same organization are eligible. Organization invitation and ownership-transfer workflows are separate.</p>
       </form>}
       {data.userRole !== "MEMBER" && <WorkspaceAdministration data={data} apiUrl={apiUrl} busy={busy} eligible={eligible} run={command} />}
+      {data.userRole !== "MEMBER" && <OrganizationBillingPanel organizationId={data.organizationId} />}
     </>}
   </section>;
 }

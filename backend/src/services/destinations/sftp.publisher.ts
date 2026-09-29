@@ -4,6 +4,9 @@ const SftpClient = require("ssh2-sftp-client");
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
 import { compileCanonicalToStaticBundle } from "./staticCompiler.js";
+import { resolveSafeHost } from "../../platform/integrations/safe-egress.js";
+import { getActiveConnectorCredential } from "../../platform/integrations/connector-credentials.js";
+import { parseSecretJson } from "../../platform/secrets/secret-provider.js";
 import type {
   DestinationPublisher,
   PublishDestinationResult,
@@ -40,6 +43,7 @@ export class SftpPublisher implements DestinationPublisher {
     // 1. Fetch SFTP configuration
     const config = await db.sftpConnection.findFirst({
       where: { websiteId, isActive: true },
+      include: { website: { select: { organizationId: true } } },
     });
 
     if (!config) {
@@ -58,8 +62,25 @@ export class SftpPublisher implements DestinationPublisher {
       throw new AppError("SFTP username is missing.", 400, "SFTP_INVALID_USERNAME");
     }
     const remotePath = (config.remotePath || "/var/www/html").trim();
-    if (!remotePath.startsWith("/")) {
-      throw new AppError("SFTP remote path must be an absolute path.", 400, "SFTP_INVALID_PATH");
+    if (!remotePath.startsWith("/") || remotePath.includes("..")) {
+      throw new AppError("SFTP remote path must be an absolute normalized path.", 400, "SFTP_INVALID_PATH");
+    }
+
+    const port = Number(config.port || 22);
+    const allowedPorts = process.env.NODE_ENV === "production" ? [22] : [22, 2222];
+    const destination = await resolveSafeHost(config.host.trim(), port, allowedPorts);
+    const organizationId = config.website?.organizationId;
+    let governedSecret: Record<string,string> = {};
+    let hostKeySha256 = "";
+    if (organizationId) {
+      const credential = await getActiveConnectorCredential({ organizationId, websiteId, provider: "sftp" });
+      if (credential) {
+        governedSecret = await parseSecretJson(credential.secretRef);
+        hostKeySha256 = String(credential.metadata?.hostKeySha256 || "").toLowerCase();
+      }
+    }
+    if (process.env.NODE_ENV === "production" && (!organizationId || !hostKeySha256 || (!governedSecret.password && !governedSecret.privateKey))) {
+      throw new AppError("SFTP requires an organization-scoped secret reference and pinned SHA-256 host key in production.", 503, "SFTP_CREDENTIAL_GOVERNANCE_REQUIRED");
     }
 
     // 3. Compile static website bundle from CanonicalWebsiteData
@@ -71,16 +92,28 @@ export class SftpPublisher implements DestinationPublisher {
       (customSftpFactory ? await customSftpFactory() : new SftpClient());
 
     const connectConfig: any = {
-      host: config.host.trim(),
-      port: config.port || 22,
+      host: destination.address,
+      port,
       username: config.username.trim(),
-      readyTimeout: options.timeout || 15000,
+      readyTimeout: Math.max(1000, Math.min(20000, Number(options.timeout || 15000))),
     };
 
-    if (options.password) connectConfig.password = options.password;
-    if (options.privateKey) connectConfig.privateKey = options.privateKey;
-    if (process.env.SFTP_PASSWORD && !connectConfig.password) connectConfig.password = process.env.SFTP_PASSWORD;
-    if (process.env.SFTP_PRIVATE_KEY && !connectConfig.privateKey) connectConfig.privateKey = process.env.SFTP_PRIVATE_KEY;
+    if (governedSecret.password) connectConfig.password = governedSecret.password;
+    if (governedSecret.privateKey) connectConfig.privateKey = governedSecret.privateKey;
+    if (governedSecret.passphrase) connectConfig.passphrase = governedSecret.passphrase;
+
+    // Test/local adapters may inject credentials explicitly. Production may not.
+    if (process.env.NODE_ENV !== "production") {
+      if (options.password && !connectConfig.password) connectConfig.password = options.password;
+      if (options.privateKey && !connectConfig.privateKey) connectConfig.privateKey = options.privateKey;
+      if (process.env.SFTP_PASSWORD && !connectConfig.password) connectConfig.password = process.env.SFTP_PASSWORD;
+      if (process.env.SFTP_PRIVATE_KEY && !connectConfig.privateKey) connectConfig.privateKey = process.env.SFTP_PRIVATE_KEY;
+    }
+
+    if (hostKeySha256) {
+      connectConfig.hostHash = "sha256";
+      connectConfig.hostVerifier = (actual: string) => actual.replace(/:/g, "").toLowerCase() === hostKeySha256;
+    }
 
     let actualFilesCount = 0;
     let actualBytes = 0;
@@ -122,7 +155,8 @@ export class SftpPublisher implements DestinationPublisher {
       } else {
         const sanitizedErr = (err?.message || String(err))
           .replace(connectConfig.password || "___", "[REDACTED]")
-          .replace(connectConfig.privateKey || "___", "[REDACTED]");
+          .replace(connectConfig.privateKey || "___", "[REDACTED]")
+          .replace(connectConfig.passphrase || "___", "[REDACTED]");
         throw new AppError(`SFTP deployment failed: ${sanitizedErr}`, 502, "SFTP_TRANSFER_FAILED");
       }
     } finally {
@@ -162,6 +196,7 @@ export class SftpPublisher implements DestinationPublisher {
     const start = Date.now();
     const config = await db.sftpConnection.findFirst({
       where: { websiteId, isActive: true },
+      include: { website: { select: { organizationId: true } } },
     });
 
     if (!config) {
@@ -173,19 +208,23 @@ export class SftpPublisher implements DestinationPublisher {
       };
     }
 
-    // Verify host and port reachability
-    const isValid = Boolean(config.host && config.username && config.remotePath);
-    return {
-      verified: isValid,
-      statusCode: isValid ? 200 : 400,
-      latencyMs: Date.now() - start,
-      details: {
-        host: config.host,
-        port: config.port,
-        remotePath: config.remotePath,
-        status: isValid ? "CONFIG_VERIFIED" : "CONFIG_INVALID",
-      },
-    };
+    try {
+      const port = Number(config.port || 22);
+      await resolveSafeHost(config.host, port, process.env.NODE_ENV === "production" ? [22] : [22,2222]);
+      const credential = config.website?.organizationId
+        ? await getActiveConnectorCredential({ organizationId: config.website.organizationId, websiteId, provider: "sftp" })
+        : null;
+      const governed = !!credential?.metadata?.hostKeySha256 && !!credential?.secretRef;
+      return {
+        verified: process.env.NODE_ENV === "production" ? governed : true,
+        statusCode: process.env.NODE_ENV === "production" && !governed ? 503 : 200,
+        latencyMs: Date.now() - start,
+        details: { host: config.host, port, remotePath: config.remotePath, credentialGoverned: governed,
+          status: governed || process.env.NODE_ENV !== "production" ? "CONFIG_VERIFIED" : "CREDENTIAL_GOVERNANCE_REQUIRED" },
+      };
+    } catch (error:any) {
+      return { verified:false,statusCode:error?.statusCode||400,latencyMs:Date.now()-start,error:error?.message||"SFTP configuration failed validation" };
+    }
   }
 
   async rollback(

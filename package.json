@@ -5,6 +5,10 @@
   "description": "ForgeStudio Visual Website Builder Monorepo",
   "type": "module",
   "scripts": {
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "dev:stack": "docker compose up --build",
+    "down:stack": "docker compose down",
     "test:part-b": "tsx tests/run-part-b-regression.ts",
     "test:api": "tsx tests/api/part-b-api.test.ts",
     "test:db": "tsx tests/database/part-b-db.test.ts",

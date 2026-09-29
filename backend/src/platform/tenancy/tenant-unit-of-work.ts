@@ -45,7 +45,7 @@ export async function withTenantTransaction<T>(
 }
 
 export async function withServiceTransaction<T>(
-  serviceRole: "dispatcher" | "worker" | "billing-webhook" | "file-scanner",
+  serviceRole: "dispatcher" | "worker" | "billing-webhook" | "file-scanner" | "platform-control",
   work: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
   const client = await pgPool.connect();

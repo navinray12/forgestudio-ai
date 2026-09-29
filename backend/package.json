@@ -11,10 +11,13 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:provision-local-test": "tsx scripts/provision-local-agency-test.ts",
     "prebuild": "prisma generate",
     "predev": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "worker:platform": "node dist/workers/platform-worker.js"
+    "worker:platform": "node dist/workers/platform-worker.js",
+    "worker": "node dist/workers/main.js",
+    "dev:worker": "tsx watch src/workers/main.ts"
   },
   "keywords": [],
   "author": "",
@@ -33,7 +36,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
-    "nodemailer": "9.1.1",
+    "nodemailer": "10.0.12",
     "openid-client": "6.8.8",
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
@@ -52,7 +55,7 @@
     "@types/express": "^5.0.6",
     "@types/express-rate-limit": "^6.0.0",
     "@types/node": "^26.2.0",
-    "@types/nodemailer": "^7.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport": "^1.0.17",
     "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.17",
@@ -64,6 +67,7 @@
     "typescript": "^7.0.2"
   },
   "overrides": {
+    "fast-uri": "3.1.7",
     "@prisma/config": {
       "deepmerge-ts": "8.0.2"
     },

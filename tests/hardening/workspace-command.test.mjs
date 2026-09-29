@@ -40,7 +40,8 @@ async function fixture({auditFailure=false,journalFailure=false,conflicts=0}={})
 test('API-003: identical retry converges on one mutation, audit and outbox intent',async()=>{
   const f=await fixture();await f.workspaceCommand(f.input);await f.workspaceCommand(f.input);
   assert.equal(f.state().changes,1);assert.equal(f.state().audit,1);assert.equal(f.state().outbox,1);
-  assert.deepEqual(f.contexts,['organization','organization']);
+  // Each transaction establishes both actor and tenant RLS context.
+  assert.deepEqual(f.contexts,['actor','organization','actor','organization']);
 });
 
 test('API-003: changed payload with the same key conflicts',async()=>{

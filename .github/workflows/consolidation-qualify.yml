@@ -1,0 +1,133 @@
+name: Qualify branch consolidation
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/maintenance/stage-consolidation.mjs
+      - .github/workflows/consolidation-qualify.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: qualify-branch-consolidation
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_saas_foundations
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_saas_foundations
+      PGPASSWORD: disposable_fixture_only
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      FORGE_AUTH_MODE: local
+      NODE_ENV: test
+      FRONTEND_URL: http://localhost:5173
+      PORT: '5000'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - name: Require the reviewed workspace serialization-retry correction
+        run: git merge-base --is-ancestor d5e37a16097d82ed58bc6070e5cdaa022e8b5992 HEAD
+      - name: Initialize evidence directory in the allocated runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/consolidation-evidence"
+          echo "CONSOLIDATION_REPORT_DIR=$RUNNER_TEMP/consolidation-evidence" >> "$GITHUB_ENV"
+      - name: Stage exact reviewed consolidation without changing refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The signed manifest accounts for deletions and additions separately.
+          # Similarity-based rename presentation must not hide either path.
+          git config diff.renames false
+          node scripts/maintenance/stage-consolidation.mjs stage 2>&1 | tee "$CONSOLIDATION_REPORT_DIR/stage.log"
+      - name: Install, audit and build the exact candidate
+        run: |
+          set -euo pipefail
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm audit --prefix backend --audit-level moderate --json > "$CONSOLIDATION_REPORT_DIR/backend-audit.json"
+          npm audit --prefix frontend --audit-level moderate --json > "$CONSOLIDATION_REPORT_DIR/frontend-audit.json"
+          npm run build --prefix backend 2>&1 | tee "$CONSOLIDATION_REPORT_DIR/backend-build.log"
+          npm run build --prefix frontend 2>&1 | tee "$CONSOLIDATION_REPORT_DIR/frontend-build.log"
+      - name: Prepare actual browser runner
+        run: |
+          python3 -m venv "$RUNNER_TEMP/browser-venv"
+          "$RUNNER_TEMP/browser-venv/bin/pip" install playwright==1.57.0
+      - name: Verify consolidated source, migration, RLS, service and browser contracts
+        env:
+          FORGE_BROWSER_PYTHON: ${{ runner.temp }}/browser-venv/bin/python
+        run: bash scripts/maintenance/test-consolidation.sh
+      - name: Preserve existing compiled workspace and editor browser behavior
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_browser
+          FORGE_BROWSER_FIXTURE_PATH: ${{ runner.temp }}/workspace-fixture.json
+          FORGE_BROWSER_REPORT_DIR: ${{ runner.temp }}/consolidation-evidence/workspace-browser
+        run: |
+          set -euo pipefail
+          createdb -h 127.0.0.1 -U postgres forge_browser
+          (cd backend && npx --no-install prisma db push && node dist/tests/fixtures/workspace-browser-fixture.js)
+          (cd backend && exec node dist/server.js) > "$RUNNER_TEMP/workspace-api.log" 2>&1 &
+          api_pid=$!
+          (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/workspace-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true; rm -f "$FORGE_BROWSER_FIXTURE_PATH"' EXIT
+          ready=0
+          for attempt in $(seq 1 30);do
+            if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then ready=1;break;fi
+            sleep 1
+          done
+          test "$ready" = 1
+          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/workspace-journey.py
+      - name: Preserve actual identity browser journeys
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_identity_browser
+          FORGE_IDENTITY_MAIL_SINK: ${{ runner.temp }}/private-identity-mail.json
+          FORGE_IDENTITY_BROWSER_REPORT: ${{ runner.temp }}/consolidation-evidence/identity-browser
+        run: |
+          set -euo pipefail
+          createdb -h 127.0.0.1 -U postgres forge_identity_browser
+          (cd backend && npx --no-install prisma db push)
+          (cd backend && exec node dist/tests/fixtures/identity-browser-server.js) > "$RUNNER_TEMP/identity-api.log" 2>&1 &
+          api_pid=$!
+          (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/identity-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true; rm -f "$FORGE_IDENTITY_MAIL_SINK"' EXIT
+          ready=0
+          for attempt in $(seq 1 30);do
+            if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then ready=1;break;fi
+            sleep 1
+          done
+          test "$ready" = 1
+          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/identity-journey.py
+      - name: Export exact tested blobs and tree, never a branch ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/maintenance/stage-consolidation.mjs export
+      - name: Preserve evidence without private fixtures or credentials
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: consolidation-qualified-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/consolidation-candidate/candidate.json
+            ${{ runner.temp }}/consolidation-candidate/qualified-merge.json
+            ${{ runner.temp }}/consolidation-evidence/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { setTimeout as pause } from "node:timers/promises";
 import { prisma } from "../../config/prisma.js";
 import { isRetryableTransactionConflict } from "../../config/transaction-conflict.js";
 import { AppError } from "../../utils/app-error.js";
@@ -56,7 +57,14 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
     } catch (error) {
       const failure = error as { code?: string; meta?: { code?: string } };
       const conflict = isRetryableTransactionConflict(error);
-      if (conflict && attempt < 2) continue;
+      if (conflict && attempt < 2) {
+        // PostgreSQL can abort a contender before the winning transaction has
+        // committed. Yield outside the transaction so retries do not exhaust
+        // the same finite budget against an unchanged conflicting snapshot.
+        const delayMs = 50 * (2 ** attempt) + Math.floor(Math.random() * 25);
+        await pause(delayMs);
+        continue;
+      }
       if (conflict) throw new AppError("A concurrent change could not be completed; retry with the same key", 409, "CONCURRENT_CHANGE");
       if (failure.code === "P2010" && failure.meta?.code === "42P01") {
         throw new AppError("Workspace schema migration is required", 503, "MIGRATION_REQUIRED");

@@ -21,6 +21,19 @@ function isBlockedAddress(address:string){
   return true;
 }
 
+
+export async function resolveSafeHost(hostInput:string,port:number,allowedPorts:number[]=[443]){
+  const host=String(hostInput||"").trim().toLowerCase().replace(/\.$/,"");
+  if(!host||host==="localhost"||host.endsWith(".localhost")||host.endsWith(".local")||host.endsWith(".internal")||host.endsWith(".lan")){
+    throw new AppError("Private destinations are not allowed",400,"EGRESS_DESTINATION_BLOCKED");
+  }
+  if(!Number.isInteger(port)||!allowedPorts.includes(port)) throw new AppError("External destination port is not allowed",400,"EGRESS_PORT_BLOCKED");
+  if(net.isIP(host)&&isBlockedAddress(host)) throw new AppError("Private destinations are not allowed",400,"EGRESS_DESTINATION_BLOCKED");
+  const answers=net.isIP(host)?[{address:host,family:net.isIP(host)}]:await dns.lookup(host,{all:true,verbatim:true});
+  if(!answers.length||answers.some(a=>isBlockedAddress(a.address))) throw new AppError("External destination resolved to a prohibited address",400,"EGRESS_DESTINATION_BLOCKED");
+  return {host,address:answers[0].address,family:answers[0].family};
+}
+
 export async function resolveSafeDestination(raw:string, options:{allowHttp?:boolean;allowedPorts?:number[]}={}){
   let url:URL;
   try{url=new URL(raw);}catch{throw new AppError("External URL is invalid",400,"EGRESS_URL_INVALID");}

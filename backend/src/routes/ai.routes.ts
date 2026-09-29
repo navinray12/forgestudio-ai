@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { authorizeCapability } from "../services/permission.service.js";
+import { applyAiChangesetHandler, cancelAiChangesetHandler, generateSiteHandler, getAiChangesetHandler, retryAiChangesetHandler } from "../controllers/ai.controller.js";
+const router = Router();
+router.post("/websites/:id/generate", requireAuth, authorizeCapability("EDIT_DESIGN"), generateSiteHandler);
+router.get("/changesets/:changesetId", requireAuth, getAiChangesetHandler);
+router.post("/changesets/:changesetId/apply", requireAuth, applyAiChangesetHandler);
+router.post("/changesets/:changesetId/cancel", requireAuth, cancelAiChangesetHandler);
+router.post("/changesets/:changesetId/retry", requireAuth, retryAiChangesetHandler);
+export default router;

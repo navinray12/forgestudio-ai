@@ -9,6 +9,9 @@ function fixture({ workspaceRole='MEMBER', orgRole='MEMBER', orgMember=true, wor
     organization: { findUnique: async()=>({id:'organization',ownerId:orgRole==='OWNER'?actor:'org-owner'}) },
     organizationMember: { findUnique: async()=>orgMember ? {role:orgRole} : null },
     user: { findUnique: async()=>({id:actor,status:'ACTIVE'}) },
+    // Production transactions expose tagged raw queries. The access layer sets
+    // transaction-local RLS context before reading tenant-owned records.
+    $queryRaw: async()=>[],
   } };
 }
 

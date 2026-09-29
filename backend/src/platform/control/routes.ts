@@ -5,6 +5,8 @@ import { pgPool } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
 import { requireRecentPlatformReauth } from "../../services/platform-session-authentication.js";
 import { applyRuntimeChange, approveRuntimeChange, createRuntimeChange, listChanges } from "./change.service.js";
+import { tenantIsolationPreflight } from "../../operations/tenant-isolation-preflight.js";
+import { listDeadLetters, listReconciliationCases, replayDeadLetter, resolveReconciliationCase } from "../reliability/postgres-queue.js";
 
 const router = Router();
 router.use(requirePlatformAuth);
@@ -51,6 +53,27 @@ router.get("/overview", async (_req, res, next) => {
       note: "Capacity targets are architecture contracts until deployment qualification evidence exists.",
     });
   } catch (error) { next(error); }
+});
+
+router.get("/tenant-isolation/preflight",async(_req,res,next)=>{
+  try{requirePlatformRole(res);res.json({success:true,preflight:await tenantIsolationPreflight()});}catch(error){next(error);}
+});
+
+router.get("/dead-letters",async(_req,res,next)=>{
+  try{requirePlatformRole(res);res.json({success:true,deadLetters:await listDeadLetters()});}catch(error){next(error);}
+});
+router.post("/dead-letters/:id/replay",async(req,res,next)=>{
+  try{requirePlatformRole(res);requireRecentPlatformReauth(res.locals.session);res.json({success:true,replay:await replayDeadLetter(String(req.params.id),res.locals.user.id)});}catch(error){next(error);}
+});
+router.get("/reconciliation",async(_req,res,next)=>{
+  try{requirePlatformRole(res);res.json({success:true,cases:await listReconciliationCases()});}catch(error){next(error);}
+});
+router.post("/reconciliation/:id/resolve",async(req,res,next)=>{
+  try{
+    requirePlatformRole(res);requireRecentPlatformReauth(res.locals.session);
+    const outcome=req.body?.outcome==="ABANDONED"?"ABANDONED":"RESOLVED";
+    res.json({success:true,case:await resolveReconciliationCase(String(req.params.id),res.locals.user.id,String(req.body?.note||""),outcome)});
+  }catch(error){next(error);}
 });
 
 router.get("/changes",async(_req,res,next)=>{

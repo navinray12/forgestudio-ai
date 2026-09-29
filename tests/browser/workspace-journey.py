@@ -54,6 +54,17 @@ with sync_playwright() as playwright:
         record("workspace.browser.authorized-load", since)
 
         since = time.monotonic()
+        unnamed_buttons = owner.locator("button").evaluate_all(
+            """els => els.filter(el => !(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.textContent.trim() || el.getAttribute('title'))).length"""
+        )
+        unlabeled_fields = owner.locator("input:not([type=hidden]), select, textarea").evaluate_all(
+            """els => els.filter(el => !(el.labels && el.labels.length) && !el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby')).length"""
+        )
+        if unnamed_buttons or unlabeled_fields:
+            raise AssertionError(f"Accessible-name contract failed: buttons={unnamed_buttons}, fields={unlabeled_fields}")
+        record("workspace.browser.accessibility-basics", since)
+
+        since = time.monotonic()
         admin = panel.get_by_label("Workspace administration", exact=True)
         admin.get_by_label("Name", exact=True).fill("Engineering browser verified")
         admin.get_by_label("Locale", exact=True).fill("en-IN")
@@ -114,6 +125,15 @@ with sync_playwright() as playwright:
         owner.wait_for_url(re.compile(r"/editor/[a-f0-9-]+"))
         website_id = urlparse(owner.url).path.split("/")[-1]
         expect(owner.get_by_role("button", name="Save", exact=True)).to_be_enabled(timeout=30000)
+
+        since = time.monotonic()
+        skip_link = owner.locator('a[href="#forge-editor-root"]')
+        expect(skip_link).to_have_count(1)
+        skip_link.focus()
+        expect(skip_link).to_be_focused()
+        skip_link.press("Enter")
+        expect(owner.locator("#forge-editor-root")).to_be_focused()
+        record("document.browser.skip-link", since)
         with owner.expect_response(lambda response: response.request.method == "PUT" and
                 response.url.endswith("/api/websites/" + website_id)) as saving:
             owner.get_by_role("button", name="Save", exact=True).click()

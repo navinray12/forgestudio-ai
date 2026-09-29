@@ -6,7 +6,7 @@ import { requireBrowserOrigin } from "../../../middlewares/browser-origin.js";
 import { requireAuth } from "../../../middlewares/auth.middleware.js";
 import { authenticateSession } from "../../../services/session-authentication.js";
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS, AUTH_CHALLENGE_COOKIE, AUTH_CHALLENGE_OPTIONS,
-  browserOrigin, localAuthenticationEnabled } from "../../../config/auth.js";
+  browserOrigin, localAuthenticationEnabled, PLATFORM_AUTH_COOKIE_NAME } from "../../../config/auth.js";
 import { AppError } from "../../../utils/app-error.js";
 
 export function createOidcRouter(identity: OidcAuthentication | null = oidcAuthentication) {
@@ -32,6 +32,17 @@ export function createOidcRouter(identity: OidcAuthentication | null = oidcAuthe
     res.cookie(AUTH_CHALLENGE_COOKIE, result.secret, AUTH_CHALLENGE_OPTIONS);
     res.json({ success: true, data: { authorizationUrl: result.url } });
   });
+  router.post("/oidc/platform/start", requireBrowserOrigin, async (req, res, next) => {
+    try {
+      if (!identity) throw new AppError("Managed sign-in is not configured.", 503, "IDENTITY_PROVIDER_UNAVAILABLE");
+      if (!req.is("application/json")) throw new AppError("A JSON request is required.", 415, "JSON_REQUIRED");
+      z.object({}).strict().parse(req.body);
+      await localAuthentication.rateLimit("oidc-platform-start-ip", req.ip ?? "unknown", 30);
+      const result = await identity.begin(undefined, "PLATFORM");
+      res.cookie(AUTH_CHALLENGE_COOKIE, result.secret, AUTH_CHALLENGE_OPTIONS);
+      res.json({ success: true, data: { authorizationUrl: result.url } });
+    } catch (error) { next(error); }
+  });
   router.get("/oidc/callback", async (req, res, next) => {
     res.setHeader("Cache-Control", "no-store"); res.setHeader("Referrer-Policy", "no-referrer");
     res.clearCookie(AUTH_CHALLENGE_COOKIE, AUTH_CHALLENGE_OPTIONS);
@@ -42,8 +53,13 @@ export function createOidcRouter(identity: OidcAuthentication | null = oidcAuthe
       callback.search = new URL(req.originalUrl, "http://callback.invalid").search;
       const current = await authenticateSession(req.cookies?.[AUTH_COOKIE_NAME]);
       const result = await identity.finish(req.cookies?.[AUTH_CHALLENGE_COOKIE], callback, current?.id);
-      res.cookie(AUTH_COOKIE_NAME, result.token, AUTH_COOKIE_OPTIONS);
-      res.redirect(303, `${browserOrigin()}/dashboard`);
+      if (result.audience === "PLATFORM") {
+        res.cookie(PLATFORM_AUTH_COOKIE_NAME, result.token, AUTH_COOKIE_OPTIONS);
+        res.redirect(303, `${browserOrigin()}/platform-control`);
+      } else {
+        res.cookie(AUTH_COOKIE_NAME, result.token, AUTH_COOKIE_OPTIONS);
+        res.redirect(303, `${browserOrigin()}/dashboard`);
+      }
     } catch (error) { next(error); }
   });
   return router;

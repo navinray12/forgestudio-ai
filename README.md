@@ -1,5 +1,74 @@
 # ForgeStudio
 
+## Start on Windows
+
+Run `start.bat` (or `strt.bat`). It uses Docker Compose when Docker Desktop is running; otherwise
+it starts the API, worker, and Vite frontend locally after validating Node, env
+files, dependencies, and `DATABASE_URL`. Native mode requires a reachable PostgreSQL
+server on loopback. Native mode writes development-only sign-in codes to
+`%TEMP%\forge-local-otp.json`; no SMTP account is required. Configure OpenAI only in `backend/.env`:
+`OPENAI_API_KEY`, `AI_MODEL_PLANNER`, `AI_MODEL_EDITOR`, and `AI_MODEL_COPY`.
+The browser never receives provider credentials.
+The dashboard's AI website draft action proposes up to eight editable pages and
+ten sections per page. A draft is saved as a changeset; review its page summary
+and click **Apply draft** before the website document changes. The generated
+widgets are limited to container, heading, text, and button. A blog page is
+only a page layout: AI does not yet create CMS collections, entries, assets, or
+publish the site. After applying, open the visual editor to make manual edits.
+
+For Compose, set `AI_SITE_PROVIDER=openai` and `OPENAI_API_KEY` in the root
+`.env`, or `AI_SITE_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`. Native mode
+uses `backend/.env`. `AI_MODEL_PLANNER` is an optional provider-specific model
+override; leave it blank to use the adapter default. Secrets stay server-side
+and the UI cannot change them. Do not put keys in `frontend/.env` or a browser
+request. No live AI generation is available without a configured provider key.
+The app uses the OpenAI Responses API or Anthropic Messages API and validates
+their structured output before constructing editor elements. Provider errors
+are intentionally not returned to the browser. Prompt retry requires
+`AI_PROMPT_ENCRYPTION_KEY` (base64-encoded 32-byte key); without it prompts are
+not retained. Production qualification still requires live provider tests,
+CMS-generation support, end-to-end publishing verification, and broader
+security/load testing.
+Latest local qualification: backend and frontend production builds passed,
+six focused AI blueprint/provider tests passed, and `docker compose config
+--quiet` passed. A subsequent `docker compose up -d --build api frontend`
+stalled while rebuilding on the local Docker Desktop host; HTTP health probes
+timed out, so the rebuilt Compose runtime and live-provider generation are
+**not verified**. Restart Docker Desktop and rerun the Compose build and
+`/api/v1/health` plus `/api/ready` probes before relying on this stack.
+
+Use the explicit IPv4 address above: another local development server may own
+`localhost` on IPv6 while Docker owns the IPv4 port. Compose binds API and
+frontend to loopback only; its nginx frontend supports direct `/login` and
+other client-side routes.
+
+### Disposable local Agency test account
+
+After the Docker stack is up, run these commands once in PowerShell:
+
+```powershell
+docker compose run --rm migrate npm run db:seed
+docker compose run --rm -e FORGE_DISPOSABLE_TEST_DB=1 -e FORGE_AUTH_MODE=local -e NODE_ENV=development migrate npm run db:provision-local-test
+```
+
+The second command prints a randomly generated password once. Sign in at
+`http://127.0.0.1:5173/login` as `agency-tester@example.test`; after entering
+the password, obtain the one-time code with:
+
+```powershell
+docker compose exec -T api cat /tmp/forge-local-otp.json
+```
+
+This is a **local, disposable fixture**, not a paid subscription or verified
+provider entitlement. The Agency plan and organization entitlement expire after
+30 days; the script refuses to overwrite an existing account. The local code
+file is never exposed by HTTP or logged. Production mode forbids local code
+delivery and local password login. Do not use this account or Compose's default
+database credentials on any public deployment.
+
+For a fresh test database only, `docker compose down -v` removes all local
+PostgreSQL data; then run `docker compose up -d --build` and provision again.
+
 > Multi-tenant SaaS visual website builder with workspace administration, managed identity, version-aware editing, realtime presence, dynamic content, WordPress/SFTP publishing, and production-hardening pipelines.
 
 ## Status

@@ -34,12 +34,8 @@ export function errorMiddleware(error: unknown, _req: Request, res: Response, ne
       status = 400; code = "INVALID_JSON"; message = "The request body is not valid JSON";
     }
   }
-  // Do not stringify the original Error in production: ORM errors can contain parameters and
+  // Do not stringify the original Error: ORM errors can contain parameters and
   // provider errors can contain tokens. Correlation enables safe operator triage.
-  if (process.env.NODE_ENV !== "production") {
-    const safeMsg = error instanceof Error ? error.message : typeof error === "object" && error !== null ? JSON.stringify(error) : String(error);
-    console.error(`[BACKEND-DEV-DIAGNOSTIC] [${requestId}] ${code} (${status}): ${safeMsg}`);
-  }
   if (status >= 500) console.error(JSON.stringify({ event: "request.failed", requestId, code, status }));
   res.setHeader("X-Request-Id", requestId);
   res.setHeader("Cache-Control", "no-store");

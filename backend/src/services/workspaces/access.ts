@@ -18,11 +18,16 @@ export function memberRole(value: unknown): "ADMIN" | "MEMBER" {
 }
 
 export async function requireActiveActor(tx: WorkspaceTransaction, actorId: string) {
+  // Set the actor before touching tenant-owned relations. The value is transaction
+  // local, so it cannot leak through the PostgreSQL pool.
+  await tx.$queryRaw`SELECT set_config('app.actor_id', ${actorId}, true)`;
   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { id: true, status: true } });
   if (!actor || actor.status !== "ACTIVE") throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
 }
 
 export async function requireOrganization(tx: WorkspaceTransaction, organizationId: string, actorId: string) {
+  await tx.$queryRaw`SELECT set_config('app.actor_id', ${actorId}, true)`;
+  await tx.$queryRaw`SELECT set_config('app.tenant_id', ${organizationId}, true)`;
   const organization = await tx.organization.findUnique({ where: { id: organizationId } });
   const membership = await tx.organizationMember.findUnique({
     where: { organizationId_userId: { organizationId, userId: actorId } },
@@ -44,6 +49,8 @@ export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: st
   if (!workspace.organizationId) {
     throw new AppError("Legacy workspace ownership requires migration", 409, "WORKSPACE_MIGRATION_REQUIRED");
   }
+  await tx.$queryRaw`SELECT set_config('app.tenant_id', ${workspace.organizationId}, true)`;
+  await tx.$queryRaw`SELECT set_config('app.workspace_id', ${workspace.id}, true)`;
   const organizationContext = await requireOrganization(tx, workspace.organizationId, actorId);
   if (manage && !managerRoles.has(membership.role)) throw new AppError("Workspace management is not permitted", 403, "FORBIDDEN");
   return { workspace, membership, organization: organizationContext.organization, organizationMembership: organizationContext.membership };

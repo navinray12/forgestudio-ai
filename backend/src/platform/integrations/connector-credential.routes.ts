@@ -11,7 +11,7 @@ router.post("/",async(req,res,next)=>{
     const credential=await registerConnectorCredential({
       organizationId:org(req),workspaceId:req.body?.workspaceId||null,websiteId:req.body?.websiteId||null,
       actorId:res.locals.user.id,provider:req.body?.provider,secretRef:req.body?.secretRef,
-      scopes:Array.isArray(req.body?.scopes)?req.body.scopes.map(String):[],endpoint:req.body?.endpoint||null,
+      scopes:Array.isArray(req.body?.scopes)?req.body.scopes.map(String):[],endpoint:req.body?.endpoint||null,metadata:req.body?.metadata&&typeof req.body.metadata==="object"?req.body.metadata:{},
     });
     res.status(201).json({success:true,credential});
   }catch(error){next(error);}

@@ -24,13 +24,9 @@ export async function getAllActivePlans() {
 /** Read-only: missing records and unavailable storage are not an active plan. */
 export async function getUserSubscription(userId: string): Promise<SubscriptionWithPlan> {
   requireUserId(userId);
-  let subscription = await prisma.userSubscription.findUnique({ where: { userId }, include: { plan: true } });
+  const subscription = await prisma.userSubscription.findUnique({ where: { userId }, include: { plan: true } });
   if (!subscription) {
-    try {
-      subscription = await assignDefaultFreePlan(userId);
-    } catch {
-      throw new AppError("Subscription provisioning is incomplete", 503, "SUBSCRIPTION_NOT_PROVISIONED");
-    }
+    throw new AppError("Subscription provisioning is incomplete", 503, "SUBSCRIPTION_NOT_PROVISIONED");
   }
   return subscription;
 }
@@ -43,24 +39,9 @@ export async function assignDefaultFreePlan(userId: string): Promise<Subscriptio
       return await prisma.$transaction(async (tx) => {
         const existing = await tx.userSubscription.findUnique({ where: { userId }, include: { plan: true } });
         if (existing) return existing;
-        let plan = await tx.subscriptionPlan.findUnique({ where: { slug: "free" } });
+        const plan = await tx.subscriptionPlan.findUnique({ where: { slug: "free" } });
         if (!plan || !plan.isActive || plan.price !== 0) {
-          plan = await tx.subscriptionPlan.upsert({
-            where: { slug: "free" },
-            update: { isActive: true, price: 0 },
-            create: {
-              name: "Free",
-              slug: "free",
-              price: 0,
-              currency: "INR",
-              billingInterval: "monthly",
-              websiteLimit: 5,
-              storageLimitMb: 100,
-              aiCreditLimit: 10,
-              features: ["Free Website", "Basic widgets", "Preview"],
-              isActive: true,
-            },
-          });
+          throw new AppError("The free plan is not configured", 503, "FREE_PLAN_UNAVAILABLE");
         }
         const subscription = await tx.userSubscription.create({
           data: { userId, planId: plan.id, status: "ACTIVE", currentPeriodStart: new Date(), currentPeriodEnd: null },
@@ -81,6 +62,9 @@ export async function assignDefaultFreePlan(userId: string): Promise<Subscriptio
   }
 }
 
+/** Compatibility endpoint. Paid changes require an implemented, verified billing
+ * adapter; there is deliberately no client flag or test-mode bypass.
+ */
 export async function changeUserPlan(userId: string, planSlug: string): Promise<PlanSelectionResult> {
   requireUserId(userId);
   if (typeof planSlug !== "string" || !/^[a-z0-9-]{1,64}$/i.test(planSlug)) {
@@ -88,67 +72,14 @@ export async function changeUserPlan(userId: string, planSlug: string): Promise<
   }
   const plan = await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug.toLowerCase() } });
   if (!plan || !plan.isActive) throw new AppError("Invalid or inactive subscription plan", 400, "INVALID_PLAN");
-
-  // In production WITH an active Stripe secret configured, enforce verified provider checkout.
-  // In development OR when Stripe is not configured, permit direct plan selection.
-  const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-  if (process.env.NODE_ENV === "production" && isStripeConfigured) {
-    if (plan.slug !== "free" || plan.price !== 0) {
-      throw new AppError("Paid plan changes require verified checkout", 402, "PAYMENT_VERIFICATION_REQUIRED");
-    }
+  if (plan.slug !== "free" || plan.price !== 0) {
+    throw new AppError("Paid plan changes require verified checkout", 402, "PAYMENT_VERIFICATION_REQUIRED");
   }
-
-  const now = new Date();
-  const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-  const subscription = await prisma.userSubscription.upsert({
-    where: { userId },
-    create: {
-      userId,
-      planId: plan.id,
-      status: "ACTIVE",
-      currentPeriodStart: now,
-      currentPeriodEnd: periodEnd,
-    },
-    update: {
-      planId: plan.id,
-      status: "ACTIVE",
-      currentPeriodStart: now,
-      currentPeriodEnd: periodEnd,
-    },
-    include: { plan: true },
-  });
-
-  if (plan.price > 0) {
-    try {
-      await prisma.billingInvoice.create({
-        data: {
-          userId,
-          planId: plan.id,
-          amount: plan.price,
-          currency: plan.currency || "INR",
-          status: "PAID",
-          invoiceNumber,
-          billingPeriodStart: now,
-          billingPeriodEnd: periodEnd,
-        },
-      });
-    } catch {}
+  const subscription = await assignDefaultFreePlan(userId);
+  if (subscription.plan.slug !== "free" || subscription.plan.price !== 0) {
+    throw new AppError("Manage the existing subscription through its billing provider", 409, "BILLING_PROVIDER_REQUIRED");
   }
-
-  try {
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: "PLAN_CHANGED",
-        targetResource: `subscription:${subscription.id}`,
-        details: { planId: plan.id, planSlug: plan.slug, price: plan.price },
-      },
-    });
-  } catch {}
-
-  return { ...subscription, invoiceNumber: plan.price > 0 ? invoiceNumber : undefined };
+  return subscription;
 }
 
 export async function cancelSubscription(userId: string) {

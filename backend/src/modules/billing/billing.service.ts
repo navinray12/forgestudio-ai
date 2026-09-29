@@ -42,13 +42,28 @@ function checkoutRequestHash(planKey: string, successUrl: string, cancelUrl: str
   return createHash("sha256").update(JSON.stringify({ planKey, successUrl, cancelUrl })).digest("hex");
 }
 
+export async function listOrganizationPlans(organizationId: string, actorId: string) {
+  await assertBillingManager(organizationId, actorId);
+  let catalog: Record<string, any>;
+  try { catalog = JSON.parse(process.env.FORGE_PLAN_CATALOG_JSON || "{}"); }
+  catch { throw new AppError("Plan catalogue is invalid", 503, "BILLING_CONFIGURATION_INVALID"); }
+  return Object.entries(catalog).flatMap(([key, value]) => {
+    if (!value || typeof value !== "object") return [];
+    const seatLimit = Number(value.seatLimit ?? 1);
+    const quotas = typeof value.quotas === "object" && value.quotas ? value.quotas : {};
+    return [{ key, name: String(value.name || key), description: String(value.description || ""), seatLimit, quotas }];
+  });
+}
+
 export async function getOrganizationBilling(organizationId: string, actorId: string) {
   await assertBillingManager(organizationId, actorId);
   return withTenantTransaction({ organizationId, actorId }, async (client) => {
-    const account = await client.query(`SELECT id,provider,status,"providerCustomerId","updatedAt" FROM organization_billing_accounts WHERE "organizationId"=$1::uuid`, [organizationId]);
-    const subscription = await client.query(`SELECT id,"planKey",status,"seatLimit",quotas,"currentPeriodStart","currentPeriodEnd","updatedAt" FROM organization_subscriptions_v2 WHERE "organizationId"=$1::uuid`, [organizationId]);
-    const seats = await client.query(`SELECT count(*)::int AS count FROM organization_seat_assignments WHERE "organizationId"=$1::uuid AND status='ACTIVE'`, [organizationId]);
-    const reservations = await client.query(`SELECT resource,coalesce(sum(amount),0)::text AS amount FROM usage_reservations WHERE "organizationId"=$1::uuid AND state IN ('RESERVED','CONSUMED') GROUP BY resource`, [organizationId]);
+    const [account, subscription, seats, reservations] = await Promise.all([
+      client.query(`SELECT id,provider,status,"providerCustomerId","updatedAt" FROM organization_billing_accounts WHERE "organizationId"=$1::uuid`, [organizationId]),
+      client.query(`SELECT id,"planKey",status,"seatLimit",quotas,"currentPeriodStart","currentPeriodEnd","updatedAt" FROM organization_subscriptions_v2 WHERE "organizationId"=$1::uuid`, [organizationId]),
+      client.query(`SELECT count(*)::int AS count FROM organization_seat_assignments WHERE "organizationId"=$1::uuid AND status='ACTIVE'`, [organizationId]),
+      client.query(`SELECT resource,coalesce(sum(amount),0)::text AS amount FROM usage_reservations WHERE "organizationId"=$1::uuid AND state IN ('RESERVED','CONSUMED') GROUP BY resource`, [organizationId]),
+    ]);
     return {
       account: account.rows[0] || null,
       subscription: subscription.rows[0] || null,

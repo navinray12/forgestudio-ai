@@ -58,6 +58,8 @@ model User {
   licenses                License[]
   whiteLabelConfig        WhiteLabelConfig?
   invoices                BillingInvoice[]
+  aiExecutions            AiExecution[]
+  aiChangesets            AiChangeset[]
 
 
   @@index([status])
@@ -105,6 +107,8 @@ model Website {
   emailLogs           EmailDeliveryLog[]
   performanceMetrics  SitePerformanceMetric[]
   optimizedMedia      MediaOptimizationAsset[]
+  aiExecutions        AiExecution[]
+  aiChangesets        AiChangeset[]
 
   @@index([userId], map: "idx_websites_user_id")
   @@index([organizationId])
@@ -777,10 +781,62 @@ model Workspace {
   owner          User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   members        WorkspaceMember[]
   websites       Website[]
+  aiExecutions   AiExecution[]
+  aiChangesets   AiChangeset[]
 
   @@index([ownerId])
   @@index([organizationId])
   @@map("workspaces")
+}
+
+model AiExecution {
+  id String @id @default(uuid()) @db.Uuid
+  websiteId String @db.Uuid
+  workspaceId String? @db.Uuid
+  organizationId String? @db.Uuid
+  actorId String @db.Uuid
+  operation String @db.VarChar(50)
+  promptVersion String @default("site-generation-v1") @db.VarChar(100)
+  provider String @db.VarChar(50)
+  model String @db.VarChar(150)
+  status String @default("PENDING") @db.VarChar(30)
+  inputSummary Json @default("{}")
+  promptCiphertext String? @db.Text
+  promptExpiresAt DateTime? @db.Timestamptz(6)
+  outputSummary Json?
+  errorCode String? @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  completedAt DateTime? @db.Timestamptz(6)
+  website Website @relation(fields:[websiteId], references:[id], onDelete:Cascade)
+  workspace Workspace? @relation(fields:[workspaceId], references:[id], onDelete:SetNull)
+  actor User @relation(fields:[actorId], references:[id], onDelete:Restrict)
+  changeset AiChangeset?
+  @@index([websiteId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("ai_executions")
+}
+
+model AiChangeset {
+  id String @id @default(uuid()) @db.Uuid
+  executionId String @unique @db.Uuid
+  websiteId String @db.Uuid
+  workspaceId String? @db.Uuid
+  organizationId String? @db.Uuid
+  actorId String @db.Uuid
+  status String @default("PENDING_REVIEW") @db.VarChar(30)
+  expectedDocumentVersion Int
+  proposedDocument Json
+  summary Json @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  approvedAt DateTime? @db.Timestamptz(6)
+  cancelledAt DateTime? @db.Timestamptz(6)
+  appliedAt DateTime? @db.Timestamptz(6)
+  website Website @relation(fields:[websiteId], references:[id], onDelete:Cascade)
+  workspace Workspace? @relation(fields:[workspaceId], references:[id], onDelete:SetNull)
+  actor User @relation(fields:[actorId], references:[id], onDelete:Restrict)
+  execution AiExecution @relation(fields:[executionId], references:[id], onDelete:Cascade)
+  @@index([websiteId, status, createdAt])
+  @@map("ai_changesets")
 }
 
 model Organization {
@@ -890,21 +946,26 @@ model PublishApprovalRequest {
 }
 
 model BackgroundJob {
-  id          String    @id @default(uuid()) @db.Uuid
-  type        String    @db.VarChar(100)
-  payload     Json      @default("{}")
-  status      String    @default("QUEUED") @db.VarChar(50) // QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
-  lastError   String?   @db.VarChar(2000)
-  runAt       DateTime  @default(now()) @db.Timestamptz(6)
-  startedAt   DateTime? @db.Timestamptz(6)
-  completedAt DateTime? @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String?   @db.Uuid
+  type           String    @db.VarChar(100)
+  payload        Json      @default("{}")
+  status         String    @default("QUEUED") @db.VarChar(50) // QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3)
+  idempotencyKey String?   @db.VarChar(128)
+  lastError      String?   @db.VarChar(2000)
+  runAt          DateTime  @default(now()) @db.Timestamptz(6)
+  lockedUntil    DateTime? @db.Timestamptz(6)
+  lockToken      String?   @db.Uuid
+  startedAt      DateTime? @db.Timestamptz(6)
+  completedAt    DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@index([status, runAt])
   @@index([type])
+  // The partial unique organization/type/idempotency index is migration-owned SQL.
   @@map("background_jobs")
 }
 

@@ -75,7 +75,7 @@ class PostgresIdentityTransaction implements IdentityTransaction {
     return this.tx.user.update({ where: { id: userId }, data: { emailVerified: true, lastLoginAt: new Date() } });
   }
   async createSession(session: NewIdentitySession) {
-    await this.tx.session.create({ data: { ...session, audience: "TENANT" } });
+    await this.tx.session.create({ data: { ...session, audience: session.audience ?? "TENANT" } });
   }
   async audit(userId: string, action: string, resource: string, details: Record<string, string | number | boolean> = {}) {
     await this.tx.auditLog.create({ data: { userId, action, targetResource: resource, details } });

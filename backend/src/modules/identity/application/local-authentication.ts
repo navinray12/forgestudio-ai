@@ -94,13 +94,6 @@ export class LocalAuthentication {
       await tx.updateChallenge(row.id, { status: "DELIVERING", otpHash: codeHash, lastSentAt: this.now() });
       return user.email;
     });
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`\n========================================`);
-      console.log(`🔑 [DEV OTP] Purpose: ${purpose}`);
-      console.log(`📧 [DEV OTP] Email:   ${email}`);
-      console.log(`⚡ [DEV OTP] CODE:    ${code}`);
-      console.log(`========================================\n`);
-    }
     try {
       await this.delivery.sendCode({ email, code, purpose });
     } catch {

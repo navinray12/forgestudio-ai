@@ -1,4 +1,5 @@
-import { prisma } from "../../config/prisma.js";
+import crypto from "crypto";
+import { pgPool, prisma } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
 
 export type JobType =
@@ -20,8 +21,12 @@ export type JobHandler = (payload: any, job: any) => Promise<any>;
 // Registered in-process handlers
 const handlers: Map<string, JobHandler> = new Map();
 
-// In-memory fallback if database table is initializing
+// In-memory queue is an explicit local/test development aid only. Production
+// accepted work must be durable before acknowledgement.
 const memoryQueue: any[] = [];
+function memoryFallbackAllowed(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.FORGE_ALLOW_MEMORY_JOB_FALLBACK === "1";
+}
 
 let workerInterval: any = null;
 
@@ -54,7 +59,9 @@ export async function enqueueJob(
     });
     return job;
   } catch (err) {
-    // Fallback to in-memory queue
+    if (!memoryFallbackAllowed()) {
+      throw new AppError("Durable job storage is unavailable; work was not accepted", 503, "JOB_STORAGE_UNAVAILABLE");
+    }
     const memJob = {
       id: `mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       type,
@@ -82,7 +89,7 @@ export async function getJobById(jobId: string) {
     if (job) return job;
   } catch {}
 
-  return memoryQueue.find((j) => j.id === jobId) || null;
+  return memoryFallbackAllowed() ? (memoryQueue.find((j) => j.id === jobId) || null) : null;
 }
 
 export async function listJobs(filters: { type?: string; status?: string; limit?: number } = {}) {
@@ -101,6 +108,7 @@ export async function listJobs(filters: { type?: string; status?: string; limit?
     if (dbJobs.length > 0) return dbJobs;
   } catch {}
 
+  if (!memoryFallbackAllowed()) return [];
   let memFiltered = memoryQueue;
   if (filters.type) memFiltered = memFiltered.filter((j) => j.type === filters.type);
   if (filters.status) memFiltered = memFiltered.filter((j) => j.status === filters.status);
@@ -146,8 +154,8 @@ export async function cancelJob(
     if (err instanceof AppError) throw err;
   }
 
-  // 2. Try Memory Queue fallback
-  const memJob = memoryQueue.find((j) => j.id === jobId);
+  // 2. Local/test memory fallback only.
+  const memJob = memoryFallbackAllowed() ? memoryQueue.find((j) => j.id === jobId) : undefined;
   if (memJob) {
     if (memJob.status === "CANCELLED") {
       return { success: true, job: memJob, alreadyCancelled: true };
@@ -181,11 +189,13 @@ export async function retryJob(jobId: string) {
         runAt: now,
         completedAt: null,
         updatedAt: now,
-      },
+        lockedUntil: null,
+        lockToken: null,
+      } as any,
     });
     return job;
   } catch {
-    const memJob = memoryQueue.find((j) => j.id === jobId);
+    const memJob = memoryFallbackAllowed() ? memoryQueue.find((j) => j.id === jobId) : undefined;
     if (memJob) {
       memJob.status = "QUEUED";
       memJob.attempts = 0;
@@ -227,32 +237,27 @@ export async function processNextJob(
   // Try DB first
   let job: any = null;
   try {
-    const where: any = {
-      status: "QUEUED",
-      runAt: { lte: now },
-    };
-    if (filter?.id) where.id = filter.id;
-    if (filter?.type) where.type = filter.type;
+    const clauses = ["status='QUEUED'", "\"runAt\" <= now()", "(\"lockedUntil\" IS NULL OR \"lockedUntil\" < now())"];
+    const values: unknown[] = [];
+    if (filter?.id) { values.push(filter.id); clauses.push(`id=${values.length}::uuid`); }
+    if (filter?.type) { values.push(filter.type); clauses.push(`type=${values.length}`); }
+    const token = crypto.randomUUID(); values.push(token);
+    const tokenIndex = values.length;
+    const query = `WITH picked AS (
+      SELECT id FROM background_jobs WHERE ${clauses.join(" AND ")}
+      ORDER BY "runAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1
+    )
+    UPDATE background_jobs j SET status='RUNNING',"startedAt"=now(),
+      "lockedUntil"=now()+interval '30 seconds',"lockToken"=${tokenIndex}::uuid
+    FROM picked WHERE j.id=picked.id RETURNING j.*`;
+    const claimed = await pgPool.query(query, values);
+    job = claimed.rows[0] ?? null;
+  } catch (error) {
+    if (!memoryFallbackAllowed()) throw new AppError("Durable job claim failed", 503, "JOB_STORAGE_UNAVAILABLE");
+  }
 
-    const candidate = await (prisma as any).backgroundJob.findFirst({
-      where,
-      orderBy: { runAt: "asc" },
-    });
-
-    if (candidate) {
-      // Mark RUNNING
-      job = await (prisma as any).backgroundJob.update({
-        where: { id: candidate.id },
-        data: {
-          status: "RUNNING",
-          startedAt: new Date(),
-        },
-      });
-    }
-  } catch {}
-
-  // Try Memory Queue fallback if no DB job
-  if (!job) {
+  // Local/test memory fallback if explicitly enabled.
+  if (!job && memoryFallbackAllowed()) {
     const memIdx = memoryQueue.findIndex(
       (j) =>
         j.status === "QUEUED" &&
@@ -308,7 +313,9 @@ async function markJobCompleted(job: any, _result?: any) {
         status: "COMPLETED",
         completedAt: now,
         updatedAt: now,
-      },
+        lockedUntil: null,
+        lockToken: null,
+      } as any,
     });
   } catch {
     job.status = "COMPLETED";
@@ -327,6 +334,14 @@ async function markJobFailed(job: any, errorMsg: string) {
   const nextRunAt = new Date(Date.now() + backoffMs);
 
   const nextStatus = isFinalFailure ? "FAILED" : "QUEUED";
+  if (isFinalFailure) {
+    try {
+      await pgPool.query(
+        'INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason) VALUES($1::uuid,$2::uuid,$3,$4::jsonb,$5,$6)',
+        [job.organizationId ?? null, job.id, job.type, JSON.stringify(job.payload ?? {}), nextAttempts, errorMsg.slice(0,2000)],
+      );
+    } catch { /* migration may not yet be applied in legacy/dev databases */ }
+  }
 
   try {
     await (prisma as any).backgroundJob.update({

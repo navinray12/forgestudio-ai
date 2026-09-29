@@ -2,7 +2,7 @@
 import PopupManagerModal from "./components/PopupManagerModal";
 import IconPickerModal from "./components/IconPickerModal";
 import PopupRuntimePreview from "./components/PopupRuntimePreview";
-import DeveloperModal, { type DeveloperModalMode } from "./components/DeveloperModal";
+import type { DeveloperModalMode } from "./components/DeveloperModal";
 import { PageManagerModal } from "./components/PageManagerModal";
 import { PublishModal } from "./components/PublishModal";
 import { SupportCredentialsModal } from "./components/SupportCredentialsModal";
@@ -29,7 +29,7 @@ import { ExperimentManagerModal } from "./components/experiments/ExperimentManag
 import { useCanvasPresence } from "../../features/collaboration/hooks/useCanvasPresence";
 import { WooCommerceProvider } from "../../context/WooCommerceContext";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
@@ -325,6 +325,10 @@ import {
   createDefault404Elements,
   createDefaultSearchResultsElements,
 } from "./navigation/navigationDefaults";
+
+// Monaco includes a substantial language runtime; load it only when a developer
+// opens code editing rather than with every editor session.
+const DeveloperModal = lazy(() => import("./components/DeveloperModal"));
 
 export default function WebsiteEditor() {
   const { websiteId } = useParams<{ websiteId: string }>();
@@ -20196,10 +20200,10 @@ export default function WebsiteEditor() {
       )}
 
       {/* Developer Modal (F-102 - F-109) */}
-      <DeveloperModal
+      {devModalMode && <Suspense fallback={null}><DeveloperModal
         isOpen={!!devModalMode}
         onClose={() => setDevModalMode(null)}
-        mode={devModalMode!}
+        mode={devModalMode}
         targetElement={selectedElement || elements[0]}
         initialValue={
           devModalMode === "element-css" ? selectedElement?.customCss :
@@ -20228,7 +20232,7 @@ export default function WebsiteEditor() {
             }
           }
         }}
-      />
+      /></Suspense>}
 
       {/* F-322 / F-334 Save as Template / Update Template Dialog Modal */}
       <SaveTemplateDialog

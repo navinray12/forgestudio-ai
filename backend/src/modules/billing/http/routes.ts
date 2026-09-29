@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../../../middlewares/auth.middleware.js";
-import { assignOrganizationSeat, getOrganizationBilling, reserveUsage, settleUsageReservation, startOrganizationCheckout } from "../billing.service.js";
+import { assignOrganizationSeat, getOrganizationBilling, listOrganizationPlans, reserveUsage, settleUsageReservation, startOrganizationCheckout } from "../billing.service.js";
 
 const router = Router({ mergeParams: true });
 router.use(requireAuth);
@@ -8,6 +8,12 @@ router.use(requireAuth);
 function organizationId(req: { params: Record<string, unknown> }) {
   return String(req.params.organizationId || "");
 }
+
+router.get("/plans", async (req, res, next) => {
+  try {
+    res.json({ success: true, plans: await listOrganizationPlans(organizationId(req), res.locals.user.id) });
+  } catch (error) { next(error); }
+});
 
 router.get("/", async (req, res, next) => {
   try {
