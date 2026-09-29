@@ -1,0 +1,70 @@
+name: Prepare reviewed dependency candidate
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/dependency-candidate.yml']
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Stage reviewed identity source in the disposable runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/maintenance/qualify-increment.mjs stage
+      - name: Resolve narrowly scoped security updates without install scripts
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dependency-candidate"
+          cp backend/package.json "$RUNNER_TEMP/dependency-candidate/package.before.json"
+          cp backend/package-lock.json "$RUNNER_TEMP/dependency-candidate/package-lock.before.json"
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const file='backend/package.json'; const p=JSON.parse(readFileSync(file));
+          p.overrides ??= {};
+          p.overrides['@prisma/config']={...(p.overrides['@prisma/config']??{}),'deepmerge-ts':'8.0.2'};
+          p.overrides.prisma={...(p.overrides.prisma??{}),mysql2:'3.24.4'};
+          writeFileSync(file,JSON.stringify(p,null,2)+'\n');
+          JS
+          npm install --prefix backend --save-exact --package-lock-only --ignore-scripts nodemailer@9
+          npm update --prefix backend --package-lock-only --ignore-scripts qs
+          cp backend/package.json backend/package-lock.json "$RUNNER_TEMP/dependency-candidate/"
+          npm audit --prefix backend --json > "$RUNNER_TEMP/dependency-candidate/backend-audit.json" || test "$?" = 1
+          git diff -- backend/package.json backend/package-lock.json > "$RUNNER_TEMP/dependency-candidate/dependency.diff"
+      - name: Export candidate blobs only, never commit or update a branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const files=[];
+          for (const path of ['backend/package.json','backend/package-lock.json']) {
+            const bytes=readFileSync(path);
+            const expected=createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+            const r=await fetch('https://api.github.com/repos/ooarchitect92/forge/git/blobs',{
+              method:'POST',signal:AbortSignal.timeout(30000),
+              headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+              body:JSON.stringify({encoding:'base64',content:bytes.toString('base64')})});
+            if(!r.ok) throw Error(`Candidate blob export rejected: ${r.status}`);
+            const result=await r.json(); if(result.sha!==expected)throw Error('Candidate blob hash mismatch');
+            files.push({path,sha:expected});
+          }
+          writeFileSync(process.env.RUNNER_TEMP+'/dependency-candidate/blob-map.json',JSON.stringify({sourceCommit:process.env.GITHUB_SHA,files},null,2)+'\n');
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dependency-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/dependency-candidate/
+          if-no-files-found: error
+          retention-days: 7

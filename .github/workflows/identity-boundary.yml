@@ -1,0 +1,148 @@
+name: Identity boundary qualification
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', 'tests/**', '.github/workflows/identity-boundary.yml']
+  pull_request:
+    paths: ['backend/**', 'frontend/**', 'tests/**', '.github/workflows/identity-boundary.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  identity-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_hardening
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_hardening
+      PGPASSWORD: disposable_fixture_only
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      FORGE_AUTH_MODE: local
+      NODE_ENV: test
+      FRONTEND_URL: http://localhost:5173
+      PORT: '5000'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install locked dependencies and build
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm run build --prefix backend 2>&1 | tee "$RUNNER_TEMP/backend-build.log"
+          npm run build --prefix frontend 2>&1 | tee "$RUNNER_TEMP/frontend-build.log"
+      - name: Source and module boundary checks
+        run: node --experimental-vm-modules --test tests/hardening/*.test.mjs 2>&1 | tee "$RUNNER_TEMP/source-unit.tap"
+      - name: Signed OIDC fixtures and real local TLS mail contracts
+        working-directory: backend
+        run: node --test dist/tests/oidc-adapter.test.js dist/tests/smtp-delivery.test.js 2>&1 | tee "$RUNNER_TEMP/identity-adapters.tap"
+      - name: Existing workspace and document PostgreSQL contracts
+        working-directory: backend
+        run: |
+          npx --no-install prisma db push
+          node --test dist/tests/workspace-integration.test.js 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
+      - name: Identity migration and negative HTTP contracts
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_identity
+        working-directory: backend
+        run: |
+          createdb -h 127.0.0.1 -U postgres forge_identity
+          npx --no-install prisma db push
+          node --test dist/tests/identity-security.test.js 2>&1 | tee "$RUNNER_TEMP/identity-security.tap"
+      - name: Actual WebSocket authorization and revocation
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_presence
+        working-directory: backend
+        run: |
+          createdb -h 127.0.0.1 -U postgres forge_presence
+          npx --no-install prisma db push
+          node --test dist/tests/presence-security.test.js 2>&1 | tee "$RUNNER_TEMP/presence-security.tap"
+      - name: Prepare browser runner
+        run: |
+          python3 -m venv "$RUNNER_TEMP/browser-venv"
+          "$RUNNER_TEMP/browser-venv/bin/pip" install playwright==1.57.0
+      - name: Existing compiled workspace and editor browser journey
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_browser
+          FORGE_BROWSER_FIXTURE_PATH: ${{ runner.temp }}/workspace-fixture.json
+          FORGE_BROWSER_REPORT_DIR: ${{ runner.temp }}/workspace-browser-report
+        run: |
+          createdb -h 127.0.0.1 -U postgres forge_browser
+          (cd backend && npx --no-install prisma db push && node dist/tests/fixtures/workspace-browser-fixture.js)
+          (cd backend && exec node dist/server.js) > "$RUNNER_TEMP/workspace-browser-api.log" 2>&1 &
+          api_pid=$!
+          (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then break; fi
+            sleep 1
+          done
+          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/workspace-journey.py
+      - name: Real identity browser journey with test-only private delivery sink
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_identity_browser
+          FORGE_IDENTITY_MAIL_SINK: ${{ runner.temp }}/private-identity-mail.json
+          FORGE_IDENTITY_BROWSER_REPORT: ${{ runner.temp }}/identity-browser-report
+        run: |
+          createdb -h 127.0.0.1 -U postgres forge_identity_browser
+          (cd backend && npx --no-install prisma db push)
+          (cd backend && exec node dist/tests/fixtures/identity-browser-server.js) > "$RUNNER_TEMP/identity-browser-api.log" 2>&1 &
+          api_pid=$!
+          (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true; rm -f "$FORGE_IDENTITY_MAIL_SINK"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then break; fi
+            sleep 1
+          done
+          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/identity-journey.py
+      - name: Retain evidence, never fixture credentials
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: identity-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/*build.log
+            ${{ runner.temp }}/*.tap
+            ${{ runner.temp }}/workspace-browser-report/
+            ${{ runner.temp }}/identity-browser-report/
+          if-no-files-found: error
+          retention-days: 7
+  dependency-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Audit both lockfiles; high findings block the gate
+        run: |
+          failed=0
+          npm audit --prefix backend --audit-level high --json > "$RUNNER_TEMP/backend-audit.json" || failed=1
+          npm audit --prefix frontend --audit-level high --json > "$RUNNER_TEMP/frontend-audit.json" || failed=1
+          exit "$failed"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: identity-dependency-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/*audit.json
+          if-no-files-found: error
+          retention-days: 7

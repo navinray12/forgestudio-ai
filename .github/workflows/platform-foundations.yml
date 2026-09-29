@@ -1,0 +1,45 @@
+name: Platform foundations qualification
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/platform/**'
+      - 'backend/src/modules/billing/**'
+      - 'backend/src/workers/platform-worker.ts'
+      - 'backend/src/tests/platform-foundations.test.ts'
+      - 'backend/prisma/migrations/20260929093000_platform_foundations/**'
+      - '.github/workflows/platform-foundations.yml'
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_platform
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_platform
+      PGPASSWORD: disposable_fixture_only
+      NODE_ENV: test
+      FRONTEND_URL: http://localhost:5173
+      FORGE_PLAN_CATALOG_JSON: '{"pro":{"seatLimit":3,"quotas":{"storage.bytes":1000}}}'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: '22.16.0' }
+      - run: npm ci --prefix backend
+      - run: npm run build --prefix backend
+      - name: Build disposable current schema
+        run: cd backend && npx --no-install prisma db push
+      - name: Apply additive platform foundation migration
+        run: psql -h 127.0.0.1 -U postgres -d forge_platform -v ON_ERROR_STOP=1 -f backend/prisma/migrations/20260929093000_platform_foundations/migration.sql
+      - name: Run platform contracts
+        run: cd backend && node --test dist/tests/platform-foundations.test.js

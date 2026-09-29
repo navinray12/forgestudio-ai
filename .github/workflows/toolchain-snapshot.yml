@@ -1,0 +1,40 @@
+name: Reproducible locked toolchain snapshot
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/toolchain-snapshot.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://build:unused@127.0.0.1:5432/build_only
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install only the committed graphs
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          (cd backend && npx --no-install prisma generate)
+      - name: Archive dependency bytes, never configuration or credentials
+        run: |
+          tar -czf "$RUNNER_TEMP/forge-locked-toolchains.tar.gz" backend/node_modules frontend/node_modules
+          sha256sum backend/package-lock.json frontend/package-lock.json > "$RUNNER_TEMP/lock-digests.txt"
+          node --version > "$RUNNER_TEMP/runtime-version.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: locked-toolchains-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/forge-locked-toolchains.tar.gz
+            ${{ runner.temp }}/lock-digests.txt
+            ${{ runner.temp }}/runtime-version.txt
+          retention-days: 1
+          compression-level: 0

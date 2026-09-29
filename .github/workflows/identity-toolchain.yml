@@ -1,0 +1,38 @@
+name: Identity toolchain preparation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/identity-toolchain.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.16.0
+      - name: Prepare dependency candidate without changing application source or refs
+        run: |
+          npm install --prefix backend --save-exact --package-lock-only --ignore-scripts openid-client@6.8.8
+          npm ci --prefix backend --ignore-scripts
+          tar -czf "$RUNNER_TEMP/identity-toolchain.tar.gz" backend/package.json backend/package-lock.json backend/node_modules/openid-client backend/node_modules/oauth4webapi backend/node_modules/jose
+          sha256sum "$RUNNER_TEMP/identity-toolchain.tar.gz" > "$RUNNER_TEMP/identity-toolchain.sha256"
+          npm audit --prefix backend --json > "$RUNNER_TEMP/identity-dependency-audit.json" || test "$?" = 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: identity-toolchain-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/identity-toolchain.tar.gz
+            ${{ runner.temp }}/identity-toolchain.sha256
+            ${{ runner.temp }}/identity-dependency-audit.json
+          retention-days: 2
+          if-no-files-found: error

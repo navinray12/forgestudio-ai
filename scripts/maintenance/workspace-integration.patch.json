@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "patches": [
+    {
+      "path": "backend/src/app.ts",
+      "baseBlob": "415f202d305c8df42f0afb94fa767f534c1014be",
+      "targetBlob": "60c84d86622bf423f648b1ab22088db6ce731ab5",
+      "changes": [
+        {
+          "old": "import apiV1Routes from \"./routes/api-v1.routes.js\";",
+          "new": "import apiV1Routes from \"./routes/api-v1.routes.js\";\nimport tenantWorkspaceRoutes from \"./routes/tenant-workspace.routes.js\";"
+        },
+        {
+          "old": "// Public API v1 Standardized Endpoints\napp.use(\"/api/v1\", apiV1Routes);",
+          "new": "// Workspace commands have their own validated scope and idempotency contract.\napp.use(\"/api/v1/tenant-workspaces\", tenantWorkspaceRoutes);\n\n// Public API v1 Standardized Endpoints\napp.use(\"/api/v1\", apiV1Routes);"
+        }
+      ]
+    },
+    {
+      "path": "backend/src/services/website.service.ts",
+      "baseBlob": "8537c1bf3b73415d13db3e04c21f5deb093f9e05",
+      "targetBlob": "bbecf0ed89556c53bccf6250b93b4e76e4aeed03",
+      "changes": [
+        {
+          "old": "import { checkWebsiteLimit } from \"./subscription.service.js\";",
+          "new": "import { getScopedWebsite, listScopedOwnedWebsites } from \"./websites/scoped-access.js\";\nimport { createPersonalWebsite } from \"./websites/create-personal-website.js\";"
+        },
+        {
+          "old": "// Auto-run initialization\ninitWebsiteTable();",
+          "new": "// Schema is provisioned by the migration process, never by importing this service."
+        },
+        {
+          "start": "export async function getUserWebsites(userId: string) {",
+          "end": "/**\n * Aggregated details for Managed Site View",
+          "new": "export async function getUserWebsites(userId: string): Promise<any[]> {\n  // Legacy response surface stays compatible while owned repository contracts migrate.\n  return listScopedOwnedWebsites(userId);\n}\n\n"
+        },
+        {
+          "start": "export async function getWebsiteById(websiteId: string, userId: string) {",
+          "end": "/**\n * Create a new website with subscription limit check",
+          "new": "export async function getWebsiteById(websiteId: string, userId: string): Promise<any> {\n  return getScopedWebsite(websiteId, userId);\n}\n\n"
+        },
+        {
+          "start": "export async function createWebsite(\n",
+          "end": "/**\n * Validates the canonical editorData structure",
+          "new": "export async function createWebsite(\n  userIdOrOptions: string | { userId: string; name: string; slug?: string; editorData?: any; templateId?: string },\n  nameArg?: string\n): Promise<any> {\n  const input = typeof userIdOrOptions === \"string\"\n    ? { userId: userIdOrOptions, name: nameArg || \"\" }\n    : userIdOrOptions;\n  if (input.editorData !== undefined) validateCanonicalEditorData(input.editorData);\n  return createPersonalWebsite(input);\n}\n\n"
+        }
+      ]
+    },
+    {
+      "path": "backend/prisma/schema.prisma",
+      "baseBlob": "5bded2a706f3798862f10290673d65297ef2e978",
+      "targetBlob": "958bf50cc37e8793aa8216134c1246d744f196a3",
+      "changes": [
+        {
+          "old": "  workspaces  Workspace[]\n  websites    Website[]",
+          "new": "  workspaces  Workspace[]\n  websites    Website[]\n  workspaceCommands WorkspaceCommandJournal[]\n  workspaceEvents WorkspaceOutbox[]"
+        },
+        {
+          "old": "model WorkspaceMember {",
+          "new": "\n// Durable command tables use forced RLS and additional SQL constraints in the\n// 20260928090000 migration. Never use db push against a production database.\nmodel WorkspaceCommandJournal {\n  organizationId String @db.Uuid\n  actorId String @db.Uuid\n  operation String @db.VarChar(100)\n  idempotencyKey String @db.VarChar(128)\n  requestHash String @db.Char(64)\n  result Json\n  createdAt DateTime @default(now()) @db.Timestamptz(6)\n  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction)\n  @@id([organizationId, actorId, operation, idempotencyKey])\n  @@index([createdAt], map: \"workspace_command_journal_created_idx\")\n  @@map(\"workspace_command_journal\")\n}\n\nmodel WorkspaceOutbox {\n  id String @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  organizationId String @db.Uuid\n  actorId String @db.Uuid\n  operation String @db.VarChar(100)\n  resourceId String @db.Uuid\n  schemaVersion Int @default(1)\n  createdAt DateTime @default(now()) @db.Timestamptz(6)\n  dispatchedAt DateTime? @db.Timestamptz(6)\n  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction)\n  // Pending partial index and schemaVersion check are migration-owned SQL.\n  @@map(\"workspace_outbox\")\n}\n\nmodel WorkspaceMember {"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/pages/dashboard/components/WorkspaceSwitcher.tsx",
+      "baseBlob": "436243d4da7cd607dffbd5fe0f8d45981ba463cc",
+      "targetBlob": "dea9a2593e9fc6d7a961b1e5c8e8661f7a0ea81e",
+      "changes": [
+        {
+          "replaceAll": true,
+          "new": "// Compatibility export: implementation belongs to the workspace feature.\nexport { WorkspaceSwitcher, default } from \"../../../features/workspaces/WorkspaceSwitcher\";\nexport type { WorkspaceItem } from \"../../../features/workspaces/WorkspaceSwitcher\";\n"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/pages/dashboard/UserDashboard.tsx",
+      "baseBlob": "3d75528b2e170440f6f0ea4276cde6af5a608fc1",
+      "targetBlob": "5653484cf5c17d7d54f2b0f5e45da1bf89f070c8",
+      "changes": [
+        {
+          "old": "import { WorkspaceSwitcher } from \"./components/WorkspaceSwitcher\";",
+          "new": "import { WorkspaceSwitcher } from \"./components/WorkspaceSwitcher\";\nimport { WorkspaceDashboardView } from \"../../features/workspaces/WorkspaceDashboardView\";"
+        },
+        { "old": "default: return <WebsitesTab />;", "new": "default: return renderWebsitesTab();" },
+        { "old": "function WebsitesTab() {", "new": "function renderWebsitesTab() {" },
+        {
+          "old": "onSelectWorkspace={setCurrentWorkspaceId}",
+          "new": "onSelectWorkspace={(id) => { setCurrentWorkspaceId(id); setCurrentTeamId(null); setSelectedSiteIds([]); setIsModalOpen(false); setIsImportKitOpen(false); }}"
+        },
+        {
+          "old": "onSelectTeam={setCurrentTeamId}",
+          "new": "onSelectTeam={(id) => { setCurrentTeamId(id); setCurrentWorkspaceId(null); setSelectedSiteIds([]); setIsModalOpen(false); setIsImportKitOpen(false); }}"
+        },
+        {
+          "old": "        {currentTeamId ? (\n          <TeamDashboardView",
+          "new": "        {currentWorkspaceId ? (\n          <WorkspaceDashboardView key={currentWorkspaceId} apiUrl={apiUrl} workspaceId={currentWorkspaceId} onOpenWebsite={(id) => navigate(`/editor/${id}`)} />\n        ) : currentTeamId ? (\n          <TeamDashboardView"
+        },
+        {
+          "old": "            <button\n              onClick={() => {\n                setError(\"\");",
+          "new": "            <button\n              disabled={Boolean(currentWorkspaceId)}\n              title={currentWorkspaceId ? \"Use Create in this workspace below\" : \"Create a personal website\"}\n              onClick={() => {\n                setError(\"\");"
+        },
+        {
+          "old": "              onClick={() => setIsImportKitOpen(true)}",
+          "new": "              disabled={Boolean(currentWorkspaceId)}\n              onClick={() => setIsImportKitOpen(true)}"
+        },
+        {
+          "old": "title=\"Import a Website Kit JSON file to create a new project\"",
+          "new": "title={currentWorkspaceId ? \"Workspace-scoped kit import is not yet available\" : \"Import a Website Kit JSON file to create a new project\"}"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/App.tsx",
+      "baseBlob": "e84b3723eac6fd7c035f44dc4f6d92e7ec408697",
+      "targetBlob": "fad9db10a668b5e200d535234d30e693e7b50b65",
+      "changes": [
+        {
+          "old": "const WebsiteEditor = lazy(() => import(\"./pages/editor/WebsiteEditor\"));",
+          "new": "const WebsiteEditor = lazy(() => import(\"./features/editor-access/EditorRoute\"));"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/pages/editor/WebsiteEditor.tsx",
+      "baseBlob": "d5cbbbddb18752cf3a2359b13d8c7b1b88b89c87",
+      "targetBlob": "7912d8d5f23de618555bf515f8b2a6ea7d6367e7",
+      "changes": [
+        {
+          "old": "import { useComponentAccess } from \"../../features/permissions/hooks/useComponentAccess\";",
+          "new": "import { useComponentAccess } from \"../../features/permissions/hooks/useComponentAccess\";\nimport { loadAuthorizedWebsite } from \"../../features/editor-access/load-authorized-website\";\nimport { saveAuthorizedWebsite } from \"../../features/editor-access/save-authorized-website\";"
+        },
+        {
+          "old": "    const fetchWebsite = async () => {\n      try {\n        setLoading(true);",
+          "new": "    const controller = new AbortController();\n    const fetchWebsite = async () => {\n      try {\n        setLoading(true);\n        setWebsite(null);"
+        },
+        {
+          "start": "        let loadedSite: any = null;\n",
+          "end": "        if (loadedSite) {",
+          "new": "        const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, controller.signal);\n        if (controller.signal.aborted) return;\n\n"
+        },
+        {
+          "old": "const accessRes = await fetch(`${apiUrl}/api/v1/component-access/${websiteId}/all`, {\n              credentials: \"include\"",
+          "new": "const accessRes = await fetch(`${apiUrl}/api/v1/component-access/${websiteId}/all`, {\n              signal: controller.signal,\n              credentials: \"include\""
+        },
+        {
+          "old": "            const accessData = await accessRes.json();\n            if (accessRes.ok",
+          "new": "            const accessData = await accessRes.json();\n            if (controller.signal.aborted) return;\n            if (accessRes.ok"
+        },
+        {
+          "old": "            console.error(\"Failed to fetch accesses\", e);\n          }",
+          "new": "            if (controller.signal.aborted) return;\n            console.error(\"Failed to fetch accesses\", e);\n          }"
+        },
+        {
+          "old": "      } catch (err) {\n        console.error(\"Error loading website:\", err);\n      } finally {\n        setLoading(false);\n      }\n    };\n\n    fetchWebsite();",
+          "new": "      } catch (err) {\n        if (!controller.signal.aborted) setErrorMessage(err instanceof Error ? err.message : \"Website loading failed\");\n      } finally {\n        if (!controller.signal.aborted) setLoading(false);\n      }\n    };\n\n    fetchWebsite();\n    return () => controller.abort();"
+        },
+        { "old": "    isLoadingWebsite: loading,", "new": "    isLoadingWebsite: loading || !website || !userAccess.canEditContent," },
+        {
+          "old": "  const handleSave = async () => {\n    if (!websiteId) return;",
+          "new": "  const handleSave = async () => {\n    if (!websiteId || !website || !userAccess.canEditContent) return;"
+        },
+        {
+          "start": "      // 1. Always save locally immediately\n",
+          "end": "      // Update F-321 Autosave baseline on successful save",
+          "new": "      // Only a confirmed server response advances the saved baseline.\n      await saveAuthorizedWebsite(apiUrl, websiteId, payload);\n\n"
+        },
+        {
+          "old": "      setSaveMessage(\"Saved locally!\");",
+          "new": "      setSaveMessage(\"Save failed — changes remain unsaved\");\n      setErrorMessage(err instanceof Error ? err.message : \"The server did not confirm this save\");"
+        },
+        {
+          "old": "  return (\n    <WooCommerceProvider websiteId={websiteId}>",
+          "new": "  if (!website) {\n    return <main className=\"min-h-screen flex flex-col items-center justify-center gap-4 p-6\" role=\"alert\">\n      <p>{errorMessage || \"Website access could not be established.\"}</p>\n      <Link to=\"/dashboard\" className=\"underline\">Return to dashboard</Link>\n    </main>;\n  }\n\n  return (\n    <WooCommerceProvider websiteId={websiteId}>"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/features/autosave/hooks/useAutosave.ts",
+      "baseBlob": "a7573411f81f59c0395f2d43484b7d951493d22d",
+      "targetBlob": "79b93b68772f4fd3f20f2fb616946c51ea490db1",
+      "changes": [
+        {
+          "old": "import type { AutosaveStatus } from \"../types/autosave.types\";",
+          "new": "import type { AutosaveStatus } from \"../types/autosave.types\";\nimport { saveAuthorizedWebsite } from \"../../editor-access/save-authorized-website\";"
+        },
+        {
+          "old": "  const baselineRef = useRef<string | null>(null);",
+          "new": "  const baselineRef = useRef<string | null>(null);\n  const failedSnapshotRef = useRef<string | null>(null);\n  const requestController = useRef<AbortController | null>(null);\n  const mountedRef = useRef(true);"
+        },
+        {
+          "old": "      baselineRef.current = snapshot;",
+          "new": "      baselineRef.current = snapshot;\n      failedSnapshotRef.current = null;"
+        },
+        {
+          "start": "        // 1. Always persist snapshot to local storage as immediate fail-safe\n",
+          "end": "        // Update baseline to the snapshot that was persisted",
+          "new": "        const controller = new AbortController();\n        requestController.current = controller;\n        await saveAuthorizedWebsite(currentApiUrl, currentWebId, bodyPayload, controller.signal);\n        if (!mountedRef.current || controller.signal.aborted) return;\n        failedSnapshotRef.current = null;\n\n"
+        },
+        {
+          "old": "        setStatus(\"saved\"); // Local save succeeded",
+          "new": "        if (!mountedRef.current) return;\n        failedSnapshotRef.current = payload.snapshot;\n        setStatus(\"error\");\n        setErrorMessage(err instanceof Error ? err.message : \"The server did not confirm this save\");"
+        },
+        {
+          "old": "    // Meaningful change detected -> status becomes unsaved",
+          "new": "    // A failed immutable payload is not automatically retried without an\n    // idempotency contract. A new edit or explicit manual save is required.\n    if (currentSnapshot === failedSnapshotRef.current) return;\n\n    // Meaningful change detected -> status becomes unsaved"
+        },
+        {
+          "old": "  // Cleanup on unmount\n  useEffect(() => {\n    return () => {",
+          "new": "  // Cleanup on unmount\n  useEffect(() => {\n    mountedRef.current = true;\n    return () => {\n      mountedRef.current = false;\n      requestController.current?.abort();"
+        },
+        {
+          "old": "    isDirty: status === \"unsaved\" || status === \"saving\",",
+          "new": "    isDirty: status === \"unsaved\" || status === \"saving\" || status === \"error\","
+        }
+      ]
+    }
+  ]
+}

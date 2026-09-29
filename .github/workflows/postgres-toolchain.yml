@@ -1,0 +1,43 @@
+name: Disposable PostgreSQL runtime snapshot
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/postgres-toolchain.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Export installed PostgreSQL programs and their runtime dependencies only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, shutil, subprocess, tarfile, os
+          candidates = sorted(pathlib.Path('/usr/lib/postgresql').glob('*/bin/postgres'))
+          assert candidates, 'Runner has no PostgreSQL runtime'
+          program = candidates[-1]
+          version = program.parents[1].name
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'postgres-runtime'
+          libs = root / 'libs'; libs.mkdir(parents=True)
+          for source in [program.parents[1], pathlib.Path('/usr/share/postgresql') / version]:
+              shutil.copytree(source, root / str(source).lstrip('/'), symlinks=False)
+          excluded = {'libc.so.6','libm.so.6','libpthread.so.0','libdl.so.2','librt.so.1','libresolv.so.2','ld-linux-x86-64.so.2'}
+          binaries = list(program.parent.iterdir()) + list(program.parents[1].glob('lib/*.so'))
+          for binary in binaries:
+              result = subprocess.run(['ldd', str(binary)], capture_output=True, text=True)
+              for source in re.findall(r'=> (/[^ ]+)', result.stdout):
+                  source = pathlib.Path(source)
+                  if source.name not in excluded and source.is_file(): shutil.copy2(source, libs / source.name)
+          (root / 'version.txt').write_text(version)
+          with tarfile.open(pathlib.Path(os.environ['RUNNER_TEMP'])/'postgres-runtime.tar.gz','w:gz') as archive:
+              archive.add(root, arcname='postgres-runtime')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/postgres-runtime.tar.gz
+          retention-days: 1
+          compression-level: 0

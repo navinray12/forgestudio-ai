@@ -1,0 +1,73 @@
+name: Production build validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-build-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  source-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Archive tracked source for reproducible diagnostics
+        shell: bash
+        run: |
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/forge-source.tar.gz"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
+          sha256sum "$RUNNER_TEMP/forge-source.tar.gz" > "$RUNNER_TEMP/source-sha256.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/forge-source.tar.gz
+            ${{ runner.temp }}/source-commit.txt
+            ${{ runner.temp }}/source-sha256.txt
+          retention-days: 3
+          compression-level: 0
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.component }}
+        shell: bash
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install the committed dependency graph
+        run: npm ci 2>&1 | tee "$RUNNER_TEMP/install.log"
+      - name: Generate the database client without connecting to a database
+        if: matrix.component == 'backend'
+        run: npx --no-install prisma generate 2>&1 | tee "$RUNNER_TEMP/generate.log"
+      - name: Build production output
+        run: npm run build 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Retain build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build-${{ matrix.component }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/install.log
+            ${{ runner.temp }}/generate.log
+            ${{ runner.temp }}/build.log
+          if-no-files-found: ignore
+          retention-days: 7
