@@ -2,6 +2,25 @@ import test from 'node:test';import assert from 'node:assert/strict';import {loa
 const module=await loadTypeScript('frontend/src/features/editor-access/document-save-coordinator.ts',{}, {AbortSignal,crypto:globalThis.crypto});
 const transport=await loadTypeScript('frontend/src/features/editor-access/save-authorized-website.ts',{}, {AbortSignal});
 const ack=version=>({id:'site',name:'Site',slug:'site',status:'DRAFT',documentVersion:version,updatedAt:new Date().toISOString()});
+
+test('AI apply invalidates already queued older autosaves',async()=>{
+ let manualCalls=0; const writer=new module.DocumentSaveCoordinator(async()=>{manualCalls++;return ack(3)});
+ writer.initialize(1);
+ const applied=writer.applyExternal({changesetId:'draft'},1,'apply-key',async()=>ack(2));
+ const oldSave=writer.save({editorData:{text:'old document'}});
+ await applied; await assert.rejects(oldSave); assert.equal(manualCalls,0);
+});
+test('AI apply replays its original endpoint after a lost acknowledgement',async()=>{
+ let calls=0;const writer=new module.DocumentSaveCoordinator(async()=>{throw new Error('wrong endpoint')}); writer.initialize(1);
+ const send=async(_payload,options)=>{assert.equal(options.key,'apply-key');calls++;if(calls===1)throw new Error('network');return ack(2)};
+ await assert.rejects(writer.applyExternal({changesetId:'draft'},1,'apply-key',send));
+ assert.equal((await writer.applyExternal({changesetId:'draft'},1,'apply-key',send)).documentVersion,2);assert.equal(calls,2);
+});
+test('manual save cannot overwrite an uncertain AI apply while reconciling',async()=>{
+ let calls=0,manual=0;const writer=new module.DocumentSaveCoordinator(async()=>{manual++;return ack(3)});writer.initialize(1);
+ await assert.rejects(writer.applyExternal({changesetId:'draft'},1,'apply-key',async()=>{if(++calls===1)throw new Error('network');return ack(2)}));
+ await assert.rejects(writer.save({editorData:{text:'old'}}),{code:'DOCUMENT_SCOPE_CHANGED'});assert.equal(manual,0);assert.equal(calls,2);
+});
 test('DOC-CLIENT-001: manual and automatic commands are serialized using acknowledged versions',async()=>{
  const calls=[];let counter=0;const writer=new module.DocumentSaveCoordinator(async(payload,options)=>{calls.push({payload,options});return ack(options.expectedVersion+1);},()=>`test-key-${++counter}`);
  writer.initialize(1);await Promise.all([writer.save({editorData:{text:'A'}}),writer.save({editorData:{text:'B'}})]);

@@ -11,6 +11,7 @@ import { assignDefaultFreePlan } from "../services/subscription.service.js";
 import * as workspaces from "../services/workspaces/workspace-api.service.js";
 import workspaceRouter from "../routes/tenant-workspace.routes.js";
 import { errorMiddleware } from "../middlewares/error.middleware.js";
+import { fixtureHasMigration } from "./migration-fixture.js";
 
 // This suite intentionally creates fixtures and exercises a migration. It must
 // never accept a production URL, an arbitrary database name, or an implicit opt-in.
@@ -24,8 +25,10 @@ test("workspace contracts on disposable PostgreSQL", async (t) => {
   t.after(async () => { await prisma.$disconnect(); await pgPool.end(); });
   // db push is used only to prepare the disposable legacy schema. Recreate only
   // these new, empty fixture tables to exercise their actual additive migration.
-  await pgPool.query('DROP TABLE IF EXISTS workspace_outbox, workspace_command_journal');
-  await pgPool.query(readFileSync("prisma/migrations/20260928090000_workspace_command_journal/migration.sql", "utf8"));
+  if (!await fixtureHasMigration("20260928090000_workspace_command_journal")) {
+    await pgPool.query('DROP TABLE IF EXISTS workspace_outbox, workspace_command_journal');
+    await pgPool.query(readFileSync("prisma/migrations/20260928090000_workspace_command_journal/migration.sql", "utf8"));
+  }
   const owner = await prisma.user.create({ data: { fullName: "Fixture owner", email: `owner-${randomUUID()}@example.test`, status: "ACTIVE" } });
   const member = await prisma.user.create({ data: { fullName: "Fixture member", email: `member-${randomUUID()}@example.test`, status: "ACTIVE" } });
   const outsider = await prisma.user.create({ data: { fullName: "Fixture outsider", email: `outsider-${randomUUID()}@example.test`, status: "ACTIVE" } });

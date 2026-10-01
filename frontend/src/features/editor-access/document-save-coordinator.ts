@@ -6,7 +6,7 @@ type Sender = (payload: unknown, options: DocumentWriteOptions) => Promise<Docum
 export class DocumentSaveCoordinator {
   private version: number | null = null;
   private tail: Promise<void> = Promise.resolve();
-  private pending: { payload: unknown; options: DocumentWriteOptions } | null = null;
+  private pending: { payload: unknown; options: DocumentWriteOptions; send?: Sender } | null = null;
   private blocked: DocumentSaveError | null = null;
   private generation = 0;
   private readonly send: Sender;
@@ -23,6 +23,12 @@ export class DocumentSaveCoordinator {
       if (this.blocked) throw this.blocked;
       if (signal?.aborted) throw new DocumentSaveError("Save cancelled before submission", 0, "DOCUMENT_CANCELLED");
       if (this.pending) {
+        if (this.pending.send) {
+          await this.submit(this.pending, signal, generation);
+          this.generation++;
+          this.blocked = new DocumentSaveError("The AI apply was confirmed. Reload the accepted document before further saves; copy any local edits first.", 409, "DOCUMENT_SCOPE_CHANGED");
+          throw this.blocked;
+        }
         const samePayload = JSON.stringify(this.pending.payload) === JSON.stringify(payload);
         const recovered = await this.submit(this.pending, signal, generation);
         if (samePayload) return recovered;
@@ -34,9 +40,31 @@ export class DocumentSaveCoordinator {
     this.tail = work.then(() => undefined, () => undefined);
     return work;
   }
+  /** Queue approved proposals with manual saves. Retain the original sender/key
+   * after an uncertain response and invalidate autosaves captured before apply. */
+  applyExternal(payload: unknown, expectedVersion: number, key: string, send: Sender): Promise<DocumentAcknowledgement> {
+    const generation = this.generation;
+    const work = this.tail.then(async () => {
+      if (generation !== this.generation || this.version === null) throw new DocumentSaveError("Reload the website before applying", 409, "DOCUMENT_SCOPE_CHANGED");
+      if (this.blocked) throw this.blocked;
+      if (this.pending) {
+        const same = this.pending.options.key === key && JSON.stringify(this.pending.payload) === JSON.stringify(payload);
+        const recovered = await this.submit(this.pending, undefined, generation);
+        if (same) { this.generation++; return recovered; }
+      }
+      if (this.version !== expectedVersion) throw new DocumentSaveError("The document changed. Generate a new proposal.", 412, "DOCUMENT_VERSION_CONFLICT");
+      const pending = { payload: JSON.parse(JSON.stringify(payload)), options: { key, expectedVersion }, send };
+      this.pending = pending;
+      const saved = await this.submit(pending, undefined, generation);
+      this.generation++;
+      return saved;
+    });
+    this.tail = work.then(() => undefined, () => undefined);
+    return work;
+  }
   private async submit(command: NonNullable<DocumentSaveCoordinator["pending"]>, signal: AbortSignal | undefined, generation: number) {
     try {
-      const saved = await this.send(command.payload, { ...command.options, signal });
+      const saved = await (command.send ?? this.send)(command.payload, { ...command.options, signal });
       if (generation !== this.generation) throw new DocumentSaveError("Website changed during save", 409, "DOCUMENT_SCOPE_CHANGED");
       this.version = saved.documentVersion; this.pending = null;
       return saved;

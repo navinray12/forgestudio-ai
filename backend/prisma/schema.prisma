@@ -805,6 +805,14 @@ model AiExecution {
   promptExpiresAt DateTime? @db.Timestamptz(6)
   outputSummary Json?
   errorCode String? @db.VarChar(100)
+  expectedDocumentVersion Int?
+  scope Json?
+  providerSnapshot Json?
+  parentExecutionId String? @db.Uuid
+  stage String? @db.VarChar(100)
+  cancelRequestedAt DateTime? @db.Timestamptz(6)
+  reservedUnits Int @default(0)
+  stages AiExecutionStage[]
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   completedAt DateTime? @db.Timestamptz(6)
   website Website @relation(fields:[websiteId], references:[id], onDelete:Cascade)
@@ -813,7 +821,22 @@ model AiExecution {
   changeset AiChangeset?
   @@index([websiteId, createdAt])
   @@index([actorId, createdAt])
+  @@index([promptExpiresAt])
   @@map("ai_executions")
+}
+
+model AiExecutionStage {
+  id String @id @default(uuid()) @db.Uuid
+  executionId String @db.Uuid
+  key String @db.VarChar(100)
+  status String @default("PENDING") @db.VarChar(30)
+  artifactKey String? @db.VarChar(200)
+  externalReference Json?
+  startedAt DateTime? @db.Timestamptz(6)
+  completedAt DateTime? @db.Timestamptz(6)
+  execution AiExecution @relation(fields:[executionId], references:[id], onDelete:Cascade)
+  @@unique([executionId,key])
+  @@map("ai_execution_stages")
 }
 
 model AiChangeset {
@@ -831,6 +854,8 @@ model AiChangeset {
   approvedAt DateTime? @db.Timestamptz(6)
   cancelledAt DateTime? @db.Timestamptz(6)
   appliedAt DateTime? @db.Timestamptz(6)
+  appliedRevisionId String? @db.Uuid
+  applyAcknowledgement Json?
   website Website @relation(fields:[websiteId], references:[id], onDelete:Cascade)
   workspace Workspace? @relation(fields:[workspaceId], references:[id], onDelete:SetNull)
   actor User @relation(fields:[actorId], references:[id], onDelete:Restrict)

@@ -10,12 +10,15 @@ import * as lifecycle from "../services/workspaces/lifecycle.service.js";
 import * as invites from "../services/workspaces/invitation.service.js";
 import workspaceRouter from "../routes/tenant-workspace.routes.js";
 import {errorMiddleware} from "../middlewares/error.middleware.js";
+import { fixtureHasMigration } from "./migration-fixture.js";
 
 export async function runWorkspaceLifecycleContracts(t:TestContext) {
  // Only the parent suite's explicitly guarded disposable database reaches here.
  // Replace the schema-only fixture additions with the actual migration and triggers.
- await pgPool.query('DROP TABLE IF EXISTS workspace_invitations; ALTER TABLE workspaces DROP COLUMN "lifecycleStatus", DROP COLUMN version, DROP COLUMN "archivedAt"');
- await pgPool.query(readFileSync("prisma/migrations/20260928122000_workspace_lifecycle/migration.sql","utf8"));
+ if (!await fixtureHasMigration("20260928122000_workspace_lifecycle")) {
+   await pgPool.query('DROP TABLE IF EXISTS workspace_invitations; ALTER TABLE workspaces DROP COLUMN "lifecycleStatus", DROP COLUMN version, DROP COLUMN "archivedAt"');
+   await pgPool.query(readFileSync("prisma/migrations/20260928122000_workspace_lifecycle/migration.sql","utf8"));
+ }
  const createUser=(name:string)=>prisma.user.create({data:{fullName:name,email:`${randomUUID()}@example.test`,emailVerified:true,status:"ACTIVE"}});
  const owner=await createUser("Lifecycle owner"), recipient=await createUser("Invited recipient"), stranger=await createUser("Other recipient");
  const created=await workspaces.createTenantWorkspace(owner.id,{name:"Lifecycle"},"lifecycle-create-1");

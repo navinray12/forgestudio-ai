@@ -4,6 +4,13 @@ import { scanFileObject } from "../services/files/file.service.js";
 import { leaseOutboxBatch, markOutboxDispatched, markOutboxFailed } from "../platform/execution/durable-outbox.js";
 import { enqueueDurableJob } from "../services/jobs/durable-job.js";
 import { pgPool, prisma } from "../config/prisma.js";
+import { startPromptCleanup } from "../modules/ai/prompt-cleanup-scheduler.js";
+import { runDesignExecution } from "../modules/ai/design/pipeline.js";
+
+registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => {
+  if (typeof payload?.executionId !== "string") throw new Error("AI_EXECUTION_ID_REQUIRED");
+  return runDesignExecution(payload.executionId, job);
+});
 
 registerJobHandler("FILE_SCAN", async (payload) => {
   if (!payload?.fileId || !payload?.organizationId) throw new Error("FILE_SCAN requires fileId and organizationId");
@@ -35,12 +42,15 @@ registerJobHandler("DOMAIN_EVENT", async (payload) => {
 });
 
 startJobWorker(Number(process.env.JOB_WORKER_INTERVAL_MS || 1000));
+const promptCleanup = startPromptCleanup({ onFailure: () => console.error("ai-prompt-cleanup-failed") });
 const outboxTimer=setInterval(()=>{void dispatchOutbox().catch(error=>console.error("outbox-dispatch-failed",error));},Number(process.env.OUTBOX_INTERVAL_MS||1000));
 void dispatchOutbox();
 
 async function shutdown(signal:string){
-  if(stopping) return; stopping=true; clearInterval(outboxTimer); stopJobWorker();
+  if(stopping) return; stopping=true; clearInterval(outboxTimer);
+  await stopJobWorker();
   console.log("worker-shutdown",signal);
+  await promptCleanup.stop();
   await prisma.$disconnect().catch(()=>undefined); await pgPool.end().catch(()=>undefined);
   process.exit(0);
 }

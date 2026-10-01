@@ -26,4 +26,7 @@ Thumbs.db
 
 # Runtime / test generated files
 backend/artifacts/
+.data/
+test-results/
+playwright-report/
 backend/uploads/backups/

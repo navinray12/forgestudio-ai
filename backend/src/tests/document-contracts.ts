@@ -13,10 +13,13 @@ import { getPublicWebsiteById, updateWebsiteEditorData } from "../services/websi
 import { getWebsiteByIdHandler, updateWebsiteHandler } from "../controllers/website.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { errorMiddleware } from "../middlewares/error.middleware.js";
+import { fixtureHasMigration } from "./migration-fixture.js";
 
 export async function runDocumentContracts(t: TestContext) {
-  await pgPool.query('ALTER TABLE websites DROP COLUMN "documentVersion", DROP COLUMN "performanceSettings"');
-  await pgPool.query(readFileSync('prisma/migrations/20260928140000_document_concurrency/migration.sql','utf8'));
+  if (!await fixtureHasMigration("20260928140000_document_concurrency")) {
+    await pgPool.query('ALTER TABLE websites DROP COLUMN "documentVersion", DROP COLUMN "performanceSettings"');
+    await pgPool.query(readFileSync('prisma/migrations/20260928140000_document_concurrency/migration.sql','utf8'));
+  }
   const owner = await prisma.user.create({data:{fullName:'Document owner',email:`doc-owner-${randomUUID()}@example.test`,status:'ACTIVE',emailVerified:true}});
   const editor = await prisma.user.create({data:{fullName:'Document editor',email:`doc-editor-${randomUUID()}@example.test`,status:'ACTIVE',emailVerified:true}});
   const outsider = await prisma.user.create({data:{fullName:'Other tenant',email:`doc-outsider-${randomUUID()}@example.test`,status:'ACTIVE',emailVerified:true}});

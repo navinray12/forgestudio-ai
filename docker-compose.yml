@@ -23,9 +23,16 @@ services:
       FORGE_LOCAL_OTP_FILE: /tmp/forge-local-otp.json
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      STITCH_API_KEY: ${STITCH_API_KEY:-}
+      AI_CLAUDE_DESIGN_MODEL: ${AI_CLAUDE_DESIGN_MODEL:-}
+      AI_STITCH_MODEL: ${AI_STITCH_MODEL:-GEMINI_3_1_PRO}
+      AI_DESIGN_MAX_PAGES: ${AI_DESIGN_MAX_PAGES:-8}
+      AI_DESIGN_DAILY_UNITS: ${AI_DESIGN_DAILY_UNITS:-100}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
       AI_SITE_PROVIDER: ${AI_SITE_PROVIDER:-openai}
       AI_MODEL_PLANNER: ${AI_MODEL_PLANNER:-}
+      AI_MODEL_GEMINI: ${AI_MODEL_GEMINI:-gemini-3.5-flash-lite}
       AI_PROMPT_ENCRYPTION_KEY: ${AI_PROMPT_ENCRYPTION_KEY:-}
       AI_PROMPT_RETENTION_HOURS: ${AI_PROMPT_RETENTION_HOURS:-24}
     depends_on:
@@ -39,6 +46,16 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://forge:forge_local_only@postgres:5432/forge
+      AI_PROMPT_CLEANUP_INTERVAL_MS: ${AI_PROMPT_CLEANUP_INTERVAL_MS:-60000}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      STITCH_API_KEY: ${STITCH_API_KEY:-}
+      AI_CLAUDE_DESIGN_MODEL: ${AI_CLAUDE_DESIGN_MODEL:-}
+      AI_MODEL_PLANNER: ${AI_MODEL_PLANNER:-}
+      AI_STITCH_MODEL: ${AI_STITCH_MODEL:-GEMINI_3_1_PRO}
+      AI_PROMPT_ENCRYPTION_KEY: ${AI_PROMPT_ENCRYPTION_KEY:-}
+      AI_ARTIFACT_DIRECTORY: /app/.data/ai-artifacts
+    volumes: [ai-artifacts:/app/.data/ai-artifacts]
     depends_on:
       migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
@@ -63,3 +80,4 @@ services:
 
 volumes:
   postgres-data:
+  ai-artifacts:

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { prisma } from "../src/config/prisma.js";
+import { prisma, pgPool } from "../src/config/prisma.js";
 
 async function main() {
   console.log("Seeding subscription plans...");
@@ -161,4 +161,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pgPool.end();
   });

@@ -29,6 +29,7 @@ function memoryFallbackAllowed(): boolean {
 }
 
 let workerInterval: any = null;
+let workerActive: Promise<unknown> | null = null;
 
 export function registerJobHandler(type: string, handler: JobHandler) {
   handlers.set(type, handler);
@@ -239,8 +240,13 @@ export async function processNextJob(
   try {
     const clauses = ["status='QUEUED'", "\"runAt\" <= now()", "(\"lockedUntil\" IS NULL OR \"lockedUntil\" < now())"];
     const values: unknown[] = [];
-    if (filter?.id) { values.push(filter.id); clauses.push(`id=${values.length}::uuid`); }
-    if (filter?.type) { values.push(filter.type); clauses.push(`type=${values.length}`); }
+    if (filter?.id) { values.push(filter.id); clauses.push(`id=$${values.length}::uuid`); }
+    if (filter?.type) { values.push(filter.type); clauses.push(`type=$${values.length}`); }
+    if (!filter?.id && !filter?.type) {
+      // Workers claim only types they can execute; a scanner must not consume
+      // another worker's publishing or AI stage jobs.
+      values.push([...handlers.keys()]); clauses.push(`type=ANY($${values.length}::text[])`);
+    }
     const token = crypto.randomUUID(); values.push(token);
     const tokenIndex = values.length;
     const query = `WITH picked AS (
@@ -248,7 +254,7 @@ export async function processNextJob(
       ORDER BY "runAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1
     )
     UPDATE background_jobs j SET status='RUNNING',"startedAt"=now(),
-      "lockedUntil"=now()+interval '30 seconds',"lockToken"=${tokenIndex}::uuid
+      "lockedUntil"=now()+interval '30 seconds',"lockToken"=$${tokenIndex}::uuid
     FROM picked WHERE j.id=picked.id RETURNING j.*`;
     const claimed = await pgPool.query(query, values);
     job = claimed.rows[0] ?? null;
@@ -283,11 +289,20 @@ export async function processNextJob(
 
   const handler = handlers.get(job.type);
   if (!handler) {
-    const errMsg = `No handler registered for job type: ${job.type}`;
+    const errMsg = "JOB_HANDLER_UNAVAILABLE";
     await markJobFailed(job, errMsg);
     return { processed: true, job, error: errMsg };
   }
 
+  // A long provider/scan call must not lose its lease after thirty seconds.
+  // Fencing every final write prevents an old worker from completing a job that
+  // was cancelled or taken over. Handlers still need domain-level idempotency.
+  let renewing: Promise<unknown> | null = null;
+  const heartbeat = job.lockToken ? setInterval(() => {
+    if (renewing) return;
+    renewing = renewJobLease(job.id, job.lockToken).catch(() => false).finally(() => { renewing = null; });
+  }, 10_000) : null;
+  heartbeat?.unref();
   try {
     const result = await handler(job.payload, job);
     // Double check if cancelled concurrently during execution
@@ -295,33 +310,50 @@ export async function processNextJob(
     if (currentStatus?.status === "CANCELLED") {
       return { processed: true, job: currentStatus, result: { cancelled: true } };
     }
-    await markJobCompleted(job, result);
+    if (!await markJobCompleted(job, result)) return { processed: true, job, error: "JOB_LEASE_LOST" };
     return { processed: true, job, result };
   } catch (err: any) {
-    const errMsg = err?.message || String(err);
+    const errMsg = "JOB_EXECUTION_FAILED";
     await markJobFailed(job, errMsg);
     return { processed: true, job, error: errMsg };
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+    if (renewing) await renewing;
   }
+}
+
+export async function renewJobLease(jobId: string, token: string): Promise<boolean> {
+  const result = await pgPool.query(`UPDATE background_jobs SET "lockedUntil"=now()+interval '30 seconds',"updatedAt"=now()
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [jobId, token]);
+  return result.rowCount === 1;
+}
+
+/** An interrupted external operation is uncertain, not a safe automatic retry.
+ * Retain a durable review record before releasing the expired job. */
+export async function reconcileExpiredJobs(): Promise<number> {
+  const result = await pgPool.query(`WITH expired AS (
+    SELECT id FROM background_jobs WHERE status='RUNNING' AND "lockedUntil"<now()
+    ORDER BY "lockedUntil" LIMIT 25 FOR UPDATE SKIP LOCKED
+  ), failed AS (
+    UPDATE background_jobs j SET status='FAILED',"lastError"='JOB_OUTCOME_UNKNOWN',
+      "completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+    FROM expired WHERE j.id=expired.id RETURNING j.*
+  ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
+    SELECT "organizationId",id,type,payload,attempts,'JOB_OUTCOME_UNKNOWN' FROM failed`);
+  return result.rowCount ?? 0;
 }
 
 async function markJobCompleted(job: any, _result?: any) {
   const now = new Date();
-  try {
-    await (prisma as any).backgroundJob.update({
-      where: { id: job.id },
-      data: {
-        status: "COMPLETED",
-        completedAt: now,
-        updatedAt: now,
-        lockedUntil: null,
-        lockToken: null,
-      } as any,
-    });
-  } catch {
+  if (memoryFallbackAllowed() && String(job.id).startsWith("mem_")) {
     job.status = "COMPLETED";
     job.completedAt = now;
     job.updatedAt = now;
+    return true;
   }
+  const result = await pgPool.query(`UPDATE background_jobs SET status='COMPLETED',"completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [job.id, job.lockToken]);
+  return result.rowCount === 1;
 }
 
 async function markJobFailed(job: any, errorMsg: string) {
@@ -334,50 +366,40 @@ async function markJobFailed(job: any, errorMsg: string) {
   const nextRunAt = new Date(Date.now() + backoffMs);
 
   const nextStatus = isFinalFailure ? "FAILED" : "QUEUED";
-  if (isFinalFailure) {
-    try {
-      await pgPool.query(
-        'INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason) VALUES($1::uuid,$2::uuid,$3,$4::jsonb,$5,$6)',
-        [job.organizationId ?? null, job.id, job.type, JSON.stringify(job.payload ?? {}), nextAttempts, errorMsg.slice(0,2000)],
-      );
-    } catch { /* migration may not yet be applied in legacy/dev databases */ }
-  }
-
-  try {
-    await (prisma as any).backgroundJob.update({
-      where: { id: job.id },
-      data: {
-        status: nextStatus,
-        attempts: nextAttempts,
-        lastError: errorMsg.slice(0, 2000),
-        runAt: isFinalFailure ? job.runAt : nextRunAt,
-        completedAt: isFinalFailure ? now : null,
-        updatedAt: now,
-      },
-    });
-  } catch {
+  if (memoryFallbackAllowed() && String(job.id).startsWith("mem_")) {
     job.status = nextStatus;
     job.attempts = nextAttempts;
     job.lastError = errorMsg.slice(0, 2000);
     job.runAt = isFinalFailure ? job.runAt : nextRunAt;
     job.completedAt = isFinalFailure ? now : null;
     job.updatedAt = now;
+    return;
   }
+  await pgPool.query(`WITH failed AS (
+    UPDATE background_jobs SET status=$3,attempts=$4,"lastError"=$5,"runAt"=$6,
+      "completedAt"=$7,"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()
+    RETURNING *
+  ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
+    SELECT "organizationId",id,type,payload,attempts,"lastError" FROM failed WHERE status='FAILED'`,
+    [job.id, job.lockToken, nextStatus, nextAttempts, errorMsg, isFinalFailure ? job.runAt : nextRunAt, isFinalFailure ? now : null]);
 }
 
 export function startJobWorker(intervalMs: number = 2000) {
   if (workerInterval) return;
 
-  workerInterval = setInterval(async () => {
-    try {
-      await processNextJob();
-    } catch {}
+  workerInterval = setInterval(() => {
+    if (workerActive) return;
+    workerActive = reconcileExpiredJobs().then(() => processNextJob())
+      .catch(() => { console.error("job-worker-tick-failed"); })
+      .finally(() => { workerActive = null; });
   }, intervalMs);
 }
 
-export function stopJobWorker() {
+export async function stopJobWorker() {
   if (workerInterval) {
     clearInterval(workerInterval);
     workerInterval = null;
   }
+  await workerActive;
 }

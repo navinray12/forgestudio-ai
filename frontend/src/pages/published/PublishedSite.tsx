@@ -271,7 +271,7 @@ interface RenderNodeProps {
 }
 
 // F-358: Safely caches execution overhead per Element in PublishedSite skipping massive style hashing recalculations
-const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritical, activeBreakpointId, breakpoints, globalSettings, elementClassMap, apiUrl, websiteId, allElements, pages, onSwitchPage }) => {
+export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritical, activeBreakpointId, breakpoints, globalSettings, elementClassMap, apiUrl, websiteId, allElements, pages, onSwitchPage }) => {
     // F-351 logic exactly as website outputs
     const resolvedStyles = resolveElementStyles(el, activeBreakpointId, breakpoints, globalSettings);
 
@@ -344,7 +344,8 @@ const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritical, acti
 
     if (el.type === "heading") {
         const resolvedHeading = resolveDynamicTokens(el.content || "", tokenContext);
-        return <React.Fragment key={el.id}><h2 ref={assignRefIfTracked as any} {...mergedProps} className={`${mergedProps.className} ${optInnerClass}`} style={{ fontSize: "32px", fontWeight: "700", color: "#0f172a", ...mergedProps.style, ...finalInnerStyles }}>{resolvedHeading}</h2></React.Fragment>;
+        const Heading = el.headingLevel && /^h[1-6]$/.test(el.headingLevel) ? el.headingLevel : "h2";
+        return <React.Fragment key={el.id}><Heading ref={assignRefIfTracked as any} {...mergedProps} className={`${mergedProps.className} ${optInnerClass}`} style={{ fontSize: "32px", fontWeight: "700", color: "#0f172a", ...mergedProps.style, ...finalInnerStyles }}>{resolvedHeading}</Heading></React.Fragment>;
     }
 
     if (el.type === "text") {

@@ -18,6 +18,8 @@ import { validateSlug, generateSlug, safeDeletePage } from "./utils/pageManagerS
 import { matchesThemeCondition, type SitePartsConfig, type PublishingState, type DeploymentConfig, type CanonicalWebsiteData, type ThemeBuilderScope, resolveDynamicTokens, type DynamicContext } from "./types";
 import { SaveTemplateDialog, ReplaceTemplateDialog, ImportWebsiteKitDialog, useSaveTemplate, useTemplateLibrary, TemplateLibrary, exportWebsiteKitAsJson, type Template } from "../../features/templates";
 import { RevisionHistoryPanel, revisionHistoryService } from "../../features/revision-history";
+import { DesignAssistant } from "../../features/ai/DesignAssistant";
+import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
 import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
 import { publishingService } from "../../features/publishing/services/publishingService";
@@ -30,7 +32,7 @@ import { useCanvasPresence } from "../../features/collaboration/hooks/useCanvasP
 import { WooCommerceProvider } from "../../context/WooCommerceContext";
 
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
   ChevronDown, ChevronRight, Layers, Type, Image as ImageIcon, Box, Grid,
@@ -882,6 +884,19 @@ export default function WebsiteEditor() {
   });
   const [isElementManagerOpen, setIsElementManagerOpen] = useState(false);
   const [isRevisionHistoryOpen, setIsRevisionHistoryOpen] = useState(false);
+  const [isDesignAssistantOpen, setIsDesignAssistantOpen] = useState(false);
+  const [startParams, setStartParams] = useSearchParams();
+  useEffect(() => {
+    if (loading || !website || !userAccess.canEditDesign) return;
+    const mode = startParams.get("start");
+    if (mode !== "ai" && mode !== "template") return;
+    if (mode === "ai") setIsDesignAssistantOpen(true);
+    else setLeftSidebarTab("templates");
+    const remaining = new URLSearchParams(startParams);
+    remaining.delete("start");
+    setStartParams(remaining, { replace: true });
+  }, [loading, website, userAccess.canEditDesign, startParams, setStartParams]);
+  const pendingDesignApplyKey = useRef<string | null>(null);
   const [widgetLibrarySearch, setWidgetLibrarySearch] = useState("");
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
   const [managerCategoryFilter, setManagerCategoryFilter] = useState<string>("All");
@@ -2002,7 +2017,7 @@ export default function WebsiteEditor() {
     popups,
     pageCss,
     apiUrl,
-    isLoadingWebsite: loading || !website || !userAccess.canEditContent,
+    isLoadingWebsite: loading || !website || !userAccess.canEditContent || isDesignAssistantOpen,
     persistDocument,
   });
 
@@ -2479,7 +2494,7 @@ export default function WebsiteEditor() {
       };
 
       // Only a confirmed server response advances the saved baseline.
-      await persistDocument(payload);
+      const acknowledged = await persistDocument(payload);
 
       // Update F-321 Autosave baseline on successful save
       updateAutosaveBaseline(
@@ -2499,6 +2514,7 @@ export default function WebsiteEditor() {
 
       setSaveMessage("Saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
+      return acknowledged;
     } catch (err: any) {
       setSaveMessage("Save failed — changes remain unsaved");
       setErrorMessage(err instanceof Error ? err.message : "The server did not confirm this save");
@@ -3962,6 +3978,10 @@ export default function WebsiteEditor() {
       styles.boxShadow = mergedStyles.boxShadow;
     }
 
+    for (const property of ["background", "border", "borderTop", "borderRight", "borderBottom", "borderLeft"]) {
+      if (mergedStyles[property] !== undefined) Object.assign(styles, { [property]: mergedStyles[property] });
+    }
+
     return styles;
   };
 
@@ -4944,6 +4964,7 @@ export default function WebsiteEditor() {
             marginLeft: mergedStyles.marginLeft ?? "0px",
             ...compileBackgroundAndBorderStyles(mergedStyles),
             ...compilePositioningStyles(mergedStyles),
+            ...Object.fromEntries(["display", "gap", "rowGap", "columnGap", "minHeight", "maxHeight", "flexGrow", "flexShrink", "flexBasis", "gridColumn", "gridRow", "overflow", "overflowX", "overflowY", "color", "fontFamily", "fontSize", "lineHeight"].filter(key => mergedStyles[key] !== undefined).map(key => [key, mergedStyles[key]])),
           }}
         >
           {/* Drop Indicators for Container */}
@@ -20272,6 +20293,30 @@ export default function WebsiteEditor() {
       />
 
       {/* F-320 Revision History Slide-Over Drawer */}
+      {websiteId && userAccess.canEditDesign && <button type="button" onClick={() => setIsDesignAssistantOpen(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-indigo-700 px-5 py-3 font-semibold text-white shadow-lg">Design with AI</button>}
+      {isDesignAssistantOpen && websiteId && <DesignAssistant apiUrl={apiUrl} websiteId={websiteId} pageId={activePageId} elementId={selectedId || undefined}
+        onClose={() => setIsDesignAssistantOpen(false)}
+        prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
+        apply={async (proposal, key) => {
+          if (pendingDesignApplyKey.current !== key) {
+            const saved = await handleSave();
+            if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+            pendingDesignApplyKey.current = key;
+          }
+          await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
+            let response: Response;
+            try { response = await fetch(`${apiUrl}/api/v1/ai/changesets/${proposal.id}/apply`, { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { "Content-Type": "application/json", "X-Forge-Intent": "document-command", "Idempotency-Key": options.key, "If-Match": `"${websiteId}:document:${options.expectedVersion}"` } }); }
+            catch { throw new DocumentSaveError("Apply outcome is unknown. Retry Apply to confirm the same operation.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true); }
+            let body;
+            try { body = await response.json(); } catch { throw new DocumentSaveError("Apply response was interrupted. Retry Apply.", response.status, "DOCUMENT_OUTCOME_UNKNOWN", true); }
+            if (!response.ok) throw new DocumentSaveError(response.status === 412 ? "The website changed. Generate a new proposal." : "The proposal could not be applied.", response.status, body?.code || "AI_APPLY_FAILED", response.status >= 500);
+            if (body?.website?.id !== websiteId || !Number.isInteger(body.website.documentVersion) || body.website.documentVersion < options.expectedVersion || body.website.documentVersion > options.expectedVersion + 1) throw new DocumentSaveError("Apply acknowledgement was invalid. Retry Apply.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true);
+            return body.website;
+          });
+          // Remount from the acknowledged server document; old queued saves have
+          // been invalidated by the coordinator's generation barrier.
+          window.location.reload();
+        }} />}
       <RevisionHistoryPanel
         isOpen={isRevisionHistoryOpen}
         onClose={() => setIsRevisionHistoryOpen(false)}

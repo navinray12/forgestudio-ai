@@ -149,6 +149,8 @@ export function getMergedStyles(el: EditorElement, device: DeviceMode, state: El
     "borderTopLeftRadius", "borderTopRightRadius", "borderBottomRightRadius", "borderBottomLeftRadius",
     "boxShadow", "position", "top", "right", "bottom", "left", "zIndex"
   ];
+  // Keep new native CSS properties responsive too, not only legacy controls.
+  styleKeys.push(...Object.keys(el.styles || {}), ...Object.keys(el.responsiveStyles?.[device] || {}));
   const res: ElementStyles = { ...el.styles };
   for (const k of styleKeys) {
     const val = getEffectiveStyle(el, device, k);
@@ -172,6 +174,7 @@ export function getMergedLayout(el: EditorElement, device: DeviceMode): Containe
   return {
     layoutType: getEffectiveLayout(el, device, "layoutType") ?? base.layoutType ?? "flex",
     direction: getEffectiveLayout(el, device, "direction") ?? base.direction ?? "column",
+    flexWrap: getEffectiveLayout(el, device, "flexWrap") ?? base.flexWrap,
     justifyContent: getEffectiveLayout(el, device, "justifyContent") ?? base.justifyContent ?? "flex-start",
     alignItems: getEffectiveLayout(el, device, "alignItems") ?? base.alignItems ?? "stretch",
     gap: getEffectiveLayout(el, device, "gap") ?? base.gap ?? 10,
@@ -554,7 +557,8 @@ export function getBreakpointFallbackChain(bpId: string, activeBps: Breakpoint[]
   const bp = activeBps.find(b => b.id === bpId);
   const desktop = activeBps.find(b => b.id === "desktop") || { id: "desktop", width: 1024 };
 
-  if (!bp || bp.id === "desktop") return ["desktop"];
+  if (!bp) return bpId === "mobile" ? ["mobile", "tablet", "desktop"] : bpId === "tablet" ? ["tablet", "desktop"] : ["desktop"];
+  if (bp.id === "desktop") return ["desktop"];
 
   if (bp.width > desktop.width) {
     return activeBpsSorted
@@ -836,6 +840,14 @@ export function resolveElementStyles(
 
   const flexWrap = getVal("flexWrap" as any);
   if (flexWrap) (styles as any).flexWrap = flexWrap;
+
+  // Explicit CSS allowlist: imported layouts remain native styles, not HTML or
+  // executable CSS. Preserve old documents unless these properties are set.
+  const nativeProperties = ["display", "padding", "margin", "gap", "rowGap", "columnGap", "flexDirection", "flexGrow", "flexShrink", "flexBasis", "alignItems", "justifyContent", "gridTemplateColumns", "gridTemplateRows", "background", "border", "borderTop", "borderRight", "borderBottom", "borderLeft", "fontStyle", "textDecoration", "textTransform", "whiteSpace", "overflowWrap", "wordBreak", "overflow"];
+  for (const property of nativeProperties) {
+    const value = getVal(property);
+    if (value !== undefined) Object.assign(styles, { [property]: value });
+  }
 
   return styles;
 }

@@ -1,0 +1,33 @@
+# Disposable qualification overlay; never use this profile for real customer data.
+# Requires Docker Compose v2.24.4+ for !override. Provider calls are disabled.
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: forge_hardening
+    ports: ["127.0.0.1:55434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge -d forge_hardening"]
+  migrate:
+    environment:
+      DATABASE_URL: postgresql://forge:forge_local_only@postgres:5432/forge_hardening
+  api:
+    ports: !override ["127.0.0.1:55000:5000"]
+    environment:
+      DATABASE_URL: postgresql://forge:forge_local_only@postgres:5432/forge_hardening
+      FRONTEND_URL: http://127.0.0.1:55173
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GEMINI_API_KEY: ""
+      STITCH_API_KEY: ""
+      AI_PROMPT_ENCRYPTION_KEY: ""
+  worker:
+    environment:
+      DATABASE_URL: postgresql://forge:forge_local_only@postgres:5432/forge_hardening
+      ANTHROPIC_API_KEY: ""
+      STITCH_API_KEY: ""
+      AI_PROMPT_ENCRYPTION_KEY: ""
+  frontend:
+    ports: !override ["127.0.0.1:55173:80"]
+    build:
+      args:
+        VITE_API_URL: http://127.0.0.1:55000
