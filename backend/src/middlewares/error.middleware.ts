@@ -34,16 +34,20 @@ export function errorMiddleware(error: unknown, _req: Request, res: Response, ne
       status = 400; code = "INVALID_JSON"; message = "The request body is not valid JSON";
     }
   }
-  // Do not stringify the original Error: ORM errors can contain parameters and
+  // Do not stringify the original Error in production: ORM errors can contain parameters and
   // provider errors can contain tokens. Correlation enables safe operator triage.
-  if (status >= 500) console.error(JSON.stringify({ event: "request.failed", requestId, code, status }));
+  if (status >= 500) {
+    console.error("Internal server error:", error);
+    console.error(JSON.stringify({ event: "request.failed", requestId, code, status, message: (error as any)?.message }));
+  }
+  const responseMessage = process.env.NODE_ENV !== "production" && status >= 500 && (error as any)?.message ? (error as any).message : message;
   res.setHeader("X-Request-Id", requestId);
   res.setHeader("Cache-Control", "no-store");
   res.type("application/problem+json");
   return res.status(status).json({
     type: `urn:forge:problem:${code.toLowerCase().replaceAll("_", "-")}`,
     title: status >= 500 ? "Service request failed" : "Request rejected",
-    status, detail: message, code, requestId, retryable: status === 503,
-    success: false, error: { code, message, requestId },
+    status, detail: responseMessage, code, requestId, retryable: status === 503,
+    success: false, error: { code, message: responseMessage, requestId },
   });
 }

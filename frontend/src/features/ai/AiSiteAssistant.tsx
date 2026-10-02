@@ -17,17 +17,25 @@ Visual direction: editorial, confident, and modern; warm ivory, deep forest/navy
 const MAX_BRIEF_LENGTH = 64_000;
 
 async function generationError(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as { code?: unknown } | null;
-  const code = typeof body?.code === "string" ? body.code : "";
+  const body = await response.json().catch(() => null) as {
+    code?: unknown;
+    message?: unknown;
+    detail?: unknown;
+    error?: { code?: string; message?: string };
+  } | null;
+  const code = (typeof body?.code === "string" ? body.code : (body?.error?.code ?? "")).toString();
+  const detail = typeof body?.detail === "string" ? body.detail : (body?.error?.message ?? (typeof body?.message === "string" ? body.message : ""));
   if (code === "AI_PROMPT_INVALID" || response.status === 422) return "Brief must be between 12 and 64,000 characters. Shorten it and try again.";
   if (code === "DOCUMENT_VERSION_CONFLICT" || response.status === 412) return "This website changed. Reload and generate a new draft.";
   if (code === "AI_INVALID_OUTPUT" || response.status === 502) return "The AI returned a draft that could not be validated. Please retry or simplify the brief.";
-  if (code === "AI_NOT_CONFIGURED") return "The server AI provider is not configured. Ask an administrator to check the server settings.";
-  if (code === "AI_PROVIDER_UNAVAILABLE" || response.status === 503) return "The AI provider is unavailable or timed out. Please retry in a moment.";
-  if (response.status === 429) return "Too many requests. Please wait before generating another draft.";
+  if (code === "AI_NOT_CONFIGURED" || code === "AI_AUTH_ERROR") return "The AI provider configuration needs attention. Check server settings.";
+  if (code === "AI_TIMEOUT" || response.status === 504) return "AI generation took longer than expected. Please try again.";
+  if (code === "AI_RATE_LIMIT" || response.status === 429) return "The AI provider is temporarily rate limited. Please try again shortly.";
+  if (code === "AI_QUOTA_EXCEEDED") return "Your current plan has reached its AI generation limit.";
+  if (code === "AI_PROVIDER_UNAVAILABLE" || response.status === 503) return "The AI provider is temporarily unavailable. Please retry in a moment.";
   if (response.status === 401) return "Your session expired. Sign in again and retry.";
   if (response.status === 403) return "You do not have permission to generate a draft for this website.";
-  return "Generation could not complete. Please retry; if it continues, contact an administrator.";
+  return detail || "Generation could not complete. Please retry; if it continues, contact an administrator.";
 }
 
 export function AiSiteAssistant({ apiUrl, websiteId, onClose, onApplied }: {

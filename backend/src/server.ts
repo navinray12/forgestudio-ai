@@ -6,6 +6,7 @@ import { initPresenceWebSocketServer } from "./services/collaboration/presence.s
 import { pgPool, prisma } from "./config/prisma.js";
 
 import { validateIdentityConfiguration } from "./modules/identity/composition.js";
+import { ensureDatabaseTables } from "./config/ensure-schema.js";
 validateIdentityConfiguration();
 
 const PORT = process.env.PORT || 5000;
@@ -13,9 +14,17 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 initPresenceWebSocketServer(server);
 
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  startScheduler();
+void ensureDatabaseTables().then(() => {
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    startScheduler();
+  });
+}).catch((err) => {
+  console.error("Failed to ensure tables, starting server anyway:", err);
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    startScheduler();
+  });
 });
 
 server.on("error", (error) => {

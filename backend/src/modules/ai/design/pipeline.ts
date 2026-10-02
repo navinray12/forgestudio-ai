@@ -121,7 +121,15 @@ export async function runDesignExecution(executionId: string, job: { id: string;
     if (code !== "AI_JOB_LEASE_LOST" && code !== "AI_CANCELLED") {
       try {
         await transaction(async tx => {
-          const changed = await tx.aiExecution.updateMany({ where: { id: executionId, status: { in: ["QUEUED", "RUNNING"] } }, data: { status: code === "AI_EXTERNAL_OUTCOME_UNKNOWN" ? "RECONCILIATION_REQUIRED" : "FAILED", errorCode: code, completedAt: new Date() } });
+          const changed = await tx.aiExecution.updateMany({
+            where: { id: executionId, status: { in: ["QUEUED", "RUNNING"] } },
+            data: {
+              status: code === "AI_EXTERNAL_OUTCOME_UNKNOWN" ? "RECONCILIATION_REQUIRED" : "FAILED",
+              errorCode: code,
+              completedAt: new Date(),
+              reservedUnits: 0,
+            }
+          });
           if (!changed.count) return;
           await tx.aiExecutionStage.updateMany({ where: { executionId, status: "RUNNING" }, data: { status: code === "AI_EXTERNAL_OUTCOME_UNKNOWN" ? "UNKNOWN" : "FAILED", completedAt: new Date() } });
           await tx.auditLog.create({ data: { userId: execution.actorId, action: "AI_DESIGN_FAILED", targetResource: `ai-execution:${executionId}`, details: { code } } });

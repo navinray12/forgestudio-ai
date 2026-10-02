@@ -5,7 +5,14 @@ import { authorizedExecution, cancelDesignExecution, getDesignExecution, retryDe
 import { designAvailability } from "../modules/ai/design/config.js";
 
 export async function createDesignHandler(req: Request, res: Response, next: NextFunction) {
-  try { const id = String(req.params.id); const result = await startDesignExecution(id, res.locals.user.id, req.body, documentWriteContext(req, id)); res.status(202).json(result); } catch (error) { next(error); }
+  try {
+    const id = String(req.params.id);
+    const result = await startDesignExecution(id, res.locals.user.id, req.body, documentWriteContext(req, id));
+    res.status(202).json(result);
+  } catch (error) {
+    console.error("[AI-DESIGN] Failed to create design execution:", error);
+    next(error);
+  }
 }
 export async function getDesignHandler(req: Request, res: Response, next: NextFunction) {
   try { res.setHeader("Cache-Control", "no-store"); res.json({ execution: await getDesignExecution(String(req.params.executionId), res.locals.user.id) }); } catch (error) { next(error); }

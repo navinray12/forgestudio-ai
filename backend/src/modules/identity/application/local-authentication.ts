@@ -94,9 +94,25 @@ export class LocalAuthentication {
       await tx.updateChallenge(row.id, { status: "DELIVERING", otpHash: codeHash, lastSentAt: this.now() });
       return user.email;
     });
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`\n==================================================`);
+      console.log(`🔐 [AUTH OTP] Verification code for ${email}: ${code} (${purpose})`);
+      console.log(`==================================================\n`);
+    }
     try {
       await this.delivery.sendCode({ email, code, purpose });
-    } catch {
+    } catch (err: any) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`⚠️ [AUTH] SMTP delivery failed, but OTP code is active for local development: ${code}`);
+        await this.store.transaction(async tx => {
+          const user = await tx.lockUser(userId); requireUsableUser(user);
+          const current = await tx.lockChallenge(row.id);
+          requireChallenge(current, user, this.now(), purpose);
+          await tx.updateChallenge(row.id, { status: "READY" });
+          await tx.audit(userId, "IDENTITY_CODE_ACCEPTED_BY_DEV_FALLBACK", `challenge:${row.id}`);
+        });
+        return;
+      }
       await this.store.transaction(async tx => {
         await tx.lockUser(userId);
         const current = await tx.lockChallenge(row.id);

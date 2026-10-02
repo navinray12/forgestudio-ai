@@ -11,6 +11,10 @@ const safeMessages: Record<string, string> = {
   AI_EXTERNAL_OUTCOME_UNKNOWN: "A provider may have completed the request. Administrator reconciliation is required before another attempt; no site content was changed.",
   AI_CONVERSION_UNSUPPORTED: "The design contains features that could not be converted safely. No site content was changed.",
   AI_QUOTA_EXCEEDED: "The workspace's daily design quota has been reached.",
+  AI_TIMEOUT: "AI design generation took longer than expected. Please retry.",
+  AI_RATE_LIMIT: "The AI provider is temporarily rate limited. Please retry in a few moments.",
+  AI_AUTH_ERROR: "The AI provider credentials or workspace configuration need attention.",
+  AI_PROVIDER_UNAVAILABLE: "The AI provider is temporarily unavailable. Please retry in a moment.",
   AI_EXECUTION_ACTIVE: "A design is already being generated for this website. Resume it or wait for it to finish.",
   AI_PROMPT_EXPIRED: "The saved brief expired. Submit a new brief.",
   DOCUMENT_VERSION_CONFLICT: "The website changed. Generate a new proposal against the latest saved version.",
@@ -20,7 +24,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try { response = await fetch(url, { ...init, credentials: "include" }); } catch { throw new Error("The request could not be confirmed. Retry using the same action."); }
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(safeMessages[body?.code] || (response.status === 401 ? "Sign in again to continue." : "The operation could not complete. Your website has not been replaced."));
+  if (!response.ok) throw new Error(safeMessages[body?.code] || body?.detail || body?.error?.message || (response.status === 401 ? "Sign in again to continue." : "The operation could not complete. Your website has not been replaced."));
   return body as T;
 }
 
@@ -96,7 +100,8 @@ export function DesignAssistant({ apiUrl, websiteId, onClose, prepare, apply, pa
       const expectedVersion = await version();
       const chosen: Scope = { type: scope, ...(scope !== "site" ? { pageId } : {}), ...(scope === "selection" ? { elementId } : {}) };
       const body = { workflow: "stitch-claude", prompt, operation, scope: chosen };
-      const response = await request<{ executionId: string }>(`${apiUrl}/api/v1/ai/websites/${websiteId}/executions`, { method: "POST", headers: headers(keyFor(JSON.stringify({ body, expectedVersion })), expectedVersion), body: JSON.stringify(body) });
+      const commandKey = crypto.randomUUID();
+      const response = await request<{ executionId: string }>(`${apiUrl}/api/v1/ai/websites/${websiteId}/executions`, { method: "POST", headers: headers(commandKey, expectedVersion), body: JSON.stringify(body) });
       setProposal(null); setCurrentDocument(null); setShowCurrent(false); setStale(false); setExecution(null); remember(response.executionId);
     });
   }
@@ -132,7 +137,25 @@ export function DesignAssistant({ apiUrl, websiteId, onClose, prepare, apply, pa
         <button disabled={busy || running || available !== true || prompt.trim().length < 12} onClick={() => void generate()} className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">Generate proposal</button>
         <button disabled={busy} onClick={() => setPrompt("Design a premium accounting training academy website with Home, Programs, About and Contact pages. Use editorial typography, warm ivory, deep green and restrained coral, generous whitespace and varied layouts. Include CMA, CPA and ACCA program introductions and clear navigation between real pages. Use expressive CSS shapes and gradients rather than external images. Do not invent testimonials, prices or statistics. Make the layout work from 320px mobile to desktop.")}>Use sample brief</button>
       </div>
-      {execution && <div className="my-4" role="status"><p>{execution.status} · {execution.stage}</p><p className="text-sm">{execution.stages.filter(stage => stage.status === "COMPLETED").length} stages complete. You can return to manual editing while generation runs.</p></div>}
+      {execution && <div className="my-4" role="status">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold">{execution.status} · {execution.stage}</p>
+          {!running && (
+            <button
+              className="text-xs text-blue-600 hover:underline"
+              onClick={() => {
+                try { sessionStorage.removeItem(storageKey); } catch {}
+                setExecutionId(null);
+                setExecution(null);
+                setError("");
+              }}
+            >
+              Clear attempt
+            </button>
+          )}
+        </div>
+        <p className="text-sm">{execution.stages.filter(stage => stage.status === "COMPLETED").length} stages complete. You can return to manual editing while generation runs.</p>
+      </div>}
       {running && <button disabled={busy} onClick={() => void discard()} className="my-3 rounded border px-3 py-2">Cancel generation</button>}
       {proposal?.status === "PENDING_REVIEW" && <div className="mt-5">
         <h3 className="mb-2 font-semibold">Native editable proposal — not yet saved</h3>

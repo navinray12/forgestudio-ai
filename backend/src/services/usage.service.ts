@@ -1,6 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
-import { getUserSubscription } from "./subscription.service.js";
+import { getUserSubscription, assignDefaultFreePlan } from "./subscription.service.js";
 import { getUserLicenses } from "./license.service.js";
 import { initOptimizationTables } from "./imageOptimization.service.js";
 
@@ -19,7 +19,16 @@ export async function getUserUsageSummary(userId: string) {
   } catch (_) {}
 
   // 1. Fetch Subscription and Plan
-  const subscription = await getUserSubscription(userId);
+  let subscription: any;
+  try {
+    subscription = await getUserSubscription(userId);
+  } catch (err: any) {
+    if (err?.code === "SUBSCRIPTION_NOT_PROVISIONED") {
+      subscription = await assignDefaultFreePlan(userId);
+    } else {
+      throw err;
+    }
+  }
   const plan = subscription.plan || {
     name: "Free",
     slug: "free",

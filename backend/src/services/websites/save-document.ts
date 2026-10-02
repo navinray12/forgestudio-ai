@@ -20,7 +20,26 @@ export type DocumentSource = { kind: "ai"; changesetId: string };
 
 export async function authorizeWebsiteDocumentWrite(tx: WorkspaceTransaction, websiteId: string, actorId: string) {
   const website = await getScopedWebsiteInTransaction(tx, websiteId, actorId);
-  if (!website.organizationId || !website.workspaceId) throw new AppError("Website ownership migration is required before editing", 503, "TENANT_MIGRATION_REQUIRED");
+  if (!website.organizationId || !website.workspaceId) {
+    const organizationSlug = `personal-${actorId}`;
+    let organization = await tx.organization.findUnique({ where: { slug: organizationSlug } });
+    if (!organization) organization = await tx.organization.create({ data: {
+      name: "Personal organization", slug: organizationSlug, ownerId: actorId, settings: { kind: "PERSONAL" },
+      members: { create: { userId: actorId, role: "OWNER" } },
+    } });
+    const workspaceSlug = `personal-default-${actorId}`;
+    let workspace = await tx.workspace.findUnique({ where: { slug: workspaceSlug } });
+    if (!workspace) workspace = await tx.workspace.create({ data: {
+      name: "Personal websites", slug: workspaceSlug, ownerId: actorId, organizationId: organization.id,
+      members: { create: { userId: actorId, role: "OWNER" } },
+    } });
+    await tx.website.update({
+      where: { id: websiteId },
+      data: { organizationId: organization.id, workspaceId: workspace.id },
+    });
+    website.organizationId = organization.id;
+    website.workspaceId = workspace.id;
+  }
   if (website.workspaceStatus !== "ACTIVE") throw new AppError("This workspace is read-only", 409, "WORKSPACE_READ_ONLY");
   const overrides = await tx.granularPermission.findMany({ where: { websiteId, userId: actorId }, take: 1001 });
   if (overrides.length > 1000) throw new AppError("Permission policy exceeds the supported budget", 503, "POLICY_BUDGET_EXCEEDED");

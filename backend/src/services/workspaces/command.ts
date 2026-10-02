@@ -5,8 +5,9 @@ import { isRetryableTransactionConflict } from "../../config/transaction-conflic
 import { AppError } from "../../utils/app-error.js";
 import type { WorkspaceTransaction } from "./access.js";
 import { requireActiveActor } from "./access.js";
+import { ensureDatabaseTables } from "../../config/ensure-schema.js";
 
-type Result = { resourceId: string; [key: string]: unknown };
+type Result = { resourceId: string;[key: string]: unknown };
 type Scope = { organizationId: string };
 
 /** Single database commit for result, mutation, mandatory audit and outbox intent.
@@ -40,10 +41,12 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
         }
         const result = await input.execute(tx, context);
         const encoded = JSON.stringify(result);
-        await tx.auditLog.create({ data: {
-          userId: input.actorId, action: input.operation, targetResource: `workspace-operation:${result.resourceId}`,
-          details: { organizationId: context.organizationId, requestHash: hash },
-        } });
+        await tx.auditLog.create({
+          data: {
+            userId: input.actorId, action: input.operation, targetResource: `workspace-operation:${result.resourceId}`,
+            details: { organizationId: context.organizationId, requestHash: hash },
+          }
+        });
         await tx.$executeRaw`
           INSERT INTO workspace_outbox ("organizationId","actorId",operation,"resourceId")
           VALUES (${context.organizationId}::uuid,${input.actorId}::uuid,${input.operation},${result.resourceId}::uuid)
@@ -55,6 +58,7 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
         return JSON.parse(encoded) as R;
       }, { isolationLevel: "Serializable", maxWait: 2000, timeout: 5000 });
     } catch (error) {
+      console.error("[WORKSPACE-COMMAND CAUGHT ERROR]:", error);
       const failure = error as { code?: string; meta?: { code?: string } };
       const conflict = isRetryableTransactionConflict(error);
       if (conflict && attempt < 2) {
@@ -66,8 +70,20 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
         continue;
       }
       if (conflict) throw new AppError("A concurrent change could not be completed; retry with the same key", 409, "CONCURRENT_CHANGE");
-      if (failure.code === "P2010" && failure.meta?.code === "42P01") {
-        throw new AppError("Workspace schema migration is required", 503, "MIGRATION_REQUIRED");
+      const msg = String((error as any)?.message || "");
+      const isMissingTable = (failure.code === "P2010" && failure.meta?.code === "42P01") ||
+        failure.code === "P2021" || failure.code === "P2022" || msg.includes("does not exist") || msg.includes("42P01") || msg.includes("42703");
+      if (isMissingTable && attempt === 0) {
+        try {
+          await ensureDatabaseTables();
+          continue;
+        } catch (e) {
+          console.error("[ENSURE-TABLES FAILED ON RETRY]:", e);
+        }
+      }
+      if (isMissingTable) {
+        console.error("[WORKSPACE-COMMAND MIGRATION_REQUIRED REASON]:", error);
+        throw new AppError("Workspace database schema migration is required. Please run 'npm run db:migrate'.", 503, "MIGRATION_REQUIRED");
       }
       throw error;
     }

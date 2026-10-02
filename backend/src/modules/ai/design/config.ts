@@ -10,13 +10,31 @@ export const designConfigSchema = z.object({
 });
 export type DesignConfig = z.infer<typeof designConfigSchema>;
 export function designConfig(): DesignConfig {
-  const result = designConfigSchema.safeParse({ claudeModel: process.env.AI_CLAUDE_DESIGN_MODEL || process.env.AI_MODEL_PLANNER,
-    stitchModel: process.env.AI_STITCH_MODEL || "GEMINI_3_1_PRO", maxPages: Number(process.env.AI_DESIGN_MAX_PAGES || 8), dailyUnits: Number(process.env.AI_DESIGN_DAILY_UNITS || 100) });
-  if (!result.success || !process.env.STITCH_API_KEY || !process.env.ANTHROPIC_API_KEY) throw new AppError("Configure Stitch, Claude and an explicit Claude model on the server", 503, "AI_DESIGN_NOT_CONFIGURED");
+  let claudeModel = process.env.AI_CLAUDE_DESIGN_MODEL || process.env.AI_MODEL_PLANNER;
+  if (!claudeModel || claudeModel.startsWith("sk-ant-")) {
+    claudeModel = "claude-3-7-sonnet-20250219";
+  }
+  const result = designConfigSchema.safeParse({
+    claudeModel,
+    stitchModel: process.env.AI_STITCH_MODEL || "GEMINI_3_1_PRO",
+    maxPages: Number(process.env.AI_DESIGN_MAX_PAGES || 8),
+    dailyUnits: Number(process.env.AI_DESIGN_DAILY_UNITS || 100),
+  });
+  if (!result.success || !process.env.STITCH_API_KEY || !process.env.ANTHROPIC_API_KEY) {
+    throw new AppError("Configure Stitch, Claude and an explicit Claude model on the server", 503, "AI_DESIGN_NOT_CONFIGURED");
+  }
   encryptPrompt("configuration-check");
   return result.data;
 }
 export function designAvailability() {
-  try { const config = designConfig(); return { available: true, workflow: "stitch-claude", maxBriefCharacters: 64000, maxPages: config.maxPages, scopes: ["site", "page", "selection"], models: { claude: config.claudeModel, stitch: config.stitchModel } }; }
-  catch { return { available: false, workflow: "stitch-claude", reason: "AI_DESIGN_NOT_CONFIGURED", maxBriefCharacters: 64000 }; }
+  try {
+    const config = designConfig();
+    return { available: true, workflow: "stitch-claude", maxBriefCharacters: 64000, maxPages: config.maxPages, scopes: ["site", "page", "selection"], models: { claude: config.claudeModel, stitch: config.stitchModel } };
+  }
+  catch (err: any) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[AI Design] Capability check failed:", err?.message || err);
+    }
+    return { available: false, workflow: "stitch-claude", reason: "AI_DESIGN_NOT_CONFIGURED", maxBriefCharacters: 64000 };
+  }
 }

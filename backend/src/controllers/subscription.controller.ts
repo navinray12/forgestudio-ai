@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import {
   getAllActivePlans,
   getUserSubscription,
+  assignDefaultFreePlan,
   changeUserPlan,
   cancelSubscription,
   getUserInvoices,
@@ -49,7 +50,16 @@ export async function getCurrentSubscription(
       });
     }
 
-    const subscription = await getUserSubscription(user.id);
+    let subscription: any;
+    try {
+      subscription = await getUserSubscription(user.id);
+    } catch (err: any) {
+      if (err?.code === "SUBSCRIPTION_NOT_PROVISIONED") {
+        subscription = await assignDefaultFreePlan(user.id);
+      } else {
+        throw err;
+      }
+    }
 
     return res.status(200).json({
       success: true,

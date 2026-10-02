@@ -24,11 +24,11 @@ const globalForPrisma = globalThis as unknown as {
 
 export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
   connectionString,
-  max: positiveInteger("DATABASE_POOL_MAX", 5, 100),
-  connectionTimeoutMillis: positiveInteger("DATABASE_ACQUIRE_TIMEOUT_MS", 2000, 30000),
+  max: positiveInteger("DATABASE_POOL_MAX", 10, 100),
+  connectionTimeoutMillis: positiveInteger("DATABASE_ACQUIRE_TIMEOUT_MS", 10000, 30000),
   idleTimeoutMillis: positiveInteger("DATABASE_IDLE_TIMEOUT_MS", 30000, 300000),
-  statement_timeout: positiveInteger("DATABASE_STATEMENT_TIMEOUT_MS", 5000, 60000),
-  idle_in_transaction_session_timeout: 10000,
+  statement_timeout: positiveInteger("DATABASE_STATEMENT_TIMEOUT_MS", 30000, 60000),
+  idle_in_transaction_session_timeout: 30000,
 });
 const adapter = new PrismaPg(pgPool);
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });

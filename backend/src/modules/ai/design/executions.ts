@@ -36,7 +36,14 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
       await tx.$queryRaw`SELECT id FROM workspaces WHERE id=${website.workspaceId}::uuid FOR UPDATE`;
       const start = new Date(); start.setUTCHours(0, 0, 0, 0);
       const units = input.operation === "EDIT_DOCUMENT" ? 1 : 2 + 3 * config.maxPages;
-      const usage = await tx.aiExecution.aggregate({ where: { workspaceId: website.workspaceId, createdAt: { gte: start } }, _sum: { reservedUnits: true } });
+      const usage = await tx.aiExecution.aggregate({
+        where: {
+          workspaceId: website.workspaceId,
+          createdAt: { gte: start },
+          status: { notIn: ["FAILED", "CANCELLED", "RECONCILIATION_REQUIRED"] },
+        },
+        _sum: { reservedUnits: true }
+      });
       if ((usage._sum.reservedUnits ?? 0) + units > config.dailyUnits) throw new AppError("Workspace design generation quota reached", 429, "AI_QUOTA_EXCEEDED");
       if (await tx.aiExecution.count({ where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: "stitch-claude" } })) throw new AppError("A design execution is already active for this website", 409, "AI_EXECUTION_ACTIVE");
       const execution = await tx.aiExecution.create({ data: { id: randomUUID(), websiteId, workspaceId: website.workspaceId, organizationId: website.organizationId, actorId,

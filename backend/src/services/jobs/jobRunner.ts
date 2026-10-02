@@ -258,8 +258,12 @@ export async function processNextJob(
     FROM picked WHERE j.id=picked.id RETURNING j.*`;
     const claimed = await pgPool.query(query, values);
     job = claimed.rows[0] ?? null;
-  } catch (error) {
-    if (!memoryFallbackAllowed()) throw new AppError("Durable job claim failed", 503, "JOB_STORAGE_UNAVAILABLE");
+  } catch (error: any) {
+    if (error?.code === "42P01" || error?.code === "42703" || error?.message?.includes("does not exist")) {
+      job = null;
+    } else if (!memoryFallbackAllowed()) {
+      throw new AppError("Durable job claim failed", 503, "JOB_STORAGE_UNAVAILABLE");
+    }
   }
 
   // Local/test memory fallback if explicitly enabled.
@@ -331,16 +335,23 @@ export async function renewJobLease(jobId: string, token: string): Promise<boole
 /** An interrupted external operation is uncertain, not a safe automatic retry.
  * Retain a durable review record before releasing the expired job. */
 export async function reconcileExpiredJobs(): Promise<number> {
-  const result = await pgPool.query(`WITH expired AS (
-    SELECT id FROM background_jobs WHERE status='RUNNING' AND "lockedUntil"<now()
-    ORDER BY "lockedUntil" LIMIT 25 FOR UPDATE SKIP LOCKED
-  ), failed AS (
-    UPDATE background_jobs j SET status='FAILED',"lastError"='JOB_OUTCOME_UNKNOWN',
-      "completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
-    FROM expired WHERE j.id=expired.id RETURNING j.*
-  ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
-    SELECT "organizationId",id,type,payload,attempts,'JOB_OUTCOME_UNKNOWN' FROM failed`);
-  return result.rowCount ?? 0;
+  try {
+    const result = await pgPool.query(`WITH expired AS (
+      SELECT id FROM background_jobs WHERE status='RUNNING' AND "lockedUntil"<now()
+      ORDER BY "lockedUntil" LIMIT 25 FOR UPDATE SKIP LOCKED
+    ), failed AS (
+      UPDATE background_jobs j SET status='FAILED',"lastError"='JOB_OUTCOME_UNKNOWN',
+        "completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+      FROM expired WHERE j.id=expired.id RETURNING j.*
+    ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
+      SELECT "organizationId",id,type,payload,attempts,'JOB_OUTCOME_UNKNOWN' FROM failed`);
+    return result.rowCount ?? 0;
+  } catch (error: any) {
+    if (error?.code === "42P01" || error?.code === "42703" || error?.message?.includes("does not exist")) {
+      return 0;
+    }
+    throw error;
+  }
 }
 
 async function markJobCompleted(job: any, _result?: any) {
@@ -385,13 +396,72 @@ async function markJobFailed(job: any, errorMsg: string) {
     [job.id, job.lockToken, nextStatus, nextAttempts, errorMsg, isFinalFailure ? job.runAt : nextRunAt, isFinalFailure ? now : null]);
 }
 
+let tablesEnsured = false;
+export async function ensureJobTables(): Promise<void> {
+  if (tablesEnsured) return;
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS background_jobs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "organizationId" uuid,
+        type varchar(100) NOT NULL,
+        payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+        status varchar(50) NOT NULL DEFAULT 'QUEUED',
+        attempts integer NOT NULL DEFAULT 0,
+        "maxAttempts" integer NOT NULL DEFAULT 3,
+        "idempotencyKey" varchar(128),
+        "lastError" varchar(2000),
+        "runAt" timestamptz NOT NULL DEFAULT now(),
+        "lockedUntil" timestamptz,
+        "lockToken" uuid,
+        "startedAt" timestamptz,
+        "completedAt" timestamptz,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "updatedAt" timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS job_dead_letters (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "organizationId" uuid,
+        "jobId" uuid,
+        "jobType" varchar(100) NOT NULL,
+        payload jsonb NOT NULL,
+        attempts integer NOT NULL,
+        reason text NOT NULL,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "replayedAt" timestamptz
+      );
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "organizationId" UUID;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "idempotencyKey" VARCHAR(128);
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "maxAttempts" INTEGER NOT NULL DEFAULT 3;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lastError" VARCHAR(2000);
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "runAt" TIMESTAMPTZ NOT NULL DEFAULT now();
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMPTZ;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lockToken" UUID;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "startedAt" TIMESTAMPTZ;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMPTZ;
+      ALTER TABLE job_dead_letters ADD COLUMN IF NOT EXISTS "organizationId" UUID;
+    `);
+    tablesEnsured = true;
+  } catch {
+    // Graceful in restricted environments
+  }
+}
+
 export function startJobWorker(intervalMs: number = 2000) {
   if (workerInterval) return;
+
+  void ensureJobTables();
 
   workerInterval = setInterval(() => {
     if (workerActive) return;
     workerActive = reconcileExpiredJobs().then(() => processNextJob())
-      .catch(() => { console.error("job-worker-tick-failed"); })
+      .catch((err) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("job-worker-tick-failed:", err?.message || err);
+        } else {
+          console.error("job-worker-tick-failed");
+        }
+      })
       .finally(() => { workerActive = null; });
   }, intervalMs);
 }
