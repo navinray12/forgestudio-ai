@@ -22,15 +22,24 @@ export class GeminiProvider implements AiProvider {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
     try {
+      const systemText = request.systemPrompt || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_INSTRUCTIONS : "You are a professional website and design AI assistant. Return your response in clean JSON or text as requested.");
+      const userContent = request.operation === "SITE_GENERATION"
+        ? JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName })
+        : JSON.stringify({ prompt: request.prompt, ...request.context });
+      const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
+
       const response = await this.fetcher(
         `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent`,
         { method: "POST", signal,
           headers: { "x-goog-api-key": this.apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SITE_BLUEPRINT_INSTRUCTIONS }] },
-            contents: [{ role: "user", parts: [{ text: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }] }],
-            generationConfig: { maxOutputTokens: 8192, responseMimeType: "application/json",
-              responseJsonSchema: SITE_BLUEPRINT_JSON_SCHEMA },
+            systemInstruction: { parts: [{ text: systemText }] },
+            contents: [{ role: "user", parts: [{ text: userContent }] }],
+            generationConfig: {
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+              ...(schema ? { responseJsonSchema: schema } : {}),
+            },
           }),
         },
       );

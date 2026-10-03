@@ -18,9 +18,15 @@ export class ClaudeDesignPlanner implements DesignPlanner {
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
         console.error(`[CLAUDE PLANNER ERROR ${response.status}]:`, errorText);
+        if (response.status === 429) {
+          throw new AppError("Claude rate limit reached", 429, "AI_RATE_LIMIT");
+        }
         if ((response.status === 400 || response.status === 401) && process.env.GEMINI_API_KEY) {
           console.warn("[CLAUDE PLANNER] Falling back to Gemini planner due to workspace requirement...");
           return await this.callGemini(system, data, signal);
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new AppError("Claude authentication failed", 401, "AI_AUTH_ERROR");
         }
         throw new AppError("Claude is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");
       }
@@ -29,6 +35,7 @@ export class ClaudeDesignPlanner implements DesignPlanner {
       if (body.stop_reason !== "end_turn" || parts?.length !== 1 || !parts[0]?.text) throw new AppError("Claude output was incomplete", 502, "AI_INVALID_OUTPUT");
       return parts[0].text;
     } catch (error) {
+      if (signal?.aborted) throw new AppError("Execution cancelled", 409, "AI_CANCELLED");
       if (error instanceof AppError) throw error;
       if (process.env.GEMINI_API_KEY) {
         console.warn("[CLAUDE PLANNER] Claude call failed, falling back to Gemini planner...");

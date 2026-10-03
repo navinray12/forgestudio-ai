@@ -254,7 +254,7 @@ export async function processNextJob(
       ORDER BY "runAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1
     )
     UPDATE background_jobs j SET status='RUNNING',"startedAt"=now(),
-      "lockedUntil"=now()+interval '30 seconds',"lockToken"=$${tokenIndex}::uuid
+      "lockedUntil"=now()+interval '120 seconds',"lockToken"=$${tokenIndex}::uuid
     FROM picked WHERE j.id=picked.id RETURNING j.*`;
     const claimed = await pgPool.query(query, values);
     job = claimed.rows[0] ?? null;
@@ -317,7 +317,7 @@ export async function processNextJob(
     if (!await markJobCompleted(job, result)) return { processed: true, job, error: "JOB_LEASE_LOST" };
     return { processed: true, job, result };
   } catch (err: any) {
-    const errMsg = "JOB_EXECUTION_FAILED";
+    const errMsg = err instanceof AppError ? err.code : (typeof err?.message === "string" ? err.message : "JOB_EXECUTION_FAILED");
     await markJobFailed(job, errMsg);
     return { processed: true, job, error: errMsg };
   } finally {
@@ -327,9 +327,9 @@ export async function processNextJob(
 }
 
 export async function renewJobLease(jobId: string, token: string): Promise<boolean> {
-  const result = await pgPool.query(`UPDATE background_jobs SET "lockedUntil"=now()+interval '30 seconds',"updatedAt"=now()
-    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [jobId, token]);
-  return result.rowCount === 1;
+  const result = await pgPool.query(`UPDATE background_jobs SET "lockedUntil"=now()+interval '120 seconds',"updatedAt"=now()
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid`, [jobId, token]);
+  return (result.rowCount ?? 0) === 1;
 }
 
 /** An interrupted external operation is uncertain, not a safe automatic retry.

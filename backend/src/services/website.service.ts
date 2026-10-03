@@ -318,11 +318,11 @@ export async function deleteWebsite(websiteId: string, userId: string) {
 export async function getWebsiteRoles(websiteId: string, userId: string) {
   const website = await getWebsiteById(websiteId, userId);
 
-  const ownerData = await db.user.findUnique({ where: { id: website.userId } });
+  const ownerData = website.userId ? await db.user.findUnique({ where: { id: website.userId } }) : null;
   const members = [{
-    id: ownerData.id,
-    name: ownerData.fullName || ownerData.email,
-    email: ownerData.email,
+    id: ownerData?.id || website.userId || "owner",
+    name: ownerData?.fullName || ownerData?.email || "Project Owner",
+    email: ownerData?.email || "",
     role: "OWNER"
   }];
 

@@ -284,6 +284,11 @@ function App() {
           />
 
           <Route
+            path="/subscription"
+            element={<Navigate to="/subscriptions" replace />}
+          />
+
+          <Route
             path="/editor/:websiteId"
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>

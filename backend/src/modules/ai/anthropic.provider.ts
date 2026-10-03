@@ -24,7 +24,17 @@ export class AnthropicProvider implements AiProvider {
     try {
       const activeModel = this.model?.startsWith("claude-") ? this.model : "claude-3-7-sonnet-20250219";
       const workspaceId = await resolveAnthropicWorkspaceId(this.apiKey);
-      const systemPrompt = `${SITE_BLUEPRINT_INSTRUCTIONS}\n\nIMPORTANT: Return ONLY a raw, valid JSON object strictly matching this schema. Do not wrap in markdown or backticks. Schema:\n${JSON.stringify(SITE_BLUEPRINT_JSON_SCHEMA)}`;
+      const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
+      const defaultInstruction = request.operation === "SITE_GENERATION"
+        ? SITE_BLUEPRINT_INSTRUCTIONS
+        : "You are a professional website and design AI assistant. Return your response in clean JSON or text as requested.";
+      const systemPrompt = request.systemPrompt || (schema
+        ? `${defaultInstruction}\n\nIMPORTANT: Return ONLY a raw, valid JSON object strictly matching this schema. Do not wrap in markdown or backticks. Schema:\n${JSON.stringify(schema)}`
+        : defaultInstruction);
+      const userContent = request.operation === "SITE_GENERATION"
+        ? JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName })
+        : JSON.stringify({ prompt: request.prompt, ...request.context });
+
       const response = await this.fetcher("https://api.anthropic.com/v1/messages", {
         method: "POST", signal,
         headers: {
@@ -37,7 +47,7 @@ export class AnthropicProvider implements AiProvider {
           model: activeModel,
           max_tokens: 8192,
           system: systemPrompt,
-          messages: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
+          messages: [{ role: "user", content: userContent }],
         }),
       });
       if (!response.ok) {

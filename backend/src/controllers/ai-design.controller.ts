@@ -23,4 +23,14 @@ export async function cancelDesignHandler(req: Request, res: Response, next: Nex
 export async function retryDesignHandler(req: Request, res: Response, next: NextFunction) {
   try { const id = String(req.params.executionId), row = await authorizedExecution(id, res.locals.user.id); res.status(202).json(await retryDesignExecution(id, res.locals.user.id, documentWriteContext(req, row.websiteId))); } catch (error) { next(error); }
 }
-export function designCapabilitiesHandler(_req: Request, res: Response) { res.setHeader("Cache-Control", "no-store"); res.json({ design: designAvailability() }); }
+import { getImageCapabilityMatrix } from "../modules/ai/images/image-provider.js";
+import { getPlatformCapabilityMatrix } from "../modules/ai/provider-routing.js";
+
+export function designCapabilitiesHandler(_req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    design: designAvailability(),
+    images: getImageCapabilityMatrix(),
+    platform: getPlatformCapabilityMatrix(),
+  });
+}
