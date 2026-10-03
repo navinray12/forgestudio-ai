@@ -1,0 +1,475 @@
+import crypto from "crypto";
+import { pgPool, prisma } from "../../config/prisma.js";
+import { AppError } from "../../utils/app-error.js";
+
+export type JobType =
+  | "SCHEDULED_PUBLISH"
+  | "DEPLOYMENT_VERIFY"
+  | "WEBHOOK_RETRY"
+  | "MEDIA_OPTIMIZATION"
+  | string;
+
+export type JobStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
+
+export type JobHandler = (payload: any, job: any) => Promise<any>;
+
+// Registered in-process handlers
+const handlers: Map<string, JobHandler> = new Map();
+
+// In-memory queue is an explicit local/test development aid only. Production
+// accepted work must be durable before acknowledgement.
+const memoryQueue: any[] = [];
+function memoryFallbackAllowed(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.FORGE_ALLOW_MEMORY_JOB_FALLBACK === "1";
+}
+
+let workerInterval: any = null;
+let workerActive: Promise<unknown> | null = null;
+
+export function registerJobHandler(type: string, handler: JobHandler) {
+  handlers.set(type, handler);
+}
+
+export function unregisterJobHandler(type: string) {
+  handlers.delete(type);
+}
+
+export async function enqueueJob(
+  type: string,
+  payload: any,
+  options: { runAt?: Date; maxAttempts?: number } = {}
+) {
+  const runAt = options.runAt || new Date();
+  const maxAttempts = options.maxAttempts || 3;
+
+  try {
+    const job = await (prisma as any).backgroundJob.create({
+      data: {
+        type,
+        payload: payload || {},
+        status: "QUEUED",
+        attempts: 0,
+        maxAttempts,
+        runAt,
+      },
+    });
+    return job;
+  } catch (err) {
+    if (!memoryFallbackAllowed()) {
+      throw new AppError("Durable job storage is unavailable; work was not accepted", 503, "JOB_STORAGE_UNAVAILABLE");
+    }
+    const memJob = {
+      id: `mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      type,
+      payload: payload || {},
+      status: "QUEUED",
+      attempts: 0,
+      maxAttempts,
+      lastError: null,
+      runAt,
+      startedAt: null,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    memoryQueue.push(memJob);
+    return memJob;
+  }
+}
+
+export async function getJobById(jobId: string) {
+  try {
+    const job = await (prisma as any).backgroundJob.findUnique({
+      where: { id: jobId },
+    });
+    if (job) return job;
+  } catch {}
+
+  return memoryFallbackAllowed() ? (memoryQueue.find((j) => j.id === jobId) || null) : null;
+}
+
+export async function listJobs(filters: { type?: string; status?: string; limit?: number } = {}) {
+  const limit = filters.limit || 50;
+
+  try {
+    const where: any = {};
+    if (filters.type) where.type = filters.type;
+    if (filters.status) where.status = filters.status;
+
+    const dbJobs = await (prisma as any).backgroundJob.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+    if (dbJobs.length > 0) return dbJobs;
+  } catch {}
+
+  if (!memoryFallbackAllowed()) return [];
+  let memFiltered = memoryQueue;
+  if (filters.type) memFiltered = memFiltered.filter((j) => j.type === filters.type);
+  if (filters.status) memFiltered = memFiltered.filter((j) => j.status === filters.status);
+  return memFiltered.slice(0, limit);
+}
+
+export async function cancelJob(
+  jobId: string,
+  reason?: string
+): Promise<{ success: boolean; job: any; alreadyCancelled?: boolean }> {
+  if (!jobId) {
+    throw new AppError("jobId is required to cancel job", 400, "INVALID_JOB_ID");
+  }
+
+  const now = new Date();
+
+  // 1. Try DB first
+  try {
+    const existing = await (prisma as any).backgroundJob.findUnique({
+      where: { id: jobId },
+    });
+
+    if (existing) {
+      if (existing.status === "CANCELLED") {
+        return { success: true, job: existing, alreadyCancelled: true };
+      }
+      if (existing.status === "COMPLETED") {
+        throw new AppError("Cannot cancel job that has already completed", 400, "JOB_ALREADY_COMPLETED");
+      }
+
+      const updated = await (prisma as any).backgroundJob.update({
+        where: { id: jobId },
+        data: {
+          status: "CANCELLED",
+          lastError: reason ? `Cancelled: ${reason}` : "Cancelled by user",
+          completedAt: now,
+          updatedAt: now,
+        },
+      });
+      return { success: true, job: updated };
+    }
+  } catch (err: any) {
+    if (err instanceof AppError) throw err;
+  }
+
+  // 2. Local/test memory fallback only.
+  const memJob = memoryFallbackAllowed() ? memoryQueue.find((j) => j.id === jobId) : undefined;
+  if (memJob) {
+    if (memJob.status === "CANCELLED") {
+      return { success: true, job: memJob, alreadyCancelled: true };
+    }
+    if (memJob.status === "COMPLETED") {
+      throw new AppError("Cannot cancel job that has already completed", 400, "JOB_ALREADY_COMPLETED");
+    }
+
+    memJob.status = "CANCELLED";
+    memJob.lastError = reason ? `Cancelled: ${reason}` : "Cancelled by user";
+    memJob.completedAt = now;
+    memJob.updatedAt = now;
+    return { success: true, job: memJob };
+  }
+
+  throw new AppError(`Job ${jobId} not found`, 404, "JOB_NOT_FOUND");
+}
+
+export async function retryJob(jobId: string) {
+  if (!jobId) {
+    throw new AppError("jobId is required", 400, "INVALID_JOB_ID");
+  }
+  const now = new Date();
+  try {
+    const job = await (prisma as any).backgroundJob.update({
+      where: { id: jobId },
+      data: {
+        status: "QUEUED",
+        attempts: 0,
+        lastError: null,
+        runAt: now,
+        completedAt: null,
+        updatedAt: now,
+        lockedUntil: null,
+        lockToken: null,
+      } as any,
+    });
+    return job;
+  } catch {
+    const memJob = memoryFallbackAllowed() ? memoryQueue.find((j) => j.id === jobId) : undefined;
+    if (memJob) {
+      memJob.status = "QUEUED";
+      memJob.attempts = 0;
+      memJob.lastError = null;
+      memJob.runAt = now;
+      memJob.completedAt = null;
+      memJob.updatedAt = now;
+      return memJob;
+    }
+    throw new AppError(`Job ${jobId} not found`, 404, "JOB_NOT_FOUND");
+  }
+}
+
+export async function purgeCompletedJobs(): Promise<{ purgedCount: number }> {
+  try {
+    const count = await (prisma as any).backgroundJob.deleteMany({
+      where: {
+        status: { in: ["COMPLETED", "CANCELLED"] },
+      },
+    });
+    return { purgedCount: count.count || 0 };
+  } catch {
+    let purged = 0;
+    for (let i = memoryQueue.length - 1; i >= 0; i--) {
+      if (memoryQueue[i].status === "COMPLETED" || memoryQueue[i].status === "CANCELLED") {
+        memoryQueue.splice(i, 1);
+        purged++;
+      }
+    }
+    return { purgedCount: purged };
+  }
+}
+
+export async function processNextJob(
+  filter?: { id?: string; type?: string }
+): Promise<{ processed: boolean; job?: any; result?: any; error?: any }> {
+  const now = new Date();
+
+  // Try DB first
+  let job: any = null;
+  try {
+    const clauses = ["status='QUEUED'", "\"runAt\" <= now()", "(\"lockedUntil\" IS NULL OR \"lockedUntil\" < now())"];
+    const values: unknown[] = [];
+    if (filter?.id) { values.push(filter.id); clauses.push(`id=$${values.length}::uuid`); }
+    if (filter?.type) { values.push(filter.type); clauses.push(`type=$${values.length}`); }
+    if (!filter?.id && !filter?.type) {
+      // Workers claim only types they can execute; a scanner must not consume
+      // another worker's publishing or AI stage jobs.
+      values.push([...handlers.keys()]); clauses.push(`type=ANY($${values.length}::text[])`);
+    }
+    const token = crypto.randomUUID(); values.push(token);
+    const tokenIndex = values.length;
+    const query = `WITH picked AS (
+      SELECT id FROM background_jobs WHERE ${clauses.join(" AND ")}
+      ORDER BY "runAt", "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1
+    )
+    UPDATE background_jobs j SET status='RUNNING',"startedAt"=now(),
+      "lockedUntil"=now()+interval '30 seconds',"lockToken"=$${tokenIndex}::uuid
+    FROM picked WHERE j.id=picked.id RETURNING j.*`;
+    const claimed = await pgPool.query(query, values);
+    job = claimed.rows[0] ?? null;
+  } catch (error: any) {
+    if (error?.code === "42P01" || error?.code === "42703" || error?.message?.includes("does not exist")) {
+      job = null;
+    } else if (!memoryFallbackAllowed()) {
+      throw new AppError("Durable job claim failed", 503, "JOB_STORAGE_UNAVAILABLE");
+    }
+  }
+
+  // Local/test memory fallback if explicitly enabled.
+  if (!job && memoryFallbackAllowed()) {
+    const memIdx = memoryQueue.findIndex(
+      (j) =>
+        j.status === "QUEUED" &&
+        new Date(j.runAt).getTime() <= now.getTime() &&
+        (!filter?.id || j.id === filter.id) &&
+        (!filter?.type || j.type === filter.type)
+    );
+    if (memIdx >= 0) {
+      job = memoryQueue[memIdx];
+      job.status = "RUNNING";
+      job.startedAt = new Date();
+    }
+  }
+
+  if (!job) {
+    return { processed: false };
+  }
+
+  // Prevent executing cancelled jobs
+  if (job.status === "CANCELLED") {
+    return { processed: false, job, error: "Job is cancelled" };
+  }
+
+  const handler = handlers.get(job.type);
+  if (!handler) {
+    const errMsg = "JOB_HANDLER_UNAVAILABLE";
+    await markJobFailed(job, errMsg);
+    return { processed: true, job, error: errMsg };
+  }
+
+  // A long provider/scan call must not lose its lease after thirty seconds.
+  // Fencing every final write prevents an old worker from completing a job that
+  // was cancelled or taken over. Handlers still need domain-level idempotency.
+  let renewing: Promise<unknown> | null = null;
+  const heartbeat = job.lockToken ? setInterval(() => {
+    if (renewing) return;
+    renewing = renewJobLease(job.id, job.lockToken).catch(() => false).finally(() => { renewing = null; });
+  }, 10_000) : null;
+  heartbeat?.unref();
+  try {
+    const result = await handler(job.payload, job);
+    // Double check if cancelled concurrently during execution
+    const currentStatus = await getJobById(job.id);
+    if (currentStatus?.status === "CANCELLED") {
+      return { processed: true, job: currentStatus, result: { cancelled: true } };
+    }
+    if (!await markJobCompleted(job, result)) return { processed: true, job, error: "JOB_LEASE_LOST" };
+    return { processed: true, job, result };
+  } catch (err: any) {
+    const errMsg = "JOB_EXECUTION_FAILED";
+    await markJobFailed(job, errMsg);
+    return { processed: true, job, error: errMsg };
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+    if (renewing) await renewing;
+  }
+}
+
+export async function renewJobLease(jobId: string, token: string): Promise<boolean> {
+  const result = await pgPool.query(`UPDATE background_jobs SET "lockedUntil"=now()+interval '30 seconds',"updatedAt"=now()
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [jobId, token]);
+  return result.rowCount === 1;
+}
+
+/** An interrupted external operation is uncertain, not a safe automatic retry.
+ * Retain a durable review record before releasing the expired job. */
+export async function reconcileExpiredJobs(): Promise<number> {
+  try {
+    const result = await pgPool.query(`WITH expired AS (
+      SELECT id FROM background_jobs WHERE status='RUNNING' AND "lockedUntil"<now()
+      ORDER BY "lockedUntil" LIMIT 25 FOR UPDATE SKIP LOCKED
+    ), failed AS (
+      UPDATE background_jobs j SET status='FAILED',"lastError"='JOB_OUTCOME_UNKNOWN',
+        "completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+      FROM expired WHERE j.id=expired.id RETURNING j.*
+    ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
+      SELECT "organizationId",id,type,payload,attempts,'JOB_OUTCOME_UNKNOWN' FROM failed`);
+    return result.rowCount ?? 0;
+  } catch (error: any) {
+    if (error?.code === "42P01" || error?.code === "42703" || error?.message?.includes("does not exist")) {
+      return 0;
+    }
+    throw error;
+  }
+}
+
+async function markJobCompleted(job: any, _result?: any) {
+  const now = new Date();
+  if (memoryFallbackAllowed() && String(job.id).startsWith("mem_")) {
+    job.status = "COMPLETED";
+    job.completedAt = now;
+    job.updatedAt = now;
+    return true;
+  }
+  const result = await pgPool.query(`UPDATE background_jobs SET status='COMPLETED',"completedAt"=now(),"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [job.id, job.lockToken]);
+  return result.rowCount === 1;
+}
+
+async function markJobFailed(job: any, errorMsg: string) {
+  const now = new Date();
+  const nextAttempts = (job.attempts || 0) + 1;
+  const isFinalFailure = nextAttempts >= (job.maxAttempts || 3);
+
+  // Exponential backoff: 2^attempts seconds
+  const backoffMs = Math.pow(2, nextAttempts) * 1000;
+  const nextRunAt = new Date(Date.now() + backoffMs);
+
+  const nextStatus = isFinalFailure ? "FAILED" : "QUEUED";
+  if (memoryFallbackAllowed() && String(job.id).startsWith("mem_")) {
+    job.status = nextStatus;
+    job.attempts = nextAttempts;
+    job.lastError = errorMsg.slice(0, 2000);
+    job.runAt = isFinalFailure ? job.runAt : nextRunAt;
+    job.completedAt = isFinalFailure ? now : null;
+    job.updatedAt = now;
+    return;
+  }
+  await pgPool.query(`WITH failed AS (
+    UPDATE background_jobs SET status=$3,attempts=$4,"lastError"=$5,"runAt"=$6,
+      "completedAt"=$7,"updatedAt"=now(),"lockedUntil"=NULL,"lockToken"=NULL
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()
+    RETURNING *
+  ) INSERT INTO job_dead_letters("organizationId","jobId","jobType",payload,attempts,reason)
+    SELECT "organizationId",id,type,payload,attempts,"lastError" FROM failed WHERE status='FAILED'`,
+    [job.id, job.lockToken, nextStatus, nextAttempts, errorMsg, isFinalFailure ? job.runAt : nextRunAt, isFinalFailure ? now : null]);
+}
+
+let tablesEnsured = false;
+export async function ensureJobTables(): Promise<void> {
+  if (tablesEnsured) return;
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS background_jobs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "organizationId" uuid,
+        type varchar(100) NOT NULL,
+        payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+        status varchar(50) NOT NULL DEFAULT 'QUEUED',
+        attempts integer NOT NULL DEFAULT 0,
+        "maxAttempts" integer NOT NULL DEFAULT 3,
+        "idempotencyKey" varchar(128),
+        "lastError" varchar(2000),
+        "runAt" timestamptz NOT NULL DEFAULT now(),
+        "lockedUntil" timestamptz,
+        "lockToken" uuid,
+        "startedAt" timestamptz,
+        "completedAt" timestamptz,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "updatedAt" timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS job_dead_letters (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "organizationId" uuid,
+        "jobId" uuid,
+        "jobType" varchar(100) NOT NULL,
+        payload jsonb NOT NULL,
+        attempts integer NOT NULL,
+        reason text NOT NULL,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "replayedAt" timestamptz
+      );
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "organizationId" UUID;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "idempotencyKey" VARCHAR(128);
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "maxAttempts" INTEGER NOT NULL DEFAULT 3;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lastError" VARCHAR(2000);
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "runAt" TIMESTAMPTZ NOT NULL DEFAULT now();
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMPTZ;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "lockToken" UUID;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "startedAt" TIMESTAMPTZ;
+      ALTER TABLE background_jobs ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMPTZ;
+      ALTER TABLE job_dead_letters ADD COLUMN IF NOT EXISTS "organizationId" UUID;
+    `);
+    tablesEnsured = true;
+  } catch {
+    // Graceful in restricted environments
+  }
+}
+
+export function startJobWorker(intervalMs: number = 2000) {
+  if (workerInterval) return;
+
+  void ensureJobTables();
+
+  workerInterval = setInterval(() => {
+    if (workerActive) return;
+    workerActive = reconcileExpiredJobs().then(() => processNextJob())
+      .catch((err) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("job-worker-tick-failed:", err?.message || err);
+        } else {
+          console.error("job-worker-tick-failed");
+        }
+      })
+      .finally(() => { workerActive = null; });
+  }, intervalMs);
+}
+
+export async function stopJobWorker() {
+  if (workerInterval) {
+    clearInterval(workerInterval);
+    workerInterval = null;
+  }
+  await workerActive;
+}

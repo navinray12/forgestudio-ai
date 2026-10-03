@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {loadTypeScript} from "./load-typescript.mjs";
+const policy=await loadTypeScript("backend/src/services/workspaces/lifecycle-policy.ts");
+for(const value of [undefined,null,0,-1,1.5,"1",2147483647])test(`WORKSPACE-011: reject missing or invalid version ${value}`,()=>assert.throws(()=>policy.expectedWorkspaceVersion(value),{code:"PRECONDITION_REQUIRED"}));
+test("WORKSPACE-012: reject stale replacement",()=>assert.throws(()=>policy.assertWorkspaceVersion(2,1),{code:"VERSION_CONFLICT"}));
+test("WORKSPACE-013: version match admitted",()=>assert.equal(policy.assertWorkspaceVersion(4,4),undefined));
+for(const state of ["ARCHIVED","UNKNOWN","DELETED"])test(`WORKSPACE-014: block ${state}`,()=>assert.throws(()=>policy.assertWorkspaceWritable({lifecycleStatus:state}),{code:"WORKSPACE_READ_ONLY"}));
+test("WORKSPACE-015: supported settings normalized",()=>assert.equal(policy.workspaceSettings({locale:"en-in",timeZone:"Asia/Kolkata"}).locale,"en-IN"));
+for(const settings of [{role:"OWNER"},{locale:"!!!"},{timeZone:"anything"},[],null,{__proto__:null,constructor:"x"}])test(`WORKSPACE-016: forbidden settings ${JSON.stringify(settings)}`,()=>assert.throws(()=>policy.workspaceSettings(settings),{code:"VALIDATION_ERROR"}));
+for(const reason of ["",null,"a".repeat(501)])test("WORKSPACE-017: lifecycle needs bounded reason",()=>assert.throws(()=>policy.boundedReason(reason),{code:"REASON_REQUIRED"}));

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "repository": "ooarchitect92/forge",
+  "qualificationRevision": 5,
+  "parts": [
+    "2054a12244c0f2ae3e44a0d7d3a87e7caaf6549a",
+    "c8e82f3fbd27969b2f0c30d1af0ff08f14a87d19",
+    "95ac72cb758723486167789cf61c6ab5abe4b001",
+    "e29022f3277822492a578787c108188575698832",
+    "dbdb454f35ec1b15d9122c3dace47c1d413f9e31"
+  ],
+  "sha256": "d60b250bd476df9c983f640f454a2d8a8a4c92d9b75fb3c701d01a9be361bc93",
+  "overrides": [
+    {"path":"backend/package.json","before":"c559ada9e193e5db5707db7141e1605e624ecd94","after":"2ab81befbc9fcb3c07668ed4623789ec7bedf28a"},
+    {"path":"backend/package-lock.json","before":"ac5353aec4923b2044e0282853a3c3a8d6cfec11","after":"13b3ac0f830d761d75e55a6004ffedd8bffe5ddc"},
+    {"path":"frontend/src/context/AuthContext.tsx","before":"d8ac65fadacd3025253e178969edef3a4728329c","after":"9e708344301c50d8edde74c39455bbd143212f6e"},
+    {"path":"tests/hardening/identity-policy.test.mjs","before":"eb645c282ca814f96001bfe14307ea9a4019743f","after":"3fd4607a6e5df39b42d0ec0401fc0af9e14e6dab"}
+  ]
+}

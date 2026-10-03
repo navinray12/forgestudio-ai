@@ -1,0 +1,56 @@
+name: Workspace PostgreSQL and HTTP contracts
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  workspace-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_hardening
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_hardening
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - run: npm ci
+      - name: Prepare disposable legacy schema, not a production migration
+        run: |
+          npx --no-install prisma generate
+          npx --no-install prisma db push
+          npm run build
+      - name: Exercise actual workspace SQL migration and contracts
+        run: node --test dist/tests/workspace-integration.test.js 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
+      - name: Retain evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workspace-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-contracts.tap
+          if-no-files-found: ignore
+          retention-days: 7

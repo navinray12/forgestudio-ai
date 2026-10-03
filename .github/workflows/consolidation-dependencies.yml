@@ -1,0 +1,88 @@
+name: Consolidation dependency candidate
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/consolidation-dependencies.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://fixture:fixture@127.0.0.1:5432/unused_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: {node-version: '22.16.0'}
+      - name: Resolve only reviewed security packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dependencies"
+          node --input-type=module <<'JS'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          const backend=JSON.parse(readFileSync('backend/package.json'));
+          backend.dependencies.nodemailer='10.0.12';
+          backend.overrides ??= {};
+          backend.overrides['fast-uri']='3.1.7';
+          writeFileSync('backend/package.json',JSON.stringify(backend,null,2)+'\n');
+          const frontend=JSON.parse(readFileSync('frontend/package.json'));
+          frontend.overrides ??= {};
+          frontend.overrides['monaco-editor']={...(frontend.overrides['monaco-editor'] ?? {}),dompurify:'3.4.15'};
+          writeFileSync('frontend/package.json',JSON.stringify(frontend,null,2)+'\n');
+          JS
+          npm install --prefix backend --package-lock-only --ignore-scripts
+          npm install --prefix frontend --package-lock-only --ignore-scripts
+          npm audit --prefix backend --json > "$RUNNER_TEMP/dependencies/backend-audit.json" || test "$?" = 1
+          npm audit --prefix frontend --json > "$RUNNER_TEMP/dependencies/frontend-audit.json" || test "$?" = 1
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          for(const name of ['backend','frontend']){
+            const r=JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/dependencies/${name}-audit.json`));
+            if(r.error||!r.metadata?.vulnerabilities)throw Error(`Audit unavailable: ${name}`);
+            const v=r.metadata.vulnerabilities;
+            console.log(name,v);
+            if(v.high||v.critical||v.moderate)throw Error(`Unresolved security findings: ${name}`);
+          }
+          JS
+      - name: Install and build the exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm run build --prefix backend
+          npm run build --prefix frontend
+          tar -czf "$RUNNER_TEMP/dependencies/toolchains.tar.gz" backend/node_modules frontend/node_modules
+      - name: Export immutable candidate objects only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const files=[];
+          for(const path of ['backend/package.json','backend/package-lock.json','frontend/package.json','frontend/package-lock.json']){
+            const b=readFileSync(path);
+            const sha=createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex');
+            const r=await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/git/blobs`,{
+              method:'POST',signal:AbortSignal.timeout(30000),
+              headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+              body:JSON.stringify({encoding:'base64',content:b.toString('base64')})});
+            if(!r.ok|| (await r.json()).sha!==sha)throw Error('Candidate object export failed');
+            mkdirSync(`${process.env.RUNNER_TEMP}/dependencies/${path.split('/')[0]}`,{recursive:true});
+            writeFileSync(`${process.env.RUNNER_TEMP}/dependencies/${path}`,b);
+            files.push({path,sha});
+          }
+          writeFileSync(`${process.env.RUNNER_TEMP}/dependencies/blob-map.json`,JSON.stringify({base:process.env.GITHUB_SHA,files},null,2)+'\n');
+          JS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: consolidation-dependencies-${{ github.sha }}
+          path: ${{ runner.temp }}/dependencies/
+          if-no-files-found: error
+          retention-days: 14

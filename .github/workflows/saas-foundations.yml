@@ -1,0 +1,112 @@
+name: SaaS production foundations qualification
+on:
+  push:
+    branches: [qualification/saas-foundations, main]
+    paths:
+      - backend/prisma/migrations/20260929013000_saas_production_foundations/**
+      - backend/src/platform/**
+      - backend/src/services/billing/**
+      - backend/src/services/files/**
+      - backend/src/services/integrations/**
+      - backend/src/services/control/**
+      - backend/src/services/jobs/**
+      - backend/src/utils/safe-egress.ts
+      - backend/src/workers/**
+      - backend/src/app.ts
+      - backend/src/config/auth.ts
+      - backend/src/services/session-authentication.ts
+      - backend/src/modules/identity/**
+      - backend/src/adapters/postgres/identity.store.ts
+      - frontend/src/features/platform-control/**
+      - frontend/src/features/billing/**
+      - frontend/src/features/workspaces/WorkspaceDashboardView.tsx
+      - frontend/src/App.tsx
+      - backend/src/tests/fixtures/saas-browser-fixture.ts
+      - tests/browser/saas-foundations-journey.py
+      - .github/workflows/saas-foundations.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_saas_foundations
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_saas_foundations
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+      FORGE_AUTH_MODE: local
+      FRONTEND_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install locked dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Build applications
+        run: |
+          npm run build --prefix backend
+          npm run build --prefix frontend
+      - name: Prepare disposable legacy schema
+        working-directory: backend
+        run: npx --no-install prisma db push
+      - name: Execute SaaS foundation migration and contracts
+        working-directory: backend
+        run: node --test dist/tests/saas-foundations.test.js 2>&1 | tee "$RUNNER_TEMP/saas-foundations.tap"
+      - name: Architecture and source hardening
+        run: node --experimental-vm-modules --test tests/hardening/*.test.mjs 2>&1 | tee "$RUNNER_TEMP/hardening.tap"
+      - name: Prepare browser qualification
+        run: |
+          python3 -m venv "$RUNNER_TEMP/browser-venv"
+          "$RUNNER_TEMP/browser-venv/bin/pip" install playwright==1.57.0
+          createdb -h 127.0.0.1 -U postgres forge_saas_browser
+          DATABASE_URL=postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_saas_browser npm --prefix backend exec -- prisma db push
+          PGPASSWORD=disposable_fixture_only psql -h 127.0.0.1 -U postgres -d forge_saas_browser -v ON_ERROR_STOP=1 -f backend/prisma/migrations/20260929013000_saas_production_foundations/migration.sql
+          DATABASE_URL=postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_saas_browser FORGE_SAAS_BROWSER_FIXTURE="$RUNNER_TEMP/saas-browser-fixture.json" node backend/dist/tests/fixtures/saas-browser-fixture.js
+      - name: Browser and accessibility journey
+        env:
+          DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_saas_browser
+          FORGE_SAAS_BROWSER_FIXTURE: ${{ runner.temp }}/saas-browser-fixture.json
+          FORGE_SAAS_BROWSER_REPORT: ${{ runner.temp }}/saas-browser-report
+          PORT: '5000'
+        run: |
+          (cd backend && exec node dist/server.js) > "$RUNNER_TEMP/saas-browser-api.log" 2>&1 &
+          api_pid=$!
+          (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/saas-browser-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5000/api/v1/health >/dev/null && curl --fail --silent http://127.0.0.1:5173 >/dev/null; then break; fi
+            sleep 1
+          done
+          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/saas-foundations-journey.py
+
+      - name: Dependency release gate
+        run: |
+          npm audit --prefix backend --audit-level=high
+          npm audit --prefix frontend --audit-level=high
+      - name: Retain evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: saas-foundations-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/saas-foundations.tap
+            ${{ runner.temp }}/hardening.tap
+            ${{ runner.temp }}/saas-browser-report/
+          if-no-files-found: ignore
+          retention-days: 7

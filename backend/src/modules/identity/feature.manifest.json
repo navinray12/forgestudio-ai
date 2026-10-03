@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "id": "identity.boundary",
+  "owner": "platform-security",
+  "criticality": "locked",
+  "requirements": [
+    "AUTH-001",
+    "AUTH-003",
+    "AUTH-004",
+    "SEC-002",
+    "SEC-003",
+    "REL-001"
+  ],
+  "productionProvider": "oidc",
+  "localProvider": "password-plus-browser-bound-email-code",
+  "offBehaviour": {
+    "production": "No authentication-off state; reject login when configured provider is unavailable",
+    "legacySupport": "410 SUPPORT_TOKEN_RETIRED",
+    "legacyPasswordSetup": "410 LEGACY_PASSWORD_SETUP_RETIRED"
+  },
+  "ports": [
+    "backend/src/platform/ports/identity-store.port.ts",
+    "backend/src/platform/ports/identity-provider.port.ts",
+    "backend/src/platform/ports/identity-delivery.port.ts"
+  ],
+  "adapters": [
+    "backend/src/adapters/postgres/identity.store.ts",
+    "backend/src/adapters/identity/oidc.provider.ts",
+    "backend/src/adapters/identity/smtp-otp-delivery.ts"
+  ],
+  "globalTables": [
+    "users",
+    "sessions",
+    "auth_challenges",
+    "identity_rate_buckets",
+    "oidc_identities"
+  ],
+  "migration": "backend/prisma/migrations/20260928170000_identity_boundary/migration.sql",
+  "operations": [
+    {
+      "id": "identity.begin-local-login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "permission": "local-profile; current password proof",
+      "handler": "backend/src/modules/identity/application/local-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.complete-local-login",
+      "method": "POST",
+      "path": "/api/v1/auth/login/verify-otp",
+      "permission": "same-browser; current actor epoch; one-time delivered code",
+      "handler": "backend/src/modules/identity/application/local-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.begin-managed-login",
+      "method": "POST",
+      "path": "/api/v1/auth/oidc/start",
+      "permission": "exact browser origin; bounded public entry",
+      "handler": "backend/src/modules/identity/application/oidc-authentication.ts",
+      "tests": [
+        "backend/src/tests/oidc-adapter.test.ts",
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.complete-managed-login",
+      "method": "GET",
+      "path": "/api/v1/auth/oidc/callback",
+      "permission": "one-time cookie/state/PKCE/nonce; verified issuer/subject",
+      "handler": "backend/src/modules/identity/application/oidc-authentication.ts",
+      "tests": [
+        "backend/src/tests/oidc-adapter.test.ts",
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.link-managed-identity",
+      "method": "POST",
+      "path": "/api/v1/auth/oidc/link",
+      "permission": "both authenticated identities; current initiating session; recent authentication",
+      "handler": "backend/src/modules/identity/application/oidc-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.list-account-sessions",
+      "method": "GET",
+      "path": "/api/v1/auth/sessions",
+      "permission": "current authenticated account only",
+      "handler": "backend/src/modules/identity/application/account-sessions.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.revoke-session",
+      "method": "POST",
+      "path": "/api/v1/auth/sessions/:id/revoke",
+      "permission": "same account; current session; browser origin",
+      "handler": "backend/src/modules/identity/application/account-sessions.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.revoke-all-sessions",
+      "method": "POST",
+      "path": "/api/v1/auth/sessions/revoke-all",
+      "permission": "current account; epoch fence; browser origin",
+      "handler": "backend/src/modules/identity/application/account-sessions.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.begin-local-signup",
+      "method": "POST",
+      "path": "/api/v1/auth/signup",
+      "permission": "local-profile; schema and shared abuse limits",
+      "handler": "backend/src/modules/identity/application/local-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.complete-local-signup",
+      "method": "POST",
+      "path": "/api/v1/auth/signup/verify-otp",
+      "permission": "same-browser; one-time registration challenge",
+      "handler": "backend/src/modules/identity/application/local-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.send-local-code",
+      "method": "POST",
+      "path": "/api/v1/auth/{login|signup}/{send-otp|resend-otp}",
+      "permission": "same-browser; correct challenge purpose; account cooldown",
+      "handler": "backend/src/modules/identity/application/local-authentication.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    },
+    {
+      "id": "identity.logout",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "permission": "exact browser origin; revoke only presented session",
+      "handler": "backend/src/modules/identity/application/account-sessions.ts",
+      "tests": [
+        "backend/src/tests/identity-security.test.ts"
+      ]
+    }
+  ],
+  "tests": [
+    "backend/src/tests/identity-security.test.ts",
+    "backend/src/tests/oidc-adapter.test.ts",
+    "backend/src/tests/smtp-delivery.test.ts",
+    "backend/src/tests/presence-security.test.ts",
+    "tests/browser/identity-journey.py"
+  ],
+  "runbook": "docs/implementation/14-identity-boundary.md",
+  "verification": {
+    "status": "CANDIDATE",
+    "liveProvider": "NOT_VERIFIED",
+    "browser": "BLOCKED",
+    "production": "NOT_QUALIFIED"
+  }
+}

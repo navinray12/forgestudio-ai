@@ -1,0 +1,49 @@
+name: Branch consolidation snapshot
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/consolidation-snapshot.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Preserve history and report divergence without moving refs
+        env:
+          SOURCE_COMMIT: 20e7f7b25d7465f4b647b36e39d9e686e35a2c1e
+          ORIGINAL_MAIN: 25788c93a66044e268330bcb2c240bf3c8f3967e
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/consolidation"
+          mkdir -p "$out"
+          git cat-file -e "$SOURCE_COMMIT^{commit}"
+          git cat-file -e "$ORIGINAL_MAIN^{commit}"
+          git bundle create "$out/repository.bundle" refs/remotes/origin/main refs/remotes/origin/qualification/saas-foundations
+          git bundle verify "$out/repository.bundle"
+          git for-each-ref --format='%(refname) %(objectname)' refs/remotes/origin > "$out/refs.txt"
+          git diff --name-status "$ORIGINAL_MAIN...$SOURCE_COMMIT" > "$out/source-changes.txt"
+          git diff --name-status "$SOURCE_COMMIT...$ORIGINAL_MAIN" > "$out/main-changes.txt"
+          git log --format='%H %s' --left-right "$ORIGINAL_MAIN...$SOURCE_COMMIT" > "$out/divergent-commits.txt"
+          set +e
+          git merge-tree --write-tree "$ORIGINAL_MAIN" "$SOURCE_COMMIT" > "$out/merge-tree.txt"
+          status=$?
+          set -e
+          test "$status" -le 1
+          echo "$status" > "$out/merge-tree-status.txt"
+          git archive --format=tar.gz "$SOURCE_COMMIT" > "$out/qualification-source.tar.gz"
+          git archive --format=tar.gz "$GITHUB_SHA" > "$out/main-source.tar.gz"
+          sha256sum "$out"/*.bundle "$out"/*.tar.gz > "$out/sha256.txt"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: consolidation-snapshot-${{ github.sha }}
+          path: ${{ runner.temp }}/consolidation/
+          if-no-files-found: error
+          retention-days: 14

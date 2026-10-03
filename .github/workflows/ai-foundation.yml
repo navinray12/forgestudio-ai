@@ -1,0 +1,83 @@
+name: AI approval and durable worker qualification
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_hardening
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_hardening
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.18.0'
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - name: Empty database migration chain (no db push)
+        run: npm run db:migrate --prefix backend
+      - run: npm run build --prefix backend
+      - name: AI and worker contracts (fixtures, no live provider requests)
+        working-directory: backend
+        run: node --test dist/tests/ai-changeset-integration.test.js dist/tests/job-leases-integration.test.js dist/tests/ai-prompt-cleanup.test.js dist/tests/ai-site-brief.test.js dist/tests/ai-site-blueprint.test.js dist/tests/ai-site-repair.test.js
+      - name: Changed AI UI lint
+        working-directory: frontend
+        run: npx --no-install eslint src/features/ai/AiSiteAssistant.tsx src/features/ai/DesignAssistant.tsx src/features/ai/DesignProposalPreview.tsx src/features/editor-access/document-save-coordinator.ts
+      - name: Design importer, provider boundaries and durable execution
+        working-directory: backend
+        run: node --test dist/tests/ai-design.test.js dist/tests/ai-design-integration.test.js
+      - name: Browser save coordinator ordering
+        run: node --experimental-vm-modules --test tests/hardening/document-coordinator.test.mjs tests/hardening/design-styles.test.mjs
+      - name: Existing workspace and document contracts on migrated schema
+        working-directory: backend
+        run: node --test dist/tests/workspace-integration.test.js
+      - run: npm run build --prefix frontend
+      - run: docker compose config --quiet
+      - name: Install browser qualification tools
+        run: |
+          npm ci
+          npx --no-install playwright install --with-deps chromium
+      - name: Compile browser fixture frontend
+        env:
+          VITE_API_URL: http://127.0.0.1:55001
+        run: npm run build --prefix frontend
+      - name: Real API, PostgreSQL, worker and editor browser journey
+        env:
+          FORGE_AUTH_MODE: local
+          FRONTEND_URL: http://127.0.0.1:55174
+          PORT: '55001'
+          FORGE_BROWSER_FIXTURE_PATH: ${{ runner.temp }}/forge-design-browser.json
+        shell: bash
+        run: |
+          node backend/dist/tests/fixtures/design-browser-server.js > "$RUNNER_TEMP/forge-design-api.log" 2>&1 &
+          api_pid=$!
+          npm --prefix frontend run preview -- --host 127.0.0.1 --port 55174 > "$RUNNER_TEMP/forge-design-ui.log" 2>&1 &
+          ui_pid=$!
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:55001/api/v1/health >/dev/null && curl -fsS http://127.0.0.1:55174/ >/dev/null; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          npx --no-install playwright test tests/browser/design-journey.spec.ts --workers=1 --reporter=line

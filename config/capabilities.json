@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "capabilities": [
+    {
+      "id": "authentication",
+      "owner": "platform-security",
+      "criticality": "LOCKED",
+      "changeClass": "L",
+      "minTier": "T0",
+      "provider": "oidc",
+      "dependencies": [],
+      "offBehavior": {}
+    },
+    {
+      "id": "authorization",
+      "owner": "platform-security",
+      "criticality": "LOCKED",
+      "changeClass": "L",
+      "minTier": "T0",
+      "provider": "application-rbac",
+      "dependencies": [
+        "authentication"
+      ],
+      "offBehavior": {}
+    },
+    {
+      "id": "tenant-isolation",
+      "owner": "platform-security",
+      "criticality": "LOCKED",
+      "changeClass": "L",
+      "minTier": "T0",
+      "provider": "postgres-rls",
+      "dependencies": [
+        "authorization"
+      ],
+      "offBehavior": {}
+    },
+    {
+      "id": "durable-storage",
+      "owner": "platform-data",
+      "criticality": "LOCKED",
+      "changeClass": "L",
+      "minTier": "T0",
+      "provider": "postgres",
+      "dependencies": [],
+      "offBehavior": {}
+    },
+    {
+      "id": "billing",
+      "owner": "platform-commerce",
+      "criticality": "OPTIONAL",
+      "changeClass": "A",
+      "minTier": "T0",
+      "provider": "stripe",
+      "dependencies": [
+        "durable-storage"
+      ],
+      "offBehavior": {
+        "disabled": "read-only"
+      }
+    },
+    {
+      "id": "durable-execution",
+      "owner": "platform-runtime",
+      "criticality": "REQUIRED",
+      "changeClass": "B",
+      "minTier": "T0",
+      "provider": "postgres-jobs",
+      "dependencies": [
+        "durable-storage"
+      ],
+      "offBehavior": {
+        "degraded": "reject-new-admission"
+      }
+    },
+    {
+      "id": "object-storage",
+      "owner": "platform-files",
+      "criticality": "REQUIRED",
+      "changeClass": "B",
+      "minTier": "T0",
+      "provider": "s3",
+      "dependencies": [
+        "durable-execution"
+      ],
+      "offBehavior": {
+        "disabled": "reject-new-uploads"
+      }
+    },
+    {
+      "id": "integrations",
+      "owner": "platform-integrations",
+      "criticality": "OPTIONAL",
+      "changeClass": "A",
+      "minTier": "T0",
+      "provider": "governed-egress",
+      "dependencies": [
+        "durable-execution"
+      ],
+      "offBehavior": {
+        "disabled": "pause-new-side-effects"
+      }
+    }
+  ]
+}

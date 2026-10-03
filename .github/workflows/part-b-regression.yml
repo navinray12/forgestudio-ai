@@ -1,0 +1,97 @@
+name: ForgeStudio Part B Automated Regression Suite
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: elementor_saas
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+        env:
+          MYSQL_ROOT_PASSWORD: disposable_root_fixture
+          MYSQL_DATABASE: wordpress
+          MYSQL_USER: wordpress
+          MYSQL_PASSWORD: disposable_wp_fixture
+        ports: ['3307:3306']
+        options: --health-cmd="mysqladmin ping" --health-interval 5s --health-timeout 5s --health-retries 20
+      wordpress:
+        image: wordpress@sha256:e1736f6dba253975920681a6faf57f833973a5ae8a1057a495fe94bfced2d41c
+        env:
+          WORDPRESS_DB_HOST: mysql:3306
+          WORDPRESS_DB_USER: wordpress
+          WORDPRESS_DB_PASSWORD: disposable_wp_fixture
+          WORDPRESS_DB_NAME: wordpress
+        ports: ['8000:80']
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/elementor_saas
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      FRONTEND_URL: http://127.0.0.1:5173
+      NODE_ENV: test
+      PORT: '5000'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install the locked backend toolchain
+        working-directory: backend
+        run: npm ci
+      - name: Build and initialize only the disposable fixture database
+        working-directory: backend
+        run: |
+          npx --no-install prisma generate
+          npx --no-install prisma db push
+          npm run build
+      - name: Install the actual connector in disposable WordPress
+        env:
+          WORDPRESS_CONTAINER: ${{ job.services.wordpress.id }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec "$WORDPRESS_CONTAINER" test -f /var/www/html/wp-load.php; then break; fi
+            sleep 2
+          done
+          docker cp wordpress-plugin/forgestudio-connector "$WORDPRESS_CONTAINER:/var/www/html/wp-content/plugins/"
+          docker cp tests/wordpress/bootstrap-fixture.php "$WORDPRESS_CONTAINER:/tmp/bootstrap-fixture.php"
+          docker exec "$WORDPRESS_CONTAINER" php /tmp/bootstrap-fixture.php
+      - name: Start and probe the compiled backend
+        run: |
+          mkdir -p tests/reports
+          (cd backend && node dist/server.js) > tests/reports/backend.log 2>&1 &
+          echo $! > "$RUNNER_TEMP/forge-api.pid"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:5000/api/v1/health; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Run real probes without manufacturing feature or performance evidence
+        run: backend/node_modules/.bin/tsx tests/run-part-b-regression.ts
+      - name: Stop compiled backend
+        if: always()
+        run: test ! -f "$RUNNER_TEMP/forge-api.pid" || kill "$(cat "$RUNNER_TEMP/forge-api.pid")" || true
+      - name: Retain evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: part-b-executed-${{ github.sha }}
+          path: tests/reports/
+          retention-days: 7
+          if-no-files-found: warn
