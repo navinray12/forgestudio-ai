@@ -49,7 +49,9 @@ export async function runDesignExecution(executionId: string, job: { id: string;
       return value;
     } catch (error) {
       // Provider screen/project creation may have succeeded remotely even if its
-      // reply was lost. Never blindly retry that stage or erase its attempt.
+      // reply was lost. Preserve specific classified provider errors (e.g. unavailable,
+      // auth, rate limit) and only treat genuine uncertain outcomes as reconciliation.
+      if (error instanceof AppError) throw error;
       if (external) throw new AppError("External design outcome requires reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
       throw error;
     }
@@ -125,7 +127,7 @@ export async function runDesignExecution(executionId: string, job: { id: string;
             where: { id: executionId, status: { in: ["QUEUED", "RUNNING"] } },
             data: {
               status: code === "AI_EXTERNAL_OUTCOME_UNKNOWN" ? "RECONCILIATION_REQUIRED" : "FAILED",
-              errorCode: code,
+              errorCode: code ? String(code).slice(0, 100) : "AI_DESIGN_FAILED",
               completedAt: new Date(),
               reservedUnits: 0,
             }

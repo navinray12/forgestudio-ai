@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { RoleManagerModal } from "./components/RoleManagerModal";
 import { TeamSwitcher } from "./components/TeamSwitcher";
 import { WorkspaceSwitcher } from "./components/WorkspaceSwitcher";
+import { WorkspaceInvitationInbox } from "../../features/workspaces/WorkspaceInvitationInbox";
 import { WorkspaceDashboardView } from "../../features/workspaces/WorkspaceDashboardView";
 import { TeamDashboardView } from "./components/TeamDashboardView";
 import DeveloperApiSettings from "./components/DeveloperApiSettings";
@@ -363,7 +364,25 @@ function UserDashboard() {
             >
               <span>⭐ Manage Subscription</span>
             </Link>
+            <Link
+              to="/forum"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+            >
+              <span>💬 Discussion Forum</span>
+            </Link>
+            <Link
+              to="/support"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+            >
+              <span>🎟️ Support Tickets</span>
+            </Link>
+          </div>
 
+          <div className="mt-3">
+            <WorkspaceInvitationInbox apiUrl={apiUrl} onJoined={(id) => { setCurrentWorkspaceId(id); setCurrentTeamId(null); setSelectedSiteIds([]); }} />
+          </div>
+
+          <div className="mt-4 pt-3 flex flex-wrap items-center gap-3">
             <button
               disabled={Boolean(currentWorkspaceId)}
               title={currentWorkspaceId ? "Use Create in this workspace below" : "Create a personal website"}
@@ -505,52 +524,62 @@ function UserDashboard() {
                         </p>
                       </div>
 
-                      <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
-                        <button
-                          onClick={() => setDeleteTargetId(site.id)}
-                          className="text-xs font-semibold text-red-500 hover:text-red-700 transition"
-                        >
-                          Delete
-                        </button>
+                      <div className="mt-6 border-t border-slate-100 pt-4 space-y-3">
+                        {/* Quick Tools Row */}
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => setAiSiteTarget(site)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-purple-200 bg-purple-50/80 px-2 text-[11px] font-bold text-purple-700 hover:bg-purple-100 transition shadow-2xs"
+                              title="Generate or iterate with AI draft"
+                            >
+                              <span>✨</span>
+                              <span>AI Draft</span>
+                            </button>
+                            <button
+                              onClick={() => setManagedSiteTarget(site)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+                              title="Manage WordPress sync, Site Mailer SMTP, and security/audit logs"
+                            >
+                              <span>⚡</span>
+                              <span>Manage</span>
+                            </button>
+                            <button
+                              onClick={() => setRoleManagerSite(site)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+                              title="Manage roles and team access"
+                            >
+                              <span>👥</span>
+                              <span>Roles</span>
+                            </button>
+                            <button
+                              onClick={() => handleExportDashboardKit(site)}
+                              disabled={exportingKitId === site.id}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs disabled:opacity-50"
+                              title="Export project configuration as a portable Website Kit JSON file"
+                            >
+                              <span>📦</span>
+                              <span>{exportingKitId === site.id ? "..." : "Export"}</span>
+                            </button>
+                          </div>
 
-                        <div className="flex items-center gap-1.5 flex-wrap">
                           <button
-                            onClick={() => setAiSiteTarget(site)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 transition"
-                          >AI draft</button>
-                          <button
-                            onClick={() => setManagedSiteTarget(site)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50/60 px-2.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100/80 transition shadow-2xs"
-                            title="Manage WordPress sync, Site Mailer SMTP, and security/audit logs"
+                            onClick={() => setDeleteTargetId(site.id)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition border border-transparent hover:border-red-200 cursor-pointer"
+                            title="Delete Website"
                           >
-                            <span>⚡</span>
-                            <span>Manage</span>
-                          </button>
-
-                          <button
-                            onClick={() => setRoleManagerSite(site)}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition shadow-2xs"
-                          >
-                            Roles
-                          </button>
-
-                          <button
-                            onClick={() => handleExportDashboardKit(site)}
-                            disabled={exportingKitId === site.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                            title="Export project configuration as a portable Website Kit JSON file"
-                          >
-                            {exportingKitId === site.id ? "Exporting..." : "Export Kit 📦"}
-                          </button>
-
-                          <button
-                            onClick={() => navigate(`/editor/${site.id}`)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
-                          >
-                            <span>Open Editor</span>
-                            <span>→</span>
+                            <span className="text-xs">🗑️</span>
                           </button>
                         </div>
+
+                        {/* Primary Action Button */}
+                        <button
+                          onClick={() => navigate(`/editor/${site.id}`)}
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition active:scale-[0.99] cursor-pointer"
+                        >
+                          <span>Open Visual Editor</span>
+                          <span>→</span>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -595,7 +624,6 @@ function UserDashboard() {
             <Link to="/forum" className="inline-flex h-8 items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-sm">🗣️ Forum</Link>
             <Link to="/support" className="inline-flex h-8 items-center rounded-lg border border-blue-200 bg-blue-50/80 px-3 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm">💬 Support</Link>
             <Link to="/subscriptions" className="hidden sm:inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm">⭐ Subscription</Link>
-
             <button onClick={handleLogout} className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition shadow-sm">Logout</button>
           </div>
         </div>

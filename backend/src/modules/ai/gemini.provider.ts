@@ -7,7 +7,7 @@ export class GeminiProvider implements AiProvider {
   readonly name = "gemini";
   constructor(private readonly apiKey = process.env.GEMINI_API_KEY,
     readonly model = process.env.AI_MODEL_GEMINI || "gemini-3.8-flash",
-    private readonly fetcher: typeof fetch = fetch) {}
+    private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
@@ -22,15 +22,25 @@ export class GeminiProvider implements AiProvider {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
     try {
+      const systemText = request.systemPrompt || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_INSTRUCTIONS : "You are a professional website and design AI assistant. Return your response in clean JSON or text as requested.");
+      const userContent = request.operation === "SITE_GENERATION"
+        ? JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName })
+        : JSON.stringify({ prompt: request.prompt, ...request.context });
+      const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
+
       const response = await this.fetcher(
         `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent`,
-        { method: "POST", signal,
+        {
+          method: "POST", signal,
           headers: { "x-goog-api-key": this.apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SITE_BLUEPRINT_INSTRUCTIONS }] },
-            contents: [{ role: "user", parts: [{ text: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }] }],
-            generationConfig: { maxOutputTokens: 8192, responseMimeType: "application/json",
-              responseJsonSchema: SITE_BLUEPRINT_JSON_SCHEMA },
+            systemInstruction: { parts: [{ text: systemText }] },
+            contents: [{ role: "user", parts: [{ text: userContent }] }],
+            generationConfig: {
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+              ...(schema ? { responseJsonSchema: schema } : {}),
+            },
           }),
         },
       );
@@ -58,8 +68,10 @@ export class GeminiProvider implements AiProvider {
       if (candidate?.finishReason !== "STOP" || texts.length !== 1 || !texts[0]?.trim()) {
         throw new AppError("AI provider returned an invalid website draft", 502, "AI_INVALID_OUTPUT");
       }
-      return { text: texts[0], model: activeModel, provider: this.name,
-        requestId: typeof body?.responseId === "string" ? body.responseId : undefined };
+      return {
+        text: texts[0], model: activeModel, provider: this.name,
+        requestId: typeof body?.responseId === "string" ? body.responseId : undefined
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {

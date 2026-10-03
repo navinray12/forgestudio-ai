@@ -30,12 +30,20 @@ test("durable Stitch/Claude proposal lifecycle on PostgreSQL (fixture providers)
   const input = { workflow: "stitch-claude", prompt: brief, operation: "GENERATE_SITE", scope: { type: "site" } };
   const stored = new Map<string, string>();
   const artifacts: ArtifactStore = { async put(value) { const id = randomUUID(); stored.set(id, value); return id; }, async get(key) { if (!stored.has(key)) throw new Error("Missing fixture artifact"); return stored.get(key)!; } };
-  let plans = 0, screens = 0, failExport = false, failScreen = false, cancelDuringPlan: string | undefined;
+  let plans = 0, screens = 0, failExport = false, failScreen = false, failProjectUnavailable = false, cancelDuringPlan: string | undefined;
   const planner: DesignPlanner = {
     async plan() { plans++; if (cancelDuringPlan) await cancelDesignExecution(cancelDuringPlan, owner.id, randomUUID()); return { design: "Editorial green and ivory with strong typographic hierarchy", pages: [{ name: "Home", slug: "/", brief: "A complete editorial academy landing page" }], setupRequired: [] }; },
     async repair() { throw new Error("Repair was not expected"); }, async edit() { return []; },
   };
-  const designer: DesignProvider = { async createProject() { return "fixture-project"; }, async generate() { screens++; if (failScreen) throw new Error("SECRET_REMOTE_BODY"); return { screenId: "fixture-screen" }; }, async html() { if (failExport) throw new AppError("Export unavailable", 503, "AI_EXPORT_UNAVAILABLE"); return '<body style="font-family:system-ui;color:#172033"><main><h1>Editorial academy</h1><p>Learn with confidence.</p><a href="/">Home</a></main></body>'; }, async close() {} };
+  const designer: DesignProvider = {
+    async createProject() {
+      if (failProjectUnavailable) throw new AppError("Stitch connection could not complete", 503, "AI_PROVIDER_UNAVAILABLE");
+      return "fixture-project";
+    },
+    async generate() { screens++; if (failScreen) throw new Error("SECRET_REMOTE_BODY"); return { screenId: "fixture-screen" }; },
+    async html() { if (failExport) throw new AppError("Export unavailable", 503, "AI_EXPORT_UNAVAILABLE"); return '<body style="font-family:system-ui;color:#172033"><main><h1>Editorial academy</h1><p>Learn with confidence.</p><a href="/">Home</a></main></body>'; },
+    async close() {}
+  };
   registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => runDesignExecution(String(payload.executionId), { id: job.id, lockToken: job.lockToken! }, { planner, designer, artifacts, converter: new HtmlDesignConverter() }));
   async function start() { return startDesignExecution(websiteId, owner.id, input, { key: randomUUID(), expectedVersion: (await website()).documentVersion }); }
   async function run(id: string) { const job = await prisma.backgroundJob.findFirstOrThrow({ where: { idempotencyKey: `ai:${id}` } }); await prisma.backgroundJob.update({ where: { id: job.id }, data: { runAt: new Date(0) } }); await processNextJob({ id: job.id }); return getDesignExecution(id, owner.id); }
@@ -91,5 +99,25 @@ test("durable Stitch/Claude proposal lifecycle on PostgreSQL (fixture providers)
     await prisma.aiExecution.update({ where: { id: first.executionId }, data: { promptExpiresAt: new Date(0) } });
     assert.equal((await run(first.executionId)).errorCode, "AI_PROMPT_EXPIRED"); assert.equal(plans, previousPlans);
     await assert.rejects(retryDesignExecution(first.executionId, owner.id, { key: randomUUID(), expectedVersion: (await website()).documentVersion }), { code: "AI_PROMPT_EXPIRED" });
+  });
+  await t.test("known provider connection failure becomes FAILED with quota released and retry available", async () => {
+    failProjectUnavailable = true; const first = await start(), result = await run(first.executionId); failProjectUnavailable = false;
+    assert.equal(result.status, "FAILED");
+    assert.equal(result.errorCode, "AI_PROVIDER_UNAVAILABLE");
+    assert.equal(result.reservedProviderCalls, 0);
+    assert.equal(result.retryAvailable, true);
+    const retry = await retryDesignExecution(first.executionId, owner.id, { key: randomUUID(), expectedVersion: (await website()).documentVersion });
+    assert.notEqual(retry.executionId, first.executionId);
+    assert.equal((await run(retry.executionId)).status, "COMPLETED");
+  });
+  await t.test("stale or crashed background job does not permanently lock website generation", async () => {
+    const first = await start();
+    const job = await prisma.backgroundJob.findFirstOrThrow({ where: { idempotencyKey: `ai:${first.executionId}` } });
+    await prisma.backgroundJob.update({ where: { id: job.id }, data: { status: "FAILED", lastError: "WORKER_CRASHED" } });
+    const second = await start();
+    assert.notEqual(second.executionId, first.executionId);
+    const firstDto = await getDesignExecution(first.executionId, owner.id);
+    assert.equal(firstDto.status, "FAILED");
+    assert.equal(firstDto.reservedProviderCalls, 0);
   });
 });

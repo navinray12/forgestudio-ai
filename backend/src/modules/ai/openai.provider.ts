@@ -5,7 +5,7 @@ import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-
 /** Minimal Responses API adapter. Credentials remain server-only in OPENAI_API_KEY. */
 export class OpenAiProvider implements AiProvider {
   readonly name = "openai";
-  constructor(private readonly apiKey = process.env.OPENAI_API_KEY, readonly model = process.env.AI_MODEL_PLANNER || "gpt-5", private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly apiKey = process.env.OPENAI_API_KEY, readonly model = process.env.AI_MODEL_PLANNER || "gpt-5", private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
@@ -13,10 +13,19 @@ export class OpenAiProvider implements AiProvider {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
     try {
+      const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
+      const instructions = request.systemPrompt || (request.operation === "SITE_GENERATION"
+        ? SITE_BLUEPRINT_INSTRUCTIONS
+        : "You are a professional website and design AI assistant. Return your response in clean JSON or text as requested.");
+      const inputContent = request.operation === "SITE_GENERATION"
+        ? JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName })
+        : JSON.stringify({ prompt: request.prompt, ...request.context });
+
       const response = await this.fetcher("https://api.openai.com/v1/responses", {
         method: "POST", signal,
         headers: { "Authorization": `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: this.model, store: false, max_output_tokens: 8192,
+        body: JSON.stringify({
+          model: this.model, store: false, max_output_tokens: 8192,
           instructions: SITE_BLUEPRINT_INSTRUCTIONS,
           input: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
           text: { format: { type: "json_schema", name: "site_blueprint", strict: true, schema: SITE_BLUEPRINT_JSON_SCHEMA } },

@@ -19,6 +19,7 @@ import { matchesThemeCondition, type SitePartsConfig, type PublishingState, type
 import { SaveTemplateDialog, ReplaceTemplateDialog, ImportWebsiteKitDialog, useSaveTemplate, useTemplateLibrary, TemplateLibrary, exportWebsiteKitAsJson, type Template } from "../../features/templates";
 import { RevisionHistoryPanel, revisionHistoryService } from "../../features/revision-history";
 import { DesignAssistant } from "../../features/ai/DesignAssistant";
+import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
 import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
@@ -358,6 +359,7 @@ export default function WebsiteEditor() {
   const [popups, setPopups] = useState<any[]>([]);
 
   const [isPopupManagerOpen, setIsPopupManagerOpen] = useState(false);
+  const [isUnifiedAiOpen, setIsUnifiedAiOpen] = useState(false);
   const [isSeoAnalyzerOpen, setIsSeoAnalyzerOpen] = useState(false);
   const [isMultilingualModalOpen, setIsMultilingualModalOpen] = useState(false);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
@@ -7331,6 +7333,7 @@ export default function WebsiteEditor() {
                 <span>Tokens</span>
               </button>
 
+
               {/* Classes */}
               <button
                 type="button"
@@ -7381,14 +7384,6 @@ export default function WebsiteEditor() {
                 <span>A/B Tests</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
-              >
-                {saving ? "Saving..." : "💾 Save"}
-              </button>
 
               {/* Fullscreen Canvas */}
               <button
@@ -20292,8 +20287,62 @@ export default function WebsiteEditor() {
         onImportKit={handleConfirmImportWebsiteKit}
       />
 
-      {/* F-320 Revision History Slide-Over Drawer */}
-      {websiteId && userAccess.canEditDesign && <button type="button" onClick={() => setIsDesignAssistantOpen(true)} className="fixed bottom-5 right-5 z-40 rounded-full bg-indigo-700 px-5 py-3 font-semibold text-white shadow-lg">Design with AI</button>}
+      {/* AI Studio Floating Trigger - Matching Accessibility Widget Geometry & Style */}
+      {websiteId && userAccess.canEditDesign && (
+        <div className="fixed bottom-6 right-24 z-[99998] font-sans antialiased">
+          <button
+            type="button"
+            id="ai-studio-floating-trigger-btn"
+            aria-label="Open AI Studio & Full Design Engine"
+            onClick={() => setIsUnifiedAiOpen(true)}
+            className="group relative flex h-14 items-center gap-2.5 px-4 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-700 text-white shadow-2xl hover:shadow-purple-500/40 hover:scale-105 active:scale-95 transition-all duration-300 border border-purple-400/30 focus:outline-none focus:ring-4 focus:ring-purple-400 cursor-pointer"
+            title="Open AI Studio (Assistant, Full Design, Content, Sections, Images, Code, Audits)"
+          >
+            <Sparkles className="w-5 h-5 text-amber-300 animate-pulse transition-transform group-hover:rotate-12 group-hover:scale-110" />
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-black tracking-wide leading-none">AI STUDIO</span>
+              <span className="text-[10px] text-purple-200 font-medium leading-none mt-1">Design & Tools</span>
+            </div>
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-purple-400 border-2 border-slate-900"></span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {isUnifiedAiOpen && websiteId && (
+        <UnifiedAiAssistant
+          apiUrl={apiUrl}
+          websiteId={websiteId}
+          onClose={() => setIsUnifiedAiOpen(false)}
+          onApplied={() => {
+            window.location.reload();
+          }}
+          selectedElementId={selectedId || undefined}
+          selectedElementType={selectedElement?.type}
+          pageId={activePageId}
+          prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
+          apply={async (proposal, key) => {
+            if (pendingDesignApplyKey.current !== key) {
+              const saved = await handleSave();
+              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+              pendingDesignApplyKey.current = key;
+            }
+            await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
+              let response: Response;
+              try { response = await fetch(`${apiUrl}/api/v1/ai/changesets/${proposal.id}/apply`, { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { "Content-Type": "application/json", "X-Forge-Intent": "document-command", "Idempotency-Key": options.key, "If-Match": `"${websiteId}:document:${options.expectedVersion}"` } }); }
+              catch { throw new DocumentSaveError("Apply outcome is unknown. Retry Apply to confirm the same operation.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true); }
+              let body;
+              try { body = await response.json(); } catch { throw new DocumentSaveError("Apply response was interrupted. Retry Apply.", response.status, "DOCUMENT_OUTCOME_UNKNOWN", true); }
+              if (!response.ok) throw new DocumentSaveError(response.status === 412 ? "The website changed. Generate a new proposal." : "The proposal could not be applied.", response.status, body?.code || "AI_APPLY_FAILED", response.status >= 500);
+              if (body?.website?.id !== websiteId || !Number.isInteger(body.website.documentVersion) || body.website.documentVersion < options.expectedVersion || body.website.documentVersion > options.expectedVersion + 1) throw new DocumentSaveError("Apply acknowledgement was invalid. Retry Apply.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true);
+              return body.website;
+            });
+            window.location.reload();
+          }}
+        />
+      )}
       {isDesignAssistantOpen && websiteId && <DesignAssistant apiUrl={apiUrl} websiteId={websiteId} pageId={activePageId} elementId={selectedId || undefined}
         onClose={() => setIsDesignAssistantOpen(false)}
         prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}

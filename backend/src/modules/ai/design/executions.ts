@@ -45,6 +45,30 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
         _sum: { reservedUnits: true }
       });
       if ((usage._sum.reservedUnits ?? 0) + units > config.dailyUnits) throw new AppError("Workspace design generation quota reached", 429, "AI_QUOTA_EXCEEDED");
+      // Clean up any stale or crashed executions for this website whose job is already dead
+      const activeCandidates = await tx.aiExecution.findMany({
+        where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: "stitch-claude" },
+        select: { id: true }
+      });
+      for (const candidate of activeCandidates) {
+        const job = await tx.backgroundJob.findFirst({
+          where: { idempotencyKey: `ai:${candidate.id}` }
+        });
+        if (!job || ["FAILED", "CANCELLED", "COMPLETED"].includes(job.status)) {
+          const isUnknown = job?.lastError === "JOB_OUTCOME_UNKNOWN";
+          const sanitizedErrorCode = (job?.lastError || "AI_DESIGN_FAILED").slice(0, 100);
+          await tx.aiExecution.update({
+            where: { id: candidate.id },
+            data: {
+              status: job?.status === "FAILED" ? (isUnknown ? "RECONCILIATION_REQUIRED" : "FAILED") : (job?.status ?? "FAILED"),
+              errorCode: sanitizedErrorCode,
+              outputSummary: job?.lastError ? { error: job.lastError } : undefined,
+              completedAt: new Date(),
+              reservedUnits: 0,
+            }
+          });
+        }
+      }
       if (await tx.aiExecution.count({ where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: "stitch-claude" } })) throw new AppError("A design execution is already active for this website", 409, "AI_EXECUTION_ACTIVE");
       const execution = await tx.aiExecution.create({ data: { id: randomUUID(), websiteId, workspaceId: website.workspaceId, organizationId: website.organizationId, actorId,
         provider: "stitch-claude", model: config.claudeModel, promptVersion: "design-pipeline-v1", operation: input.operation, status: "QUEUED", stage: "QUEUED",
@@ -74,14 +98,25 @@ export async function getDesignExecution(id: string, actorId: string) {
   if (["QUEUED", "RUNNING"].includes(row.status)) {
     const job = await prisma.backgroundJob.findFirst({ where: { idempotencyKey: `ai:${id}`, organizationId: row.organizationId, type: "AI_DESIGN_EXECUTION" } });
     if (job?.status === "FAILED") {
-      await prisma.aiExecution.updateMany({ where: { id, status: { in: ["QUEUED", "RUNNING"] } }, data: { status: "RECONCILIATION_REQUIRED", errorCode: "AI_EXTERNAL_OUTCOME_UNKNOWN", completedAt: new Date() } });
+      const isUnknown = job.lastError === "JOB_OUTCOME_UNKNOWN";
+      const sanitizedErrorCode = (job.lastError || "AI_DESIGN_FAILED").slice(0, 100);
+      await prisma.aiExecution.updateMany({
+        where: { id, status: { in: ["QUEUED", "RUNNING"] } },
+        data: {
+          status: isUnknown ? "RECONCILIATION_REQUIRED" : "FAILED",
+          errorCode: sanitizedErrorCode,
+          outputSummary: job.lastError ? { error: job.lastError } : undefined,
+          completedAt: new Date(),
+          reservedUnits: 0,
+        }
+      });
       row = await authorizedExecution(id, actorId);
     }
   }
   const stages = await prisma.aiExecutionStage.findMany({ where: { executionId: id }, orderBy: { startedAt: "asc" }, select: { key: true, status: true, startedAt: true, completedAt: true } });
   const proposal = await prisma.aiChangeset.findUnique({ where: { executionId: id }, select: { id: true } });
   return { id: row.id, websiteId: row.websiteId, status: row.status, stage: row.stage, errorCode: row.errorCode, expectedDocumentVersion: row.expectedDocumentVersion,
-    stages, changesetId: proposal?.id ?? null, retryAvailable: !!row.promptCiphertext && !!row.promptExpiresAt && row.promptExpiresAt > new Date() && row.status === "FAILED",
+    stages, changesetId: proposal?.id ?? null, retryAvailable: !!row.promptCiphertext && !!row.promptExpiresAt && row.promptExpiresAt > new Date() && (row.status === "FAILED" || row.status === "CANCELLED"),
     reservedProviderCalls: row.reservedUnits, createdAt: row.createdAt, completedAt: row.completedAt };
 }
 
@@ -103,7 +138,7 @@ export async function cancelDesignExecution(id: string, actorId: string, key: st
 export async function retryDesignExecution(id: string, actorId: string, write: DocumentWriteContext) {
   const row = await authorizedExecution(id, actorId);
   await prisma.$transaction(async tx => { const scope = await authorizeWebsiteDocumentWrite(tx, row.websiteId, actorId); if (!scope.can("EDIT_DESIGN")) throw new AppError("Design editing is not permitted", 403, "DOCUMENT_EDIT_FORBIDDEN"); });
-  if (row.status !== "FAILED") throw new AppError("Only failed, reconciled executions can be retried", 409, "AI_EXECUTION_STATE");
+  if (row.status !== "FAILED" && row.status !== "CANCELLED") throw new AppError("Only failed, reconciled executions can be retried", 409, "AI_EXECUTION_STATE");
   if (!row.promptCiphertext || !row.promptExpiresAt || row.promptExpiresAt <= new Date()) throw new AppError("The retained brief expired", 409, "AI_PROMPT_EXPIRED");
   return startDesignExecution(row.websiteId, actorId, { workflow: "stitch-claude", prompt: decryptPrompt(row.promptCiphertext), operation: row.operation, scope: row.scope }, write, id);
 }

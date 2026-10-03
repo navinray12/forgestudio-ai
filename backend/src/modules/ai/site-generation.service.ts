@@ -25,7 +25,7 @@ export async function generateSiteDraft(input: { websiteId: string; actorId: str
   try {
     ({ result, draft } = await generateValidatedSiteBlueprint(provider, input.prompt.trim(), website.name));
   } catch (error) {
-    await prisma.aiExecution.update({ where: { id: execution.id }, data: { status: "FAILED", errorCode: error instanceof AppError ? error.code : "AI_PROVIDER_UNAVAILABLE", completedAt: new Date() } });
+    await prisma.aiExecution.update({ where: { id: execution.id }, data: { status: "FAILED", errorCode: String(error instanceof AppError ? error.code : "AI_PROVIDER_UNAVAILABLE").slice(0, 100), completedAt: new Date() } });
     throw error;
   }
   const { editorData, pageNames, sectionCount } = draft;

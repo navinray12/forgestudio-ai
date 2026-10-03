@@ -9,6 +9,7 @@ import {
   createWebsite,
   updateWebsite,
   deleteWebsite,
+  getWebsiteRoles,
 } from "../services/website.service.js";
 
 /**
@@ -213,12 +214,15 @@ export async function getWebsiteRolesHandler(
     const websiteId = req.params.id as string;
 
     // Using default service to import
-    const { getWebsiteRoles } = await import("../services/website.service.js");
-    const roles = await getWebsiteRoles(websiteId, user.id);
+    const rolesData: any = await getWebsiteRoles(websiteId, user.id);
+    const membersList = Array.isArray(rolesData) ? rolesData : (rolesData?.members || []);
+    const invitationsList = rolesData?.invitations || [];
 
     return res.status(200).json({
       success: true,
-      roles,
+      roles: membersList,
+      members: membersList,
+      invitations: invitationsList,
     });
   } catch (error) {
     next(error);

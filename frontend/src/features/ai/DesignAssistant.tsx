@@ -69,7 +69,15 @@ export function DesignAssistant({ apiUrl, websiteId, onClose, prepare, apply, pa
           if (active) setProposal(resultProposal.changeset);
         } else if (["QUEUED", "RUNNING"].includes(result.execution.status)) timer = setTimeout(() => void poll(), 1500);
         else if (result.execution.errorCode) setError(safeMessages[result.execution.errorCode] || "Design generation failed safely. Review the settings or retry.");
-      } catch (cause) { if (active) { setError(cause instanceof Error ? cause.message : "Unable to retrieve progress."); if (++failures < 3) timer = setTimeout(() => void poll(), 5000); } }
+      } catch (cause) {
+        if (active) {
+          const msg = cause instanceof Error ? cause.message : "Unable to retrieve progress.";
+          setError(msg);
+          failures++;
+          const delay = failures > 3 ? 10000 : 3000;
+          timer = setTimeout(() => void poll(), delay);
+        }
+      }
     }
     void poll();
     return () => { active = false; clearTimeout(timer); };
@@ -155,7 +163,28 @@ export function DesignAssistant({ apiUrl, websiteId, onClose, prepare, apply, pa
           )}
         </div>
         <p className="text-sm">{execution.stages.filter(stage => stage.status === "COMPLETED").length} stages complete. You can return to manual editing while generation runs.</p>
+        {execution.status === "RECONCILIATION_REQUIRED" && (
+          <p role="alert" className="mt-2 text-sm text-amber-800">
+            {safeMessages.AI_EXTERNAL_OUTCOME_UNKNOWN}
+          </p>
+        )}
       </div>}
+      {!execution && !!executionId && error && (
+        <div className="my-4 flex items-center justify-between rounded border border-red-200 bg-red-50 p-3">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            className="text-xs font-semibold text-red-800 hover:underline"
+            onClick={() => {
+              try { sessionStorage.removeItem(storageKey); } catch {}
+              setExecutionId(null);
+              setExecution(null);
+              setError("");
+            }}
+          >
+            Clear attempt
+          </button>
+        </div>
+      )}
       {running && <button disabled={busy} onClick={() => void discard()} className="my-3 rounded border px-3 py-2">Cancel generation</button>}
       {proposal?.status === "PENDING_REVIEW" && <div className="mt-5">
         <h3 className="mb-2 font-semibold">Native editable proposal — not yet saved</h3>

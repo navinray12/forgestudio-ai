@@ -4,6 +4,8 @@ import { requireBrowserOrigin } from "../middlewares/browser-origin.js";
 import { accountSessions } from "../modules/identity/composition.js";
 import { AppError } from "../utils/app-error.js";
 import { z } from "zod";
+import { localAuthenticationEnabled } from "../config/auth.js";
+
 const router = Router();
 router.post(["/support-token", "/support-login"], (_req, _res, next) =>
   next(new AppError("Unscoped impersonation has been retired. Use an approved support grant.", 410, "SUPPORT_TOKEN_RETIRED")));
@@ -20,7 +22,6 @@ router.post(["/revoke-support-tokens", "/sessions/revoke-all"], requireAuth, req
   await accountSessions.revokeAll({ userId: res.locals.user.id, sessionId: res.locals.session.id });
   res.json({ success: true });
 });
-import { localAuthenticationEnabled } from "../config/auth.js";
 
 router.get("/capabilities", (_req, res) => {
   const local = localAuthenticationEnabled();
@@ -33,4 +34,5 @@ router.get("/capabilities", (_req, res) => {
     },
   });
 });
+
 export default router;

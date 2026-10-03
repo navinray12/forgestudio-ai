@@ -55,9 +55,6 @@ apiRouter.use("/licenses", licenseRoutes);
 apiRouter.use("/agency", whitelabelRoutes);
 
 // Websites & Content Management
-// Note: designSystemRoutes includes the 4 original design-token endpoints (GET/PUT/export/import)
-// via the embedded designTokenController import — designTokenRoutes is kept separately for
-// backward compatibility with any existing direct callers of its routes.
 apiRouter.use("/websites", websiteRoutes);
 apiRouter.use("/websites", designTokenRoutes);
 apiRouter.use("/websites", designSystemRoutes);
@@ -132,4 +129,4 @@ export { default as aiHostingRoutes } from "./aiHosting.routes.js";
 export { default as elementorCloudRoutes } from "./elementorCloud.routes.js";
 export { default as exportRoutes } from "./export.routes.js";
 export { default as supportRoutes } from "./support.routes.js";
-
+export { default as forumRoutes } from "./forum.routes.js";

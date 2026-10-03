@@ -32,8 +32,6 @@ const CreateTicketPage = lazy(() => import("./features/support/pages/CreateTicke
 const TicketDetailsPage = lazy(() => import("./features/support/pages/TicketDetails").then(m => ({ default: m.TicketDetailsPage })));
 const SupportAdminViewPage = lazy(() => import("./features/support/pages/SupportAdminView").then(m => ({ default: m.SupportAdminViewPage })));
 const ForumPage = lazy(() => import("./features/forum/pages/ForumPage"));
-
-
 interface RoleRouteProps {
   allowedRoles: UserRole[];
   children: React.ReactNode;
@@ -340,6 +338,10 @@ function App() {
                 <SupportAdminViewPage />
               </RoleRoute>
             }
+          />
+          <Route
+            path="/subscription"
+            element={<Navigate to="/subscriptions" replace />}
           />
 
           <Route

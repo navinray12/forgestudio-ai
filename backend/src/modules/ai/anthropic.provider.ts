@@ -9,7 +9,7 @@ export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
     readonly model = process.env.AI_MODEL_PLANNER || "claude-opus-5-5",
-    private readonly fetcher: typeof fetch = fetch) {}
+    private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) {
@@ -24,7 +24,17 @@ export class AnthropicProvider implements AiProvider {
     try {
       const activeModel = this.model?.startsWith("claude-") ? this.model : "claude-3-7-sonnet-20250219";
       const workspaceId = await resolveAnthropicWorkspaceId(this.apiKey);
-      const systemPrompt = `${SITE_BLUEPRINT_INSTRUCTIONS}\n\nIMPORTANT: Return ONLY a raw, valid JSON object strictly matching this schema. Do not wrap in markdown or backticks. Schema:\n${JSON.stringify(SITE_BLUEPRINT_JSON_SCHEMA)}`;
+      const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
+      const defaultInstruction = request.operation === "SITE_GENERATION"
+        ? SITE_BLUEPRINT_INSTRUCTIONS
+        : "You are a professional website and design AI assistant. Return your response in clean JSON or text as requested.";
+      const systemPrompt = request.systemPrompt || (schema
+        ? `${defaultInstruction}\n\nIMPORTANT: Return ONLY a raw, valid JSON object strictly matching this schema. Do not wrap in markdown or backticks. Schema:\n${JSON.stringify(schema)}`
+        : defaultInstruction);
+      const userContent = request.operation === "SITE_GENERATION"
+        ? JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName })
+        : JSON.stringify({ prompt: request.prompt, ...request.context });
+
       const response = await this.fetcher("https://api.anthropic.com/v1/messages", {
         method: "POST", signal,
         headers: {
@@ -53,8 +63,10 @@ export class AnthropicProvider implements AiProvider {
       let text = (body?.content?.filter(item => item.type === "text" && typeof item.text === "string").map(item => item.text as string) ?? [])[0] ?? "";
       text = text.trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
       if (!text) throw new AppError("AI provider returned an invalid website draft", 502, "AI_INVALID_OUTPUT");
-      return { text, model: typeof body?.model === "string" ? body.model : activeModel,
-        provider: this.name, requestId: typeof body?.id === "string" ? body.id : undefined };
+      return {
+        text, model: typeof body?.model === "string" ? body.model : activeModel,
+        provider: this.name, requestId: typeof body?.id === "string" ? body.id : undefined
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       console.error("[ANTHROPIC EXCEPTION]:", error);

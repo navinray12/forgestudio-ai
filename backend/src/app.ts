@@ -95,238 +95,238 @@ export function createApplication(
   localIdentityRouter: express.Router = loginRoutes,
   managedIdentityRouter: express.Router = identityRoutes,
 ) {
-const app = express();
+  const app = express();
 
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
-);
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    })
+  );
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-  })
-);
+  app.use(
+    cors({
+      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      credentials: true,
+    })
+  );
 
-// Billing provider signatures are calculated over exact raw bytes. Mount this
-// route before any JSON parser; successful verification never trusts a body-supplied tenant alone.
-app.use("/api/v1/billing/webhooks/stripe", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRoutes);
-// SaaS qualification ingress remains available on its versioned legacy path.
-app.use("/api/v1/billing/webhooks", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRouter);
+  // Billing provider signatures are calculated over exact raw bytes. Mount this
+  // route before any JSON parser; successful verification never trusts a body-supplied tenant alone.
+  app.use("/api/v1/billing/webhooks/stripe", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRoutes);
+  // SaaS qualification ingress remains available on its versioned legacy path.
+  app.use("/api/v1/billing/webhooks", express.raw({ type: "application/json", limit: "256kb" }), billingWebhookRouter);
 
-const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "10mb";
-app.use(["/api/v1/auth", "/api/auth"], (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
-  express.json({ limit: "16kb" }));
-app.use(express.json({ limit: jsonBodyLimit }));
-app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
-app.use(cookieParser());
-app.use(protectCookieMutations);
+  const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "10mb";
+  app.use(["/api/v1/auth", "/api/auth"], (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); },
+    express.json({ limit: "16kb" }));
+  app.use(express.json({ limit: jsonBodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
+  app.use(cookieParser());
+  app.use(protectCookieMutations);
 
 
-app.get("/api/v1/health", (_req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: "API is healthy",
+  app.get("/api/v1/health", (_req: Request, res: Response) => {
+    res.status(200).json({
+      success: true,
+      message: "API is healthy",
+    });
   });
-});
 
-// Auth & Session Rate Limiting (F-439)
-app.use("/api/v1/auth/login", authRateLimiter);
-app.use("/api/auth/login", authRateLimiter);
-app.use("/api/v1/auth/signup", authRateLimiter);
-app.use("/api/auth/signup", authRateLimiter);
+  // Auth & Session Rate Limiting (F-439)
+  app.use("/api/v1/auth/login", authRateLimiter);
+  app.use("/api/auth/login", authRateLimiter);
+  app.use("/api/v1/auth/signup", authRateLimiter);
+  app.use("/api/auth/signup", authRateLimiter);
 
-// Auth & Session
-app.use(["/api/v1/auth", "/api/auth"], managedIdentityRouter);
-app.use(["/api/v1/auth", "/api/auth"], localIdentityRouter);
-app.use(["/api/v1/auth", "/api/auth"], signupRoutes);
-app.use(["/api/v1/auth", "/api/auth"], authRoutes);
-app.use(["/api/v1/auth", "/api/auth"], oauthRoutes);
-app.use(["/api/v1/auth", "/api/auth"], meRoutes);
+  // Auth & Session
+  app.use(["/api/v1/auth", "/api/auth"], managedIdentityRouter);
+  app.use(["/api/v1/auth", "/api/auth"], localIdentityRouter);
+  app.use(["/api/v1/auth", "/api/auth"], signupRoutes);
+  app.use(["/api/v1/auth", "/api/auth"], authRoutes);
+  app.use(["/api/v1/auth", "/api/auth"], oauthRoutes);
+  app.use(["/api/v1/auth", "/api/auth"], meRoutes);
 
-// Organization-scoped commercial SaaS boundary. Legacy user subscriptions remain
-// available during migration but cannot be used to bypass verified provider state.
-app.use("/api/v1/organizations/:organizationId/billing", organizationBillingRoutes);
+  // Organization-scoped commercial SaaS boundary. Legacy user subscriptions remain
+  // available during migration but cannot be used to bypass verified provider state.
+  app.use("/api/v1/organizations/:organizationId/billing", organizationBillingRoutes);
 
-// SaaS foundation routes that do not overlap the consolidated billing module.
-app.use("/api/v1/organizations", integrationSecretRoutes);
-app.use("/api/v1/organizations", tenantCapabilityRoutes);
-app.use("/api/v1/files", governedFileRoutes);
-app.use("/platform/v1", saasPlatformControlRoutes);
+  // SaaS foundation routes that do not overlap the consolidated billing module.
+  app.use("/api/v1/organizations", integrationSecretRoutes);
+  app.use("/api/v1/organizations", tenantCapabilityRoutes);
+  app.use("/api/v1/files", governedFileRoutes);
+  app.use("/platform/v1", saasPlatformControlRoutes);
 
-// Platform-control session upgrade uses a distinct cookie/audience and requires
-// recent phishing-resistant OIDC from an already authenticated privileged user.
-app.use("/api/v1/platform-auth", platformAuthRoutes);
+  // Platform-control session upgrade uses a distinct cookie/audience and requires
+  // recent phishing-resistant OIDC from an already authenticated privileged user.
+  app.use("/api/v1/platform-auth", platformAuthRoutes);
 
-// Separate privileged control-plane namespace. The router additionally requires a
-// PLATFORM audience session and privileged role.
-app.use("/api/v1/platform", platformControlRoutes);
+  // Separate privileged control-plane namespace. The router additionally requires a
+  // PLATFORM audience session and privileged role.
+  app.use("/api/v1/platform", platformControlRoutes);
 
-// Subscriptions, Licensing, Whitelabel & Usage (F-440 to F-452)
-app.use("/api/v1/subscriptions", subscriptionRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/v1/licenses", licenseRoutes);
-app.use("/api/licenses", licenseRoutes);
-app.use("/api/v1/agency", whitelabelRoutes);
-app.use("/api/agency", whitelabelRoutes);
-app.use("/api/v1/users/me", usageRoutes);
-app.use("/api/users/me", usageRoutes);
+  // Subscriptions, Licensing, Whitelabel & Usage (F-440 to F-452)
+  app.use("/api/v1/subscriptions", subscriptionRoutes);
+  app.use("/api/subscriptions", subscriptionRoutes);
+  app.use("/api/v1/licenses", licenseRoutes);
+  app.use("/api/licenses", licenseRoutes);
+  app.use("/api/v1/agency", whitelabelRoutes);
+  app.use("/api/agency", whitelabelRoutes);
+  app.use("/api/v1/users/me", usageRoutes);
+  app.use("/api/users/me", usageRoutes);
 
-// Workspace commands have their own validated scope and idempotency contract.
-app.use(
-  ["/api/v1/tenant-workspaces", "/api/tenant-workspaces", "/api/v1/workspaces", "/api/workspaces"],
-  tenantWorkspaceRoutes
-);
+  // Workspace commands have their own validated scope and idempotency contract.
+  app.use(
+    ["/api/v1/tenant-workspaces", "/api/tenant-workspaces", "/api/v1/workspaces", "/api/workspaces"],
+    tenantWorkspaceRoutes
+  );
 
-// Support Ticket System
-app.use("/api/v1/support", supportRoutes);
-app.use("/api/support", supportRoutes);
+  // Support Ticket System
+  app.use("/api/v1/support", supportRoutes);
+  app.use("/api/support", supportRoutes);
 
-// Discussion Forum System
-app.use("/api/v1/forum", forumRoutes);
-app.use("/api/forum", forumRoutes);
+  // Discussion Forum System
+  app.use("/api/v1/forum", forumRoutes);
+  app.use("/api/forum", forumRoutes);
 
-// Public API v1 Standardized Endpoints
-app.use("/api/v1", apiV1Routes);
+  // Public API v1 Standardized Endpoints
+  app.use("/api/v1", apiV1Routes);
 
-// Websites & Workspace
-app.use("/api/v1/websites", websiteRoutes);
-app.use("/api/websites", websiteRoutes);
-app.use("/api/v1/websites", mailerRoutes);
-app.use("/api/websites", mailerRoutes);
-app.use("/api/v1/websites", clientBillingRoutes);
-app.use("/api/websites", clientBillingRoutes);
-app.use("/api/v1/websites", experimentRoutes);
-app.use("/api/websites", experimentRoutes);
-app.use("/api/v1/teams", teamRoutes);
-app.use("/api/teams", teamRoutes);
-app.use("/api/v1/workspaces", teamRoutes);
-app.use("/api/workspaces", teamRoutes);
-app.use("/api/v1/tenant-workspaces", tenantWorkspaceRoutes);
-app.use("/api/tenant-workspaces", tenantWorkspaceRoutes);
-app.use("/api/v1/tenant-invitations", tenantWorkspaceRoutes);
-app.use("/api/tenant-invitations", tenantWorkspaceRoutes);
+  // Websites & Workspace
+  app.use("/api/v1/websites", websiteRoutes);
+  app.use("/api/websites", websiteRoutes);
+  app.use("/api/v1/websites", mailerRoutes);
+  app.use("/api/websites", mailerRoutes);
+  app.use("/api/v1/websites", clientBillingRoutes);
+  app.use("/api/websites", clientBillingRoutes);
+  app.use("/api/v1/websites", experimentRoutes);
+  app.use("/api/websites", experimentRoutes);
+  app.use("/api/v1/teams", teamRoutes);
+  app.use("/api/teams", teamRoutes);
+  app.use("/api/v1/workspaces", teamRoutes);
+  app.use("/api/workspaces", teamRoutes);
+  app.use("/api/v1/tenant-workspaces", tenantWorkspaceRoutes);
+  app.use("/api/tenant-workspaces", tenantWorkspaceRoutes);
+  app.use("/api/v1/tenant-invitations", tenantWorkspaceRoutes);
+  app.use("/api/tenant-invitations", tenantWorkspaceRoutes);
 
-// Organization-scoped, quarantine-first object storage API.
-app.use("/api/v1/organizations/:organizationId/files", organizationFileRoutes);
+  // Organization-scoped, quarantine-first object storage API.
+  app.use("/api/v1/organizations/:organizationId/files", organizationFileRoutes);
 
-// Governed connector credential references. Secret values are never returned by this API.
-app.use("/api/v1/organizations/:organizationId/connectors/credentials", connectorCredentialRoutes);
+  // Governed connector credential references. Secret values are never returned by this API.
+  app.use("/api/v1/organizations/:organizationId/connectors/credentials", connectorCredentialRoutes);
 
-// Media & Uploads
-app.use("/api/v1/uploads", uploadRoutes);
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/v1/media", mediaRoutes);
-app.use("/api/media", mediaRoutes);
+  // Media & Uploads
+  app.use("/api/v1/uploads", uploadRoutes);
+  app.use("/api/uploads", uploadRoutes);
+  app.use("/api/v1/media", mediaRoutes);
+  app.use("/api/media", mediaRoutes);
 
-// API Keys & Developer Access
-app.use("/api/v1/apikeys", apiKeysRoutes);
-app.use("/api/apikeys", apiKeysRoutes);
-app.use("/api/v1/developer", developerRoutes);
-app.use("/api/developer", developerRoutes);
+  // API Keys & Developer Access
+  app.use("/api/v1/apikeys", apiKeysRoutes);
+  app.use("/api/apikeys", apiKeysRoutes);
+  app.use("/api/v1/developer", developerRoutes);
+  app.use("/api/developer", developerRoutes);
 
-// Editor & Custom Content
-app.use("/api/v1/composer", composerRoutes);
-app.use("/api/composer", composerRoutes);
-app.use("/api/v1/cpt", customPostTypeRoutes);
-app.use("/api/cpt", customPostTypeRoutes);
-app.use("/api/v1/custom-code", customCodeRoutes);
-app.use("/api/custom-code", customCodeRoutes);
-app.use("/api/v1/design-notes", designNotesRoutes);
-app.use("/api/design-notes", designNotesRoutes);
-app.use("/api/v1/component-access", componentAccessRoutes);
-app.use("/api/component-access", componentAccessRoutes);
-
+  // Editor & Custom Content
+  app.use("/api/v1/composer", composerRoutes);
+  app.use("/api/composer", composerRoutes);
+  app.use("/api/v1/cpt", customPostTypeRoutes);
+  app.use("/api/cpt", customPostTypeRoutes);
+  app.use("/api/v1/custom-code", customCodeRoutes);
+  app.use("/api/custom-code", customCodeRoutes);
+  app.use("/api/v1/design-notes", designNotesRoutes);
+  app.use("/api/design-notes", designNotesRoutes);
+  app.use("/api/v1/component-access", componentAccessRoutes);
+  app.use("/api/component-access", componentAccessRoutes);
 
 
-app.use("/api/v1/templates", templateRoutes);
-app.use("/api/templates", templateRoutes);
 
-// Forms: public submission + protected owner operations are enforced by the router.
-app.use("/api/v1/forms", formRoutes);
-app.use("/api/forms", formRoutes);
+  app.use("/api/v1/templates", templateRoutes);
+  app.use("/api/templates", templateRoutes);
 
-// Plugin compatibility and integrations.
-app.get("/api/v1/plugins/wordpress/download", downloadWordPressPluginHandler);
-app.get("/api/plugins/wordpress/download", downloadWordPressPluginHandler);
-app.use("/api/v1/plugins", pluginCompatRoutes);
-app.use("/api/plugins", pluginCompatRoutes);
-app.use("/api/v1/plugins-integration", pluginIntegrationRoutes);
-app.use("/api/plugins-integration", pluginIntegrationRoutes);
+  // Forms: public submission + protected owner operations are enforced by the router.
+  app.use("/api/v1/forms", formRoutes);
+  app.use("/api/forms", formRoutes);
 
-// Deployment, multisite and external integrations.
-app.use("/api/v1/sftp", sftpRoutes);
-app.use("/api/sftp", sftpRoutes);
-app.use("/api/v1/multisite", multisiteRoutes);
-app.use("/api/multisite", multisiteRoutes);
-app.use("/api/v1/integrations", integrationRoutes);
+  // Plugin compatibility and integrations.
+  app.get("/api/v1/plugins/wordpress/download", downloadWordPressPluginHandler);
+  app.get("/api/plugins/wordpress/download", downloadWordPressPluginHandler);
+  app.use("/api/v1/plugins", pluginCompatRoutes);
+  app.use("/api/plugins", pluginCompatRoutes);
+  app.use("/api/v1/plugins-integration", pluginIntegrationRoutes);
+  app.use("/api/plugins-integration", pluginIntegrationRoutes);
 
-// Phase 17: Design System / Tokens
+  // Deployment, multisite and external integrations.
+  app.use("/api/v1/sftp", sftpRoutes);
+  app.use("/api/sftp", sftpRoutes);
+  app.use("/api/v1/multisite", multisiteRoutes);
+  app.use("/api/multisite", multisiteRoutes);
+  app.use("/api/v1/integrations", integrationRoutes);
 
-app.use("/api/v1/websites", designTokenRoutes);
-app.use("/api/websites", designTokenRoutes);
+  // Phase 17: Design System / Tokens
 
-// Phase 18: E-Commerce & WooCommerce Parity
-app.use("/api/v1/websites", commerceRoutes);
-app.use("/api/websites", commerceRoutes);
+  app.use("/api/v1/websites", designTokenRoutes);
+  app.use("/api/websites", designTokenRoutes);
 
-// Phase 19: Custom Domains & Backups
-app.use("/api/v1/websites", enterpriseMultisiteRoutes);
-app.use("/api/websites", enterpriseMultisiteRoutes);
+  // Phase 18: E-Commerce & WooCommerce Parity
+  app.use("/api/v1/websites", commerceRoutes);
+  app.use("/api/websites", commerceRoutes);
 
-// Staging Sandbox Environments
-app.use("/api/v1/websites", stagingRoutes);
-app.use("/api/websites", stagingRoutes);
+  // Phase 19: Custom Domains & Backups
+  app.use("/api/v1/websites", enterpriseMultisiteRoutes);
+  app.use("/api/websites", enterpriseMultisiteRoutes);
 
-// Server Resources & SFTP Configuration
-app.use("/api/v1/websites", serverConfigRoutes);
-app.use("/api/websites", serverConfigRoutes);
+  // Staging Sandbox Environments
+  app.use("/api/v1/websites", stagingRoutes);
+  app.use("/api/websites", stagingRoutes);
 
-// Security, Privacy, Cache, Transfer & Hosting Logs
-app.use("/api/v1/websites", hostingRoutes);
-app.use("/api/websites", hostingRoutes);
-app.use("/api/v1/websites", performanceRoutes);
-app.use("/api/websites", performanceRoutes);
-app.use("/api/v1/websites", imageOptimizationRoutes);
-app.use("/api/websites", imageOptimizationRoutes);
-app.use("/api/v1/websites", designSystemRoutes);
-app.use("/api/websites", designSystemRoutes);
-app.use("/api/v1/websites", aiHostingRoutes);
-app.use("/api/websites", aiHostingRoutes);
-app.use("/api/v1/ai", aiRoutes);
-app.use("/api/ai", aiRoutes);
+  // Server Resources & SFTP Configuration
+  app.use("/api/v1/websites", serverConfigRoutes);
+  app.use("/api/websites", serverConfigRoutes);
 
-// Elementor Cloud Managed Hosting Bundles (X-804)
-app.use("/api/v1/elementor-cloud", elementorCloudRoutes);
-app.use("/api/elementor-cloud", elementorCloudRoutes);
+  // Security, Privacy, Cache, Transfer & Hosting Logs
+  app.use("/api/v1/websites", hostingRoutes);
+  app.use("/api/websites", hostingRoutes);
+  app.use("/api/v1/websites", performanceRoutes);
+  app.use("/api/websites", performanceRoutes);
+  app.use("/api/v1/websites", imageOptimizationRoutes);
+  app.use("/api/websites", imageOptimizationRoutes);
+  app.use("/api/v1/websites", designSystemRoutes);
+  app.use("/api/websites", designSystemRoutes);
+  app.use("/api/v1/websites", aiHostingRoutes);
+  app.use("/api/websites", aiHostingRoutes);
+  app.use("/api/v1/ai", aiRoutes);
+  app.use("/api/ai", aiRoutes);
 
-// Code Generation, Multi-Format Exporters & Hello Theme (F-745 to F-755, X-786)
-app.use("/api/v1/websites", exportRoutes);
-app.use("/api/websites", exportRoutes);
-app.use("/api/v1/plugins/wordpress", exportRoutes);
-app.use("/api/plugins/wordpress", exportRoutes);
+  // Elementor Cloud Managed Hosting Bundles (X-804)
+  app.use("/api/v1/elementor-cloud", elementorCloudRoutes);
+  app.use("/api/elementor-cloud", elementorCloudRoutes);
 
-// Audit Logs
-app.use("/api/v1/audit-logs", auditLogRoutes);
-app.use("/api/audit-logs", auditLogRoutes);
+  // Code Generation, Multi-Format Exporters & Hello Theme (F-745 to F-755, X-786)
+  app.use("/api/v1/websites", exportRoutes);
+  app.use("/api/websites", exportRoutes);
+  app.use("/api/v1/plugins/wordpress", exportRoutes);
+  app.use("/api/plugins/wordpress", exportRoutes);
 
-// Operations, Automation & Monitoring
-app.use("/api/v1/operations", operationsRoutes);
-app.use("/api/operations", operationsRoutes);
-app.get("/api/health", (_req, res) => {
-  res.redirect("/api/operations/health");
-});
+  // Audit Logs
+  app.use("/api/v1/audit-logs", auditLogRoutes);
+  app.use("/api/audit-logs", auditLogRoutes);
 
-// Phase 20: Production Health & Canary
-app.use("/api", healthRoutes);
+  // Operations, Automation & Monitoring
+  app.use("/api/v1/operations", operationsRoutes);
+  app.use("/api/operations", operationsRoutes);
+  app.get("/api/health", (_req, res) => {
+    res.redirect("/api/operations/health");
+  });
 
-app.use(errorMiddleware);
+  // Phase 20: Production Health & Canary
+  app.use("/api", healthRoutes);
 
-return app;
+  app.use(errorMiddleware);
+
+  return app;
 }
 
 export default createApplication();

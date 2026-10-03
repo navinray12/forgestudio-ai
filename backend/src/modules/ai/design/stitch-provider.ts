@@ -14,11 +14,17 @@ export class StitchDesignProvider implements DesignProvider {
   }
   async createProject(title: string) {
     try { return (await this.sdk.createProject(title)).id; }
-    catch { throw new AppError("Stitch project creation outcome needs reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN"); }
+    catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Stitch project creation outcome needs reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
+    }
   }
   async generate(projectId: string, prompt: string) {
     try { const screen = await this.sdk.project(projectId).generate(prompt, "DESKTOP", this.model); return { screenId: screen.id }; }
-    catch { throw new AppError("Stitch generation outcome needs reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN"); }
+    catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Stitch generation outcome needs reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
+    }
   }
   async html(projectId: string, screenId: string) {
     try {

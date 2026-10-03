@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { workspaceRequest, WorkspaceRequestError } from "./workspace-api";
 import type { WorkspaceSummary } from "./workspace-api";
+
 export type WorkspaceItem = WorkspaceSummary;
 interface Props { apiUrl: string; currentWorkspaceId: string | null; onSelectWorkspace: (id: string | null) => void }
 
