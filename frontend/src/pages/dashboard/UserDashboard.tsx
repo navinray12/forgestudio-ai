@@ -364,6 +364,18 @@ function UserDashboard() {
             >
               <span>⭐ Manage Subscription</span>
             </Link>
+            <Link
+              to="/forum"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+            >
+              <span>💬 Discussion Forum</span>
+            </Link>
+            <Link
+              to="/support"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+            >
+              <span>🎟️ Support Tickets</span>
+            </Link>
           </div>
 
           <div className="mt-3">
@@ -609,6 +621,8 @@ function UserDashboard() {
               <span>📜</span>
               <span className="hidden sm:inline">Activity Log</span>
             </button>
+            <Link to="/forum" className="inline-flex h-8 items-center rounded-lg border border-indigo-200 bg-indigo-50/80 px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-sm">🗣️ Forum</Link>
+            <Link to="/support" className="inline-flex h-8 items-center rounded-lg border border-blue-200 bg-blue-50/80 px-3 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm">💬 Support</Link>
             <Link to="/subscriptions" className="hidden sm:inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm">⭐ Subscription</Link>
             <button onClick={handleLogout} className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition shadow-sm">Logout</button>
           </div>

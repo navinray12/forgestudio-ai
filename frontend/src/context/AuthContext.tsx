@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { identityRequest } from "../features/identity/identity-api";
-export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN" | "PLATFORM_ADMIN" | "SUPPORT_ADMIN" | "DEVELOPER" | "AI_CONTENT_ADMIN" | "TEAM_MEMBER";
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN" | "PLATFORM_ADMIN" | "SUPPORT_ADMIN" | "SUPPORT_AGENT" | "SUPPORT_MANAGER" | "DEVELOPER" | "AI_CONTENT_ADMIN" | "TEAM_MEMBER";
 export interface AuthUser {
   id: string; fullName: string | null; email: string | null; phone: string | null; role: UserRole;
   status: string; emailVerified: boolean; phoneVerified: boolean; lastLoginAt: string | null;

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { workspaceRequest } from "./workspace-api";
+import { workspaceRequest, WorkspaceRequestError } from "./workspace-api";
 import type { WorkspaceSummary } from "./workspace-api";
+
 export type WorkspaceItem = WorkspaceSummary;
 interface Props { apiUrl: string; currentWorkspaceId: string | null; onSelectWorkspace: (id: string | null) => void }
 
@@ -23,8 +24,16 @@ export function WorkspaceSwitcher({ apiUrl, currentWorkspaceId, onSelectWorkspac
   useEffect(() => {
     const controller = new AbortController(); setError("");
     workspaceRequest<{workspaces: WorkspaceSummary[]; hasMore: boolean}>(apiUrl, "", { signal: controller.signal })
-      .then((data) => { if (!controller.signal.aborted) { setWorkspaces(data.workspaces); setHasMore(data.hasMore); } })
-      .catch((failure: unknown) => { if (!controller.signal.aborted) { setWorkspaces([]); setError(failure instanceof Error ? failure.message : "Unable to load workspaces"); } });
+      .then((data) => { if (!controller.signal.aborted) { setWorkspaces(data.workspaces || []); setHasMore(!!data.hasMore); } })
+      .catch((failure: unknown) => {
+        if (!controller.signal.aborted) {
+          setWorkspaces([]);
+          if (failure instanceof WorkspaceRequestError && failure.status === 401) {
+            return;
+          }
+          setError(failure instanceof Error ? failure.message : "Unable to load workspaces");
+        }
+      });
     return () => controller.abort();
   }, [apiUrl, revision]);
 

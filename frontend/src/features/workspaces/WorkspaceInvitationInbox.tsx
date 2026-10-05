@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { workspaceRequest } from "./workspace-api";
+import { workspaceRequest, WorkspaceRequestError } from "./workspace-api";
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 
 type Invitation = {
@@ -45,6 +45,10 @@ export function WorkspaceInvitationInbox({
       })
       .catch((failure) => {
         if (!controller.signal.aborted) {
+          if (failure instanceof WorkspaceRequestError && failure.status === 401) {
+            setItems([]);
+            return;
+          }
           setError(
             failure instanceof Error ? failure.message : "Invitation inbox unavailable"
           );

@@ -7,7 +7,7 @@ export class GeminiProvider implements AiProvider {
   readonly name = "gemini";
   constructor(private readonly apiKey = process.env.GEMINI_API_KEY,
     readonly model = process.env.AI_MODEL_GEMINI || "gemini-3.8-flash",
-    private readonly fetcher: typeof fetch = fetch) {}
+    private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
@@ -30,7 +30,8 @@ export class GeminiProvider implements AiProvider {
 
       const response = await this.fetcher(
         `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent`,
-        { method: "POST", signal,
+        {
+          method: "POST", signal,
           headers: { "x-goog-api-key": this.apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemText }] },
@@ -67,8 +68,10 @@ export class GeminiProvider implements AiProvider {
       if (candidate?.finishReason !== "STOP" || texts.length !== 1 || !texts[0]?.trim()) {
         throw new AppError("AI provider returned an invalid website draft", 502, "AI_INVALID_OUTPUT");
       }
-      return { text: texts[0], model: activeModel, provider: this.name,
-        requestId: typeof body?.responseId === "string" ? body.responseId : undefined };
+      return {
+        text: texts[0], model: activeModel, provider: this.name,
+        requestId: typeof body?.responseId === "string" ? body.responseId : undefined
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {

@@ -27,7 +27,6 @@ export function siteGenerationProvider(): AiProvider {
     default: throw new AppError("AI provider configuration is invalid", 503, "AI_NOT_CONFIGURED");
   }
 }
-
 export type PlatformAiCapability =
   | "TEXT"
   | "CONTENT_REFINEMENT"

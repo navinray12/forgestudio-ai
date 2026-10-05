@@ -20,6 +20,8 @@ import componentAccessRoutes from "./componentAccess.routes.js";
 import templateRoutes from "./template.routes.js";
 import formRoutes from "./form.routes.js";
 import integrationRoutes from "./integration.routes.js";
+import supportRoutes from "./support.routes.js";
+import forumRoutes from "./forum.routes.js";
 import sftpRoutes from "./sftp.routes.js";
 import pluginIntegrationRoutes from "./pluginIntegration.routes.js";
 import multisiteRoutes from "./multisite.routes.js";
@@ -35,6 +37,7 @@ import serverConfigRoutes from "./serverConfig.routes.js";
 import hostingRoutes from "./hosting.routes.js";
 import performanceRoutes from "./performance.routes.js";
 import imageOptimizationRoutes from "./imageOptimization.routes.js";
+import tenantWorkspaceRoutes from "./tenant-workspace.routes.js";
 
 const apiRouter = Router();
 
@@ -52,9 +55,6 @@ apiRouter.use("/licenses", licenseRoutes);
 apiRouter.use("/agency", whitelabelRoutes);
 
 // Websites & Content Management
-// Note: designSystemRoutes includes the 4 original design-token endpoints (GET/PUT/export/import)
-// via the embedded designTokenController import — designTokenRoutes is kept separately for
-// backward compatibility with any existing direct callers of its routes.
 apiRouter.use("/websites", websiteRoutes);
 apiRouter.use("/websites", designTokenRoutes);
 apiRouter.use("/websites", designSystemRoutes);
@@ -65,12 +65,15 @@ apiRouter.use("/websites", serverConfigRoutes);
 apiRouter.use("/websites", hostingRoutes);
 apiRouter.use("/websites", performanceRoutes);
 apiRouter.use("/websites", imageOptimizationRoutes);
+apiRouter.use("/tenant-workspaces", tenantWorkspaceRoutes);
 apiRouter.use("/teams", teamRoutes);
 apiRouter.use("/uploads", uploadRoutes);
 apiRouter.use("/api-keys", apiKeysRoutes);
 apiRouter.use("/developer", developerRoutes);
 apiRouter.use("/composer", composerRoutes);
 apiRouter.use("/sftp", sftpRoutes);
+apiRouter.use("/support", supportRoutes);
+apiRouter.use("/forum", forumRoutes);
 apiRouter.use("/plugins-integration", pluginIntegrationRoutes);
 apiRouter.use("/multisite", multisiteRoutes);
 
@@ -94,6 +97,7 @@ export { default as authRoutes } from "./auth.routes.js";
 export { default as subscriptionRoutes } from "./subscription.routes.js";
 export { default as websiteRoutes } from "./website.routes.js";
 export { default as teamRoutes } from "./team.routes.js";
+export { default as tenantWorkspaceRoutes } from "./tenant-workspace.routes.js";
 export { default as uploadRoutes } from "./upload.routes.js";
 export { default as apiKeysRoutes } from "./apiKeys.routes.js";
 export { default as developerRoutes } from "./developer.routes.js";
@@ -124,4 +128,5 @@ export { default as imageOptimizationRoutes } from "./imageOptimization.routes.j
 export { default as aiHostingRoutes } from "./aiHosting.routes.js";
 export { default as elementorCloudRoutes } from "./elementorCloud.routes.js";
 export { default as exportRoutes } from "./export.routes.js";
-
+export { default as supportRoutes } from "./support.routes.js";
+export { default as forumRoutes } from "./forum.routes.js";
