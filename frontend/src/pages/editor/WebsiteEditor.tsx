@@ -7432,6 +7432,18 @@ export default function WebsiteEditor() {
               <span className="hidden sm:inline">Save</span>
             </button>
 
+            {/* Code Workspace Button */}
+            <button
+              type="button"
+              onClick={() => navigate(`/workspace/website/${websiteId}`)}
+              className="h-8 px-3 rounded-lg border border-purple-500/60 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 hover:text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+              title="Open Developer Code Workspace (Phase 2)"
+              aria-label="Developer Code Workspace"
+            >
+              <Code2 className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">Code Workspace</span>
+            </button>
+
             {/* Publish Button */}
             <button
               type="button"

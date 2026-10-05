@@ -11,24 +11,44 @@ import type {
 const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/v1/support`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders,
       ...options.headers,
     },
     credentials: "include",
   });
 
-  const contentType = res.headers.get("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
-    throw new Error(`Server returned non-JSON response (${res.status} ${res.statusText})`);
+  const contentType = res.headers.get("content-type") || "";
+  let data: any = null;
+
+  if (contentType.includes("json")) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
   }
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error?.message || data.message || "An unexpected error occurred");
+  if (!res.ok || (data && data.success === false)) {
+    const errorMsg =
+      data?.error?.message ||
+      data?.detail ||
+      data?.message ||
+      `Server error (${res.status} ${res.statusText})`;
+    throw new Error(errorMsg);
   }
+
+  if (!data) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Server returned non-JSON response (${res.status} ${res.statusText})`);
+  }
+
   return data;
 }
 

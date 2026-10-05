@@ -19,6 +19,7 @@ const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
 const SuperAdminDashboard = lazy(() => import("./pages/dashboard/SuperAdminDashboard"));
 const SubscriptionPage = lazy(() => import("./pages/subscriptions/SubscriptionPage"));
 const WebsiteEditor = lazy(() => import("./features/editor-access/EditorRoute"));
+const DeveloperWorkspace = lazy(() => import("./features/developer-workspace/pages/DeveloperWorkspace"));
 const CustomPostTypesList = lazy(() => import("./pages/dashboard/CustomPostTypesList"));
 const CustomPostTypeBuilder = lazy(() => import("./pages/dashboard/CustomPostTypeBuilder"));
 const CustomEntriesList = lazy(() => import("./pages/dashboard/CustomEntriesList"));
@@ -350,6 +351,24 @@ function App() {
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>
                 <WebsiteEditor />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/:projectId"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <DeveloperWorkspace />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/website/:websiteId"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <DeveloperWorkspace />
               </RoleRoute>
             }
           />

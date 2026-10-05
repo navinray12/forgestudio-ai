@@ -73,6 +73,7 @@ import tenantCapabilityRoutes from "./services/capabilities/tenant-capabilities.
 import aiRoutes from "./routes/ai.routes.js";
 import supportRoutes from "./routes/support.routes.js";
 import forumRoutes from "./routes/forum.routes.js";
+import projectRoutes from "./routes/project.routes.js";
 
 
 const authRateLimiter = rateLimit({
@@ -189,6 +190,10 @@ export function createApplication(
   // Discussion Forum System
   app.use("/api/v1/forum", forumRoutes);
   app.use("/api/forum", forumRoutes);
+
+  // Phase 2: Forge Project Model, Persistent Filesystem, Manifest, Compiler, Sync & Workspace
+  app.use("/api/v1/projects", projectRoutes);
+  app.use("/api/projects", projectRoutes);
 
   // Public API v1 Standardized Endpoints
   app.use("/api/v1", apiV1Routes);

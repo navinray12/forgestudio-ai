@@ -707,5 +707,614 @@ export async function ensureDatabaseTables(): Promise<void> {
     ON CONFLICT (slug) DO NOTHING;
   `);
 
+  // 17. Phase 2: Forge Project Model, Persistent Filesystem, Revisions, Snapshots & Workspace States
+  await execSafe("forge_projects table", `
+    CREATE TABLE IF NOT EXISTS forge_projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug VARCHAR(255) UNIQUE NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      "projectType" VARCHAR(50) NOT NULL DEFAULT 'VISUAL_WEBSITE',
+      "lifecycleStatus" VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+      "websiteId" UUID REFERENCES websites(id) ON DELETE SET NULL,
+      "workspaceId" UUID REFERENCES workspaces(id) ON DELETE SET NULL,
+      "organizationId" UUID REFERENCES organizations(id) ON DELETE SET NULL,
+      "ownerId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      framework VARCHAR(50) NOT NULL DEFAULT 'react',
+      "frameworkVersion" VARCHAR(50) NOT NULL DEFAULT '19.0.0',
+      runtime VARCHAR(50) NOT NULL DEFAULT 'node',
+      "runtimeVersion" VARCHAR(50) NOT NULL DEFAULT '22.0.0',
+      "packageManager" VARCHAR(50) NOT NULL DEFAULT 'npm',
+      language VARCHAR(50) NOT NULL DEFAULT 'typescript',
+      capabilities JSONB NOT NULL DEFAULT '{"visualEditing":true,"sourceEditing":true,"react":true,"nextjs":false,"database":true,"storage":true,"git":true,"preview":true,"build":true,"ai":true,"deployment":true}'::jsonb,
+      settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+      compatibility JSONB NOT NULL DEFAULT '{"manifestVersion":"1.0.0","irVersion":"1.0.0"}'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "deletedAt" TIMESTAMPTZ,
+      "lastActivityAt" TIMESTAMPTZ DEFAULT now(),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_projects_owner ON forge_projects("ownerId");
+    CREATE INDEX IF NOT EXISTS idx_forge_projects_website ON forge_projects("websiteId");
+    CREATE INDEX IF NOT EXISTS idx_forge_projects_workspace ON forge_projects("workspaceId");
+    CREATE INDEX IF NOT EXISTS idx_forge_projects_status ON forge_projects("lifecycleStatus");
+  `);
+
+  await execSafe("forge_project_files table", `
+    CREATE TABLE IF NOT EXISTS forge_project_files (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      path VARCHAR(1000) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      extension VARCHAR(50) NOT NULL,
+      "mimeType" VARCHAR(100) NOT NULL DEFAULT 'text/plain',
+      "isDirectory" BOOLEAN NOT NULL DEFAULT false,
+      "sizeBytes" INTEGER NOT NULL DEFAULT 0,
+      content TEXT,
+      encoding VARCHAR(20) NOT NULL DEFAULT 'utf-8',
+      "contentHash" VARCHAR(64) NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      "isGenerated" BOOLEAN NOT NULL DEFAULT false,
+      "isProtected" BOOLEAN NOT NULL DEFAULT false,
+      "deletedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", path)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_project_files_proj ON forge_project_files("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_project_files_path ON forge_project_files("projectId", path);
+  `);
+
+  await execSafe("forge_project_revisions table", `
+    CREATE TABLE IF NOT EXISTS forge_project_revisions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "fileId" UUID NOT NULL REFERENCES forge_project_files(id) ON DELETE CASCADE,
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      version INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      "contentHash" VARCHAR(64) NOT NULL,
+      "changeType" VARCHAR(50) NOT NULL DEFAULT 'UPDATE',
+      "authorId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      reason VARCHAR(255),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_project_rev_file ON forge_project_revisions("fileId");
+    CREATE INDEX IF NOT EXISTS idx_forge_project_rev_proj ON forge_project_revisions("projectId");
+  `);
+
+  await execSafe("forge_project_snapshots table", `
+    CREATE TABLE IF NOT EXISTS forge_project_snapshots (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      description VARCHAR(500),
+      "fileCount" INTEGER NOT NULL DEFAULT 0,
+      "totalBytes" INTEGER NOT NULL DEFAULT 0,
+      "treeManifest" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdById" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_project_snap_proj ON forge_project_snapshots("projectId");
+  `);
+
+  await execSafe("forge_workspace_states table", `
+    CREATE TABLE IF NOT EXISTS forge_workspace_states (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      layout JSONB NOT NULL DEFAULT '{}'::jsonb,
+      preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", "userId")
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_ws_state_proj ON forge_workspace_states("projectId", "userId");
+  `);
+
+  // Phase 2 Modules 10-15 Execution Infrastructure Tables
+  await execSafe("forge_runtime_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_runtime_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "runtimeType" VARCHAR(50) NOT NULL DEFAULT 'development',
+      status VARCHAR(50) NOT NULL DEFAULT 'STOPPED',
+      port INTEGER,
+      "nodeVersion" VARCHAR(50) NOT NULL DEFAULT '20.x',
+      "resourceQuotas" JSONB NOT NULL DEFAULT '{"maxMemoryMb":512,"maxCpuPercent":80,"timeoutMs":300000}'::jsonb,
+      "startedAt" TIMESTAMPTZ,
+      "stoppedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_runtime_proj ON forge_runtime_sessions("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_runtime_status ON forge_runtime_sessions("status");
+  `);
+
+  await execSafe("forge_build_records table", `
+    CREATE TABLE IF NOT EXISTS forge_build_records (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "buildMode" VARCHAR(50) NOT NULL DEFAULT 'production',
+      status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+      trigger VARCHAR(50) NOT NULL DEFAULT 'manual',
+      "durationMs" INTEGER DEFAULT 0,
+      stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+      diagnostics JSONB NOT NULL DEFAULT '[]'::jsonb,
+      reproducibility JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdById" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "startedAt" TIMESTAMPTZ,
+      "completedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_build_proj ON forge_build_records("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_build_status ON forge_build_records("status");
+  `);
+
+  await execSafe("forge_build_artifacts table", `
+    CREATE TABLE IF NOT EXISTS forge_build_artifacts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "buildId" UUID NOT NULL REFERENCES forge_build_records(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      "artifactType" VARCHAR(50) NOT NULL DEFAULT 'bundle',
+      "sizeBytes" INTEGER NOT NULL DEFAULT 0,
+      "contentHash" VARCHAR(64) NOT NULL,
+      "fileList" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_artifact_proj ON forge_build_artifacts("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_artifact_build ON forge_build_artifacts("buildId");
+  `);
+
+  await execSafe("forge_preview_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_preview_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "runtimeId" UUID REFERENCES forge_runtime_sessions(id) ON DELETE SET NULL,
+      "sessionToken" VARCHAR(128) NOT NULL UNIQUE,
+      status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+      "targetPort" INTEGER NOT NULL DEFAULT 5173,
+      "previewUrl" VARCHAR(500) NOT NULL,
+      viewport JSONB NOT NULL DEFAULT '{"preset":"desktop","width":1280,"height":800}'::jsonb,
+      "expiresAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_preview_proj ON forge_preview_sessions("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_preview_token ON forge_preview_sessions("sessionToken");
+  `);
+
+  await execSafe("forge_terminal_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_terminal_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "runtimeId" UUID REFERENCES forge_runtime_sessions(id) ON DELETE SET NULL,
+      name VARCHAR(100) NOT NULL DEFAULT 'Terminal',
+      status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+      cwd VARCHAR(500) NOT NULL DEFAULT '/',
+      history JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "lastActivityAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_terminal_proj ON forge_terminal_sessions("projectId");
+  `);
+
+  await execSafe("forge_debug_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_debug_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "runtimeId" UUID REFERENCES forge_runtime_sessions(id) ON DELETE SET NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'IDLE',
+      target VARCHAR(50) NOT NULL DEFAULT 'client',
+      breakpoints JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "watchExpressions" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "callStack" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_debug_proj ON forge_debug_sessions("projectId");
+  `);
+
+  await execSafe("forge_execution_audits table", `
+    CREATE TABLE IF NOT EXISTS forge_execution_audits (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "userId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "actionType" VARCHAR(100) NOT NULL,
+      command VARCHAR(1000),
+      "exitCode" INTEGER,
+      "durationMs" INTEGER,
+      "resourceUsage" JSONB DEFAULT '{}'::jsonb,
+      "errorDetails" JSONB,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_audit_proj ON forge_execution_audits("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_audit_action ON forge_execution_audits("actionType");
+  `);
+
+  // 19. Forge Source-Based Hosting & Deployments (Module 29)
+  await execSafe("forge_deployments table", `
+    CREATE TABLE IF NOT EXISTS forge_deployments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      environment VARCHAR(50) NOT NULL DEFAULT 'preview',
+      mode VARCHAR(50) NOT NULL DEFAULT 'STATIC',
+      status VARCHAR(50) NOT NULL DEFAULT 'QUEUED',
+      "artifactId" VARCHAR(255),
+      "commitHash" VARCHAR(64),
+      branch VARCHAR(255) DEFAULT 'main',
+      url VARCHAR(500),
+      config JSONB NOT NULL DEFAULT '{}'::jsonb,
+      logs JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "healthCheck" JSONB DEFAULT '{}'::jsonb,
+      "rollbackFromId" UUID,
+      "durationMs" INTEGER,
+      "createdById" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_deploy_proj ON forge_deployments("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_deploy_env ON forge_deployments("projectId", environment);
+    CREATE INDEX IF NOT EXISTS idx_forge_deploy_status ON forge_deployments("status");
+  `);
+
+  // 20. Forge CI/CD Pipelines (Module 30)
+  await execSafe("forge_cicd_pipelines table", `
+    CREATE TABLE IF NOT EXISTS forge_cicd_pipelines (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      trigger VARCHAR(50) NOT NULL DEFAULT 'manual',
+      environment VARCHAR(50) NOT NULL DEFAULT 'preview',
+      status VARCHAR(50) NOT NULL DEFAULT 'QUEUED',
+      "commitHash" VARCHAR(64),
+      branch VARCHAR(255) DEFAULT 'main',
+      stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+      artifacts JSONB DEFAULT '[]'::jsonb,
+      "approvalGate" JSONB,
+      "deploymentId" UUID,
+      logs JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "startedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "completedAt" TIMESTAMPTZ,
+      "createdById" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_cicd_proj ON forge_cicd_pipelines("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_cicd_status ON forge_cicd_pipelines("status");
+  `);
+
+  // 21. Forge Custom Domains & GoDaddy Integration (Module 31)
+  await execSafe("forge_custom_domains table", `
+    CREATE TABLE IF NOT EXISTS forge_custom_domains (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      domain VARCHAR(255) NOT NULL,
+      provider VARCHAR(50) NOT NULL DEFAULT 'godaddy',
+      environment VARCHAR(50) NOT NULL DEFAULT 'production',
+      "deploymentId" UUID,
+      status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+      "verificationMethod" VARCHAR(50) NOT NULL DEFAULT 'TXT',
+      "verificationToken" VARCHAR(255) NOT NULL,
+      "dnsRecords" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "sslStatus" VARCHAR(50) NOT NULL DEFAULT 'PENDING_DNS',
+      "sslIssuer" VARCHAR(100),
+      "sslExpiresAt" TIMESTAMPTZ,
+      "expiresAt" TIMESTAMPTZ,
+      "autoRenew" BOOLEAN NOT NULL DEFAULT true,
+      "lastCheckedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", domain)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_domain_proj ON forge_custom_domains("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_domain_name ON forge_custom_domains(domain);
+  `);
+
+  // 22. Forge Git Version Control (Module 16)
+  await execSafe("forge_git_repositories table", `
+    CREATE TABLE IF NOT EXISTS forge_git_repositories (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL UNIQUE REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "currentBranch" VARCHAR(255) NOT NULL DEFAULT 'main',
+      "headCommit" VARCHAR(64),
+      "remoteUrl" VARCHAR(512),
+      "remoteBranch" VARCHAR(255) DEFAULT 'main',
+      remotes JSONB DEFAULT '{"origin": {"url": ""}}'::jsonb,
+      status VARCHAR(50) NOT NULL DEFAULT 'INITIALIZED',
+      "isDetachedHead" BOOLEAN NOT NULL DEFAULT false,
+      staged JSONB DEFAULT '[]'::jsonb,
+      "mergeHead" VARCHAR(64),
+      "mergeMessage" TEXT,
+      "rebaseOnto" VARCHAR(64),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_git_repo_proj ON forge_git_repositories("projectId");
+  `);
+
+  await execSafe("forge_git_commits table", `
+    CREATE TABLE IF NOT EXISTS forge_git_commits (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      hash VARCHAR(64) NOT NULL,
+      "treeHash" VARCHAR(64) NOT NULL,
+      "parentHashes" TEXT[] DEFAULT '{}',
+      author JSONB NOT NULL,
+      committer JSONB NOT NULL,
+      message TEXT NOT NULL,
+      branch VARCHAR(255) NOT NULL DEFAULT 'main',
+      "diffSummary" JSONB DEFAULT '{}'::jsonb,
+      tree JSONB DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", hash)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_git_commit_proj ON forge_git_commits("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_git_commit_hash ON forge_git_commits(hash);
+  `);
+
+  await execSafe("forge_git_branches table", `
+    CREATE TABLE IF NOT EXISTS forge_git_branches (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      "commitHash" VARCHAR(64) NOT NULL,
+      "isProtected" BOOLEAN NOT NULL DEFAULT false,
+      upstream VARCHAR(255),
+      "aheadCount" INTEGER NOT NULL DEFAULT 0,
+      "behindCount" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_git_branch_proj ON forge_git_branches("projectId");
+  `);
+
+  await execSafe("forge_git_stashes table", `
+    CREATE TABLE IF NOT EXISTS forge_git_stashes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      index INTEGER NOT NULL DEFAULT 0,
+      message VARCHAR(255) NOT NULL,
+      branch VARCHAR(255) NOT NULL,
+      "commitHash" VARCHAR(64) NOT NULL,
+      "stagedFiles" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "unstagedFiles" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_git_stash_proj ON forge_git_stashes("projectId");
+  `);
+
+  await execSafe("forge_git_tags table", `
+    CREATE TABLE IF NOT EXISTS forge_git_tags (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      "commitHash" VARCHAR(64) NOT NULL,
+      message TEXT,
+      tagger JSONB,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_git_tag_proj ON forge_git_tags("projectId");
+  `);
+
+  // 23. Forge GitHub Integration (Module 17)
+  await execSafe("forge_github_connections table", `
+    CREATE TABLE IF NOT EXISTS forge_github_connections (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL UNIQUE REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "repoOwner" VARCHAR(255) NOT NULL,
+      "repoName" VARCHAR(255) NOT NULL,
+      "repoUrl" VARCHAR(512) NOT NULL,
+      "defaultBranch" VARCHAR(255) NOT NULL DEFAULT 'main',
+      "installationId" VARCHAR(100),
+      "accessTokenEncrypted" TEXT,
+      status VARCHAR(50) NOT NULL DEFAULT 'CONNECTED',
+      "syncEnabled" BOOLEAN NOT NULL DEFAULT true,
+      "lastSyncAt" TIMESTAMPTZ,
+      "webhookId" VARCHAR(100),
+      "webhookSecret" VARCHAR(255),
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_github_conn_proj ON forge_github_connections("projectId");
+  `);
+
+  await execSafe("forge_github_pull_requests table", `
+    CREATE TABLE IF NOT EXISTS forge_github_pull_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "githubPrNumber" INTEGER NOT NULL,
+      title VARCHAR(512) NOT NULL,
+      body TEXT,
+      "sourceBranch" VARCHAR(255) NOT NULL,
+      "targetBranch" VARCHAR(255) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'OPEN',
+      author JSONB NOT NULL,
+      url VARCHAR(512),
+      "diffUrl" VARCHAR(512),
+      checks JSONB DEFAULT '[]'::jsonb,
+      reviews JSONB DEFAULT '[]'::jsonb,
+      "issueLinks" TEXT[] DEFAULT '{}',
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", "githubPrNumber")
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_github_pr_proj ON forge_github_pull_requests("projectId");
+  `);
+
+  // 24. Forge CLI Linkings & Sessions (Module 18)
+  await execSafe("forge_cli_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_cli_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(255) UNIQUE NOT NULL,
+      "deviceCode" VARCHAR(100),
+      "clientName" VARCHAR(255) DEFAULT 'forge-cli',
+      "lastActiveAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_cli_sess_user ON forge_cli_sessions("userId");
+    CREATE INDEX IF NOT EXISTS idx_forge_cli_sess_token ON forge_cli_sessions(token);
+  `);
+
+  // 25. Forge AI Provider Gateway (Module 19)
+  await execSafe("forge_ai_providers table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_providers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "userId" UUID REFERENCES users(id) ON DELETE CASCADE,
+      "projectId" UUID REFERENCES forge_projects(id) ON DELETE CASCADE,
+      provider VARCHAR(50) NOT NULL,
+      "apiKeyEncrypted" TEXT NOT NULL,
+      "defaultModel" VARCHAR(100),
+      "isByok" BOOLEAN NOT NULL DEFAULT false,
+      "isEnabled" BOOLEAN NOT NULL DEFAULT true,
+      "rateLimitPerMin" INTEGER DEFAULT 60,
+      "circuitStatus" VARCHAR(20) NOT NULL DEFAULT 'CLOSED',
+      "errorCount" INTEGER NOT NULL DEFAULT 0,
+      "lastSuccessAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_ai_prov_user ON forge_ai_providers("userId");
+    CREATE INDEX IF NOT EXISTS idx_forge_ai_prov_proj ON forge_ai_providers("projectId");
+  `);
+
+  await execSafe("forge_ai_requests table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "userId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "projectId" UUID REFERENCES forge_projects(id) ON DELETE SET NULL,
+      provider VARCHAR(50) NOT NULL,
+      model VARCHAR(100) NOT NULL,
+      task VARCHAR(100) NOT NULL,
+      "promptTokens" INTEGER NOT NULL DEFAULT 0,
+      "completionTokens" INTEGER NOT NULL DEFAULT 0,
+      "totalTokens" INTEGER NOT NULL DEFAULT 0,
+      "latencyMs" INTEGER NOT NULL DEFAULT 0,
+      status VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+      "errorMessage" TEXT,
+      "costEstimateUsd" NUMERIC(10, 6) DEFAULT 0,
+      "traceId" VARCHAR(100),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_ai_req_proj ON forge_ai_requests("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_ai_req_user ON forge_ai_requests("userId");
+  `);
+
+  // 26. Forge AI Tool Execution Framework (Module 23)
+  await execSafe("forge_ai_tool_executions table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_tool_executions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "userId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "sessionId" UUID,
+      "toolName" VARCHAR(100) NOT NULL,
+      category VARCHAR(50) NOT NULL,
+      "riskLevel" VARCHAR(20) NOT NULL DEFAULT 'LOW',
+      status VARCHAR(30) NOT NULL DEFAULT 'REQUESTED',
+      parameters JSONB NOT NULL DEFAULT '{}'::jsonb,
+      result JSONB,
+      "errorMessage" TEXT,
+      "approvedBy" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "approvedAt" TIMESTAMPTZ,
+      "executionDurationMs" INTEGER,
+      "traceId" VARCHAR(100),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "completedAt" TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_tool_exec_proj ON forge_ai_tool_executions("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_tool_exec_sess ON forge_ai_tool_executions("sessionId");
+  `);
+
+  // 27. Forge AI Agent Sessions & Plans (Modules 20, 21, 22)
+  await execSafe("forge_ai_agent_sessions table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_agent_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "agentType" VARCHAR(50) NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+      goal TEXT NOT NULL,
+      context JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "currentPlanId" UUID,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_agent_sess_proj ON forge_ai_agent_sessions("projectId");
+  `);
+
+  await execSafe("forge_ai_agent_plans table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_agent_plans (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "sessionId" UUID NOT NULL REFERENCES forge_ai_agent_sessions(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+      status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+      "riskAssessment" JSONB DEFAULT '{}'::jsonb,
+      "approvedAt" TIMESTAMPTZ,
+      "completedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_agent_plan_sess ON forge_ai_agent_plans("sessionId");
+  `);
+
+  await execSafe("forge_ai_checkpoints table", `
+    CREATE TABLE IF NOT EXISTS forge_ai_checkpoints (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "sessionId" UUID REFERENCES forge_ai_agent_sessions(id) ON DELETE SET NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      "snapshotId" UUID,
+      "filesSnapshot" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_ai_chk_proj ON forge_ai_checkpoints("projectId");
+  `);
+
+  // 28. Forge Model Context Protocol (MCP) (Module 24)
+  await execSafe("forge_mcp_servers table", `
+    CREATE TABLE IF NOT EXISTS forge_mcp_servers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "userId" UUID REFERENCES users(id) ON DELETE CASCADE,
+      "projectId" UUID REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'EXTERNAL',
+      transport VARCHAR(20) NOT NULL DEFAULT 'HTTP',
+      endpoint VARCHAR(512) NOT NULL,
+      "trustLevel" VARCHAR(20) NOT NULL DEFAULT 'UNTRUSTED',
+      capabilities JSONB NOT NULL DEFAULT '[]'::jsonb,
+      tools JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "authConfigEncrypted" TEXT,
+      "isEnabled" BOOLEAN NOT NULL DEFAULT true,
+      status VARCHAR(20) NOT NULL DEFAULT 'DISCONNECTED',
+      "lastHealthCheck" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_mcp_proj ON forge_mcp_servers("projectId");
+  `);
+
+  await execSafe("forge_mcp_executions table", `
+    CREATE TABLE IF NOT EXISTS forge_mcp_executions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "serverId" UUID NOT NULL REFERENCES forge_mcp_servers(id) ON DELETE CASCADE,
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "toolName" VARCHAR(100) NOT NULL,
+      arguments JSONB NOT NULL DEFAULT '{}'::jsonb,
+      result JSONB,
+      "isError" BOOLEAN NOT NULL DEFAULT false,
+      "errorMessage" TEXT,
+      "durationMs" INTEGER NOT NULL DEFAULT 0,
+      "traceId" VARCHAR(100),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_mcp_exec_srv ON forge_mcp_executions("serverId");
+  `);
+
   console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
 }
+
