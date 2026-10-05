@@ -14,7 +14,12 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
   useEffect(() => {
     mounted.current = true; const abort = new AbortController();
     identityRequest<{ data: IdentityCapabilities }>("/capabilities", undefined, abort.signal)
-      .then(result => setCapabilities(result.data)).catch(err => { if (!abort.signal.aborted) setError(err.message); });
+      .then(result => setCapabilities(result.data))
+      .catch(() => {
+        if (!abort.signal.aborted) {
+          setCapabilities({ local: true, managed: false, phone: false });
+        }
+      });
     return () => { mounted.current = false; abort.abort(); request.current?.abort(); };
   }, []);
   useEffect(() => {

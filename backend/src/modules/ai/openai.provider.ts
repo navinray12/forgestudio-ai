@@ -5,7 +5,7 @@ import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-
 /** Minimal Responses API adapter. Credentials remain server-only in OPENAI_API_KEY. */
 export class OpenAiProvider implements AiProvider {
   readonly name = "openai";
-  constructor(private readonly apiKey = process.env.OPENAI_API_KEY, readonly model = process.env.AI_MODEL_PLANNER || "gpt-5", private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly apiKey = process.env.OPENAI_API_KEY, readonly model = process.env.AI_MODEL_PLANNER || "gpt-5", private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
@@ -24,10 +24,11 @@ export class OpenAiProvider implements AiProvider {
       const response = await this.fetcher("https://api.openai.com/v1/responses", {
         method: "POST", signal,
         headers: { "Authorization": `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: this.model, store: false, max_output_tokens: 8192,
-          instructions,
-          input: [{ role: "user", content: inputContent }],
-          ...(schema ? { text: { format: { type: "json_schema", name: "output_schema", strict: true, schema } } } : {}),
+        body: JSON.stringify({
+          model: this.model, store: false, max_output_tokens: 8192,
+          instructions: SITE_BLUEPRINT_INSTRUCTIONS,
+          input: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
+          text: { format: { type: "json_schema", name: "site_blueprint", strict: true, schema: SITE_BLUEPRINT_JSON_SCHEMA } },
         }),
       });
       if (!response.ok) throw new AppError("AI provider is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");

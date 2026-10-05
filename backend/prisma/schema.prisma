@@ -60,7 +60,18 @@ model User {
   invoices                BillingInvoice[]
   aiExecutions            AiExecution[]
   aiChangesets            AiChangeset[]
-
+  supportTickets          SupportTicket[]          @relation("UserSupportTickets")
+  assignedSupportTickets  SupportTicket[]          @relation("AgentSupportTickets")
+  supportMessages         SupportTicketMessage[]
+  supportAttachments     SupportTicketAttachment[]
+  supportEvents           SupportTicketEvent[]
+  supportTeamMemberships  SupportTeamMember[]
+  forumTopics             ForumTopic[]             @relation("UserForumTopics")
+  forumPosts              ForumPost[]              @relation("UserForumPosts")
+  forumReactions          ForumReaction[]          @relation("UserForumReactions")
+  forumBookmarks          ForumBookmark[]          @relation("UserForumBookmarks")
+  forumFollows            ForumTopicFollower[]     @relation("UserForumFollows")
+  forumReports            ForumReport[]            @relation("UserForumReports")
 
   @@index([status])
   @@index([role])
@@ -109,6 +120,8 @@ model Website {
   optimizedMedia      MediaOptimizationAsset[]
   aiExecutions        AiExecution[]
   aiChangesets        AiChangeset[]
+  supportTickets      SupportTicket[]
+  forumTopics         ForumTopic[]
 
   @@index([userId], map: "idx_websites_user_id")
   @@index([organizationId])
@@ -285,6 +298,8 @@ enum UserRole {
   SUPER_ADMIN
   PLATFORM_ADMIN
   SUPPORT_ADMIN
+  SUPPORT_AGENT
+  SUPPORT_MANAGER
   DEVELOPER
   AI_CONTENT_ADMIN
   TEAM_MEMBER
@@ -783,6 +798,8 @@ model Workspace {
   websites       Website[]
   aiExecutions   AiExecution[]
   aiChangesets   AiChangeset[]
+  supportTickets SupportTicket[]
+  forumTopics    ForumTopic[]
 
   @@index([ownerId])
   @@index([organizationId])
@@ -1198,3 +1215,499 @@ model WorkspaceInvitation {
   @@index([organizationId, recipientUserId, status])
   @@map("workspace_invitations")
 }
+
+// ==========================================
+// SUPPORT TICKET SYSTEM MODELS & ENUMS
+// ==========================================
+
+enum SupportTicketStatus {
+  NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  CUSTOMER_REPLIED
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum SupportTicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum SupportTicketSource {
+  WEB
+  EMAIL
+  API
+  SYSTEM
+}
+
+enum SupportTicketMessageType {
+  PUBLIC_REPLY
+  INTERNAL_NOTE
+  SYSTEM_EVENT
+}
+
+model SupportCategory {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @db.VarChar(255)
+  slug        String          @unique @db.VarChar(255)
+  description String?         @db.VarChar(500)
+  icon        String?         @db.VarChar(100)
+  color       String?         @db.VarChar(50)
+  isActive    Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime        @default(now()) @updatedAt @db.Timestamptz(6)
+  tickets     SupportTicket[]
+
+  @@map("support_categories")
+}
+
+model SupportTeam {
+  id          String              @id @default(uuid()) @db.Uuid
+  name        String              @db.VarChar(255)
+  description String?             @db.VarChar(500)
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
+  members     SupportTeamMember[]
+  tickets     SupportTicket[]
+
+  @@map("support_teams")
+}
+
+model SupportTeamMember {
+  id        String      @id @default(uuid()) @db.Uuid
+  teamId    String      @db.Uuid
+  userId    String      @db.Uuid
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  team      SupportTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("support_team_members")
+}
+
+model SupportSlaPolicy {
+  id                   String                @id @default(uuid()) @db.Uuid
+  name                 String                @db.VarChar(255)
+  priority             SupportTicketPriority
+  firstResponseMinutes Int
+  resolutionMinutes   Int
+  businessHoursEnabled Boolean               @default(false)
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  tickets              SupportTicket[]
+
+  @@map("support_sla_policies")
+}
+
+model SupportTicket {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  ticketNumber       String                  @unique @db.VarChar(50)
+  workspaceId        String?                 @db.Uuid
+  userId             String                  @db.Uuid
+  websiteId          String?                 @db.Uuid
+  categoryId         String                  @db.Uuid
+  assignedTeamId     String?                 @db.Uuid
+  assignedAgentId    String?                 @db.Uuid
+  subject            String                  @db.VarChar(255)
+  description        String                  @db.Text
+  status             SupportTicketStatus     @default(NEW)
+  priority           SupportTicketPriority   @default(NORMAL)
+  source             SupportTicketSource     @default(WEB)
+  slaPolicyId        String?                 @db.Uuid
+  firstResponseAt    DateTime?               @db.Timestamptz(6)
+  resolvedAt         DateTime?               @db.Timestamptz(6)
+  closedAt           DateTime?               @db.Timestamptz(6)
+  reopenedAt         DateTime?               @db.Timestamptz(6)
+  slaDueAt           DateTime?               @db.Timestamptz(6)
+  slaPaused          Boolean                 @default(false)
+  slaPausedAt        DateTime?               @db.Timestamptz(6)
+  slaBreached        Boolean                 @default(false)
+  csatScore          Int?
+  csatComment        String?                 @db.VarChar(1000)
+  csatRatedAt        DateTime?               @db.Timestamptz(6)
+  isMerged           Boolean                 @default(false)
+  mergedIntoTicketId String?                 @db.Uuid
+  parentTicketId     String?                 @db.Uuid
+  tags               String[]                @default([])
+  contextData        Json?                   @default("{}")
+  wordpressContext   Json?                   @default("{}")
+  environmentContext Json?                   @default("{}")
+  createdAt          DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                @default(now()) @updatedAt @db.Timestamptz(6)
+
+  user          User                      @relation("UserSupportTickets", fields: [userId], references: [id], onDelete: Cascade)
+  assignedAgent User?                     @relation("AgentSupportTickets", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  assignedTeam  SupportTeam?              @relation(fields: [assignedTeamId], references: [id], onDelete: SetNull)
+  category      SupportCategory           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  slaPolicy     SupportSlaPolicy?         @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
+  workspace     Workspace?                @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  website       Website?                  @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+  messages      SupportTicketMessage[]
+  attachments   SupportTicketAttachment[]
+  events        SupportTicketEvent[]
+
+  @@index([ticketNumber])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([categoryId])
+  @@index([assignedAgentId])
+  @@index([assignedTeamId])
+  @@index([slaDueAt])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id          String                   @id @default(uuid()) @db.Uuid
+  ticketId    String                   @db.Uuid
+  authorId    String                   @db.Uuid
+  type        SupportTicketMessageType @default(PUBLIC_REPLY)
+  content     String                   @db.Text
+  createdAt   DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime                 @default(now()) @updatedAt @db.Timestamptz(6)
+
+  ticket      SupportTicket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author      User                     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  attachments SupportTicketAttachment[]
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
+
+model SupportTicketAttachment {
+  id           String                @id @default(uuid()) @db.Uuid
+  ticketId     String                @db.Uuid
+  messageId    String?               @db.Uuid
+  uploadedById String                @db.Uuid
+  fileName     String                @db.VarChar(255)
+  storageKey   String                @db.VarChar(500)
+  mimeType     String                @db.VarChar(100)
+  fileSize     Int
+  checksum     String?               @db.VarChar(64)
+  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
+
+  ticket     SupportTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  message    SupportTicketMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  uploadedBy User                  @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([uploadedById])
+  @@map("support_ticket_attachments")
+}
+
+model SupportTicketEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  actorId   String   @db.Uuid
+  eventType String   @db.VarChar(100)
+  oldValue  String?  @db.VarChar(255)
+  newValue  String?  @db.VarChar(255)
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor  User          @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_events")
+}
+
+model SupportCannedResponse {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(255)
+  shortcut    String   @unique @db.VarChar(100)
+  content     String   @db.Text
+  categoryId  String?  @db.Uuid
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("support_canned_responses")
+}
+
+model SupportSavedView {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  name      String   @db.VarChar(255)
+  filters   Json
+  isShared  Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("support_saved_views")
+}
+
+model SupportTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  color     String?  @db.VarChar(50)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("support_tags")
+}
+
+// ==========================================
+// FORGESTUDIO DISCUSSION FORUM DOMAIN
+// ==========================================
+
+enum ForumTopicStatus {
+  OPEN
+  LOCKED
+  SOLVED
+  ARCHIVED
+  HIDDEN
+}
+
+enum ForumTopicVisibility {
+  PUBLIC
+  WORKSPACE
+  PRIVATE
+}
+
+enum ForumReactionType {
+  LIKE
+  HEART
+  HELPFUL
+  CELEBRATE
+}
+
+enum ForumReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+model ForumCategory {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String       @db.VarChar(255)
+  slug         String       @unique @db.VarChar(255)
+  description  String?      @db.Text
+  icon         String?      @db.VarChar(100)
+  color        String?      @db.VarChar(50)
+  displayOrder Int          @default(0)
+  isActive     Boolean      @default(true)
+  isPublic     Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+
+  topics       ForumTopic[]
+
+  @@map("forum_categories")
+}
+
+model ForumTopic {
+  id               String               @id @default(uuid()) @db.Uuid
+  topicNumber      String               @unique @db.VarChar(50)
+  title            String               @db.VarChar(255)
+  slug             String               @unique @db.VarChar(255)
+  content          String               @db.Text
+  categoryId       String               @db.Uuid
+  authorId         String               @db.Uuid
+  workspaceId      String?              @db.Uuid
+  websiteId        String?              @db.Uuid
+  status           ForumTopicStatus     @default(OPEN)
+  visibility       ForumTopicVisibility @default(PUBLIC)
+  isPinned         Boolean              @default(false)
+  isLocked         Boolean              @default(false)
+  isFeatured       Boolean              @default(false)
+  isSolved         Boolean              @default(false)
+  acceptedAnswerId String?              @db.Uuid
+  viewCount        Int                  @default(0)
+  replyCount       Int                  @default(0)
+  lastActivityAt   DateTime             @default(now()) @db.Timestamptz(6)
+  tags             String[]             @default([])
+  contextData      Json?                @default("{}")
+  createdAt        DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+
+  category         ForumCategory        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author           User                 @relation("UserForumTopics", fields: [authorId], references: [id], onDelete: Cascade)
+  workspace        Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  website          Website?             @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+  posts            ForumPost[]
+  attachments      ForumPostAttachment[]
+  bookmarks        ForumBookmark[]
+  followers        ForumTopicFollower[]
+  reports          ForumReport[]
+  moderationEvents ForumModerationEvent[]
+
+  @@index([topicNumber])
+  @@index([slug])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([visibility])
+  @@index([lastActivityAt])
+  @@index([createdAt])
+  @@map("forum_topics")
+}
+
+model ForumPost {
+  id               String                @id @default(uuid()) @db.Uuid
+  topicId          String                @db.Uuid
+  authorId         String                @db.Uuid
+  parentPostId     String?               @db.Uuid
+  content          String                @db.Text
+  isAcceptedAnswer Boolean               @default(false)
+  isHidden         Boolean               @default(false)
+  editedAt         DateTime?             @db.Timestamptz(6)
+  editedById       String?               @db.Uuid
+  createdAt        DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+
+  topic            ForumTopic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  author           User                  @relation("UserForumPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  parentPost       ForumPost?            @relation("ThreadedReplies", fields: [parentPostId], references: [id], onDelete: SetNull)
+  replies          ForumPost[]           @relation("ThreadedReplies")
+  attachments      ForumPostAttachment[]
+  reactions        ForumReaction[]
+  mentions         ForumMention[]
+  reports          ForumReport[]
+
+  @@index([topicId, createdAt])
+  @@index([authorId])
+  @@index([parentPostId])
+  @@map("forum_posts")
+}
+
+model ForumPostAttachment {
+  id           String     @id @default(uuid()) @db.Uuid
+  topicId     String     @db.Uuid
+  postId       String?    @db.Uuid
+  uploadedById String     @db.Uuid
+  fileName     String     @db.VarChar(255)
+  storageKey   String     @db.VarChar(500)
+  mimeType     String     @db.VarChar(100)
+  fileSize     Int
+  checksum     String?    @db.VarChar(64)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+
+  topic        ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  post         ForumPost? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([topicId])
+  @@index([postId])
+  @@map("forum_post_attachments")
+}
+
+model ForumTag {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @unique @db.VarChar(100)
+  slug       String   @unique @db.VarChar(100)
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("forum_tags")
+}
+
+model ForumReaction {
+  id        String            @id @default(uuid()) @db.Uuid
+  postId    String            @db.Uuid
+  userId    String            @db.Uuid
+  type      ForumReactionType @default(LIKE)
+  createdAt DateTime          @default(now()) @db.Timestamptz(6)
+
+  post      ForumPost         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User              @relation("UserForumReactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+  @@index([postId])
+  @@map("forum_reactions")
+}
+
+model ForumBookmark {
+  id        String     @id @default(uuid()) @db.Uuid
+  topicId   String     @db.Uuid
+  userId    String     @db.Uuid
+  createdAt DateTime   @default(now()) @db.Timestamptz(6)
+
+  topic     ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User       @relation("UserForumBookmarks", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, userId])
+  @@index([userId])
+  @@map("forum_bookmarks")
+}
+
+model ForumTopicFollower {
+  id        String     @id @default(uuid()) @db.Uuid
+  topicId   String     @db.Uuid
+  userId    String     @db.Uuid
+  createdAt DateTime   @default(now()) @db.Timestamptz(6)
+
+  topic     ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User       @relation("UserForumFollows", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, userId])
+  @@index([userId])
+  @@map("forum_topic_followers")
+}
+
+model ForumMention {
+  id              String    @id @default(uuid()) @db.Uuid
+  postId          String    @db.Uuid
+  mentionedUserId String    @db.Uuid
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+
+  post            ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, mentionedUserId])
+  @@index([mentionedUserId])
+  @@map("forum_mentions")
+}
+
+model ForumReport {
+  id              String            @id @default(uuid()) @db.Uuid
+  topicId         String?           @db.Uuid
+  postId          String?           @db.Uuid
+  reporterId      String            @db.Uuid
+  reason          String            @db.VarChar(100)
+  details         String?           @db.Text
+  status          ForumReportStatus @default(PENDING)
+  resolutionNotes String?           @db.Text
+  resolvedById    String?           @db.Uuid
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  topic           ForumTopic?       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  post            ForumPost?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter        User              @relation("UserForumReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([reporterId])
+  @@map("forum_reports")
+}
+
+model ForumModerationEvent {
+  id        String     @id @default(uuid()) @db.Uuid
+  topicId   String?    @db.Uuid
+  postId    String?    @db.Uuid
+  actorId   String     @db.Uuid
+  action    String     @db.VarChar(100)
+  oldValue  String?    @db.VarChar(255)
+  newValue  String?    @db.VarChar(255)
+  reason    String?    @db.Text
+  createdAt DateTime   @default(now()) @db.Timestamptz(6)
+
+  topic     ForumTopic? @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, createdAt])
+  @@map("forum_moderation_events")
+}
+
+

@@ -8,6 +8,10 @@ export async function loadAuthorizedWebsite(base: string, websiteId: string, sig
     if ([401, 403, 404].includes(response.status)) throw new Error("This website is unavailable or you no longer have access.");
     throw new Error("The website could not be loaded. Retry when the service is available.");
   }
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("The website server returned an invalid non-JSON response.");
+  }
   const body = await response.json();
   const website = body?.website;
   if (!website || website.id !== websiteId || typeof website.userPermission !== "string") {

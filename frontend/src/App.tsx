@@ -27,6 +27,11 @@ const SharedTemplatePreviewPage = lazy(() => import("./pages/templates/SharedTem
 const PublishedSite = lazy(() => import("./pages/published/PublishedSite"));
 const PlatformControlPage = lazy(() => import("./features/platform-control/PlatformControlPage"));
 
+const TicketListPage = lazy(() => import("./features/support/pages/TicketList").then(m => ({ default: m.TicketListPage })));
+const CreateTicketPage = lazy(() => import("./features/support/pages/CreateTicket").then(m => ({ default: m.CreateTicketPage })));
+const TicketDetailsPage = lazy(() => import("./features/support/pages/TicketDetails").then(m => ({ default: m.TicketDetailsPage })));
+const SupportAdminViewPage = lazy(() => import("./features/support/pages/SupportAdminView").then(m => ({ default: m.SupportAdminViewPage })));
+const ForumPage = lazy(() => import("./features/forum/pages/ForumPage"));
 interface RoleRouteProps {
   allowedRoles: UserRole[];
   children: React.ReactNode;
@@ -283,6 +288,57 @@ function App() {
             }
           />
 
+          {/* ================= DISCUSSION FORUM SYSTEM ================= */}
+          <Route
+            path="/forum"
+            element={
+              <RoleRoute allowedRoles={["USER", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <ForumPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/forum/*"
+            element={
+              <RoleRoute allowedRoles={["USER", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <ForumPage />
+              </RoleRoute>
+            }
+          />
+
+          {/* ================= SUPPORT TICKET SYSTEM ================= */}
+          <Route
+            path="/support"
+            element={
+              <RoleRoute allowedRoles={["USER", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <TicketListPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/support/new"
+            element={
+              <RoleRoute allowedRoles={["USER", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <CreateTicketPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/support/tickets/:id"
+            element={
+              <RoleRoute allowedRoles={["USER", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <TicketDetailsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/support/admin"
+            element={
+              <RoleRoute allowedRoles={["SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <SupportAdminViewPage />
+              </RoleRoute>
+            }
+          />
           <Route
             path="/subscription"
             element={<Navigate to="/subscriptions" replace />}
@@ -290,6 +346,7 @@ function App() {
 
           <Route
             path="/editor/:websiteId"
+
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>
                 <WebsiteEditor />

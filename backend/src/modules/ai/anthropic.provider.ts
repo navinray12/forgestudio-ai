@@ -9,7 +9,7 @@ export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
     readonly model = process.env.AI_MODEL_PLANNER || "claude-opus-5-5",
-    private readonly fetcher: typeof fetch = fetch) {}
+    private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) {
@@ -47,7 +47,7 @@ export class AnthropicProvider implements AiProvider {
           model: activeModel,
           max_tokens: 8192,
           system: systemPrompt,
-          messages: [{ role: "user", content: userContent }],
+          messages: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
         }),
       });
       if (!response.ok) {
@@ -63,8 +63,10 @@ export class AnthropicProvider implements AiProvider {
       let text = (body?.content?.filter(item => item.type === "text" && typeof item.text === "string").map(item => item.text as string) ?? [])[0] ?? "";
       text = text.trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
       if (!text) throw new AppError("AI provider returned an invalid website draft", 502, "AI_INVALID_OUTPUT");
-      return { text, model: typeof body?.model === "string" ? body.model : activeModel,
-        provider: this.name, requestId: typeof body?.id === "string" ? body.id : undefined };
+      return {
+        text, model: typeof body?.model === "string" ? body.model : activeModel,
+        provider: this.name, requestId: typeof body?.id === "string" ? body.id : undefined
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       console.error("[ANTHROPIC EXCEPTION]:", error);

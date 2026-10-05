@@ -11,8 +11,10 @@ import { AppError } from "../../../utils/app-error.js";
 
 export function createOidcRouter(identity: OidcAuthentication | null = oidcAuthentication) {
   const router = Router();
-  router.get("/capabilities", (_req, res) => res.setHeader("Cache-Control", "no-store") &&
-    res.json({ success: true, data: { local: localAuthenticationEnabled(), managed: !!identity, phone: false } }));
+  router.get("/capabilities", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ success: true, data: { local: localAuthenticationEnabled(), managed: !!identity, phone: false } });
+  });
   router.post(["/oidc/start", "/oidc/link"], requireBrowserOrigin, async (req, res, next) => {
     if (!identity) throw new AppError("Managed sign-in is not configured.", 503, "IDENTITY_PROVIDER_UNAVAILABLE");
     if (!req.is("application/json")) throw new AppError("A JSON request is required.", 415, "JSON_REQUIRED");

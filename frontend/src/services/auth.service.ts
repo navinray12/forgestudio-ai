@@ -28,7 +28,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       credentials: "include",
     });
 
-    if (!response.ok) {
+    const contentType = response.headers.get("content-type");
+    if (!response.ok || !contentType || !contentType.includes("application/json")) {
       return null;
     }
 
