@@ -17,11 +17,16 @@ export async function workspaceRequest<T>(base: string, path: string, options: {
   signal?: AbortSignal; method?: string; payload?: unknown; key?: string; etag?: string;
 } = {}): Promise<T> {
   const method = options.method ?? "GET";
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   const response = await fetch(`${base}/api/v1/tenant-workspaces${path}`, {
     method, credentials: "include", signal: options.signal,
-    headers: method === "GET" ? {} : {
-      "Content-Type": "application/json", "X-Forge-Intent": "workspace-command", "Idempotency-Key": options.key ?? "",
-      ...(options.etag ? {"If-Match":options.etag} : {}),
+    headers: {
+      ...authHeaders,
+      ...(method === "GET" ? {} : {
+        "Content-Type": "application/json", "X-Forge-Intent": "workspace-command", "Idempotency-Key": options.key ?? "",
+        ...(options.etag ? {"If-Match":options.etag} : {}),
+      }),
     },
     body: options.payload === undefined ? undefined : JSON.stringify(options.payload),
   });

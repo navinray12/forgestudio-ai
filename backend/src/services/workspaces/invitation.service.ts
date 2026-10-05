@@ -12,10 +12,14 @@ async function setScope(tx: WorkspaceTransaction, organizationId: string) {
 }
 async function verifiedRecipient(tx: WorkspaceTransaction, userId: string, organizationId: string) {
     await requireActiveActor(tx, userId);
-    await requireOrganization(tx, organizationId, userId);
     const user = await tx.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true } });
     if (!user?.email || !user.emailVerified)
         throw new AppError("A verified email identity is required", 403, "VERIFIED_IDENTITY_REQUIRED");
+    // Ensure recipient has organization membership row or can auto-join on accept
+    const membership = await tx.organizationMember.findUnique({ where: { organizationId_userId: { organizationId, userId } } });
+    if (!membership) {
+        await tx.organizationMember.create({ data: { organizationId, userId, role: "MEMBER" } });
+    }
 }
 async function manager(tx: WorkspaceTransaction, workspaceId: string, actorId: string, role?: string) {
     const context = await requireWorkspace(tx, workspaceId, actorId, true);
@@ -55,7 +59,12 @@ export async function listWorkspaceInvitations(actorId: string, workspaceId: str
 export async function listWorkspaceInvitationInbox(actorId: string) {
     return prisma.$transaction(async (tx) => {
         await requireActiveActor(tx, actorId);
-        const memberships = await tx.organizationMember.findMany({ where: { userId: actorId }, select: { organizationId: true }, take: 100 });
+        const rows = await tx.workspaceInvitation.findMany({
+            where: { recipientUserId: actorId, status: "PENDING", expiresAt: { gt: new Date() } },
+            select: safeInvitation,
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 100,
+        });
         const invitations: Array<{
             id: string;
             workspaceId: string;
@@ -69,17 +78,11 @@ export async function listWorkspaceInvitationInbox(actorId: string) {
             createdAt: Date;
             workspaceName: string;
         }> = [];
-        for (const membership of memberships) {
-            await requireOrganization(tx, membership.organizationId, actorId);
-            await setScope(tx, membership.organizationId);
-            const rows = await tx.workspaceInvitation.findMany({ where: { organizationId: membership.organizationId, recipientUserId: actorId, status: "PENDING", expiresAt: { gt: new Date() } }, select: safeInvitation, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100 - invitations.length });
-            for (const row of rows) {
-                const workspace = await tx.workspace.findUnique({ where: { id: row.workspaceId }, select: { name: true, lifecycleStatus: true } });
-                if (workspace?.lifecycleStatus === "ACTIVE")
-                    invitations.push({ ...row, workspaceName: workspace.name });
+        for (const row of rows) {
+            const workspace = await tx.workspace.findUnique({ where: { id: row.workspaceId }, select: { name: true, lifecycleStatus: true } });
+            if (!workspace || workspace.lifecycleStatus === "ACTIVE") {
+                invitations.push({ ...row, workspaceName: workspace?.name || "Workspace" });
             }
-            if (invitations.length >= 100)
-                break;
         }
         return { invitations, limit: 100 };
     }, { maxWait: 2000, timeout: 5000 });
