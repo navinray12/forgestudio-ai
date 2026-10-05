@@ -494,6 +494,7 @@ export function useAutosave({
     lastSavedAt,
     errorMessage,
     isDirty: status === "unsaved" || status === "saving" || status === "error",
+    hasUnsavedChanges: () => baselineRef.current === null || isSavingRef.current || queuedPayloadRef.current !== null || serializeState(elements, pageSettings, pages, homePageId, siteParts, globalSettings, globalStyles, publishing, deployment, breakpoints, popups, pageCss) !== baselineRef.current,
     updateBaseline,
   };
 }

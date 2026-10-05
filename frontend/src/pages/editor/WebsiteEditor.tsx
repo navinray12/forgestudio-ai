@@ -2004,6 +2004,7 @@ export default function WebsiteEditor() {
     lastSavedAt: autosaveLastSavedAt,
     errorMessage: autosaveError,
     updateBaseline: updateAutosaveBaseline,
+    hasUnsavedChanges: hasUnsavedDocumentChanges,
   } = useAutosave({
     websiteId,
     elements,
@@ -2019,7 +2020,7 @@ export default function WebsiteEditor() {
     popups,
     pageCss,
     apiUrl,
-    isLoadingWebsite: loading || !website || !userAccess.canEditContent || isDesignAssistantOpen,
+    isLoadingWebsite: loading || !website || !userAccess.canEditContent || isDesignAssistantOpen || isUnifiedAiOpen,
     persistDocument,
   });
 
@@ -20337,8 +20338,10 @@ export default function WebsiteEditor() {
           prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
           apply={async (proposal, key) => {
             if (pendingDesignApplyKey.current !== key) {
-              const saved = await handleSave();
-              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+              if (hasUnsavedDocumentChanges()) {
+                const saved = await handleSave();
+                if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+              }
               pendingDesignApplyKey.current = key;
             }
             await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
@@ -20360,8 +20363,10 @@ export default function WebsiteEditor() {
         prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
         apply={async (proposal, key) => {
           if (pendingDesignApplyKey.current !== key) {
-            const saved = await handleSave();
-            if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+            if (hasUnsavedDocumentChanges()) {
+              const saved = await handleSave();
+              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+            }
             pendingDesignApplyKey.current = key;
           }
           await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {

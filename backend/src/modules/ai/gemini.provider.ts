@@ -45,8 +45,7 @@ export class GeminiProvider implements AiProvider {
         },
       );
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        console.error(`[GEMINI ERROR ${response.status}]:`, errorText);
+        console.error(`[GEMINI ERROR ${response.status}]`);
         if (response.status === 401 || response.status === 403) {
           throw new AppError("AI provider authentication failed", 401, "AI_AUTH_ERROR");
         }
@@ -78,7 +77,7 @@ export class GeminiProvider implements AiProvider {
         console.error("[GEMINI TIMEOUT]: Request timed out or aborted");
         throw new AppError("AI provider request timed out", 504, "AI_TIMEOUT");
       }
-      console.error("[GEMINI EXCEPTION]:", error);
+      console.error("[GEMINI EXCEPTION]: Request failed");
       throw new AppError("AI provider request could not complete", 503, "AI_PROVIDER_UNAVAILABLE");
     } finally { clearTimeout(timeout); }
   }

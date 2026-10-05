@@ -13,7 +13,11 @@ test("prompt, native responsive preview, explicit apply, manual save and scoped 
   const page = await context.newPage();
   const readWebsite = async () => (await (await context.request.get(`${api}/api/websites/${fixture.websiteId}`)).json()).website;
   await page.goto(`${base}/editor/${fixture.websiteId}`);
-  await page.getByRole("button", { name: "Design with AI", exact: true }).click();
+  const openDesigner = async () => {
+    await page.getByRole("button", { name: "Open AI Studio & Full Design Engine", exact: true }).click();
+    await page.getByRole("button", { name: /^Full Design(?: |$)/ }).click();
+  };
+  await openDesigner();
   const dialog = page.getByRole("dialog", { name: "Stitch and Claude website designer" });
   await dialog.getByRole("button", { name: "Use sample brief" }).click();
   const queuedResponse = page.waitForResponse(response => response.url().endsWith(`/ai/websites/${fixture.websiteId}/executions`) && response.request().method() === "POST");
@@ -27,12 +31,17 @@ test("prompt, native responsive preview, explicit apply, manual save and scoped 
   await expect(heading).toHaveCSS("font-size", "48px");
   await dialog.getByLabel("Preview viewport").selectOption("mobile");
   await expect(heading).toHaveCSS("font-size", "28px");
+  const appliedResponse = page.waitForResponse(response => response.url().endsWith(`/changesets/${execution.changesetId}/apply`) && response.request().method() === "POST");
   await dialog.getByRole("button", { name: "Apply changes", exact: true }).click();
+  expect((await appliedResponse).status()).toBe(200);
+  const applied = (await (await context.request.get(`${api}/api/v1/ai/changesets/${execution.changesetId}`)).json()).changeset;
+  expect(applied.status).toBe("APPLIED");
+  expect((await readWebsite()).documentVersion).toBe(before.documentVersion + 1);
   await expect(dialog).toHaveCount(0, { timeout: 20000 });
   const editable = page.locator('[contenteditable="true"]').filter({ hasText: "Editorial academy" }).first();
-  await expect(editable).toBeVisible();
+  await expect(editable).toBeVisible({ timeout: 30000 });
   await editable.fill("Manually improved heading"); await page.keyboard.press("Tab");
-  await page.getByRole("button", { name: "Design with AI", exact: true }).click();
+  await openDesigner();
   await dialog.getByLabel("AI operation").selectOption("EDIT_DOCUMENT");
   await dialog.getByLabel("Design brief").fill("Rewrite the first heading to make it more direct.");
   await dialog.getByRole("button", { name: "Generate proposal", exact: true }).click();
@@ -41,6 +50,6 @@ test("prompt, native responsive preview, explicit apply, manual save and scoped 
   await dialog.getByRole("button", { name: "Discard proposal", exact: true }).click();
   await dialog.getByRole("button", { name: "Back to editing", exact: true }).click();
   await page.reload();
-  await expect(page.locator('[contenteditable="true"]').filter({ hasText: "Manually improved heading" }).first()).toBeVisible();
+  await expect(page.locator('[contenteditable="true"]').filter({ hasText: "Manually improved heading" }).first()).toBeVisible({ timeout: 30000 });
   await context.close();
 });

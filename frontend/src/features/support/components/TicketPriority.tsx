@@ -5,6 +5,7 @@ const PRIORITY_CONFIG: Record<
   SupportTicketPriority,
   { label: string; bg: string; text: string; border: string; icon?: string }
 > = {
+  CRITICAL: { label: "Critical", bg: "bg-red-600/20", text: "text-red-300", border: "border-red-600/40" },
   URGENT: { label: "Urgent", bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/30", icon: "🔥" },
   HIGH: { label: "High", bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/30", icon: "⚡" },
   NORMAL: { label: "Normal", bg: "bg-slate-500/10", text: "text-slate-300", border: "border-slate-500/20" },

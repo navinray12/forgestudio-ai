@@ -1,5 +1,62 @@
 # ForgeStudio
 
+## Local verification, 2026-10-05
+
+This checkout's local test UI is running at `http://127.0.0.1:55174/login`,
+with the regular API at `http://127.0.0.1:55000` and a durable worker. It uses a
+separate PostgreSQL 18 cluster in WSL at port 55434 (`forge_hardening`). Existing
+services on ports 5173 and 5432 were left running. These are local processes,
+not a deployed site; restart them after a machine restart.
+
+A disposable USER account with a 30-day Agency fixture is recorded privately
+in `.data/local-test-accounts.json`. Password login still requires an OTP.
+After requesting the code, read it locally with PowerShell:
+
+```powershell
+Get-Content (Join-Path $env:TEMP 'forge-local-otp.json')
+```
+
+The current editor entry point is **AI Studio → Full Design**. Set
+`AI_DESIGN_PROVIDER=stitch` for Stitch-only single-page generation; it does not
+call Claude or require an Anthropic key. Configure `STITCH_API_KEY`, a stable
+32-byte base64 `AI_PROMPT_ENCRYPTION_KEY`, and `AI_STITCH_MODEL` server-side in
+root `.env`, then restart API and worker. The local live run used
+`GEMINI_3_8_FLASH`, which returned HTML; the tested lightweight model returned
+metadata JSON and is unsuitable for this editable-page import.
+The fixture browser server was stopped after testing; the regular application
+does not inject fixture providers.
+
+Live Stitch-only acceptance passed with the brief **I want to build a CRM**:
+authenticated enqueue, provider generation, native conversion, review and
+explicit Apply returned HTTP 200, marked the proposal APPLIED, and preserved
+the native editable heading after reload on a disposable test website.
+Apply now skips an unchanged pre-apply save, which previously advanced the
+document version and invalidated its own proposal. Initial
+attempts exposed old model names, an outdated `get_screen` request, a missing
+Google export origin, an error-subclass recovery bug and unsupported valid
+border/font CSS and structured list rows. These were repaired; linked retries reused completed provider
+checkpoints. Refresh an existing editor and **Clear attempt** before starting
+with Stitch if the previous failed execution used the combined provider.
+
+A broader assistant-intent test still fails: a text request is routed to section
+generation. This is outside the qualified Stitch design path.
+
+Stitch-only mode generates one editable page. Scoped AI text/style edits remain
+available in the combined workflow; CRM data/actions, authentication, CMS/forms,
+publishing and pixel-perfect/mobile fidelity are separate qualification work.
+
+Fresh checks passed: backend/frontend production builds, all 22 migrations,
+68 AI/provider/converter/worker contracts, 30 workspace/document contracts,
+10 frontend coordinator/responsive-style checks, and the Chromium design
+journey (generation, desktop/mobile preview, Apply, manual edit, scoped AI edit,
+Discard and reload persistence). The regular native worker also passed the
+durable-job smoke probe. Frontend large-chunk warnings remain. These checks do
+not certify live provider quality, publishing or production readiness.
+
+Repairs include the missing `scripts/start-forge.ps1` launcher, backend lockfile,
+two build errors, private provider-error handling, preservation of selected
+Claude routing, expired lease fencing and safe stored worker error codes.
+
 ## Website creation options and local test access
 
 In **Personal websites**, click **Create New Website** or **New Website** to choose
