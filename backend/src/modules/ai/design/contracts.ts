@@ -3,7 +3,7 @@ import type { JsonObject } from "../../../services/websites/document-policy.js";
 
 export const sitePlanSchema = z.object({
   design: z.string().min(20).max(8000),
-  pages: z.array(z.object({ name: z.string().min(1).max(100), slug: z.string().regex(/^\/(?:[a-z0-9-]+\/?)*$/), brief: z.string().min(20).max(8000) }).strict()).min(1).max(8),
+  pages: z.array(z.object({ name: z.string().min(1).max(100), slug: z.string().regex(/^\/(?:[a-z0-9-]+\/?)*$/), brief: z.string().min(20).max(64000) }).strict()).min(1).max(8),
   setupRequired: z.array(z.string().max(300)).max(20),
 }).strict();
 export type SitePlan = z.infer<typeof sitePlanSchema>;

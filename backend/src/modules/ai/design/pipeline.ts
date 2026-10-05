@@ -8,6 +8,7 @@ import { designConfigSchema } from "./config.js";
 import { DESIGN_CONTRACT, sitePlanSchema, type ArtifactStore, type DesignConverter, type DesignPlanner, type DesignProvider, type EditScope } from "./contracts.js";
 import { LocalDesignArtifacts } from "./artifacts.js";
 import { ClaudeDesignPlanner } from "./claude-planner.js";
+import { StitchOnlyPlanner } from "./stitch-planner.js";
 import { StitchDesignProvider } from "./stitch-provider.js";
 import { ConversionError } from "./converter.js";
 import { IsolatedDesignConverter } from "./isolated-converter.js";
@@ -57,7 +58,7 @@ export async function runDesignExecution(executionId: string, job: { id: string;
     }
   }
   try {
-    ports = supplied ?? { planner: new ClaudeDesignPlanner(config.claudeModel), designer: new StitchDesignProvider(config.stitchModel), artifacts: new LocalDesignArtifacts(), converter: new IsolatedDesignConverter() };
+    ports = supplied ?? { planner: config.provider === "stitch" ? new StitchOnlyPlanner() : new ClaudeDesignPlanner(config.claudeModel), designer: new StitchDesignProvider(config.stitchModel), artifacts: new LocalDesignArtifacts(), converter: new IsolatedDesignConverter() };
     if (!execution.promptCiphertext || !execution.promptExpiresAt || execution.promptExpiresAt <= new Date()) throw new AppError("Retained brief expired", 409, "AI_PROMPT_EXPIRED");
     const prompt = decryptPrompt(execution.promptCiphertext);
     const website = await transaction(tx => tx.website.findUniqueOrThrow({ where: { id: execution.websiteId } }));
@@ -94,6 +95,12 @@ export async function runDesignExecution(executionId: string, job: { id: string;
           try { return await ports.converter.convert(html, `${executionId}:${index}`); }
           catch (error) {
             if (!(error instanceof ConversionError)) throw error;
+            if (config.provider === "stitch") {
+              const repairedScreen = await stage(`REPAIR_SCREEN_${index}`, () => ports.designer.generate(projectId,
+                `${DESIGN_CONTRACT}\nCreate a simpler replacement for this page using only inline styles, containers, plain headings/text and links to /. Never nest elements inside headings, paragraphs, spans or links: their content must be plain text. No stylesheet blocks, pseudo-selectors, cursor, transitions, transforms, Tailwind, custom scripts, remote assets or icons. Conversion issues: ${JSON.stringify(error.issues)}\n${page.brief}`), true);
+              const repairedHtml = await stage(`REPAIR_EXPORT_${index}`, () => ports.designer.html(projectId, repairedScreen.screenId));
+              return ports.converter.convert(repairedHtml, `${executionId}:${index}`);
+            }
             const repaired = await stage(`REPAIR_${index}`, () => ports.planner.repair(html, error.issues));
             return ports.converter.convert(repaired, `${executionId}:${index}`);
           }
@@ -111,7 +118,7 @@ export async function runDesignExecution(executionId: string, job: { id: string;
     await transaction(async tx => {
       await tx.aiChangeset.create({ data: { executionId, websiteId: execution.websiteId, workspaceId: execution.workspaceId, organizationId: execution.organizationId, actorId: execution.actorId,
         expectedDocumentVersion: execution.expectedDocumentVersion!, proposedDocument: document as Prisma.InputJsonValue,
-        summary: { provider: "stitch-claude", pageNames: pages.map(page => page.name), pageCount: pages.length, setupRequired, conversionVersion: 1, proposalHash: createHash("sha256").update(JSON.stringify(document)).digest("hex") } as Prisma.InputJsonValue,
+        summary: { provider: config.provider, pageNames: pages.map(page => page.name), pageCount: pages.length, setupRequired, conversionVersion: 1, proposalHash: createHash("sha256").update(JSON.stringify(document)).digest("hex") } as Prisma.InputJsonValue,
       } });
       await tx.aiExecution.update({ where: { id: executionId }, data: { status: "COMPLETED", stage: "PENDING_REVIEW", completedAt: new Date(), outputSummary: { pageCount: pages.length } } });
       await tx.auditLog.create({ data: { userId: execution.actorId, action: "AI_DESIGN_READY", targetResource: `ai-execution:${executionId}`, details: { pageCount: pages.length } } });

@@ -11,7 +11,7 @@ import { designConfig, designConfigSchema } from "./config.js";
 
 export const executionRequestSchema = z.object({
   prompt: z.string().min(12).max(64000), operation: z.enum(["GENERATE_SITE", "EDIT_DOCUMENT"]),
-  workflow: z.literal("stitch-claude"),
+  workflow: z.enum(["stitch", "stitch-claude"]),
   scope: z.object({ type: z.enum(["site", "page", "selection"]), pageId: z.string().max(200).optional(), elementId: z.string().max(200).optional() }).strict().default({ type: "site" }),
 }).strict();
 export type ExecutionRequest = z.infer<typeof executionRequestSchema>;
@@ -30,6 +30,7 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
     },
     execute: async (tx, { website }) => {
       const config = parent ? designConfigSchema.parse(parent.providerSnapshot) : designConfig();
+      if (config.provider === "stitch" && input.operation === "EDIT_DOCUMENT") throw new AppError("Stitch-only mode supports page generation", 422, "AI_UNSUPPORTED_OPERATION");
       if (website.documentVersion !== write.expectedVersion) throw new AppError("Save or reload the website before generation", 412, "DOCUMENT_VERSION_CONFLICT");
       // Serialize workspace admission, bounding concurrent requests and reserved
       // provider calls. Reservations are conservative and not a claim of dollar cost.
@@ -47,7 +48,7 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
       if ((usage._sum.reservedUnits ?? 0) + units > config.dailyUnits) throw new AppError("Workspace design generation quota reached", 429, "AI_QUOTA_EXCEEDED");
       // Clean up any stale or crashed executions for this website whose job is already dead
       const activeCandidates = await tx.aiExecution.findMany({
-        where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: "stitch-claude" },
+        where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: { in: ["stitch", "stitch-claude"] } },
         select: { id: true }
       });
       for (const candidate of activeCandidates) {
@@ -69,9 +70,9 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
           });
         }
       }
-      if (await tx.aiExecution.count({ where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: "stitch-claude" } })) throw new AppError("A design execution is already active for this website", 409, "AI_EXECUTION_ACTIVE");
+      if (await tx.aiExecution.count({ where: { websiteId, status: { in: ["QUEUED", "RUNNING"] }, provider: { in: ["stitch", "stitch-claude"] } } })) throw new AppError("A design execution is already active for this website", 409, "AI_EXECUTION_ACTIVE");
       const execution = await tx.aiExecution.create({ data: { id: randomUUID(), websiteId, workspaceId: website.workspaceId, organizationId: website.organizationId, actorId,
-        provider: "stitch-claude", model: config.claudeModel, promptVersion: "design-pipeline-v1", operation: input.operation, status: "QUEUED", stage: "QUEUED",
+        provider: config.provider, model: config.provider === "stitch" ? config.stitchModel : config.claudeModel, promptVersion: "design-pipeline-v1", operation: input.operation, status: "QUEUED", stage: "QUEUED",
         promptCiphertext: encryptPrompt(input.prompt), promptExpiresAt: retentionExpiry(), expectedDocumentVersion: write.expectedVersion,
         inputSummary: { promptLength: input.prompt.length }, scope: input.scope, providerSnapshot: config, parentExecutionId: parentId, reservedUnits: units,
       } });
@@ -115,7 +116,7 @@ export async function getDesignExecution(id: string, actorId: string) {
   }
   const stages = await prisma.aiExecutionStage.findMany({ where: { executionId: id }, orderBy: { startedAt: "asc" }, select: { key: true, status: true, startedAt: true, completedAt: true } });
   const proposal = await prisma.aiChangeset.findUnique({ where: { executionId: id }, select: { id: true } });
-  return { id: row.id, websiteId: row.websiteId, status: row.status, stage: row.stage, errorCode: row.errorCode, expectedDocumentVersion: row.expectedDocumentVersion,
+  return { id: row.id, websiteId: row.websiteId, provider: row.provider, status: row.status, stage: row.stage, errorCode: row.errorCode, expectedDocumentVersion: row.expectedDocumentVersion,
     stages, changesetId: proposal?.id ?? null, retryAvailable: !!row.promptCiphertext && !!row.promptExpiresAt && row.promptExpiresAt > new Date() && (row.status === "FAILED" || row.status === "CANCELLED"),
     reservedProviderCalls: row.reservedUnits, createdAt: row.createdAt, completedAt: row.completedAt };
 }

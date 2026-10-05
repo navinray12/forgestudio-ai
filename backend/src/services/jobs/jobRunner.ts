@@ -317,7 +317,7 @@ export async function processNextJob(
     if (!await markJobCompleted(job, result)) return { processed: true, job, error: "JOB_LEASE_LOST" };
     return { processed: true, job, result };
   } catch (err: any) {
-    const errMsg = err instanceof AppError ? err.code : (typeof err?.message === "string" ? err.message : "JOB_EXECUTION_FAILED");
+    const errMsg = err instanceof AppError ? err.code : "JOB_EXECUTION_FAILED";
     await markJobFailed(job, errMsg);
     return { processed: true, job, error: errMsg };
   } finally {
@@ -328,7 +328,7 @@ export async function processNextJob(
 
 export async function renewJobLease(jobId: string, token: string): Promise<boolean> {
   const result = await pgPool.query(`UPDATE background_jobs SET "lockedUntil"=now()+interval '120 seconds',"updatedAt"=now()
-    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid`, [jobId, token]);
+    WHERE id=$1::uuid AND status='RUNNING' AND "lockToken"=$2::uuid AND "lockedUntil">now()`, [jobId, token]);
   return (result.rowCount ?? 0) === 1;
 }
 

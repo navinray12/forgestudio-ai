@@ -7,7 +7,7 @@ import { AppError } from "../../../utils/app-error.js";
 import type { JsonObject } from "../../../services/websites/document-policy.js";
 import type { DesignConverter } from "./contracts.js";
 
-const properties = new Set(`display position top right bottom left z-index width min-width max-width height min-height max-height padding padding-top padding-right padding-bottom padding-left margin margin-top margin-right margin-bottom margin-left gap row-gap column-gap flex flex-direction flex-wrap flex-grow flex-shrink flex-basis align-items align-self justify-content justify-self grid-template-columns grid-template-rows grid-column grid-row color background background-color background-image font-family font-size font-weight font-style line-height letter-spacing text-align text-decoration text-transform white-space overflow-wrap word-break border border-width border-style border-color border-top border-right border-bottom border-left border-radius box-shadow opacity overflow overflow-x overflow-y box-sizing object-fit list-style list-style-type`.split(" "));
+const properties = new Set(`display position top right bottom left z-index width min-width max-width height min-height max-height padding padding-top padding-right padding-bottom padding-left margin margin-top margin-right margin-bottom margin-left gap row-gap column-gap flex flex-direction flex-wrap flex-grow flex-shrink flex-basis align-items align-self justify-content justify-self grid-template-columns grid-template-rows grid-column grid-row color background background-color background-image font-family font-size font-weight font-style line-height letter-spacing text-align text-decoration text-transform white-space overflow-wrap word-break border border-width border-style border-color border-top border-right border-bottom border-left border-top-width border-right-width border-bottom-width border-left-width border-top-style border-right-style border-bottom-style border-left-style border-top-color border-right-color border-bottom-color border-left-color border-radius box-shadow opacity overflow overflow-x overflow-y box-sizing object-fit list-style list-style-type -webkit-font-smoothing -moz-osx-font-smoothing`.split(" "));
 export class ConversionError extends AppError {
   constructor(readonly issues: string[]) { super("The design uses unsupported structure or styling", 422, "AI_CONVERSION_UNSUPPORTED"); }
 }
@@ -25,6 +25,7 @@ export function safeDesignStyles(styles: Record<string, string>): Record<string,
 export class HtmlDesignConverter implements DesignConverter {
   async convert(html: string, namespace: string): Promise<JsonObject[]> {
     if (Buffer.byteLength(html) > 1024 * 1024) throw new ConversionError(["HTML_SIZE_LIMIT"]);
+    if (!/<(?:html|body|header|main|footer|section|article|div|h[1-6]|p|span|a)(?:\s|>)/i.test(html)) throw new ConversionError(["HTML_PAGE_REQUIRED"]);
     const $ = load(html);
     const issues = new Set<string>();
     if ($("*").length > 1800) throw new ConversionError(["ELEMENT_LIMIT"]);
@@ -36,7 +37,10 @@ export class HtmlDesignConverter implements DesignConverter {
     if ($("link[rel=stylesheet]").length) issues.add("EXTERNAL_STYLESHEET");
     const styleTexts = $("style").toArray().map(el => $(el).text());
     if (Buffer.byteLength(styleTexts.join("")) > 200_000) throw new ConversionError(["CSS_SIZE_LIMIT"]);
-    const compiled = await postcss([tailwindcss({ content: [{ raw: html, extension: "html" }], corePlugins: { preflight: false }, theme: {}, plugins: [] })]).process("@tailwind utilities;", { from: undefined });
+    // Scan actual class names only. Copy and comments can contain words such as
+    // "transition", which otherwise generate unused unsupported utility rules.
+    const utilityClasses = $("[class]").toArray().map(el => $(el).attr("class") || "").join(" ");
+    const compiled = await postcss([tailwindcss({ content: [{ raw: utilityClasses, extension: "html" }], corePlugins: { preflight: false }, theme: {}, plugins: [] })]).process("@tailwind utilities;", { from: undefined });
     const css = postcss.parse([...styleTexts, compiled.css].join("\n"));
     const rules: Array<{ selector: string; widthMin: number; widthMax: number; weight: number; styles: Record<string, string> }> = [];
     css.walkAtRules(at => { if (!["media"].includes(at.name)) issues.add("UNSUPPORTED_CSS_AT_RULE"); });
@@ -120,7 +124,7 @@ export class HtmlDesignConverter implements DesignConverter {
       const childrenInherited = computed.map(style => Object.fromEntries(Object.entries(style).filter(([key]) => inheritedKeys.has(key) || key.startsWith("--"))));
       const children = el.children.map((child, index) => walk(child, `${path}.${index}`, childrenInherited, depth + 1)).filter((child): child is JsonObject => child !== null);
       const id = createHash("sha256").update(`${namespace}:${path}`).digest("hex").slice(0, 24);
-      const type = /^h[1-6]$/.test(tag) ? "heading" : ["a", "button"].includes(tag) ? "button" : ["p", "span", "strong", "em", "li", "br"].includes(tag) ? "text" : "container";
+      const type = tag === "li" && el.children.some(child => child.type === "tag") ? "container" : /^h[1-6]$/.test(tag) ? "heading" : ["a", "button"].includes(tag) ? "button" : ["p", "span", "strong", "em", "li", "br"].includes(tag) ? "text" : "container";
       const href = el.attribs.href;
       if (type === "button" && (!href || !/^\/(?!\/)[a-z0-9/-]*$/.test(href))) issues.add("UNRESOLVED_LINK");
       if (type !== "container" && children.some(child => child.type === "container" || child.type === "button")) issues.add("COMPLEX_INLINE_CONTENT");

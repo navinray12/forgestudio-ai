@@ -8,6 +8,7 @@ import { generateCodePreviewSandbox } from "../modules/ai/code/code-generation.s
 import { detectIntent, orchestrateAssistantRequest, executeAssistantCommand } from "../modules/ai/assistant/assistant-orchestrator.service.js";
 import { getImageCapabilityMatrix, OpenAiImageProvider } from "../modules/ai/images/image-provider.js";
 import * as acorn from "acorn";
+import type { JsonObject } from "../services/websites/document-policy.js";
 
 test("ForgeStudio AI Platform Final Verification Pass", async (t) => {
 
@@ -95,7 +96,7 @@ test("ForgeStudio AI Platform Final Verification Pass", async (t) => {
   });
 
   await t.test("6. Performance Analysis: Separation of Static AST from Runtime Telemetry", async () => {
-    const mockDoc = {
+    const mockDoc: JsonObject = {
       pages: [
         {
           id: "page-1",

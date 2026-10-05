@@ -41,11 +41,34 @@ test("scoped operations preserve unrelated elements and input", () => {
   assert.throws(() => applyScopedEdits(input, [{ type: "text", elementId: "b", text: "Escape" }], { type: "selection", pageId: "home", elementId: "a" }), { code: "AI_SCOPE_VIOLATION" });
 });
 test("provider invalid JSON, timeout and error bodies remain safe", async t => {
+  const logged: unknown[] = [];
+  t.mock.method(console, "error", (...values: unknown[]) => logged.push(values));
   const original = process.env.ANTHROPIC_API_KEY; process.env.ANTHROPIC_API_KEY = "fixture-only";
   t.after(() => { if (original === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = original; });
   for (const fetcher of [async () => new Response(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: "SECRET_INVALID_JSON" }] })), async () => new Response("SECRET_PROVIDER_BODY", { status: 429 }), async () => { throw new DOMException("SECRET_TIMEOUT", "TimeoutError"); }]) {
     const planner = new ClaudeDesignPlanner("fixture-model", fetcher as typeof fetch);
     await assert.rejects(planner.plan("A detailed private brief"), error => error instanceof Error && !error.message.includes("SECRET"));
+  }
+  assert.equal(JSON.stringify(logged).includes("SECRET"), false);
+});
+
+test("Claude planner preserves the selected provider when Gemini is also configured", async t => {
+  const previous = { anthropic: process.env.ANTHROPIC_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  process.env.ANTHROPIC_API_KEY = "fixture-only";
+  process.env.GEMINI_API_KEY = "fixture-only";
+  t.after(() => {
+    for (const [key, value] of [["ANTHROPIC_API_KEY", previous.anthropic], ["GEMINI_API_KEY", previous.gemini]]) {
+      if (value === undefined) delete process.env[key!]; else process.env[key!] = value;
+    }
+  });
+  for (const status of [400, 401]) {
+    const urls: string[] = [];
+    const planner = new ClaudeDesignPlanner("fixture-model", (async url => {
+      urls.push(String(url));
+      return new Response("private provider error", { status });
+    }) as typeof fetch);
+    await assert.rejects(planner.plan("A detailed website brief"));
+    assert.deepEqual(urls, ["https://api.anthropic.com/v1/messages"]);
   }
 });
 test("private artifacts are encrypted and path traversal is rejected", async t => {
