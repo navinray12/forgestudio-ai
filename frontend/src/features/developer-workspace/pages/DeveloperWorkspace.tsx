@@ -16,6 +16,8 @@ import {
   ChevronUp,
   ExternalLink,
   Shield,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   RefreshCw,
   CheckCircle,
@@ -32,6 +34,9 @@ import {
   Link2,
   GitBranch,
   Bot,
+  Database,
+  FolderArchive,
+  Zap,
 } from "lucide-react";
 import {
   forgeProjectService,
@@ -52,9 +57,16 @@ import { CicdPanel } from "../components/CicdPanel";
 import { DomainPanel } from "../components/DomainPanel";
 import { GitPanel } from "../components/GitPanel";
 import { AiAgentPanel } from "../components/AiAgentPanel";
+import { DatabaseStudioPanel } from "../components/DatabaseStudioPanel";
+import { ObjectStoragePanel } from "../components/ObjectStoragePanel";
+import { AppRuntimePanel } from "../components/AppRuntimePanel";
+import { DeveloperQualityPanel } from "../components/DeveloperQualityPanel";
+import { DeveloperOpsSecurityPanel } from "../components/DeveloperOpsSecurityPanel";
+import { DeveloperIntelligencePanel } from "../components/DeveloperIntelligencePanel";
 
 type WorkspaceMode = "code" | "split" | "preview";
-type BottomTab = "ai" | "git" | "terminal" | "build" | "hosting" | "cicd" | "domains" | "dependencies" | "debug" | "output" | "problems" | "manifest" | "snapshots";
+type BottomTab = "ai" | "git" | "terminal" | "build" | "hosting" | "cicd" | "domains" | "dependencies" | "database" | "storage" | "runtime" | "quality" | "devops" | "intelligence" | "debug" | "output" | "problems" | "manifest" | "snapshots";
+
 
 
 export const DeveloperWorkspace: React.FC = () => {
@@ -864,6 +876,96 @@ export const DeveloperWorkspace: React.FC = () => {
 
             <button
               onClick={() => {
+                setActiveBottomTab("database");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "database"
+                  ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Database</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("storage");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "storage"
+                  ? "bg-amber-600/30 text-amber-300 border border-amber-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FolderArchive className="w-3.5 h-3.5 text-amber-400" />
+              <span>Storage</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("runtime");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "runtime"
+                  ? "bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Runtime</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("quality");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "quality"
+                  ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Quality & Testing</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("devops");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "devops"
+                  ? "bg-rose-600/30 text-rose-300 border border-rose-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+              <span>DevOps & Security</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("intelligence");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "intelligence"
+                  ? "bg-violet-600/30 text-violet-300 border border-violet-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+              <span>Intelligence & Arch</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setActiveBottomTab("debug");
                 setBottomDrawerOpen(true);
               }}
@@ -963,6 +1065,18 @@ export const DeveloperWorkspace: React.FC = () => {
             {activeBottomTab === "domains" && <DomainPanel projectId={project.id} />}
 
             {activeBottomTab === "dependencies" && <DependencyPanel projectId={project.id} />}
+
+            {activeBottomTab === "database" && <DatabaseStudioPanel projectId={project.id} />}
+
+            {activeBottomTab === "storage" && <ObjectStoragePanel projectId={project.id} />}
+
+            {activeBottomTab === "runtime" && <AppRuntimePanel projectId={project.id} />}
+
+            {activeBottomTab === "quality" && <DeveloperQualityPanel projectId={project.id} />}
+
+            {activeBottomTab === "devops" && <DeveloperOpsSecurityPanel projectId={project.id} />}
+
+            {activeBottomTab === "intelligence" && <DeveloperIntelligencePanel projectId={project.id} />}
 
             {activeBottomTab === "debug" && (
               <DebugPanel

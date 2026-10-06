@@ -1197,5 +1197,1088 @@ export const forgeProjectService = {
       body: JSON.stringify(payload),
     });
   },
+
+  // ========================================================
+  // AI Engineering Platform (Modules 37–42)
+  // ========================================================
+
+  // Module 37: AI Context Engine
+  async assembleContext(
+    projectId: string,
+    payload: {
+      objective?: string;
+      query?: string;
+      files?: string[];
+      contextProfile?: string;
+      tokenBudget?: number;
+    }
+  ): Promise<{ success: boolean; snapshot: any }> {
+    return request<{ success: boolean; snapshot: any }>(`/${projectId}/ai/context`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getContextSnapshot(
+    projectId: string,
+    snapshotId: string
+  ): Promise<{ success: boolean; snapshot: any }> {
+    return request<{ success: boolean; snapshot: any }>(`/${projectId}/ai/context/${snapshotId}`);
+  },
+
+  // Module 38: AI Project Memory
+  async createMemory(
+    projectId: string,
+    payload: {
+      type: string;
+      title: string;
+      content: string;
+      severity?: string;
+      tags?: string[];
+      relatedFiles?: string[];
+    }
+  ): Promise<{ success: boolean; memory: any }> {
+    return request<{ success: boolean; memory: any }>(`/${projectId}/ai/memories`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listMemories(
+    projectId: string,
+    filters: { type?: string; status?: string; severity?: string; q?: string } = {}
+  ): Promise<{ success: boolean; memories: any[] }> {
+    const params = new URLSearchParams();
+    if (filters.type) params.append("type", filters.type);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.severity) params.append("severity", filters.severity);
+    if (filters.q) params.append("q", filters.q);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return request<{ success: boolean; memories: any[] }>(`/${projectId}/ai/memories${qs}`);
+  },
+
+  async updateMemory(
+    projectId: string,
+    memoryId: string,
+    payload: any
+  ): Promise<{ success: boolean; memory: any }> {
+    return request<{ success: boolean; memory: any }>(`/${projectId}/ai/memories/${memoryId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async revokeMemory(
+    projectId: string,
+    memoryId: string,
+    reason?: string
+  ): Promise<{ success: boolean; memory: any }> {
+    return request<{ success: boolean; memory: any }>(`/${projectId}/ai/memories/${memoryId}/revoke`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  // Module 39: AI Planning Agent
+  async generateAiPlan(
+    projectId: string,
+    payload: { objective: string; targetFiles?: string[]; constraints?: string[] }
+  ): Promise<{ success: boolean; plan: any }> {
+    return request<{ success: boolean; plan: any }>(`/${projectId}/ai/plans`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAiPlan(
+    projectId: string,
+    planId: string
+  ): Promise<{ success: boolean; plan: any }> {
+    return request<{ success: boolean; plan: any }>(`/${projectId}/ai/plans/${planId}`);
+  },
+
+  async approveAiPlan(
+    projectId: string,
+    planId: string
+  ): Promise<{ success: boolean; plan: any }> {
+    return request<{ success: boolean; plan: any }>(`/${projectId}/ai/plans/${planId}/approve`, {
+      method: "POST",
+    });
+  },
+
+  async rejectAiPlan(
+    projectId: string,
+    planId: string,
+    reason: string
+  ): Promise<{ success: boolean; plan: any }> {
+    return request<{ success: boolean; plan: any }>(`/${projectId}/ai/plans/${planId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  // Module 40: AI Architecture Agent
+  async analyzeArchitecture(
+    projectId: string
+  ): Promise<{ success: boolean; snapshot: any }> {
+    return request<{ success: boolean; snapshot: any }>(`/${projectId}/ai/architecture/analyze`, {
+      method: "POST",
+    });
+  },
+
+  async getArchitectureSnapshot(
+    projectId: string
+  ): Promise<{ success: boolean; snapshot: any }> {
+    return request<{ success: boolean; snapshot: any }>(`/${projectId}/ai/architecture/snapshot`);
+  },
+
+  async listArchitectureFindings(
+    projectId: string
+  ): Promise<{ success: boolean; findings: any[] }> {
+    return request<{ success: boolean; findings: any[] }>(`/${projectId}/ai/architecture/findings`);
+  },
+
+  // Module 42: Agent Task / Run Manager
+  async createAiTask(
+    projectId: string,
+    payload: { title: string; objective: string; priority?: string }
+  ): Promise<{ success: boolean; task: any }> {
+    return request<{ success: boolean; task: any }>(`/${projectId}/ai/tasks`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listAiTasks(
+    projectId: string,
+    status?: string
+  ): Promise<{ success: boolean; tasks: any[] }> {
+    const qs = status ? `?status=${status}` : "";
+    return request<{ success: boolean; tasks: any[] }>(`/${projectId}/ai/tasks${qs}`);
+  },
+
+  async getAiTask(
+    projectId: string,
+    taskId: string
+  ): Promise<{ success: boolean; task: any }> {
+    return request<{ success: boolean; task: any }>(`/${projectId}/ai/tasks/${taskId}`);
+  },
+
+  async startAiRun(
+    projectId: string,
+    taskId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/tasks/${taskId}/run`, {
+      method: "POST",
+    });
+  },
+
+  async getAiRun(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/runs/${runId}`);
+  },
+
+  async pauseAiRun(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/runs/${runId}/pause`, {
+      method: "POST",
+    });
+  },
+
+  async resumeAiRun(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/runs/${runId}/resume`, {
+      method: "POST",
+    });
+  },
+
+  async cancelAiRun(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/runs/${runId}/cancel`, {
+      method: "POST",
+    });
+  },
+
+  async retryAiRun(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; run: any }> {
+    return request<{ success: boolean; run: any }>(`/${projectId}/ai/runs/${runId}/retry`, {
+      method: "POST",
+    });
+  },
+
+  async compareAiRuns(
+    projectId: string,
+    runId: string,
+    otherRunId: string
+  ): Promise<{ success: boolean; comparison: any }> {
+    return request<{ success: boolean; comparison: any }>(`/${projectId}/ai/runs/${runId}/compare/${otherRunId}`);
+  },
+
+  async getRunEvents(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; events: any[] }> {
+    return request<{ success: boolean; events: any[] }>(`/${projectId}/ai/runs/${runId}/events`);
+  },
+
+  async listRunArtifacts(
+    projectId: string,
+    runId: string
+  ): Promise<{ success: boolean; artifacts: any[] }> {
+    return request<{ success: boolean; artifacts: any[] }>(`/${projectId}/ai/runs/${runId}/artifacts`);
+  },
+
+  // ==========================================
+  // Forge Data Platform (Modules 25–28)
+  // ==========================================
+
+  // Module 25: Forge Database
+  async getDatabase(projectId: string, environment = "development"): Promise<{ success: boolean; database: any }> {
+    return request<{ success: boolean; database: any }>(`/${projectId}/database?environment=${environment}`);
+  },
+
+  async listDatabases(projectId: string): Promise<{ success: boolean; databases: any[] }> {
+    return request<{ success: boolean; databases: any[] }>(`/${projectId}/database/list`);
+  },
+
+  async branchDatabase(
+    projectId: string,
+    parentEnv: string,
+    branchName: string
+  ): Promise<{ success: boolean; database: any }> {
+    return request<{ success: boolean; database: any }>(`/${projectId}/database/branch`, {
+      method: "POST",
+      body: JSON.stringify({ parentEnv, branchName }),
+    });
+  },
+
+  async listDatabaseTables(projectId: string, databaseId: string): Promise<{ success: boolean; tables: any[] }> {
+    return request<{ success: boolean; tables: any[] }>(`/${projectId}/database/${databaseId}/tables`);
+  },
+
+  async getTableSchema(
+    projectId: string,
+    databaseId: string,
+    tableName: string
+  ): Promise<{ success: boolean; schema: any }> {
+    return request<{ success: boolean; schema: any }>(`/${projectId}/database/${databaseId}/tables/${tableName}/schema`);
+  },
+
+  async createTable(
+    projectId: string,
+    databaseId: string,
+    payload: any
+  ): Promise<{ success: boolean; schema: any }> {
+    return request<{ success: boolean; schema: any }>(`/${projectId}/database/${databaseId}/tables`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async alterTable(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    payload: any
+  ): Promise<{ success: boolean; schema: any }> {
+    return request<{ success: boolean; schema: any }>(`/${projectId}/database/${databaseId}/tables/${tableName}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async dropTable(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    confirmed = true
+  ): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/database/${databaseId}/tables/${tableName}`, {
+      method: "DELETE",
+      body: JSON.stringify({ confirmed }),
+    });
+  },
+
+  async introspectDatabaseSchema(
+    projectId: string,
+    databaseId: string
+  ): Promise<{ success: boolean; schema: { tables: any[] } }> {
+    return request<{ success: boolean; schema: { tables: any[] } }>(`/${projectId}/database/${databaseId}/introspect`);
+  },
+
+  async createDatabaseBackup(
+    projectId: string,
+    databaseId: string,
+    name?: string
+  ): Promise<{ success: boolean; backup: any }> {
+    return request<{ success: boolean; backup: any }>(`/${projectId}/database/${databaseId}/backups`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  async listDatabaseBackups(projectId: string, databaseId: string): Promise<{ success: boolean; backups: any[] }> {
+    return request<{ success: boolean; backups: any[] }>(`/${projectId}/database/${databaseId}/backups`);
+  },
+
+  async restoreDatabaseBackup(
+    projectId: string,
+    databaseId: string,
+    backupId: string
+  ): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/database/${databaseId}/backups/${backupId}/restore`, {
+      method: "POST",
+    });
+  },
+
+  async getDatabaseMetrics(projectId: string, databaseId: string): Promise<{ success: boolean; metrics: any }> {
+    return request<{ success: boolean; metrics: any }>(`/${projectId}/database/${databaseId}/metrics`);
+  },
+
+  async listDatabaseMigrations(projectId: string, databaseId: string): Promise<{ success: boolean; migrations: any[] }> {
+    return request<{ success: boolean; migrations: any[] }>(`/${projectId}/database/${databaseId}/migrations`);
+  },
+
+  async applyDatabaseMigration(
+    projectId: string,
+    databaseId: string,
+    migrationId: string
+  ): Promise<{ success: boolean; migration: any }> {
+    return request<{ success: boolean; migration: any }>(
+      `/${projectId}/database/${databaseId}/migrations/${migrationId}/apply`,
+      { method: "POST" }
+    );
+  },
+
+  async rollbackDatabaseMigration(
+    projectId: string,
+    databaseId: string,
+    migrationId: string
+  ): Promise<{ success: boolean; migration: any }> {
+    return request<{ success: boolean; migration: any }>(
+      `/${projectId}/database/${databaseId}/migrations/${migrationId}/rollback`,
+      { method: "POST" }
+    );
+  },
+
+  // Module 26: Database Studio
+  async getTableData(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    params: any = {}
+  ): Promise<{ success: boolean; data: any }> {
+    const qs = new URLSearchParams(params).toString();
+    return request<{ success: boolean; data: any }>(
+      `/${projectId}/database/${databaseId}/tables/${tableName}/data?${qs}`
+    );
+  },
+
+  async insertTableRow(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    row: any
+  ): Promise<{ success: boolean; row: any }> {
+    return request<{ success: boolean; row: any }>(
+      `/${projectId}/database/${databaseId}/tables/${tableName}/data`,
+      { method: "POST", body: JSON.stringify(row) }
+    );
+  },
+
+  async updateTableRow(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    pkField: string,
+    pkValue: any,
+    changes: any
+  ): Promise<{ success: boolean; row: any }> {
+    return request<{ success: boolean; row: any }>(
+      `/${projectId}/database/${databaseId}/tables/${tableName}/data`,
+      { method: "PATCH", body: JSON.stringify({ pkField, pkValue, changes }) }
+    );
+  },
+
+  async deleteTableRow(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    pkField: string,
+    pkValue: any
+  ): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(
+      `/${projectId}/database/${databaseId}/tables/${tableName}/data`,
+      { method: "DELETE", body: JSON.stringify({ pkField, pkValue }) }
+    );
+  },
+
+  async executeSqlQuery(
+    projectId: string,
+    databaseId: string,
+    sql: string,
+    confirmDestructive = false
+  ): Promise<{ success: boolean; result: any }> {
+    return request<{ success: boolean; result: any }>(`/${projectId}/database/${databaseId}/sql`, {
+      method: "POST",
+      body: JSON.stringify({ sql, confirmDestructive }),
+    });
+  },
+
+  async explainSqlQuery(
+    projectId: string,
+    databaseId: string,
+    sql: string,
+    analyze = false
+  ): Promise<{ success: boolean; result: any }> {
+    return request<{ success: boolean; result: any }>(`/${projectId}/database/${databaseId}/explain`, {
+      method: "POST",
+      body: JSON.stringify({ sql, analyze }),
+    });
+  },
+
+  async getQueryHistory(projectId: string, databaseId: string): Promise<{ success: boolean; history: any[] }> {
+    return request<{ success: boolean; history: any[] }>(`/${projectId}/database/${databaseId}/history`);
+  },
+
+  async seedTableData(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    count = 5
+  ): Promise<{ success: boolean; result: { inserted: number } }> {
+    return request<{ success: boolean; result: { inserted: number } }>(
+      `/${projectId}/database/${databaseId}/tables/${tableName}/seed`,
+      { method: "POST", body: JSON.stringify({ count }) }
+    );
+  },
+
+  // Module 27: Data / API Layer
+  async getApiConfigs(projectId: string, databaseId: string): Promise<{ success: boolean; configs: any[] }> {
+    return request<{ success: boolean; configs: any[] }>(`/${projectId}/database/${databaseId}/api/configs`);
+  },
+
+  async updateApiConfig(
+    projectId: string,
+    databaseId: string,
+    tableName: string,
+    payload: any
+  ): Promise<{ success: boolean; config: any }> {
+    return request<{ success: boolean; config: any }>(
+      `/${projectId}/database/${databaseId}/api/configs/${tableName}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
+    );
+  },
+
+  async getOpenApiSpec(projectId: string, databaseId: string): Promise<any> {
+    return request<any>(`/${projectId}/database/${databaseId}/api/openapi.json`);
+  },
+
+  async getTypedClientCode(
+    projectId: string,
+    databaseId: string
+  ): Promise<{ success: boolean; client: { typescriptCode: string; typesDefinition: string } }> {
+    return request<{ success: boolean; client: { typescriptCode: string; typesDefinition: string } }>(
+      `/${projectId}/database/${databaseId}/api/client.ts`
+    );
+  },
+
+  // Module 28: Object Storage
+  async createStorageBucket(
+    projectId: string,
+    payload: { name: string; accessPolicy?: string; maxSizeBytes?: number }
+  ): Promise<{ success: boolean; bucket: any }> {
+    return request<{ success: boolean; bucket: any }>(`/${projectId}/storage/buckets`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listStorageBuckets(projectId: string): Promise<{ success: boolean; buckets: any[] }> {
+    return request<{ success: boolean; buckets: any[] }>(`/${projectId}/storage/buckets`);
+  },
+
+  async deleteStorageBucket(projectId: string, bucketName: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/storage/buckets/${bucketName}`, {
+      method: "DELETE",
+    });
+  },
+
+  async listStorageObjects(
+    projectId: string,
+    bucketName: string,
+    prefix?: string
+  ): Promise<{ success: boolean; objects: any[] }> {
+    const qs = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+    return request<{ success: boolean; objects: any[] }>(`/${projectId}/storage/buckets/${bucketName}/objects${qs}`);
+  },
+
+  async uploadStorageObject(
+    projectId: string,
+    bucketName: string,
+    key: string,
+    content: string,
+    fileName?: string,
+    mimeType?: string
+  ): Promise<{ success: boolean; object: any }> {
+    return request<{ success: boolean; object: any }>(`/${projectId}/storage/buckets/${bucketName}/objects`, {
+      method: "POST",
+      body: JSON.stringify({ key, content, fileName: fileName || key, mimeType }),
+    });
+  },
+
+  async deleteStorageObject(
+    projectId: string,
+    bucketName: string,
+    key: string
+  ): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(
+      `/${projectId}/storage/buckets/${bucketName}/objects/${encodeURIComponent(key)}`,
+      { method: "DELETE" }
+    );
+  },
+
+  async generateSignedStorageUrl(
+    projectId: string,
+    bucketName: string,
+    key: string,
+    method = "GET",
+    expiresInSeconds = 300
+  ): Promise<{ success: boolean; signedUrl: any }> {
+    return request<{ success: boolean; signedUrl: any }>(`/${projectId}/storage/buckets/${bucketName}/signed-url`, {
+      method: "POST",
+      body: JSON.stringify({ key, method, expiresInSeconds }),
+    });
+  },
+
+  // Modules 46–52: Application Runtime Platform
+  // Module 46: Functions
+  async listRuntimeFunctions(projectId: string, environment?: string): Promise<{ functions: any[] }> {
+    const qs = environment ? `?environment=${environment}` : "";
+    return request<{ functions: any[] }>(`/${projectId}/runtime/functions${qs}`);
+  },
+
+  async createRuntimeFunction(projectId: string, payload: any): Promise<{ function: any }> {
+    return request<{ function: any }>(`/${projectId}/runtime/functions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async invokeRuntimeFunction(projectId: string, fnId: string, payload: any): Promise<{ result: any }> {
+    return request<{ result: any }>(`/${projectId}/runtime/functions/${fnId}/invoke`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteRuntimeFunction(projectId: string, fnId: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/runtime/functions/${fnId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Module 47: Queues
+  async listTaskQueues(projectId: string): Promise<{ queues: any[] }> {
+    return request<{ queues: any[] }>(`/${projectId}/runtime/queues`);
+  },
+
+  async createTaskQueue(projectId: string, payload: any): Promise<{ queue: any }> {
+    return request<{ queue: any }>(`/${projectId}/runtime/queues`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getQueueMetrics(projectId: string, queueId: string): Promise<{ metrics: any }> {
+    return request<{ metrics: any }>(`/${projectId}/runtime/queues/${queueId}/metrics`);
+  },
+
+  async listQueueJobs(projectId: string, queueId: string, status?: string): Promise<{ jobs: any[] }> {
+    const qs = status ? `?status=${status}` : "";
+    return request<{ jobs: any[] }>(`/${projectId}/runtime/queues/${queueId}/jobs${qs}`);
+  },
+
+  async enqueueQueueJob(projectId: string, queueId: string, payload: any): Promise<{ job: any }> {
+    return request<{ job: any }>(`/${projectId}/runtime/queues/${queueId}/jobs`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async replayDlqJob(projectId: string, queueId: string, jobId: string): Promise<{ job: any }> {
+    return request<{ job: any }>(`/${projectId}/runtime/queues/${queueId}/jobs/${jobId}/replay`, {
+      method: "POST",
+    });
+  },
+
+  // Module 48: Scheduler
+  async listCronSchedules(projectId: string): Promise<{ schedules: any[] }> {
+    return request<{ schedules: any[] }>(`/${projectId}/runtime/schedules`);
+  },
+
+  async createCronSchedule(projectId: string, payload: any): Promise<{ schedule: any }> {
+    return request<{ schedule: any }>(`/${projectId}/runtime/schedules`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async triggerCronSchedule(projectId: string, scheduleId: string): Promise<{ execution: any }> {
+    return request<{ execution: any }>(`/${projectId}/runtime/schedules/${scheduleId}/trigger`, {
+      method: "POST",
+    });
+  },
+
+  async deleteCronSchedule(projectId: string, scheduleId: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/runtime/schedules/${scheduleId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Module 49: Event Bus
+  async listEventTopics(projectId: string): Promise<{ topics: any[] }> {
+    return request<{ topics: any[] }>(`/${projectId}/runtime/topics`);
+  },
+
+  async createEventTopic(projectId: string, payload: any): Promise<{ topic: any }> {
+    return request<{ topic: any }>(`/${projectId}/runtime/topics`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async publishEvent(projectId: string, topicId: string, payload: any): Promise<any> {
+    return request<any>(`/${projectId}/runtime/topics/${topicId}/publish`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listEventSubscriptions(projectId: string, topicId?: string): Promise<{ subscriptions: any[] }> {
+    const qs = topicId ? `?topicId=${topicId}` : "";
+    return request<{ subscriptions: any[] }>(`/${projectId}/runtime/subscriptions${qs}`);
+  },
+
+  async createEventSubscription(projectId: string, payload: any): Promise<{ subscription: any }> {
+    return request<{ subscription: any }>(`/${projectId}/runtime/subscriptions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Module 50: Realtime
+  async listRealtimeChannels(projectId: string): Promise<{ channels: any[] }> {
+    return request<{ channels: any[] }>(`/${projectId}/runtime/channels`);
+  },
+
+  async createRealtimeChannel(projectId: string, payload: any): Promise<{ channel: any }> {
+    return request<{ channel: any }>(`/${projectId}/runtime/channels`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async broadcastRealtimeMessage(projectId: string, channel: string, payload: any): Promise<{ message: any }> {
+    return request<{ message: any }>(`/${projectId}/runtime/channels/${channel}/broadcast`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getChannelPresence(projectId: string, channel: string): Promise<{ presence: any[] }> {
+    return request<{ presence: any[] }>(`/${projectId}/runtime/channels/${channel}/presence`);
+  },
+
+  // Module 51: KV
+  async listKvNamespaces(projectId: string): Promise<{ namespaces: any[] }> {
+    return request<{ namespaces: any[] }>(`/${projectId}/runtime/kv/namespaces`);
+  },
+
+  async createKvNamespace(projectId: string, payload: any): Promise<{ namespace: any }> {
+    return request<{ namespace: any }>(`/${projectId}/runtime/kv/namespaces`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listKvKeys(projectId: string, namespace: string, prefix?: string): Promise<{ keys: any[] }> {
+    const qs = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+    return request<{ keys: any[] }>(`/${projectId}/runtime/kv/${namespace}/keys${qs}`);
+  },
+
+  async getKvKey(projectId: string, namespace: string, key: string): Promise<{ key: string; value: any }> {
+    return request<{ key: string; value: any }>(`/${projectId}/runtime/kv/${namespace}/keys/${key}`);
+  },
+
+  async setKvKey(projectId: string, namespace: string, key: string, payload: any): Promise<{ entry: any }> {
+    return request<{ entry: any }>(`/${projectId}/runtime/kv/${namespace}/keys/${key}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteKvKey(projectId: string, namespace: string, key: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/runtime/kv/${namespace}/keys/${key}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Module 52: Gateway & Schema Registry
+  async listGatewayRoutes(projectId: string): Promise<{ routes: any[] }> {
+    return request<{ routes: any[] }>(`/${projectId}/runtime/gateway/routes`);
+  },
+
+  async createGatewayRoute(projectId: string, payload: any): Promise<{ route: any }> {
+    return request<{ route: any }>(`/${projectId}/runtime/gateway/routes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteGatewayRoute(projectId: string, routeId: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/${projectId}/runtime/gateway/routes/${routeId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async listSchemas(projectId: string): Promise<{ schemas: any[] }> {
+    return request<{ schemas: any[] }>(`/${projectId}/runtime/schemas`);
+  },
+
+  async registerSchema(projectId: string, payload: any): Promise<{ schema: any }> {
+    return request<{ schema: any }>(`/${projectId}/runtime/schemas`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Modules 43–45: Quality, API Testing & Browser DevTools
+  // Module 43: Automated Testing Platform
+  async listTestSuites(projectId: string): Promise<{ suites: any[] }> {
+    return request<{ suites: any[] }>(`/${projectId}/quality/tests/suites`);
+  },
+
+  async discoverTestSuites(projectId: string): Promise<{ suites: any[] }> {
+    return request<{ suites: any[] }>(`/${projectId}/quality/tests/suites/discover`, {
+      method: "POST",
+    });
+  },
+
+  async runProjectTests(projectId: string, options: any = {}): Promise<{ testRun: any }> {
+    return request<{ testRun: any }>(`/${projectId}/quality/tests/run`, {
+      method: "POST",
+      body: JSON.stringify(options),
+    });
+  },
+
+  async listTestRuns(projectId: string): Promise<{ runs: any[] }> {
+    return request<{ runs: any[] }>(`/${projectId}/quality/tests/runs`);
+  },
+
+  // Module 44: API Testing Studio
+  async listApiCollections(projectId: string): Promise<{ collections: any[] }> {
+    return request<{ collections: any[] }>(`/${projectId}/quality/api/collections`);
+  },
+
+  async createApiCollection(projectId: string, payload: any): Promise<{ collection: any }> {
+    return request<{ collection: any }>(`/${projectId}/quality/api/collections`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listApiRequests(projectId: string, collectionId: string): Promise<{ requests: any[] }> {
+    return request<{ requests: any[] }>(`/${projectId}/quality/api/collections/${collectionId}/requests`);
+  },
+
+  async createApiRequest(projectId: string, collectionId: string, payload: any): Promise<{ request: any }> {
+    return request<{ request: any }>(`/${projectId}/quality/api/collections/${collectionId}/requests`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async executeApiRequest(projectId: string, requestId: string, variables?: any): Promise<{ result: any }> {
+    return request<{ result: any }>(`/${projectId}/quality/api/requests/${requestId}/execute`, {
+      method: "POST",
+      body: JSON.stringify({ variables: variables || {} }),
+    });
+  },
+
+  async runApiCollection(projectId: string, collectionId: string, variables?: any): Promise<{ runRecord: any }> {
+    return request<{ runRecord: any }>(`/${projectId}/quality/api/collections/${collectionId}/run`, {
+      method: "POST",
+      body: JSON.stringify({ variables: variables || {} }),
+    });
+  },
+
+  async importOpenApiToCollection(projectId: string, spec: any, name?: string): Promise<{ collection: any }> {
+    return request<{ collection: any }>(`/${projectId}/quality/api/collections/import-openapi`, {
+      method: "POST",
+      body: JSON.stringify({ spec, name }),
+    });
+  },
+
+  // Module 45: Browser DevTools & Runtime Inspector
+  async getDevToolsState(projectId: string): Promise<{ state: any }> {
+    return request<{ state: any }>(`/${projectId}/quality/devtools/state`);
+  },
+
+  async ingestDevToolsConsole(projectId: string, payload: any): Promise<{ event: any }> {
+    return request<{ event: any }>(`/${projectId}/quality/devtools/console`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async ingestDevToolsNetwork(projectId: string, payload: any): Promise<{ event: any }> {
+    return request<{ event: any }>(`/${projectId}/quality/devtools/network`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async captureDevToolsSnapshot(projectId: string, url?: string): Promise<{ snapshot: any }> {
+    return request<{ snapshot: any }>(`/${projectId}/quality/devtools/snapshot`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  async analyzeDevToolsErrorWithAi(projectId: string, errorLogId?: string): Promise<{ analysis: any }> {
+    return request<{ analysis: any }>(`/${projectId}/quality/devtools/analyze-ai`, {
+      method: "POST",
+      body: JSON.stringify({ errorLogId }),
+    });
+  },
+
+  // Modules 53–56: DevOps, Observability, Security & Feature Flags Platform
+  // Module 53: Preview Environment Manager
+  async listPreviewEnvironments(projectId: string): Promise<{ environments: any[] }> {
+    return request<{ environments: any[] }>(`/${projectId}/devops/previews`);
+  },
+
+  async createPreviewEnvironment(projectId: string, payload: any): Promise<{ environment: any }> {
+    return request<{ environment: any }>(`/${projectId}/devops/previews`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deployPreviewEnvironment(projectId: string, envId: string): Promise<{ environment: any }> {
+    return request<{ environment: any }>(`/${projectId}/devops/previews/${envId}/deploy`, {
+      method: "POST",
+    });
+  },
+
+  async extendPreviewTtl(projectId: string, envId: string, additionalHours: number = 24): Promise<{ environment: any }> {
+    return request<{ environment: any }>(`/${projectId}/devops/previews/${envId}/extend-ttl`, {
+      method: "POST",
+      body: JSON.stringify({ additionalHours }),
+    });
+  },
+
+  async teardownPreviewEnvironment(projectId: string, envId: string): Promise<{ success: boolean; id: string }> {
+    return request<{ success: boolean; id: string }>(`/${projectId}/devops/previews/${envId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async promotePreviewEnvironment(projectId: string, envId: string, targetEnvironment: "staging" | "production" = "staging"): Promise<{ promotion: any }> {
+    return request<{ promotion: any }>(`/${projectId}/devops/previews/${envId}/promote`, {
+      method: "POST",
+      body: JSON.stringify({ targetEnvironment }),
+    });
+  },
+
+  // Module 54: Developer Observability
+  async queryObservabilityLogs(projectId: string, filter?: any): Promise<{ logs: any[] }> {
+    const params = new URLSearchParams(filter || {});
+    return request<{ logs: any[] }>(`/${projectId}/devops/observability/logs?${params.toString()}`);
+  },
+
+  async getApmMetrics(projectId: string): Promise<{ metrics: any }> {
+    return request<{ metrics: any }>(`/${projectId}/devops/observability/metrics`);
+  },
+
+  async getTrace(projectId: string, traceId: string): Promise<{ trace: any }> {
+    return request<{ trace: any }>(`/${projectId}/devops/observability/traces/${traceId}`);
+  },
+
+  async listObservabilityIssues(projectId: string, status?: string): Promise<{ issues: any[] }> {
+    const query = status ? `?status=${status}` : "";
+    return request<{ issues: any[] }>(`/${projectId}/devops/observability/issues${query}`);
+  },
+
+  async updateObservabilityIssue(projectId: string, issueId: string, status: string): Promise<{ issue: any }> {
+    return request<{ issue: any }>(`/${projectId}/devops/observability/issues/${issueId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async diagnoseObservabilityIssue(projectId: string, issueId: string): Promise<{ diagnostic: any }> {
+    return request<{ diagnostic: any }>(`/${projectId}/devops/observability/issues/${issueId}/diagnose`, {
+      method: "POST",
+    });
+  },
+
+  // Module 55: Application Security Scanning
+  async runSecurityScan(projectId: string, scanType: string = "FULL", policy?: any): Promise<{ scan: any }> {
+    return request<{ scan: any }>(`/${projectId}/devops/security/scan`, {
+      method: "POST",
+      body: JSON.stringify({ scanType, policy }),
+    });
+  },
+
+  async getLatestSecurityScan(projectId: string): Promise<{ scan: any }> {
+    return request<{ scan: any }>(`/${projectId}/devops/security/latest`);
+  },
+
+  async listSecurityScans(projectId: string): Promise<{ scans: any[] }> {
+    return request<{ scans: any[] }>(`/${projectId}/devops/security/scans`);
+  },
+
+  async generateSecurityRemediation(projectId: string, findingId: string): Promise<{ remediation: any }> {
+    return request<{ remediation: any }>(`/${projectId}/devops/security/remediate`, {
+      method: "POST",
+      body: JSON.stringify({ findingId }),
+    });
+  },
+
+  // Module 56: Feature Flags & Remote Configuration
+  async listFeatureFlags(projectId: string): Promise<{ flags: any[] }> {
+    return request<{ flags: any[] }>(`/${projectId}/devops/flags`);
+  },
+
+  async createFeatureFlag(projectId: string, payload: any): Promise<{ flag: any }> {
+    return request<{ flag: any }>(`/${projectId}/devops/flags`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async toggleFeatureFlag(projectId: string, key: string, isEnabled: boolean): Promise<{ flag: any }> {
+    return request<{ flag: any }>(`/${projectId}/devops/flags/${key}/toggle`, {
+      method: "POST",
+      body: JSON.stringify({ isEnabled }),
+    });
+  },
+
+  async deleteFeatureFlag(projectId: string, key: string): Promise<{ success: boolean; key: string }> {
+    return request<{ success: boolean; key: string }>(`/${projectId}/devops/flags/${key}`, {
+      method: "DELETE",
+    });
+  },
+
+  async evaluateFeatureFlags(projectId: string, context?: any): Promise<{ flags: Record<string, any> }> {
+    return request<{ flags: Record<string, any> }>(`/${projectId}/devops/flags/evaluate`, {
+      method: "POST",
+      body: JSON.stringify(context || {}),
+    });
+  },
+
+  async listRemoteConfigs(projectId: string, environment?: string): Promise<{ configs: any[] }> {
+    const query = environment ? `?environment=${environment}` : "";
+    return request<{ configs: any[] }>(`/${projectId}/devops/config${query}`);
+  },
+
+  async setRemoteConfig(projectId: string, payload: any): Promise<{ config: any }> {
+    return request<{ config: any }>(`/${projectId}/devops/config`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteRemoteConfig(projectId: string, key: string, environment?: string): Promise<{ success: boolean; key: string }> {
+    const query = environment ? `?environment=${environment}` : "";
+    return request<{ success: boolean; key: string }>(`/${projectId}/devops/config/${key}${query}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Modules 62–64: Intelligence, Optimization, Recovery & Architecture Platform
+  // Module 62: Optimization Engine
+  async runOptimizationAudit(projectId: string): Promise<{ audit: any }> {
+    return request<{ audit: any }>(`/${projectId}/intelligence/optimization/audit`, {
+      method: "POST",
+    });
+  },
+
+  async getLatestOptimizationAudit(projectId: string): Promise<{ audit: any }> {
+    return request<{ audit: any }>(`/${projectId}/intelligence/optimization/latest`);
+  },
+
+  async listOptimizationAudits(projectId: string): Promise<{ audits: any[] }> {
+    return request<{ audits: any[] }>(`/${projectId}/intelligence/optimization/audits`);
+  },
+
+  async generateOptimizationPatch(projectId: string, recId: string): Promise<{ patch: any }> {
+    return request<{ patch: any }>(`/${projectId}/intelligence/optimization/patch/${recId}`, {
+      method: "POST",
+    });
+  },
+
+  // Module 63: Project Snapshot / Checkpoint / Recovery
+  async createProjectCheckpoint(projectId: string, payload: any): Promise<{ checkpoint: any }> {
+    return request<{ checkpoint: any }>(`/${projectId}/intelligence/checkpoints`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listProjectCheckpoints(projectId: string, tag?: string): Promise<{ checkpoints: any[] }> {
+    const query = tag ? `?tag=${tag}` : "";
+    return request<{ checkpoints: any[] }>(`/${projectId}/intelligence/checkpoints${query}`);
+  },
+
+  async getProjectCheckpoint(projectId: string, checkpointId: string): Promise<{ checkpoint: any }> {
+    return request<{ checkpoint: any }>(`/${projectId}/intelligence/checkpoints/${checkpointId}`);
+  },
+
+  async diffProjectCheckpoint(projectId: string, checkpointId: string): Promise<{ diff: any }> {
+    return request<{ diff: any }>(`/${projectId}/intelligence/checkpoints/${checkpointId}/diff`);
+  },
+
+  async rollbackProjectCheckpoint(projectId: string, checkpointId: string): Promise<{ rollback: any }> {
+    return request<{ rollback: any }>(`/${projectId}/intelligence/checkpoints/${checkpointId}/rollback`, {
+      method: "POST",
+    });
+  },
+
+  async restoreProjectSingleFile(projectId: string, checkpointId: string, filePath: string): Promise<{ restored: any }> {
+    return request<{ restored: any }>(`/${projectId}/intelligence/checkpoints/${checkpointId}/restore-file`, {
+      method: "POST",
+      body: JSON.stringify({ filePath }),
+    });
+  },
+
+  async exportDisasterRecoveryBundle(projectId: string, checkpointId: string): Promise<{ bundle: any }> {
+    return request<{ bundle: any }>(`/${projectId}/intelligence/checkpoints/${checkpointId}/export`);
+  },
+
+  async importDisasterRecoveryBundle(projectId: string, bundle: any): Promise<{ rollback: any }> {
+    return request<{ rollback: any }>(`/${projectId}/intelligence/checkpoints/import`, {
+      method: "POST",
+      body: JSON.stringify({ bundle }),
+    });
+  },
+
+  // Module 64: Architecture Visualization
+  async getArchitectureGraph(projectId: string, layer: string = "ALL"): Promise<{ graph: any }> {
+    return request<{ graph: any }>(`/${projectId}/intelligence/architecture/graph?layer=${layer}`);
+  },
 };
+
 

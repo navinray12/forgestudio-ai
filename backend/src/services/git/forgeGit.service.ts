@@ -33,6 +33,20 @@ function calculateGitHash(content: string, type: "blob" | "commit" | "tree" = "b
 }
 
 /**
+ * Safely parse JSON/native array fields (e.g. staged, tree, stagedFiles)
+ */
+function parseGitArray<T = any>(val: any): T[] {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+}
+
+/**
  * Normalize and validate branch name
  */
 export function validateBranchName(name: string): string {
@@ -165,13 +179,12 @@ export async function getStatus(projectId: string): Promise<GitStatusResult> {
     : null;
 
   const headTreeMap = new Map<string, string>();
-  if (headCommitRecord && headCommitRecord.tree) {
-    for (const item of headCommitRecord.tree as Array<{ path: string; hash: string }>) {
-      headTreeMap.set(item.path, item.hash);
-    }
+  const headTree = parseGitArray<{ path: string; hash: string }>(headCommitRecord?.tree);
+  for (const item of headTree) {
+    headTreeMap.set(item.path, item.hash);
   }
 
-  const stagedList: GitFileStatus[] = (repo.staged as GitFileStatus[]) || [];
+  const stagedList: GitFileStatus[] = parseGitArray<GitFileStatus>(repo.staged);
   const stagedMap = new Map<string, GitFileStatus>();
   for (const s of stagedList) {
     stagedMap.set(s.path, s);
@@ -301,7 +314,7 @@ export async function unstageFiles(
   userId?: string
 ): Promise<GitStatusResult> {
   const repo = await getRepository(projectId);
-  let stagedList: GitFileStatus[] = (repo.staged as GitFileStatus[]) || [];
+  let stagedList: GitFileStatus[] = parseGitArray<GitFileStatus>(repo.staged);
 
   if (paths === "all") {
     stagedList = [];
@@ -333,7 +346,7 @@ export async function commit(
   }
 
   const repo = await getRepository(projectId);
-  const staged: GitFileStatus[] = (repo.staged as GitFileStatus[]) || [];
+  const staged: GitFileStatus[] = parseGitArray<GitFileStatus>(repo.staged);
 
   if (staged.length === 0) {
     throw new AppError("Nothing to commit (working tree clean, no staged changes)", 400, "NOTHING_TO_COMMIT");
@@ -640,7 +653,7 @@ export async function getFileHistory(
 
   const matchingCommits: GitCommitEntity[] = [];
   for (const c of commits) {
-    const tree = (c.tree as Array<{ path: string }>) || [];
+    const tree = parseGitArray<{ path: string }>(c.tree);
     if (tree.some((t) => t.path === filePath)) {
       matchingCommits.push(c);
       if (matchingCommits.length >= limit) break;
@@ -699,8 +712,8 @@ export async function mergeBranch(
   }
 
   // Detect conflicts: overlapping modified files
-  const currentFiles = new Map((currentCommit.tree as any[] || []).map((t) => [t.path, t.hash]));
-  const sourceFiles = new Map((sourceCommit.tree as any[] || []).map((t) => [t.path, t.hash]));
+  const currentFiles = new Map(parseGitArray<{ path: string; hash: string }>(currentCommit.tree).map((t) => [t.path, t.hash]));
+  const sourceFiles = new Map(parseGitArray<{ path: string; hash: string }>(sourceCommit.tree).map((t) => [t.path, t.hash]));
   const conflicts: string[] = [];
 
   for (const [path, sHash] of sourceFiles.entries()) {

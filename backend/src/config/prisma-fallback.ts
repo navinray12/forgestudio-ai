@@ -60,6 +60,57 @@ const MODEL_TO_TABLE: Record<string, string> = {
   forgeAiCheckpoint: "forge_ai_checkpoints",
   forgeMcpServer: "forge_mcp_servers",
   forgeMcpExecution: "forge_mcp_executions",
+  forgeAiContextSnapshot: "forge_ai_context_snapshots",
+  forgeAiProjectMemory: "forge_ai_project_memories",
+  forgeAiMemoryConflict: "forge_ai_memory_conflicts",
+  forgeAiPlan: "forge_ai_plans",
+  forgeAiArchitectureSnapshot: "forge_ai_architecture_snapshots",
+  forgeAiArchitectureFinding: "forge_ai_architecture_findings",
+  forgeAiTask: "forge_ai_tasks",
+  forgeAiRun: "forge_ai_runs",
+  forgeAiRunStep: "forge_ai_run_steps",
+  forgeAiEvent: "forge_ai_events",
+  forgeAiArtifact: "forge_ai_artifacts",
+  forgeAiAgentHandoff: "forge_ai_agent_handoffs",
+  forgeDatabase: "forge_databases",
+  forgeDatabaseMigration: "forge_database_migrations",
+  forgeDatabaseBackup: "forge_database_backups",
+  forgeQueryLog: "forge_query_logs",
+  forgeApiConfig: "forge_api_configs",
+  forgeStorageBucket: "forge_storage_buckets",
+  forgeStorageObject: "forge_storage_objects",
+  forgeStorageMultipartSession: "forge_storage_multipart_sessions",
+  forgeServerlessFunction: "forge_serverless_functions",
+  forgeFunctionInvocation: "forge_function_invocations",
+  forgeTaskQueue: "forge_task_queues",
+  forgeQueueJob: "forge_queue_jobs",
+  forgeCronSchedule: "forge_cron_schedules",
+  forgeCronExecution: "forge_cron_executions",
+  forgeEventTopic: "forge_event_topics",
+  forgeEventSubscription: "forge_event_subscriptions",
+  forgeEvent: "forge_events",
+  forgeWebhookDelivery: "forge_webhook_deliveries",
+  forgeRealtimeChannel: "forge_realtime_channels",
+  forgeKvNamespace: "forge_kv_namespaces",
+  forgeKvEntry: "forge_kv_entries",
+  forgeApiGatewayRoute: "forge_api_gateway_routes",
+  forgeSchemaRegistry: "forge_schema_registry",
+  forgeTestSuite: "forge_test_suites",
+  forgeTestRun: "forge_test_runs",
+  forgeApiCollection: "forge_api_collections",
+  forgeApiTestRequest: "forge_api_test_requests",
+  forgeApiTestRun: "forge_api_test_runs",
+  forgeRuntimeSnapshot: "forge_runtime_snapshots",
+  forgePreviewEnvironment: "forge_preview_environments",
+  forgeObservabilityLog: "forge_observability_logs",
+  forgeObservabilitySpan: "forge_observability_spans",
+  forgeObservabilityIssue: "forge_observability_issues",
+  forgeSecurityScan: "forge_security_scans",
+  forgeFeatureFlag: "forge_feature_flags",
+  forgeRemoteConfig: "forge_remote_configs",
+  forgeOptimizationAudit: "forge_optimization_audits",
+  forgeProjectCheckpoint: "forge_project_checkpoints",
+  forgeCheckpointRestore: "forge_checkpoint_restores",
 };
 
 function quoteCol(col: string): string {
@@ -472,6 +523,151 @@ async function hydrateTeams(teams: any[], include: any) {
   return teams;
 }
 
+const NATIVE_ARRAY_COLUMNS = new Set([
+  "parentHashes",
+  "roles",
+  "tags",
+  "relatedFiles",
+  "relatedSymbols",
+  "relatedModules",
+  "affectedFiles",
+  "dependencies",
+  "issueLinks",
+  "allowedOperations",
+  "allowedMimeTypes",
+  "corsOrigins",
+]);
+
+function serializeColumnValue(key: string, val: any): any {
+  if (val === undefined || val === null || val instanceof Date) {
+    return val;
+  }
+  if (Array.isArray(val)) {
+    if (NATIVE_ARRAY_COLUMNS.has(key)) {
+      return val;
+    }
+    return JSON.stringify(val);
+  }
+  if (typeof val === "object") {
+    return JSON.stringify(val);
+  }
+  return val;
+}
+
+const JSON_ARRAY_COLUMNS = new Set([
+  "staged",
+  "tree",
+  "stagedFiles",
+  "unstagedFiles",
+  "filesSnapshot",
+  "steps",
+  "diagnostics",
+  "logs",
+  "dnsRecords",
+  "stages",
+  "sources",
+  "items",
+  "assumptions",
+  "constraints",
+  "circularDependencies",
+  "layerViolations",
+  "duplicatedModules",
+  "architectureDrift",
+  "recommendations",
+  "artifactsPassed",
+  "parts",
+  "assertions",
+  "consoleLogs",
+  "networkLogs",
+  "events",
+  "findings",
+  "targetingRules",
+  "restoreLog",
+  "filesSnapshot",
+]);
+
+const JSON_OBJECT_COLUMNS = new Set([
+  "author",
+  "committer",
+  "diffSummary",
+  "remotes",
+  "tagger",
+  "settings",
+  "metadata",
+  "config",
+  "state",
+  "result",
+  "parameters",
+  "provenance",
+  "explainability",
+  "testStrategy",
+  "couplingMetrics",
+  "diagramData",
+  "contextSummary",
+  "orchestrationPlan",
+  "tokenUsage",
+  "inputPayload",
+  "outputPayload",
+  "payload",
+  "data",
+  "previousResult",
+  "dataJson",
+  "envVars",
+  "requestPayload",
+  "responsePayload",
+  "targetPayload",
+  "schemaDefinition",
+  "destinationConfig",
+  "filterPolicy",
+  "requestHeaders",
+  "value",
+  "variables",
+  "headers",
+  "params",
+  "body",
+  "auth",
+  "domTree",
+  "vitals",
+  "storage",
+  "coverage",
+  "aiDiagnostic",
+  "attributes",
+  "sampleMetadata",
+  "environmentOverrides",
+  "defaultValue",
+  "manifestSnapshot",
+  "databaseSnapshot",
+  "configSnapshot",
+]);
+
+function deserializeRecord(record: any): any {
+  if (!record || typeof record !== "object") return record;
+
+  for (const [key, val] of Object.entries(record)) {
+    if (JSON_ARRAY_COLUMNS.has(key)) {
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          record[key] = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          record[key] = [];
+        }
+      } else if (!Array.isArray(val)) {
+        // If stored as {} in DB or null/non-array, normalize to []
+        record[key] = [];
+      }
+    } else if (JSON_OBJECT_COLUMNS.has(key)) {
+      if (typeof val === "string") {
+        try {
+          record[key] = JSON.parse(val);
+        } catch {}
+      }
+    }
+  }
+
+  return record;
+}
+
 export function createFallbackModelDelegate(modelName: string) {
   const table = MODEL_TO_TABLE[modelName];
   if (!table) return undefined;
@@ -522,7 +718,7 @@ export function createFallbackModelDelegate(modelName: string) {
         await hydrateTeams(rows, args?.include);
       }
 
-      return rows;
+      return rows.map(deserializeRecord);
     },
 
     async findUnique(args: { where: any; include?: any; select?: any }): Promise<any | null> {
@@ -550,7 +746,7 @@ export function createFallbackModelDelegate(modelName: string) {
         ]);
         record.author = u.rows[0] || null;
       }
-      return record;
+      return deserializeRecord(record);
     },
 
     async findFirst(args?: { where?: any; include?: any; select?: any; orderBy?: any }): Promise<any | null> {
@@ -572,7 +768,7 @@ export function createFallbackModelDelegate(modelName: string) {
       if (table === "support_tickets") {
         await hydrateTickets([record], args?.include);
       }
-      return record;
+      return deserializeRecord(record);
     },
 
     async create(args: { data: any; include?: any }): Promise<any> {
@@ -583,11 +779,7 @@ export function createFallbackModelDelegate(modelName: string) {
       for (const [key, val] of Object.entries(args.data)) {
         if (val === undefined) continue;
         cols.push(quoteCol(key));
-        values.push(
-          typeof val === "object" && val !== null && !(val instanceof Date) && !Array.isArray(val)
-            ? JSON.stringify(val)
-            : val
-        );
+        values.push(serializeColumnValue(key, val));
         placeholders.push(`$${values.length}`);
       }
 
@@ -604,7 +796,7 @@ export function createFallbackModelDelegate(modelName: string) {
         record.author = u.rows[0] || null;
       }
 
-      return record;
+      return deserializeRecord(record);
     },
 
     async update(args: { where: any; data: any; include?: any }): Promise<any> {
@@ -613,11 +805,7 @@ export function createFallbackModelDelegate(modelName: string) {
 
       for (const [key, val] of Object.entries(args.data)) {
         if (val === undefined) continue;
-        values.push(
-          typeof val === "object" && val !== null && !(val instanceof Date) && !Array.isArray(val)
-            ? JSON.stringify(val)
-            : val
-        );
+        values.push(serializeColumnValue(key, val));
         setParts.push(`${quoteCol(key)} = $${values.length}`);
       }
 
@@ -632,7 +820,7 @@ export function createFallbackModelDelegate(modelName: string) {
       if (table === "support_tickets") {
         await hydrateTickets([record], args?.include);
       }
-      return record;
+      return deserializeRecord(record);
     },
 
     async delete(args: { where: any }): Promise<any> {
@@ -640,7 +828,7 @@ export function createFallbackModelDelegate(modelName: string) {
       const whereClause = buildWhereClause(args.where, params);
       const sql = `DELETE FROM ${table} ${whereClause} RETURNING *`;
       const { rows } = await getPool().query(sql, params);
-      return rows[0] || null;
+      return rows[0] ? deserializeRecord(rows[0]) : null;
     },
 
     async groupBy(args: { by: string[]; where?: any; _count?: Record<string, boolean> }): Promise<any[]> {

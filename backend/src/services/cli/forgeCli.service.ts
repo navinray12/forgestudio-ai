@@ -14,6 +14,27 @@ import { forgeHostingService } from "../hosting/forgeHosting.service.js";
 import { forgeGitService } from "../git/forgeGit.service.js";
 import { forgeGithubService } from "../git/forgeGithub.service.js";
 import { recordAuditLog } from "../audit.service.js";
+import { forgeDatabaseService } from "../../modules/data-platform/database/forgeDatabase.service.js";
+import { databaseStudioService } from "../../modules/data-platform/studio/databaseStudio.service.js";
+import { dataApiService } from "../../modules/data-platform/api-layer/dataApi.service.js";
+import { objectStorageService } from "../../modules/data-platform/storage/objectStorage.service.js";
+import { migrationEngine } from "../../modules/data-platform/database/migrationEngine.js";
+import { serverlessFunctionService } from "../../modules/runtime-platform/functions/serverlessFunction.service.js";
+import { taskQueueService } from "../../modules/runtime-platform/queues/taskQueue.service.js";
+import { cronEngineService } from "../../modules/runtime-platform/scheduler/cronEngine.service.js";
+import { eventBusService } from "../../modules/runtime-platform/events/eventBus.service.js";
+import { kvLayerService } from "../../modules/runtime-platform/kv/kvLayer.service.js";
+import { apiGatewayService } from "../../modules/runtime-platform/gateway/apiGateway.service.js";
+import { forgeTestRunnerService } from "../../modules/quality-platform/testing/forgeTestRunner.service.js";
+import { apiTestingStudioService } from "../../modules/quality-platform/api-testing/apiTestingStudio.service.js";
+import { browserDevToolsService } from "../../modules/quality-platform/browser-devtools/browserDevTools.service.js";
+import { previewEnvironmentService } from "../../modules/devops-platform/preview/previewEnvironment.service.js";
+import { developerObservabilityService } from "../../modules/devops-platform/observability/developerObservability.service.js";
+import { applicationSecurityService } from "../../modules/devops-platform/security/applicationSecurity.service.js";
+import { featureFlagsService } from "../../modules/devops-platform/feature-flags/featureFlags.service.js";
+import { optimizationEngineService } from "../../modules/intelligence-platform/optimization/optimizationEngine.service.js";
+import { projectRecoveryService } from "../../modules/intelligence-platform/recovery/projectRecovery.service.js";
+import { architectureVisualizationService } from "../../modules/intelligence-platform/architecture-viz/architectureVisualization.service.js";
 
 const db = prisma as any;
 const CLI_VERSION = "2.4.0";
@@ -45,12 +66,16 @@ export interface CliOptions {
  * Main CLI Command Dispatcher
  */
 export async function runCliCommand(
-  args: string[],
+  input: string | string[],
   options: CliOptions = {}
 ): Promise<CliExecutionResult> {
-  const jsonMode = options.json || args.includes("--json");
-  const nonInteractive = options.nonInteractive || args.includes("--non-interactive") || !!process.env.CI;
-  const filteredArgs = args.filter((a) => a !== "--json" && a !== "--non-interactive");
+  let rawArgs = Array.isArray(input) ? input : input.trim().split(/\s+/).filter(Boolean);
+  if (rawArgs[0] === "forge") {
+    rawArgs = rawArgs.slice(1);
+  }
+  const jsonMode = options.json || rawArgs.includes("--json");
+  const nonInteractive = options.nonInteractive || rawArgs.includes("--non-interactive") || !!process.env.CI;
+  const filteredArgs = rawArgs.filter((a) => a !== "--json" && a !== "--non-interactive");
 
   const command = filteredArgs[0] || "help";
   const subCommand = filteredArgs[1] || "";
@@ -178,7 +203,7 @@ Flags:
       // 18.6 forge import
       case "import": {
         const repoUrl = subCommand;
-        if (!repoUrl) throw new AppError("Repository URL required for import: forge import <repoUrl>", 400);
+        if (!repoUrl) throw new AppError("Repository URL required for import: forge import <repoUrl>", 400, "INVALID_INPUT");
         const imported = await forgeGithubService.importRepository({ repoUrl }, options.userId);
         resultData = imported;
         stdout = `Imported repository ${repoUrl} into project ${imported.project.name} (${imported.project.id})`;
@@ -291,26 +316,387 @@ Flags:
 
       // 18.14 forge db
       case "db": {
+        const projId = options.projectId || (await getFirstProjectId());
         const action = subCommand || "status";
-        resultData = {
-          engine: "PostgreSQL 16",
-          status: "HEALTHY",
-          migrationsApplied: 24,
-          poolConnections: 5,
-        };
-        stdout = `Database engine: PostgreSQL 16 (HEALTHY) - 24 self-healing migrations applied`;
+        const dbEntity = await forgeDatabaseService.getDatabase(projId, "development");
+
+        if (action === "status") {
+          const metrics = await forgeDatabaseService.getDatabaseMetrics(dbEntity.id);
+          resultData = metrics;
+          stdout = `Database Engine: PostgreSQL ${dbEntity.engineVersion} (Status: ${metrics.status})\nSchema: ${dbEntity.schemaName}\nTables: ${metrics.tableCount} | Storage: ${(metrics.storageUsedBytes / 1024).toFixed(1)} KB / ${(metrics.storageLimitBytes / (1024 * 1024)).toFixed(0)} MB`;
+        } else if (action === "schema") {
+          const tables = await forgeDatabaseService.listTables(dbEntity.id);
+          resultData = { tables };
+          stdout = `Tables in ${dbEntity.schemaName}:\n` + tables.map((t) => `  - ${t.name} (${t.rowCount} rows, ${(t.sizeBytes / 1024).toFixed(1)} KB)`).join("\n");
+        } else if (action === "query") {
+          const sql = subArgs.join(" ") || "SELECT 1 as ping";
+          const queryRes = await databaseStudioService.executeSqlQuery(dbEntity.id, options.userId || null, sql);
+          resultData = queryRes;
+          stdout = `Query returned ${queryRes.rowCount} row(s) in ${queryRes.durationMs}ms\n` + JSON.stringify(queryRes.rows, null, 2);
+        } else if (action === "migrate") {
+          const migrations = await migrationEngine.listMigrations(dbEntity.id);
+          const pending = migrations.filter((m) => m.status === "PENDING");
+          for (const m of pending) {
+            await migrationEngine.applyMigration(dbEntity.id, m.id);
+          }
+          resultData = { applied: pending.length };
+          stdout = `Applied ${pending.length} pending migration(s) successfully.`;
+        } else if (action === "backup") {
+          const backup = await forgeDatabaseService.createBackup(dbEntity.id, subArgs[0] || "cli-manual-backup");
+          resultData = backup;
+          stdout = `Backup created successfully. ID: ${backup.id} (Size: ${(backup.sizeBytes / 1024).toFixed(1)} KB)`;
+        }
+        break;
+      }
+
+      // forge storage
+      case "storage": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+
+        if (action === "list") {
+          const buckets = await objectStorageService.listBuckets(projId);
+          resultData = { buckets };
+          stdout = `Storage Buckets:\n` + buckets.map((b) => `  - ${b.name} (${b.objectCount} objects, ${(b.currentSizeBytes / 1024).toFixed(1)} KB)`).join("\n");
+        } else if (action === "upload") {
+          const bucketName = subArgs[0] || "default";
+          const key = subArgs[1] || "sample.txt";
+          const content = subArgs.slice(2).join(" ") || "Forge storage CLI content";
+          const uploaded = await objectStorageService.uploadObject(
+            projId,
+            bucketName,
+            key,
+            key,
+            Buffer.from(content, "utf8")
+          );
+          resultData = uploaded;
+          stdout = `Uploaded object '${key}' to bucket '${bucketName}' (Size: ${uploaded.sizeBytes} bytes, SHA256: ${uploaded.sha256?.slice(0, 12)}...)`;
+        }
+        break;
+      }
+
+      // forge api
+      case "api": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const dbEntity = await forgeDatabaseService.getDatabase(projId, "development");
+        const action = subCommand || "inspect";
+
+        if (action === "inspect" || action === "list") {
+          const configs = await dataApiService.getApiConfigs(dbEntity.id, projId);
+          resultData = { configs };
+          stdout = `Generated Project Data APIs:\n` + configs.map((c) => `  ${c.allowedOperations.join(",")} /api/v1/projects/${projId}/data/${c.tableName}`).join("\n");
+        } else if (action === "openapi") {
+          const spec = await dataApiService.generateOpenApiSpec(projId, dbEntity.id);
+          resultData = spec;
+          stdout = JSON.stringify(spec, null, 2);
+        }
+        break;
+      }
+
+      // forge fn
+      case "fn": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const fns = await serverlessFunctionService.listFunctions(projId);
+          resultData = { functions: fns };
+          stdout = `Registered Functions (${fns.length}):\n` + fns.map((f) => `  ${f.name} [${f.status}] runtime: ${f.runtime}`).join("\n");
+        } else if (action === "invoke") {
+          const fnName = subArgs[0];
+          const payload = subArgs[1] ? JSON.parse(subArgs[1]) : {};
+          const res = await serverlessFunctionService.invokeFunction(projId, fnName, payload, "MANUAL");
+          resultData = res;
+          stdout = `Function '${fnName}' Invocation Status: ${res.status} (${res.durationMs}ms)\nOutput: ${JSON.stringify(res.responsePayload, null, 2)}`;
+        }
+        break;
+      }
+
+      // forge queue
+      case "queue": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const queues = await taskQueueService.listQueues(projId);
+          resultData = { queues };
+          stdout = `Active Task Queues (${queues.length}):\n` + queues.map((q) => `  ${q.name} (Concurrency: ${q.concurrency}, Retries: ${q.maxRetries})`).join("\n");
+        } else if (action === "enqueue") {
+          const queueName = subArgs[0];
+          const jobName = subArgs[1] || "cli-job";
+          const payload = subArgs[2] ? JSON.parse(subArgs[2]) : {};
+          const job = await taskQueueService.enqueueJob(projId, queueName, { name: jobName, payload });
+          resultData = { job };
+          stdout = `Enqueued job '${job.id}' into queue '${queueName}' with priority ${job.priority}`;
+        }
+        break;
+      }
+
+      // forge cron
+      case "cron": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const schedules = await cronEngineService.listSchedules(projId);
+          resultData = { schedules };
+          stdout = `Cron Schedules (${schedules.length}):\n` + schedules.map((s) => `  ${s.name} [${s.cronExpression}] -> ${s.targetType}:${s.targetDestination}`).join("\n");
+        } else if (action === "trigger") {
+          const scheduleName = subArgs[0];
+          const exec = await cronEngineService.executeSchedule(projId, scheduleName, true);
+          resultData = { execution: exec };
+          stdout = `Triggered schedule '${scheduleName}' -> Status: ${exec.status} (${exec.durationMs}ms)`;
+        }
+        break;
+      }
+
+      // forge event
+      case "event": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "topics";
+        if (action === "topics" || action === "list") {
+          const topics = await eventBusService.listTopics(projId);
+          resultData = { topics };
+          stdout = `Event Topics (${topics.length}):\n` + topics.map((t) => `  ${t.name}`).join("\n");
+        } else if (action === "publish") {
+          const topicName = subArgs[0];
+          const eventName = subArgs[1] || "cli.event";
+          const payload = subArgs[2] ? JSON.parse(subArgs[2]) : {};
+          const pub = await eventBusService.publishEvent(projId, topicName, { eventName, payload });
+          resultData = pub;
+          stdout = `Published event '${eventName}' to topic '${topicName}' (Delivered to ${pub.deliveredCount} subscribers)`;
+        }
+        break;
+      }
+
+      // forge kv
+      case "kv": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "namespaces";
+        if (action === "namespaces" || action === "list") {
+          const nss = await kvLayerService.listNamespaces(projId);
+          resultData = { namespaces: nss };
+          stdout = `KV Namespaces (${nss.length}):\n` + nss.map((n) => `  ${n.name}`).join("\n");
+        } else if (action === "get") {
+          const ns = subArgs[0];
+          const key = subArgs[1];
+          const val = await kvLayerService.get(projId, ns, key);
+          resultData = { key, value: val };
+          stdout = JSON.stringify(val, null, 2);
+        } else if (action === "set") {
+          const ns = subArgs[0];
+          const key = subArgs[1];
+          const val = subArgs[2] ? JSON.parse(subArgs[2]) : subArgs[2];
+          const entry = await kvLayerService.set(projId, ns, { key, value: val });
+          resultData = { entry };
+          stdout = `Set KV [${ns}] ${key} = ${JSON.stringify(val)}`;
+        }
+        break;
+      }
+
+      // forge gateway
+      case "gateway": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const routes = await apiGatewayService.listRoutes(projId);
+        resultData = { routes };
+        stdout = `API Gateway Routes (${routes.length}):\n` + routes.map((r) => `  [${r.method}] ${r.path} -> ${r.targetType}:${r.targetDestination}`).join("\n");
+        break;
+      }
+
+      // forge test
+      case "test": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "run";
+        if (action === "suites" || action === "list") {
+          const suites = await forgeTestRunnerService.listTestSuites(projId);
+          resultData = { suites };
+          stdout = `Discovered Test Suites (${suites.length}):\n` + suites.map((s) => `  ${s.name} [${s.testType}] (${s.filePath})`).join("\n");
+        } else if (action === "run") {
+          const testRun = await forgeTestRunnerService.runTests(projId, { trigger: "CI" });
+          resultData = testRun;
+          stdout = `Test Run Complete: ${testRun.status} (${testRun.durationMs}ms)\n` +
+            `Total: ${testRun.total} | Passed: ${testRun.passed} | Failed: ${testRun.failed} | Skipped: ${testRun.skipped}\n` +
+            `Statements: ${testRun.coverage?.statements?.pct}% | Branches: ${testRun.coverage?.branches?.pct}%\n` +
+            testRun.results.map((r) => `  ${r.status === "PASSED" ? "✓" : "✗"} ${r.suiteName} > ${r.name}`).join("\n");
+        }
+        break;
+      }
+
+      // forge api-test
+      case "api-test": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "collections";
+        if (action === "collections" || action === "list") {
+          const colls = await apiTestingStudioService.listCollections(projId);
+          resultData = { collections: colls };
+          stdout = `API Test Collections (${colls.length}):\n` + colls.map((c) => `  ${c.name} (${c.id})`).join("\n");
+        } else if (action === "run") {
+          const collNameOrId = subArgs[0];
+          const colls = await apiTestingStudioService.listCollections(projId);
+          const target = colls.find((c) => c.name === collNameOrId || c.id === collNameOrId) || colls[0];
+          if (!target) {
+            stdout = "No API collections found to run.";
+            break;
+          }
+          const runRes = await apiTestingStudioService.runCollection(projId, target.id);
+          resultData = runRes;
+          stdout = `Collection Run [${target.name}]: ${runRes.status} (${runRes.durationMs}ms)\n` +
+            `Requests: ${runRes.totalRequests} | Passed Assertions: ${runRes.passedAssertions} | Failed: ${runRes.failedAssertions}\n` +
+            runRes.results.map((r) => `  [${r.statusCode}] ${r.method} ${r.url} -> ${r.status}`).join("\n");
+        }
+        break;
+      }
+
+      // forge devtools
+      case "devtools": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "state";
+        const state = browserDevToolsService.getRuntimeState(projId);
+        resultData = state;
+        stdout = `Runtime State for ${projId}:\n` +
+          `Console Logs: ${state.consoleLogs.length} | Network Traces: ${state.networkLogs.length}\n` +
+          `Vitals: LCP=${state.vitals.lcpMs}ms, FID=${state.vitals.fidMs}ms, CLS=${state.vitals.cls}, FCP=${state.vitals.fcpMs}ms`;
+        break;
+      }
+
+      // forge preview
+      case "preview": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const list = await previewEnvironmentService.listPreviewEnvironments(projId);
+          resultData = { previews: list };
+          stdout = `Preview Environments (${list.length}):\n` +
+            list.map((p) => `  [${p.status}] ${p.name} (${p.branch}) -> ${p.url}`).join("\n");
+        } else if (action === "create") {
+          const name = subArgs[0] || "feature-preview";
+          const branch = subArgs[1] || "feature";
+          const created = await previewEnvironmentService.createPreviewEnvironment(projId, { name, branch });
+          resultData = created;
+          stdout = `Created preview environment '${created.name}' (${created.slug}) -> ${created.url}`;
+        }
+        break;
+      }
+
+      // forge security
+      case "security": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "scan";
+        if (action === "scan") {
+          const scan = await applicationSecurityService.runSecurityScan(projId);
+          resultData = scan;
+          stdout = `Security Scan Complete: Score ${scan.score}/100 | Passed Gates: ${scan.passedGates ? "YES" : "NO"}\n` +
+            `Critical: ${scan.criticalCount} | High: ${scan.highCount} | Medium: ${scan.mediumCount} | Low: ${scan.lowCount}\n` +
+            (scan.findings || []).slice(0, 5).map((f) => `  [${f.severity}] ${f.ruleId}: ${f.title} (${f.filePath}:${f.lineNumber || 1})`).join("\n");
+        } else if (action === "latest" || action === "report") {
+          const latest = await applicationSecurityService.getLatestScan(projId);
+          resultData = { scan: latest };
+          stdout = latest
+            ? `Latest Security Scan: Score ${latest.score}/100 | Findings: ${latest.findings.length}`
+            : "No security scans on record.";
+        }
+        break;
+      }
+
+      // forge flags
+      case "flags": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const list = await featureFlagsService.listFlags(projId);
+          resultData = { flags: list };
+          stdout = `Feature Flags (${list.length}):\n` +
+            list.map((f) => `  [${f.isEnabled ? "ON" : "OFF"}] ${f.key} (${f.rolloutPercentage}%) -> ${f.name}`).join("\n");
+        } else if (action === "toggle") {
+          const key = subArgs[0];
+          if (!key) {
+            stdout = "Specify flag key to toggle.";
+            break;
+          }
+          const flag = await featureFlagsService.getFlag(projId, key);
+          const toggled = await featureFlagsService.toggleFlag(projId, key, !flag.isEnabled);
+          resultData = toggled;
+          stdout = `Flag '${key}' toggled to ${toggled.isEnabled ? "ENABLED" : "DISABLED"}`;
+        }
+        break;
+      }
+
+      // forge optimize
+      case "optimize": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "run";
+        if (action === "run") {
+          const audit = await optimizationEngineService.runOptimizationAudit(projId);
+          resultData = audit;
+          stdout = `Optimization Audit Complete: Score ${audit.score}/100\n` +
+            `Total Size: ${(audit.totalBytes / 1024).toFixed(1)} KB (Estimated Gzip: ${(audit.estimatedGzipBytes / 1024).toFixed(1)} KB)\n` +
+            `Heavy Deps: ${audit.heavyDepCount} | Dead Code: ${audit.deadCodeCount} | Recommendations: ${audit.recommendationsCount}\n` +
+            (audit.recommendations || []).slice(0, 5).map((r) => `  [${r.severity}] ${r.title}`).join("\n");
+        } else if (action === "latest") {
+          const latest = await optimizationEngineService.getLatestAudit(projId);
+          resultData = { audit: latest };
+          stdout = latest
+            ? `Latest Optimization Audit: Score ${latest.score}/100 | Recommendations: ${latest.recommendationsCount}`
+            : "No optimization audits found.";
+        }
+        break;
+      }
+
+      // forge checkpoint
+      case "checkpoint": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const action = subCommand || "list";
+        if (action === "list") {
+          const list = await projectRecoveryService.listCheckpoints(projId);
+          resultData = { checkpoints: list };
+          stdout = `Project Checkpoints (${list.length}):\n` +
+            list.map((c) => `  [${c.tag}] ${c.name} (${c.id}) - ${c.filesCount} files`).join("\n");
+        } else if (action === "create") {
+          const name = subArgs.join(" ") || "Manual Checkpoint";
+          const created = await projectRecoveryService.createCheckpoint(projId, { name, tag: "MANUAL", authorId: options.userId });
+          resultData = created;
+          stdout = `Created checkpoint '${created.name}' (${created.id}) with ${created.filesCount} files`;
+        } else if (action === "rollback") {
+          const chkId = subArgs[0];
+          if (!chkId) {
+            stdout = "Specify checkpoint ID to roll back to.";
+            break;
+          }
+          const rollback = await projectRecoveryService.rollbackToCheckpoint(projId, chkId, options.userId);
+          resultData = rollback;
+          stdout = `Rollback Complete (${rollback.status}): Restored ${rollback.filesRestoredCount} files in ${rollback.durationMs}ms`;
+        } else if (action === "diff") {
+          const chkId = subArgs[0];
+          if (!chkId) {
+            stdout = "Specify checkpoint ID to compare.";
+            break;
+          }
+          const diff = await projectRecoveryService.diffCheckpointWithWorkspace(projId, chkId);
+          resultData = diff;
+          stdout = `Checkpoint Diff: Total Changes: ${diff.totalChanges} (Added: ${diff.addedCount}, Modified: ${diff.modifiedCount}, Deleted: ${diff.deletedCount})\n` +
+            diff.diffs.filter((d) => d.status !== "UNCHANGED").map((d) => `  [${d.status}] ${d.path}`).join("\n");
+        }
+        break;
+      }
+
+      // forge arch
+      case "arch": {
+        const projId = options.projectId || (await getFirstProjectId());
+        const layer = subCommand ? (subCommand.toUpperCase() as any) : "ALL";
+        const graph = await architectureVisualizationService.generateArchitectureGraph(projId, layer);
+        resultData = graph;
+        stdout = `Architecture Topology [${graph.layer}]:\n` +
+          `Nodes: ${graph.summary.totalNodes} | Edges: ${graph.summary.totalEdges} | Components: ${graph.summary.componentCount} | Services: ${graph.summary.serviceCount}\n` +
+          `Circular Cycles: ${graph.summary.circularCount}\n` +
+          `Database Tables: ${graph.summary.databaseTablesCount}`;
         break;
       }
 
       // 18.15 forge logs
       case "logs": {
         const projId = options.projectId || (await getFirstProjectId());
-        const deps = await forgeHostingService.listDeployments(projId);
-        const latestLogs = deps[0]?.logs || [
-          { timestamp: new Date().toISOString(), stage: "runtime", level: "info", message: "Application running smoothly" },
-        ];
-        resultData = { logs: latestLogs };
-        stdout = latestLogs.map((l: any) => `[${l.stage}] [${l.level}] ${l.message}`).join("\n");
+        const obsLogs = await developerObservabilityService.queryLogs(projId, { limit: 20 });
+        resultData = { logs: obsLogs };
+        stdout = obsLogs.length > 0
+          ? obsLogs.map((l: any) => `[${l.source}] [${l.level.toUpperCase()}] ${l.message}`).join("\n")
+          : "No logs found for project.";
         break;
       }
 
@@ -419,13 +805,14 @@ Flags:
 }
 
 async function getFirstProjectId(): Promise<string> {
-  const projects = await forgeProjectService.listProjects();
+  const result = await forgeProjectService.listForgeProjects({ id: "cli-system", role: "ADMIN" });
+  const projects = result.items || [];
   if (projects.length === 0) {
-    const newProj = await forgeProjectService.createProject({
+    const newProj = await forgeProjectService.createForgeProject({
       name: "Default Workspace",
       slug: "default-workspace",
-      framework: "react",
       projectType: "REACT",
+      ownerId: "cli-system",
     });
     return newProj.id;
   }
