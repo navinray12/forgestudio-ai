@@ -122,6 +122,8 @@ model Website {
   aiChangesets        AiChangeset[]
   supportTickets      SupportTicket[]
   forumTopics         ForumTopic[]
+  projectDatabases    ProjectDatabase[]
+  storageBuckets      StorageBucket[]
 
   @@index([userId], map: "idx_websites_user_id")
   @@index([organizationId])
@@ -783,6 +785,8 @@ model Workspace {
   lifecycleStatus String @default("ACTIVE") @db.VarChar(20)
   version Int @default(1)
   archivedAt DateTime? @db.Timestamptz(6)
+  isDefault Boolean @default(false)
+  isArchived Boolean @default(false)
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String?           @db.Uuid
   name           String            @db.VarChar(255)
@@ -1708,6 +1712,156 @@ model ForumModerationEvent {
 
   @@index([topicId, createdAt])
   @@map("forum_moderation_events")
+}
+
+// ============================================================================
+// CATEGORY F: DATA & APPLICATION PLATFORM
+// ============================================================================
+
+enum DatabaseEnvironment {
+  DEVELOPMENT
+  PREVIEW
+  PRODUCTION
+}
+
+enum DatabaseProvisioningStatus {
+  PENDING
+  PROVISIONING
+  READY
+  FAILED
+  SUSPENDED
+}
+
+enum BucketVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ApiKeyType {
+  ANON
+  SERVICE_ROLE
+}
+
+model ProjectDatabase {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  websiteId            String                     @db.Uuid
+  environment          DatabaseEnvironment        @default(PRODUCTION)
+  status               DatabaseProvisioningStatus @default(PENDING)
+  dbName               String                     @db.VarChar(63)
+  dbUser               String                     @db.VarChar(63)
+  encryptedPassword    String                     @db.VarChar(500)
+  host                 String                     @db.VarChar(255)
+  port                 Int                        @default(5432)
+  connectionPoolMax    Int                        @default(10)
+  connectionPoolIdleMs Int                        @default(10000)
+  storageSizeBytes     BigInt                     @default(0)
+  lastBackupAt         DateTime?                  @db.Timestamptz(6)
+  metadata             Json                       @default("{}")
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                   @updatedAt @db.Timestamptz(6)
+
+  website              Website                    @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  migrations           DatabaseMigrationRecord[]
+  backups              ProjectDatabaseBackup[]
+  apiKeys              ProjectApiKey[]
+
+  @@unique([websiteId, environment])
+  @@index([status])
+  @@map("project_databases")
+}
+
+model ProjectDatabaseBackup {
+  id             String          @id @default(uuid()) @db.Uuid
+  databaseId     String          @db.Uuid
+  backupName     String          @db.VarChar(255)
+  storageKey     String          @db.VarChar(1000)
+  sizeBytes      BigInt
+  checksumSha256 String          @db.VarChar(64)
+  completedAt    DateTime        @default(now()) @db.Timestamptz(6)
+
+  database       ProjectDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId, completedAt])
+  @@map("project_database_backups")
+}
+
+model DatabaseMigrationRecord {
+  id              String          @id @default(uuid()) @db.Uuid
+  databaseId      String          @db.Uuid
+  migrationName   String          @db.VarChar(255)
+  batchNumber     Int             @default(1)
+  appliedByUserId String?         @db.Uuid
+  checksum        String          @db.VarChar(64)
+  sqlScript       String          @db.Text
+  executionTimeMs Int
+  appliedAt       DateTime        @default(now()) @db.Timestamptz(6)
+
+  database        ProjectDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@unique([databaseId, migrationName])
+  @@index([databaseId, batchNumber])
+  @@map("database_migration_records")
+}
+
+model ProjectApiKey {
+  id           String          @id @default(uuid()) @db.Uuid
+  databaseId   String          @db.Uuid
+  name         String          @db.VarChar(100)
+  keyType      ApiKeyType      @default(ANON)
+  tokenHash    String          @unique @db.VarChar(128)
+  prefix       String          @db.VarChar(16)
+  scopes       Json            @default("[\"data:read\", \"data:write\"]")
+  rateLimitRpm Int             @default(120)
+  expiresAt    DateTime?       @db.Timestamptz(6)
+  lastUsedAt   DateTime?       @db.Timestamptz(6)
+  revokedAt    DateTime?       @db.Timestamptz(6)
+  createdAt    DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(6)
+
+  database     ProjectDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId, keyType])
+  @@map("project_api_keys")
+}
+
+model StorageBucket {
+  id               String           @id @default(uuid()) @db.Uuid
+  websiteId        String           @db.Uuid
+  name             String           @db.VarChar(63)
+  visibility       BucketVisibility @default(PRIVATE)
+  maxSizeBytes     BigInt           @default(524288000)
+  usedSizeBytes    BigInt           @default(0)
+  allowedMimeTypes Json             @default("[\"*/*\"]")
+  corsRules        Json             @default("[]")
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
+
+  website          Website          @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  objects          StorageObject[]
+
+  @@unique([websiteId, name])
+  @@index([websiteId])
+  @@map("storage_buckets")
+}
+
+model StorageObject {
+  id             String        @id @default(uuid()) @db.Uuid
+  bucketId       String        @db.Uuid
+  objectKey      String        @db.VarChar(900)
+  originalName   String        @db.VarChar(255)
+  mimeType       String        @db.VarChar(150)
+  sizeBytes      BigInt
+  checksumSha256 String        @db.VarChar(64)
+  eTag           String?       @db.VarChar(100)
+  metadata       Json          @default("{}")
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+
+  bucket         StorageBucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+
+  @@unique([bucketId, objectKey])
+  @@index([bucketId, createdAt])
+  @@map("storage_objects")
 }
 
 
