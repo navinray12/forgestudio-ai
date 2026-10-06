@@ -236,7 +236,7 @@ export function UnifiedAiAssistant({
 
   const tabs: { id: AssistantTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "assistant", label: "Smart Assistant", icon: <Wand2 className="w-4 h-4 text-purple-400" /> },
-    { id: "design", label: "Full Design", icon: <Zap className="w-4 h-4 text-amber-400" />, badge: "Stitch+Claude" },
+    { id: "design", label: "Full Design", icon: <Zap className="w-4 h-4 text-amber-400" />, badge: "Stitch" },
     { id: "images", label: "Image Studio", icon: <Palette className="w-4 h-4 text-pink-400" /> },
     { id: "sections", label: "Sections", icon: <Layout className="w-4 h-4 text-indigo-400" /> },
     { id: "content", label: "Text & Copy", icon: <FileText className="w-4 h-4 text-emerald-400" /> },
@@ -263,7 +263,7 @@ export function UnifiedAiAssistant({
                   Studio Edition
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">Context-aware generative intelligence & Stitch + Claude pipeline</p>
+              <p className="text-xs text-slate-400 font-medium">Design proposals and editing tools</p>
             </div>
           </div>
 
@@ -455,12 +455,12 @@ export function UnifiedAiAssistant({
                       <Zap className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Stitch + Claude 3.7 Full Design Engine</h3>
-                      <p className="text-xs text-slate-400">Complete AI site blueprints, structural rewrites, and atomic document synthesis</p>
+                      <h3 className="text-sm font-bold text-white">Stitch website designer</h3>
+                      <p className="text-xs text-slate-400">Generate an editable design proposal and review it before applying</p>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Dual Pipeline Ready
+                    Design proposal
                   </span>
                 </div>
 

@@ -2,9 +2,8 @@ import { AppError } from "../../utils/app-error.js";
 import type { AiGenerationRequest, AiGenerationResult, AiProvider } from "./ai-provider.js";
 import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-blueprint.js";
 import { resolveAnthropicWorkspaceId } from "./anthropic-workspace.js";
-import { GeminiProvider } from "./gemini.provider.js";
 
-/** Server-only Claude Messages adapter with workspace resolution and resilience fallback. */
+/** Server-only Claude Messages adapter; preserves the selected provider on failure. */
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
@@ -13,9 +12,6 @@ export class AnthropicProvider implements AiProvider {
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) {
-      if (process.env.GEMINI_API_KEY) {
-        return new GeminiProvider().generate(request);
-      }
       throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
     }
     const controller = new AbortController();
@@ -47,16 +43,11 @@ export class AnthropicProvider implements AiProvider {
           model: activeModel,
           max_tokens: 8192,
           system: systemPrompt,
-          messages: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
+          messages: [{ role: "user", content: userContent }],
         }),
       });
       if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        console.error(`[ANTHROPIC ERROR ${response.status}]:`, errorBody);
-        if ((response.status === 400 || response.status === 401) && process.env.GEMINI_API_KEY) {
-          console.warn("[AI] Anthropic API rejected with workspace requirement; falling back to Gemini provider...");
-          return await new GeminiProvider().generate(request);
-        }
+        console.error(`[ANTHROPIC ERROR ${response.status}]`);
         throw new AppError(`AI provider error: ${response.status}`, 503, "AI_PROVIDER_UNAVAILABLE");
       }
       const body = await response.json().catch(() => null) as { stop_reason?: unknown; content?: Array<{ type?: unknown; text?: unknown }>; id?: unknown; model?: unknown } | null;
@@ -69,7 +60,7 @@ export class AnthropicProvider implements AiProvider {
       };
     } catch (error) {
       if (error instanceof AppError) throw error;
-      console.error("[ANTHROPIC EXCEPTION]:", error);
+      console.error("[ANTHROPIC EXCEPTION]: Request failed");
       throw new AppError("AI provider request timed out or failed", 503, "AI_PROVIDER_UNAVAILABLE");
     } finally { clearTimeout(timeout); }
   }

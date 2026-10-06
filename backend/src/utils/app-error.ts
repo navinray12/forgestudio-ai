@@ -13,6 +13,7 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.code = code;
 
-    Object.setPrototypeOf(this, AppError.prototype);
+    // Preserve subclasses so specialized errors can trigger their recovery path.
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }

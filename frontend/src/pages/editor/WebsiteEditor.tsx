@@ -2004,6 +2004,7 @@ export default function WebsiteEditor() {
     lastSavedAt: autosaveLastSavedAt,
     errorMessage: autosaveError,
     updateBaseline: updateAutosaveBaseline,
+    hasUnsavedChanges: hasUnsavedDocumentChanges,
   } = useAutosave({
     websiteId,
     elements,
@@ -2019,7 +2020,7 @@ export default function WebsiteEditor() {
     popups,
     pageCss,
     apiUrl,
-    isLoadingWebsite: loading || !website || !userAccess.canEditContent || isDesignAssistantOpen,
+    isLoadingWebsite: loading || !website || !userAccess.canEditContent || isDesignAssistantOpen || isUnifiedAiOpen,
     persistDocument,
   });
 
@@ -7430,6 +7431,18 @@ export default function WebsiteEditor() {
                 <Save className="w-3.5 h-3.5" />
               )}
               <span className="hidden sm:inline">Save</span>
+            </button>
+
+            {/* Code Workspace Button */}
+            <button
+              type="button"
+              onClick={() => navigate(`/workspace/website/${websiteId}`)}
+              className="h-8 px-3 rounded-lg border border-purple-500/60 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 hover:text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+              title="Open Developer Code Workspace (Phase 2)"
+              aria-label="Developer Code Workspace"
+            >
+              <Code2 className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">Code Workspace</span>
             </button>
 
             {/* Publish Button */}
@@ -20325,8 +20338,10 @@ export default function WebsiteEditor() {
           prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
           apply={async (proposal, key) => {
             if (pendingDesignApplyKey.current !== key) {
-              const saved = await handleSave();
-              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+              if (hasUnsavedDocumentChanges()) {
+                const saved = await handleSave();
+                if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+              }
               pendingDesignApplyKey.current = key;
             }
             await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
@@ -20348,8 +20363,10 @@ export default function WebsiteEditor() {
         prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
         apply={async (proposal, key) => {
           if (pendingDesignApplyKey.current !== key) {
-            const saved = await handleSave();
-            if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+            if (hasUnsavedDocumentChanges()) {
+              const saved = await handleSave();
+              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
+            }
             pendingDesignApplyKey.current = key;
           }
           await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {

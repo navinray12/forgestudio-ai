@@ -3,8 +3,9 @@ import { AppError } from "../../../utils/app-error.js";
 import { encryptPrompt } from "../prompt-vault.js";
 
 export const designConfigSchema = z.object({
+  provider: z.enum(["stitch", "stitch-claude"]).default("stitch-claude"),
   claudeModel: z.string().min(1).max(100),
-  stitchModel: z.enum(["GEMINI_3_PRO", "GEMINI_3_FLASH", "GEMINI_3_1_PRO"]),
+  stitchModel: z.enum(["MODEL_ID_UNSPECIFIED", "GEMINI_3_PRO", "GEMINI_3_FLASH", "GEMINI_3_1_PRO", "GEMINI_3_8_FLASH", "GEMINI_3_5_FLASH_LITE"]),
   maxPages: z.number().int().min(1).max(8),
   dailyUnits: z.number().int().min(1).max(10000),
 });
@@ -15,13 +16,14 @@ export function designConfig(): DesignConfig {
     claudeModel = "claude-3-7-sonnet-20250219";
   }
   const result = designConfigSchema.safeParse({
+    provider: process.env.AI_DESIGN_PROVIDER || "stitch-claude",
     claudeModel,
-    stitchModel: process.env.AI_STITCH_MODEL || "GEMINI_3_1_PRO",
+    stitchModel: process.env.AI_STITCH_MODEL || "MODEL_ID_UNSPECIFIED",
     maxPages: Number(process.env.AI_DESIGN_MAX_PAGES || 8),
     dailyUnits: Number(process.env.AI_DESIGN_DAILY_UNITS || 100),
   });
-  if (!result.success || !process.env.STITCH_API_KEY || !process.env.ANTHROPIC_API_KEY) {
-    throw new AppError("Configure Stitch, Claude and an explicit Claude model on the server", 503, "AI_DESIGN_NOT_CONFIGURED");
+  if (!result.success || !process.env.STITCH_API_KEY || (result.data.provider === "stitch-claude" && !process.env.ANTHROPIC_API_KEY)) {
+    throw new AppError("Configure the selected design provider on the server", 503, "AI_DESIGN_NOT_CONFIGURED");
   }
   encryptPrompt("configuration-check");
   return result.data;
@@ -29,7 +31,7 @@ export function designConfig(): DesignConfig {
 export function designAvailability() {
   try {
     const config = designConfig();
-    return { available: true, workflow: "stitch-claude", maxBriefCharacters: 64000, maxPages: config.maxPages, scopes: ["site", "page", "selection"], models: { claude: config.claudeModel, stitch: config.stitchModel } };
+    return { available: true, workflow: config.provider, operations: config.provider === "stitch" ? ["GENERATE_SITE"] : ["GENERATE_SITE", "EDIT_DOCUMENT"], maxBriefCharacters: 64000, maxPages: config.provider === "stitch" ? 1 : config.maxPages, scopes: ["site", "page", "selection"], models: { ...(config.provider === "stitch-claude" ? { claude: config.claudeModel } : {}), stitch: config.stitchModel } };
   }
   catch (err: any) {
     if (process.env.NODE_ENV !== "production") {

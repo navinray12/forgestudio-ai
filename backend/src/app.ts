@@ -77,6 +77,7 @@ import { storageRoutes } from "./modules/data-platform/storage/storage.routes.js
 import { databaseRoutes } from "./modules/data-platform/database/database.routes.js";
 import { studioRoutes } from "./modules/data-platform/studio/studio.routes.js";
 import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.routes.js";
+import projectRoutes from "./routes/project.routes.js";
 
 
 const authRateLimiter = rateLimit({
@@ -193,6 +194,10 @@ export function createApplication(
   // Discussion Forum System
   app.use("/api/v1/forum", forumRoutes);
   app.use("/api/forum", forumRoutes);
+
+  // Phase 2: Forge Project Model, Persistent Filesystem, Manifest, Compiler, Sync & Workspace
+  app.use("/api/v1/projects", projectRoutes);
+  app.use("/api/projects", projectRoutes);
 
   // Public API v1 Standardized Endpoints
   app.use("/api/v1", apiV1Routes);

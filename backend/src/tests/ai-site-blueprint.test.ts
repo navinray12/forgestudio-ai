@@ -135,7 +135,7 @@ test("Gemini adapter rejects blocked, truncated, malformed and failed responses 
     const fakeFetch = async () => response;
     await assert.rejects(new GeminiProvider("secret-gemini-key", "gemini-3.8-flash", fakeFetch as typeof fetch).generate(request), error => {
       assert.equal(JSON.stringify(error).includes("secret provider error"), false);
-      assert.equal((error as { code: string }).code, response.status === 429 ? "AI_PROVIDER_UNAVAILABLE" : "AI_INVALID_OUTPUT");
+      assert.equal((error as { code: string }).code, response.status === 429 ? "AI_RATE_LIMIT" : "AI_INVALID_OUTPUT");
       return true;
     });
   }
