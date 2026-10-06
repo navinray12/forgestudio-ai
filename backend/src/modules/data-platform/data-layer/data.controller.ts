@@ -56,10 +56,10 @@ export async function getTableDataHandler(
       await client.query("BEGIN;");
       await injectRlsClaims(client, claims);
 
-      const [dataResult, countResult] = await Promise.all([
-        client.query(compiled.sql, compiled.values),
-        compiled.countSql ? client.query(compiled.countSql, compiled.values.slice(0, -2)) : null,
-      ]);
+      const dataResult = await client.query(compiled.sql, compiled.values);
+      const countResult = compiled.countSql
+        ? await client.query(compiled.countSql, compiled.values.slice(0, -2))
+        : null;
 
       await client.query("COMMIT;");
 

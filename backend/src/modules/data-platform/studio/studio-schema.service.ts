@@ -107,10 +107,8 @@ export async function getDatabaseTables(
         AND tc.table_schema = 'public';
     `;
 
-    const [tablesRes, pkRes] = await Promise.all([
-      client.query<{ table_name: string; column_count: number; estimated_row_count: string }>(tablesQuery),
-      client.query<{ table_name: string; column_name: string }>(pkQuery),
-    ]);
+    const tablesRes = await client.query<{ table_name: string; column_count: number; estimated_row_count: string }>(tablesQuery);
+    const pkRes = await client.query<{ table_name: string; column_name: string }>(pkQuery);
 
     const pkMap = new Map<string, string[]>();
     for (const row of pkRes.rows) {
@@ -185,12 +183,10 @@ export async function getTableDetails(
       WHERE schemaname = 'public' AND tablename = $1;
     `;
 
-    const [colsRes, pksRes, fksRes, idxRes] = await Promise.all([
-      client.query<any>(colQuery, [safeTable]),
-      client.query<{ column_name: string }>(pkQuery, [safeTable]),
-      client.query<any>(fkQuery, [safeTable]),
-      client.query<{ indexname: string; indexdef: string }>(idxQuery, [safeTable]),
-    ]);
+    const colsRes = await client.query<any>(colQuery, [safeTable]);
+    const pksRes = await client.query<{ column_name: string }>(pkQuery, [safeTable]);
+    const fksRes = await client.query<any>(fkQuery, [safeTable]);
+    const idxRes = await client.query<{ indexname: string; indexdef: string }>(idxQuery, [safeTable]);
 
     const pkSet = new Set(pksRes.rows.map((r) => r.column_name));
 
