@@ -26,6 +26,7 @@ const CustomEntryEditor = lazy(() => import("./pages/dashboard/CustomEntryEditor
 const SharedTemplatePreviewPage = lazy(() => import("./pages/templates/SharedTemplatePreviewPage"));
 const PublishedSite = lazy(() => import("./pages/published/PublishedSite"));
 const PlatformControlPage = lazy(() => import("./features/platform-control/PlatformControlPage"));
+const DatabaseStudioPage = lazy(() => import("./features/database-studio/pages/DatabaseStudioPage"));
 
 const TicketListPage = lazy(() => import("./features/support/pages/TicketList").then(m => ({ default: m.TicketListPage })));
 const CreateTicketPage = lazy(() => import("./features/support/pages/CreateTicket").then(m => ({ default: m.CreateTicketPage })));
@@ -350,6 +351,24 @@ function App() {
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>
                 <WebsiteEditor />
+              </RoleRoute>
+            }
+          />
+
+          {/* ================= DATABASE STUDIO (CATEGORY F - MODULE 26) ================= */}
+          <Route
+            path="/dashboard/projects/:projectId/database"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <DatabaseStudioPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/dashboard/database/:websiteId"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <DatabaseStudioPage />
               </RoleRoute>
             }
           />

@@ -78,6 +78,20 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
+  minio:
+    image: minio/minio:latest
+    container_name: forgestudio-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-forge_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-forge_minio_secret_key_123}
+    volumes:
+      - minio_data:/data
+
 volumes:
   postgres-data:
   ai-artifacts:
+  minio_data:

@@ -536,6 +536,14 @@ function UserDashboard() {
                               <span>✨</span>
                               <span>AI Draft</span>
                             </button>
+                            <Link
+                              to={`/dashboard/database/${site.id}`}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50/80 px-2 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                              title="Open Database Studio"
+                            >
+                              <span>🗄️</span>
+                              <span>Database</span>
+                            </Link>
                             <button
                               onClick={() => setManagedSiteTarget(site)}
                               className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"

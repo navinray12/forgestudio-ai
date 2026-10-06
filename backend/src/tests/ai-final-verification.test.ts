@@ -107,7 +107,7 @@ test("ForgeStudio AI Platform Final Verification Pass", async (t) => {
       ],
     };
 
-    const { findings, metrics } = auditDocumentAst(mockDoc, "performance");
+    const { findings, metrics } = auditDocumentAst(mockDoc as any, "performance");
     assert.equal(metrics.runtimeMeasurementStatus, "RUNTIME_MEASUREMENT_NOT_AVAILABLE");
     assert.equal(metrics.totalNodes, 2);
     assert.equal(metrics.imageCount, 1);
