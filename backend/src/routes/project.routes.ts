@@ -205,6 +205,7 @@ import { RuntimePlatformController } from "../controllers/runtimePlatform.contro
 import { QualityPlatformController } from "../controllers/qualityPlatform.controller.js";
 import { DevOpsPlatformController } from "../controllers/devopsPlatform.controller.js";
 import { IntelligencePlatformController } from "../controllers/intelligencePlatform.controller.js";
+import { DeveloperPlatformController } from "../controllers/developerPlatform.controller.js";
 
 const router = Router();
 
@@ -628,6 +629,58 @@ router.post("/:id/intelligence/checkpoints/import", IntelligencePlatformControll
 
 // Module 64: Architecture Visualization
 router.get("/:id/intelligence/architecture/graph", IntelligencePlatformController.getArchitectureGraph);
+
+// =========================================================================
+// Modules 57–61: Standalone Developer Platform Capabilities
+// =========================================================================
+
+// Module 57: Collaborative Development
+router.get("/:id/collaboration/sessions", DeveloperPlatformController.getActiveSessions);
+router.post("/:id/collaboration/heartbeat", DeveloperPlatformController.heartbeatSession);
+router.delete("/:id/collaboration/sessions/:sessionId", DeveloperPlatformController.closeSession);
+router.post("/:id/collaboration/conflict/detect", DeveloperPlatformController.detectFileConflict);
+router.post("/:id/collaboration/conflict/resolve", DeveloperPlatformController.resolveFileConflict);
+router.get("/:id/collaboration/comments", DeveloperPlatformController.listComments);
+router.post("/:id/collaboration/comments", DeveloperPlatformController.createComment);
+router.post("/:id/collaboration/comments/:commentId/reply", DeveloperPlatformController.replyComment);
+router.post("/:id/collaboration/comments/:commentId/resolve", DeveloperPlatformController.resolveComment);
+router.get("/:id/collaboration/reviews", DeveloperPlatformController.listReviews);
+router.post("/:id/collaboration/reviews", DeveloperPlatformController.createReview);
+router.post("/:id/collaboration/reviews/:reviewId/decision", DeveloperPlatformController.submitReviewDecision);
+router.post("/:id/collaboration/preview-sessions", DeveloperPlatformController.createPreviewSession);
+router.get("/:id/collaboration/preview-sessions/:sessionId", DeveloperPlatformController.getPreviewSession);
+router.get("/:id/collaboration/timeline", DeveloperPlatformController.getActivityTimeline);
+
+// Module 58: Forge Extension & Plugin SDK
+router.get("/:id/extensions", DeveloperPlatformController.listPlugins);
+router.post("/:id/extensions/install", DeveloperPlatformController.installPlugin);
+router.post("/:id/extensions/:pluginId/enable", DeveloperPlatformController.enablePlugin);
+router.post("/:id/extensions/:pluginId/disable", DeveloperPlatformController.disablePlugin);
+router.delete("/:id/extensions/:pluginId", DeveloperPlatformController.uninstallPlugin);
+router.post("/:id/extensions/hooks/execute", DeveloperPlatformController.executePluginHook);
+router.post("/:id/extensions/tools/execute", DeveloperPlatformController.executePluginAiTool);
+
+// Module 59: Project Import & Migration
+router.post("/:id/import/start", DeveloperPlatformController.startImport);
+router.get("/:id/import/jobs/:jobId", DeveloperPlatformController.getImportStatus);
+router.post("/:id/import/jobs/:jobId/commit", DeveloperPlatformController.commitImport);
+
+// Module 60: Monorepo & Multi-service Support
+router.get("/:id/monorepo/graph", DeveloperPlatformController.discoverMonorepo);
+router.post("/:id/monorepo/affected", DeveloperPlatformController.getAffectedPackages);
+router.post("/:id/monorepo/deploy-plan", DeveloperPlatformController.generateCoordinatedDeployPlan);
+
+// Module 61: Container & Infrastructure Tooling
+router.get("/:id/containers/dockerfile", DeveloperPlatformController.getDockerfile);
+router.post("/:id/containers/dockerfile/generate", DeveloperPlatformController.generateDockerfile);
+router.post("/:id/containers/build", DeveloperPlatformController.buildContainer);
+router.post("/:id/containers/run", DeveloperPlatformController.runContainer);
+router.get("/:id/containers", DeveloperPlatformController.listContainers);
+router.delete("/:id/containers/:runId", DeveloperPlatformController.stopContainer);
+router.get("/:id/containers/compose", DeveloperPlatformController.getCompose);
+router.post("/:id/infra/kubernetes/generate", DeveloperPlatformController.generateKubernetes);
+router.post("/:id/infra/terraform/generate", DeveloperPlatformController.generateTerraform);
+router.get("/:id/infra/validate", DeveloperPlatformController.validateInfrastructure);
 
 export default router;
 

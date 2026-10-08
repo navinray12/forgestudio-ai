@@ -111,6 +111,41 @@ const MODEL_TO_TABLE: Record<string, string> = {
   forgeOptimizationAudit: "forge_optimization_audits",
   forgeProjectCheckpoint: "forge_project_checkpoints",
   forgeCheckpointRestore: "forge_checkpoint_restores",
+  // Module 57: Collaborative Development
+  forgeCollaborationSession: "forge_collaboration_sessions",
+  forgeFileSession: "forge_file_sessions",
+  forgeFileComment: "forge_file_comments",
+  forgeReviewRequest: "forge_review_requests",
+  forgeReviewComment: "forge_review_comments",
+  forgeReviewApproval: "forge_review_approvals",
+  forgeSharedPreviewSession: "forge_shared_preview_sessions",
+  forgeActivityEvent: "forge_activity_events",
+  // Module 58: Forge Extension & Plugin SDK
+  forgePlugin: "forge_plugins",
+  forgePluginVersion: "forge_plugin_versions",
+  forgePluginInstallation: "forge_plugin_installations",
+  forgePluginPermission: "forge_plugin_permissions",
+  forgePluginTrustRecord: "forge_plugin_trust_records",
+  forgePluginExecution: "forge_plugin_executions",
+  // Module 59: Project Import & Migration
+  forgeImportJob: "forge_import_jobs",
+  forgeImportSource: "forge_import_sources",
+  forgeImportAnalysis: "forge_import_analyses",
+  forgeImportReport: "forge_import_reports",
+  forgeMigrationPlan: "forge_migration_plans",
+  // Module 60: Monorepo & Multi-service Support
+  forgeMonorepoWorkspace: "forge_monorepo_workspaces",
+  forgeWorkspacePackage: "forge_workspace_packages",
+  forgePackageDependency: "forge_package_dependencies",
+  forgeServiceRuntime: "forge_service_runtimes",
+  forgeCoordinatedDeployment: "forge_coordinated_deployments",
+  // Module 61: Container & Infrastructure Tooling
+  forgeContainerDefinition: "forge_container_definitions",
+  forgeContainerBuild: "forge_container_builds",
+  forgeContainerRun: "forge_container_runs",
+  forgeComposeDefinition: "forge_compose_definitions",
+  forgeInfrastructureDefinition: "forge_infrastructure_definitions",
+  forgeInfrastructureValidation: "forge_infrastructure_validations",
 };
 
 function quoteCol(col: string): string {

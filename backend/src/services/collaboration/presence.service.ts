@@ -10,6 +10,7 @@ export interface PeerUser { userId: string; name: string; color: string }
 export interface PeerState {
   socketId: string; user: PeerUser; websiteId: string;
   cursor?: { x: number; y: number }; selectedElementId?: string | null; lastSeen: number;
+  activeFile?: string; cursorLine?: number; cursorColumn?: number; selectionRange?: string; previewRoute?: string;
 }
 type Principal = { id: string; user: { id: string; fullName: string | null }; expiresAt: Date };
 type Dependencies = {
@@ -21,6 +22,19 @@ const messageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("JOIN"), websiteId: z.uuid(), user: z.unknown().optional() }).strict(),
   z.object({ type: z.literal("CURSOR"), cursor: z.object({ x: z.number().finite().min(-100000).max(100000), y: z.number().finite().min(-100000).max(100000) }).strict() }).strict(),
   z.object({ type: z.literal("SELECT"), elementId: z.string().max(128).nullable() }).strict(),
+  z.object({
+    type: z.literal("EDITOR_PRESENCE"),
+    activeFile: z.string().max(256),
+    cursorLine: z.number().int().min(1).max(500000).optional(),
+    cursorColumn: z.number().int().min(1).max(10000).optional(),
+    selectionRange: z.string().max(128).optional(),
+  }).strict(),
+  z.object({
+    type: z.literal("PREVIEW_NAVIGATE"),
+    route: z.string().max(512),
+    viewportWidth: z.number().int().min(100).max(7680).optional(),
+    viewportHeight: z.number().int().min(100).max(4320).optional(),
+  }).strict(),
   z.object({ type: z.literal("PING") }).strict(),
 ]);
 let observed = { connections: 0, rooms: 0 };
@@ -98,9 +112,33 @@ export function initPresenceWebSocketServer(server: HttpServer, deps: Dependenci
         } else if (p.state && now - p.verifiedAt <= 10_000) {
           if (msg.type === "CURSOR") {
             p.state.cursor = msg.cursor; broadcast(p.state.websiteId, { type: "PEER_CURSOR", socketId, cursor: msg.cursor }, ws);
-          } else {
+          } else if (msg.type === "SELECT") {
             p.state.selectedElementId = msg.elementId;
             broadcast(p.state.websiteId, { type: "PEER_SELECT", socketId, elementId: msg.elementId }, ws);
+          } else if (msg.type === "EDITOR_PRESENCE") {
+            p.state.activeFile = msg.activeFile;
+            p.state.cursorLine = msg.cursorLine;
+            p.state.cursorColumn = msg.cursorColumn;
+            p.state.selectionRange = msg.selectionRange;
+            broadcast(p.state.websiteId, {
+              type: "PEER_EDITOR_PRESENCE",
+              socketId,
+              user: p.state.user,
+              activeFile: msg.activeFile,
+              cursorLine: msg.cursorLine,
+              cursorColumn: msg.cursorColumn,
+              selectionRange: msg.selectionRange,
+            }, ws);
+          } else if (msg.type === "PREVIEW_NAVIGATE") {
+            p.state.previewRoute = msg.route;
+            broadcast(p.state.websiteId, {
+              type: "PEER_PREVIEW_NAVIGATE",
+              socketId,
+              user: p.state.user,
+              route: msg.route,
+              viewportWidth: msg.viewportWidth,
+              viewportHeight: msg.viewportHeight,
+            }, ws);
           }
         }
       } catch { ws.close(1008, "Access unavailable"); }

@@ -35,6 +35,11 @@ import { featureFlagsService } from "../../modules/devops-platform/feature-flags
 import { optimizationEngineService } from "../../modules/intelligence-platform/optimization/optimizationEngine.service.js";
 import { projectRecoveryService } from "../../modules/intelligence-platform/recovery/projectRecovery.service.js";
 import { architectureVisualizationService } from "../../modules/intelligence-platform/architecture-viz/architectureVisualization.service.js";
+import { collaborationEngineService } from "../../modules/collaboration/collaborationEngine.service.js";
+import { pluginLifecycleService } from "../../modules/extensions/pluginLifecycle.service.js";
+import { repositoryAcquisitionService } from "../../modules/import-migration/repositoryAcquisition.service.js";
+import { monorepoDiscoveryService } from "../../modules/monorepo/monorepoDiscovery.service.js";
+import { dockerfileGeneratorService } from "../../modules/containers/dockerfileGenerator.js";
 
 const db = prisma as any;
 const CLI_VERSION = "2.4.0";
@@ -761,10 +766,143 @@ Flags:
         break;
       }
 
+      // Module 57: forge collaborate
+      case "collaborate": {
+        const projId = options.projectId || (await getFirstProjectId());
+        if (subCommand === "timeline") {
+          const activities = await collaborationEngineService.getActivityTimeline(projId, 20);
+          resultData = { activities };
+          stdout = `Activity Timeline (${activities.length} events):\n` +
+            activities.map((a: any) => `[${new Date(a.createdAt).toLocaleTimeString()}] ${a.actorId}: ${a.action} (${a.entityType})`).join("\n");
+        } else {
+          const sessions = await collaborationEngineService.getActiveSessions(projId);
+          resultData = { sessions };
+          stdout = `Active Collaborators (${sessions.length}):\n` +
+            sessions.map((s: any) => `* ${s.userId} (socket: ${s.socketId}) file: ${s.activeFile || "none"}`).join("\n");
+        }
+        break;
+      }
+
+      // Module 58: forge plugin / forge extensions
+      case "plugin":
+      case "extensions": {
+        const projId = options.projectId || (await getFirstProjectId());
+        if (subCommand === "list" || !subCommand) {
+          const plugins = await pluginLifecycleService.listPlugins(projId);
+          resultData = { plugins };
+          stdout = `Installed Plugins (${plugins.length}):\n` +
+            plugins.map((p: any) => `* ${p.name} v${p.version} [status: ${p.lifecycleState}]`).join("\n");
+        } else if (subCommand === "enable") {
+          const pluginId = subArgs[0];
+          if (!pluginId) throw new AppError("Plugin ID required: forge plugin enable <pluginId>", 400, "INVALID_INPUT");
+          const plugin = await pluginLifecycleService.enablePlugin(projId, pluginId);
+          resultData = { plugin };
+          stdout = `Plugin '${plugin.name}' enabled.`;
+        } else if (subCommand === "disable") {
+          const pluginId = subArgs[0];
+          if (!pluginId) throw new AppError("Plugin ID required: forge plugin disable <pluginId>", 400, "INVALID_INPUT");
+          const plugin = await pluginLifecycleService.disablePlugin(projId, pluginId);
+          resultData = { plugin };
+          stdout = `Plugin '${plugin.name}' disabled.`;
+        } else {
+          stdout = `Usage: forge plugin [list|enable <id>|disable <id>]`;
+        }
+        break;
+      }
+
+      // Module 60: forge monorepo
+      case "monorepo": {
+        const projId = options.projectId || (await getFirstProjectId());
+        if (subCommand === "affected") {
+          const changed = subArgs.length > 0 ? subArgs : ["src/index.ts"];
+          const affected = await monorepoDiscoveryService.findAffectedPackages(projId, changed);
+          resultData = { affected };
+          stdout = `Affected Packages (${affected.length}):\n` +
+            affected.map((p: any) => `* ${p.name} (${p.path})`).join("\n");
+        } else if (subCommand === "deploy-plan") {
+          const plan = await monorepoDiscoveryService.generateDeployPlan(projId);
+          resultData = { plan };
+          stdout = `Monorepo Deploy Plan (${plan.stages.length} stages):\n` +
+            plan.stages.map((s: any, idx: number) => `Stage ${idx + 1}: ${s.join(", ")}`).join("\n");
+        } else {
+          const graph = await monorepoDiscoveryService.discoverMonorepo(projId);
+          resultData = { graph };
+          stdout = `Monorepo Workspaces (${graph.manager}):\n` +
+            graph.packages.map((p: any) => `* [${p.type}] ${p.name} -> ${p.path}`).join("\n");
+        }
+        break;
+      }
+
+      // Module 61: forge container / forge compose
+      case "container":
+      case "compose": {
+        const projId = options.projectId || (await getFirstProjectId());
+        if (subCommand === "build") {
+          const build = await dockerfileGeneratorService.triggerContainerBuild(
+            projId,
+            { tag: subArgs[0] || "latest" },
+            options.userId || "cli-system"
+          );
+          resultData = { build };
+          stdout = `Container build triggered: ${build.id} [status: ${build.status}]`;
+        } else if (subCommand === "run") {
+          const run = await dockerfileGeneratorService.startContainer(projId, {
+            imageTag: subArgs[0] || "latest",
+            containerPort: 3000,
+            hostPort: 3000,
+          });
+          resultData = { run };
+          stdout = `Container started: ${run.id} [port: ${run.hostPort} -> ${run.containerPort}]`;
+        } else if (subCommand === "list" || !subCommand) {
+          const runs = await dockerfileGeneratorService.listContainers(projId);
+          resultData = { runs };
+          stdout = `Running Containers (${runs.length}):\n` +
+            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
+        } else if (subCommand === "stop") {
+          const runId = subArgs[0];
+          if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");
+          const stopped = await dockerfileGeneratorService.stopContainer(projId, runId);
+          resultData = { stopped };
+          stdout = `Container ${runId} stopped.`;
+        } else {
+          stdout = `Usage: forge container [build|run|list|stop <id>]`;
+        }
+        break;
+      }
+
+      // Module 61: forge infra
+      case "infra": {
+        const projId = options.projectId || (await getFirstProjectId());
+        if (subCommand === "validate") {
+          const validation = await dockerfileGeneratorService.validateInfrastructure(projId);
+          resultData = { validation };
+          stdout = `Infrastructure Validation:\n* Valid: ${validation.valid}\n* Errors (${validation.errors.length}): ${validation.errors.join(", ") || "None"}\n* Warnings (${validation.warnings.length}): ${validation.warnings.join(", ") || "None"}`;
+        } else if (subCommand === "kubernetes") {
+          const manifests = await dockerfileGeneratorService.generateKubernetesManifests(projId, {
+            serviceName: "web",
+            replicas: 2,
+            port: 3000,
+          });
+          resultData = { manifests };
+          stdout = `Kubernetes manifests generated (Deployment, Service, ConfigMap, Ingress)`;
+        } else if (subCommand === "terraform") {
+          const tf = await dockerfileGeneratorService.generateTerraform(projId, {
+            provider: "aws",
+            region: "us-east-1",
+            appName: "forge-app",
+          });
+          resultData = { terraform: tf };
+          stdout = `Terraform IaC files generated (main.tf, variables.tf, outputs.tf)`;
+        } else {
+          stdout = `Usage: forge infra [validate|kubernetes|terraform]`;
+        }
+        break;
+      }
+
       // 18.20 Shell completion
       case "completion": {
         const shell = subCommand || "bash";
-        const script = `# Forge CLI completion for ${shell}\ncomplete -W "auth link init create import dev build preview deploy env secrets db logs git github agent" forge`;
+        const script = `# Forge CLI completion for ${shell}\ncomplete -W "auth link init create import dev build preview deploy env secrets db logs git github agent collaborate plugin monorepo container infra" forge`;
         resultData = { shell, script };
         stdout = script;
         break;

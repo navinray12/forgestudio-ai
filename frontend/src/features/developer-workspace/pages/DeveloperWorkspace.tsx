@@ -37,6 +37,7 @@ import {
   Database,
   FolderArchive,
   Zap,
+  Users,
 } from "lucide-react";
 import {
   forgeProjectService,
@@ -63,9 +64,10 @@ import { AppRuntimePanel } from "../components/AppRuntimePanel";
 import { DeveloperQualityPanel } from "../components/DeveloperQualityPanel";
 import { DeveloperOpsSecurityPanel } from "../components/DeveloperOpsSecurityPanel";
 import { DeveloperIntelligencePanel } from "../components/DeveloperIntelligencePanel";
+import { DeveloperPlatformPanel } from "../components/DeveloperPlatformPanel";
 
 type WorkspaceMode = "code" | "split" | "preview";
-type BottomTab = "ai" | "git" | "terminal" | "build" | "hosting" | "cicd" | "domains" | "dependencies" | "database" | "storage" | "runtime" | "quality" | "devops" | "intelligence" | "debug" | "output" | "problems" | "manifest" | "snapshots";
+type BottomTab = "ai" | "git" | "terminal" | "build" | "hosting" | "cicd" | "domains" | "dependencies" | "database" | "storage" | "runtime" | "quality" | "devops" | "intelligence" | "platform" | "debug" | "output" | "problems" | "manifest" | "snapshots";
 
 
 
@@ -966,6 +968,21 @@ export const DeveloperWorkspace: React.FC = () => {
 
             <button
               onClick={() => {
+                setActiveBottomTab("platform");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "platform"
+                  ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Platform & Collab</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setActiveBottomTab("debug");
                 setBottomDrawerOpen(true);
               }}
@@ -1077,6 +1094,7 @@ export const DeveloperWorkspace: React.FC = () => {
             {activeBottomTab === "devops" && <DeveloperOpsSecurityPanel projectId={project.id} />}
 
             {activeBottomTab === "intelligence" && <DeveloperIntelligencePanel projectId={project.id} />}
+            {activeBottomTab === "platform" && <DeveloperPlatformPanel projectId={project.id} onLog={addLog} />}
 
             {activeBottomTab === "debug" && (
               <DebugPanel
