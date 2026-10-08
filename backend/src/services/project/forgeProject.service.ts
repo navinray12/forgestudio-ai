@@ -33,7 +33,7 @@ export interface ProjectCapabilities {
   build: boolean;
   ai: boolean;
   deployment: boolean;
-  [key: string]: boolean;
+  [key: string]: boolean | undefined;
 }
 
 export interface ProjectFrameworkMetadata {
@@ -217,7 +217,7 @@ export async function createForgeProject(input: {
   const mergedCaps: ProjectCapabilities = {
     ...baseCaps,
     ...(input.capabilities || {}),
-  };
+  } as ProjectCapabilities;
 
   const project = await db.forgeProject.create({
     data: {
@@ -411,7 +411,7 @@ export async function transitionProjectLifecycle(
 
   if (targetStatus === "DELETED") {
     data.deletedAt = new Date();
-  } else if (current.lifecycleStatus === "DELETED" && targetStatus !== "DELETED") {
+  } else if (current.lifecycleStatus === "DELETED") {
     data.deletedAt = null;
   }
 
@@ -564,6 +564,22 @@ export const forgeProjectService = {
   getOrCreateProjectForWebsite,
   updateForgeProject,
   transitionProjectLifecycle,
+  transitionLifecycle: (
+    projectId: string,
+    targetStatus: ProjectLifecycleStatus,
+    userOrUserId: string | { id: string; role?: string }
+  ) => {
+    const user = typeof userOrUserId === "string" ? { id: userOrUserId, role: "USER" } : { id: userOrUserId.id, role: userOrUserId.role || "USER" };
+    return transitionProjectLifecycle(projectId, targetStatus, user);
+  },
   listForgeProjects,
   cloneForgeProject,
+  cloneProject: (
+    sourceProjectId: string,
+    userOrUserId: string | { id: string; role?: string },
+    options?: { name?: string; slug?: string; description?: string }
+  ) => {
+    const user = typeof userOrUserId === "string" ? { id: userOrUserId, role: "USER" } : { id: userOrUserId.id, role: userOrUserId.role || "USER" };
+    return cloneForgeProject(sourceProjectId, user, options);
+  },
 };

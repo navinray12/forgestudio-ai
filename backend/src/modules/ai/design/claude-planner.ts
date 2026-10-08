@@ -5,23 +5,54 @@ import { resolveAnthropicWorkspaceId } from "../anthropic-workspace.js";
 
 export class ClaudeDesignPlanner implements DesignPlanner {
   constructor(private readonly model: string, private readonly fetcher: typeof fetch = fetch) {}
+
+  private async callAnthropic(model: string, maxTokens: number, system: string, data: unknown, signal?: AbortSignal) {
+    const workspaceId = await resolveAnthropicWorkspaceId(process.env.ANTHROPIC_API_KEY!);
+    return this.fetcher("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+        ...(workspaceId ? { "anthropic-workspace-id": workspaceId } : {})
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: JSON.stringify(data) }]
+      }),
+    });
+  }
+
   private async message(system: string, data: unknown, signal?: AbortSignal): Promise<string> {
     if (!process.env.ANTHROPIC_API_KEY || !this.model) throw new AppError("Claude planning is not configured", 503, "AI_NOT_CONFIGURED");
     try {
-      const workspaceId = await resolveAnthropicWorkspaceId(process.env.ANTHROPIC_API_KEY);
-      const response = await this.fetcher("https://api.anthropic.com/v1/messages", {
-        method: "POST", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
-        headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json",
-          ...(workspaceId ? { "anthropic-workspace-id": workspaceId } : {}) },
-        body: JSON.stringify({ model: this.model, max_tokens: 12000, system, messages: [{ role: "user", content: JSON.stringify(data) }] }),
-      });
+      let response = await this.callAnthropic(this.model, 4096, system, data, signal);
+      if (!response.ok && (response.status === 400 || response.status === 404) && this.model !== "claude-3-5-sonnet-20241022") {
+        const errorText = await response.text().catch(() => "");
+        console.warn(`[CLAUDE PLANNER] Model ${this.model} returned ${response.status} (${errorText.slice(0, 120)}). Retrying with claude-3-5-sonnet-20241022...`);
+        response = await this.callAnthropic("claude-3-5-sonnet-20241022", 4096, system, data, signal);
+      }
       if (!response.ok) {
-        console.error(`[CLAUDE PLANNER ERROR ${response.status}]`);
+        const errorText = await response.text().catch(() => "");
+        let sanitizedError = "Request failed";
+        try {
+          const parsed = JSON.parse(errorText);
+          sanitizedError = parsed?.error?.message || errorText.slice(0, 200);
+        } catch {
+          sanitizedError = errorText.slice(0, 200);
+        }
+        console.error(`[CLAUDE PLANNER ERROR ${response.status}]:`, sanitizedError);
         if (response.status === 429) {
           throw new AppError("Claude rate limit reached", 429, "AI_RATE_LIMIT");
         }
         if (response.status === 401 || response.status === 403) {
           throw new AppError("Claude authentication failed", 401, "AI_AUTH_ERROR");
+        }
+        if (response.status === 400) {
+          throw new AppError(`Claude request was invalid: ${sanitizedError}`, 400, "AI_BAD_REQUEST");
         }
         throw new AppError("Claude is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");
       }

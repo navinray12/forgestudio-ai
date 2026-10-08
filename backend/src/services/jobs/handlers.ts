@@ -229,12 +229,14 @@ export function initJobHandlers() {
     return { status: "COMPLETED", websiteId, operationType, scope };
   });
 
-  // 14. AI_DESIGN_EXECUTION Handler
-  registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => {
-    if (typeof payload?.executionId !== "string") throw new Error("AI_EXECUTION_ID_REQUIRED");
-    const { runDesignExecution } = await import("../../modules/ai/design/pipeline.js");
-    return runDesignExecution(payload.executionId, job);
-  });
+  // 14. AI_DESIGN_EXECUTION Handler (handled by dedicated worker container when FORGE_DEDICATED_WORKER=true)
+  if (process.env.FORGE_DEDICATED_WORKER !== "true") {
+    registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => {
+      if (typeof payload?.executionId !== "string") throw new Error("AI_EXECUTION_ID_REQUIRED");
+      const { runDesignExecution } = await import("../../modules/ai/design/pipeline.js");
+      return runDesignExecution(payload.executionId, job);
+    });
+  }
 }
 
 

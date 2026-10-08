@@ -79,6 +79,7 @@ export interface ForgeManifest {
 export interface ManifestValidationDiagnostic {
   severity: "error" | "warning";
   field: string;
+  code?: string;
   message: string;
   suggestedFix?: string;
 }
@@ -187,6 +188,7 @@ export function generateDefaultManifest(project: ForgeProjectEntity): ForgeManif
  */
 export function validateManifest(manifest: any): {
   isValid: boolean;
+  valid: boolean;
   diagnostics: ManifestValidationDiagnostic[];
 } {
   const diagnostics: ManifestValidationDiagnostic[] = [];
@@ -194,6 +196,7 @@ export function validateManifest(manifest: any): {
   if (!manifest || typeof manifest !== "object") {
     return {
       isValid: false,
+      valid: false,
       diagnostics: [{ severity: "error", field: "root", message: "Manifest must be a JSON object" }],
     };
   }
@@ -238,15 +241,22 @@ export function validateManifest(manifest: any): {
   }
 
   // Security check: Environment secrets check
-  if (manifest.environment?.variables) {
-    for (const [key, val] of Object.entries(manifest.environment.variables) as [string, any][]) {
-      // Check for accidental plaintext secrets in defaultValue or description
-      if (/(password|secret|key|token|auth)/i.test(key) && val.defaultValue && !val.secretRef) {
+  const envVars = manifest.env || manifest.environment?.variables;
+  if (envVars) {
+    for (const [key, val] of Object.entries(envVars) as [string, any][]) {
+      // Check for accidental plaintext secrets in value or defaultValue
+      const isSensitiveKey = /(password|secret|key|token|auth)/i.test(key);
+      const hasPlaintextSecret =
+        val?.value !== undefined ||
+        (isSensitiveKey && val?.defaultValue && !val?.secretRef);
+
+      if (hasPlaintextSecret && !val?.secretRef) {
         diagnostics.push({
           severity: "error",
+          code: "ENV_RAW_SECRET_FORBIDDEN",
           field: `environment.variables.${key}`,
-          message: `Plaintext secret detected in '${key}'. Secrets must use secretRef instead of defaultValue.`,
-          suggestedFix: `Configure secretRef: 'vault:${key.toLowerCase()}' and remove defaultValue`,
+          message: `Plaintext secret detected in '${key}'. Secrets must use secretRef instead of plaintext value or defaultValue.`,
+          suggestedFix: `Configure secretRef: 'vault:${key.toLowerCase()}' and remove plaintext secret`,
         });
       }
     }
@@ -262,7 +272,7 @@ export function validateManifest(manifest: any): {
   }
 
   const isValid = !diagnostics.some((d) => d.severity === "error");
-  return { isValid, diagnostics };
+  return { isValid, valid: isValid, diagnostics };
 }
 
 /**
@@ -372,6 +382,10 @@ export async function syncManifestToDisk(
 
 export const forgeManifestService = {
   getProjectManifest,
+  getOrCreateDefaultManifest: async (projectId: string, user?: any) => {
+    const res = await getProjectManifest(projectId, user);
+    return res.manifest;
+  },
   updateProjectManifest,
   generateDefaultManifest,
   validateManifest,

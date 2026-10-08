@@ -218,7 +218,9 @@ export const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
 
                 {/* Protected indicator */}
                 {tab.file.isProtected && (
-                  <Shield className="w-3 h-3 text-amber-400 shrink-0" title="Protected manual source file" />
+                  <span title="Protected manual source file" className="shrink-0 flex items-center">
+                    <Shield className="w-3 h-3 text-amber-400" />
+                  </span>
                 )}
 
                 {/* Dirty indicator */}

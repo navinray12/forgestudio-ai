@@ -106,9 +106,24 @@ export function createApplication(
 
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+  const configuredOrigin = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : undefined;
+  const allowedOrigins = new Set([
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    ...(configuredOrigin ? [configuredOrigin] : []),
+  ]);
+
   app.use(
     cors({
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin || allowedOrigins.has(requestOrigin)) {
+          return callback(null, true);
+        }
+        if (process.env.NODE_ENV !== "production" && (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(requestOrigin))) {
+          return callback(null, true);
+        }
+        return callback(new Error("CORS origin not allowed"), false);
+      },
       credentials: true,
     })
   );

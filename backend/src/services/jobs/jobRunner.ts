@@ -442,8 +442,11 @@ export async function ensureJobTables(): Promise<void> {
       ALTER TABLE job_dead_letters ADD COLUMN IF NOT EXISTS "organizationId" UUID;
     `);
     tablesEnsured = true;
-  } catch {
-    // Graceful in restricted environments
+    console.log("[Queue] Durable PostgreSQL job queue tables verified.");
+  } catch (err: any) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Queue] Table ensure skipped or failed:", err?.message || err);
+    }
   }
 }
 

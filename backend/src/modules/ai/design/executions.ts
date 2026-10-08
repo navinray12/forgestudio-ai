@@ -62,6 +62,7 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
             where: { id: candidate.id },
             data: {
               status: job?.status === "FAILED" ? (isUnknown ? "RECONCILIATION_REQUIRED" : "FAILED") : (job?.status ?? "FAILED"),
+              stage: isUnknown ? "UNKNOWN" : "FAILED",
               errorCode: sanitizedErrorCode,
               outputSummary: job?.lastError ? { error: job.lastError } : undefined,
               completedAt: new Date(),
@@ -105,6 +106,7 @@ export async function getDesignExecution(id: string, actorId: string) {
         where: { id, status: { in: ["QUEUED", "RUNNING"] } },
         data: {
           status: isUnknown ? "RECONCILIATION_REQUIRED" : "FAILED",
+          stage: isUnknown ? "UNKNOWN" : "FAILED",
           errorCode: sanitizedErrorCode,
           outputSummary: job.lastError ? { error: job.lastError } : undefined,
           completedAt: new Date(),

@@ -64,6 +64,7 @@ export interface DesignTokenIR {
 
 export interface ProjectIR {
   irVersion: string;
+  schemaVersion?: string;
   projectId: string;
   name: string;
   slug: string;
@@ -93,6 +94,7 @@ export interface CompilationResult {
   ir: ProjectIR;
   diagnostics: CompilerDiagnostic[];
   generatedFiles: Array<{ path: string; content: string; mimeType: string }>;
+  filesCount?: number;
   incremental: boolean;
 }
 
@@ -246,6 +248,7 @@ export function visualDocumentToIR(
 
   return {
     irVersion: IR_SCHEMA_VERSION,
+    schemaVersion: IR_SCHEMA_VERSION,
     projectId: projectInfo.id,
     name: projectInfo.name,
     slug: projectInfo.slug,

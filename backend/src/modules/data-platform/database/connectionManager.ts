@@ -56,7 +56,7 @@ export class CustomerConnectionManager {
   /**
    * Execute a single parameterized query directly in the customer's schema
    */
-  public async querySchema<T = any>(
+  public async querySchema<T extends pg.QueryResultRow = any>(
     schemaName: string,
     queryText: string,
     params: any[] = []

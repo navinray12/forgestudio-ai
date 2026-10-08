@@ -10,6 +10,7 @@ import {
   AiGatewayResponse,
   AiProviderName,
   AiStreamChunk,
+  AiTaskClass,
   ModelCapability,
   ProviderHealthStatus,
 } from "./aiGateway.types.js";
@@ -33,6 +34,29 @@ export class AiGatewayService {
       throw new AppError("Request messages cannot be empty", 400, "INVALID_MESSAGES");
     }
     return await this.router.executeWithFallback(request);
+  }
+
+  /**
+   * Helper to execute a prompt string with options
+   */
+  public async executePrompt(
+    prompt: string,
+    options: {
+      maxTokens?: number;
+      temperature?: number;
+      model?: string;
+      provider?: AiProviderName;
+      task?: AiTaskClass;
+    } = {}
+  ): Promise<AiGatewayResponse> {
+    return this.complete({
+      task: options.task || "general",
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      model: options.model,
+      provider: options.provider,
+    });
   }
 
   /**

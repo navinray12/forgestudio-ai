@@ -32,7 +32,7 @@ export class PrivateStitchClient extends StitchToolClient {
     this.activeAudit = audit;
     const transport = new StreamableHTTPClientTransport(new URL("https://stitch.googleapis.com/mcp"), {
       requestInit: { headers: { "X-Goog-Api-Key": this.apiKey } },
-      fetch: async (input, init) => {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
         if (this.activeAudit) this.activeAudit.dispatched = true;
         try {
           const res = await this.fetcher(input, {
@@ -54,7 +54,8 @@ export class PrivateStitchClient extends StitchToolClient {
 
     try {
       await this.connection.connect(transport, { timeout: 30000 });
-    } catch {
+    } catch (connectErr: any) {
+      console.error("[STITCH CONNECT ERROR]:", audit.status, connectErr?.message || connectErr);
       this.connecting = undefined;
       if (audit.status === 401 || audit.status === 403) {
         throw new AppError("Stitch authentication failed", 401, "AI_AUTH_ERROR");
@@ -75,7 +76,39 @@ export class PrivateStitchClient extends StitchToolClient {
     try {
       const result = await this.connection.callTool({ name, arguments: args }, undefined, { timeout: 180000 });
       if (result.isError) {
-        throw new AppError("Stitch operation rejected by provider", 503, "AI_PROVIDER_UNAVAILABLE");
+        const rawContent = result.content as Array<{ type: string; text?: string }> | undefined;
+        const textPayload = rawContent?.map(c => c.text).filter(Boolean).join("\n") || "";
+        let parsedPayload: any = null;
+        try {
+          parsedPayload = textPayload ? JSON.parse(textPayload) : null;
+        } catch {
+          parsedPayload = null;
+        }
+
+        const modelId = typeof args.modelId === "string" ? args.modelId : undefined;
+        const providerMsg = parsedPayload?.error?.message || parsedPayload?.message || textPayload || "Stitch operation rejected by provider";
+        const providerCode = parsedPayload?.error?.code || parsedPayload?.error?.status || parsedPayload?.code || audit.status;
+
+        console.error(`[STITCH] tool=${name}`);
+        if (modelId) console.error(`[STITCH] modelId=${modelId}`);
+        console.error(`[STITCH] provider rejected request`);
+        console.error(`[STITCH] errorCode=${providerCode || "unknown"}`);
+        console.error(`[STITCH] errorMessage=${providerMsg.slice(0, 300)}`);
+
+        const lowerMsg = providerMsg.toLowerCase();
+        if (audit.status === 401 || audit.status === 403 || lowerMsg.includes("unauthorized") || lowerMsg.includes("api key") || lowerMsg.includes("permission") || lowerMsg.includes("auth")) {
+          throw new AppError(`Stitch authentication failed: ${providerMsg.slice(0, 150)}`, 401, "AI_AUTH_ERROR");
+        }
+        if (audit.status === 429 || lowerMsg.includes("quota") || lowerMsg.includes("rate limit") || lowerMsg.includes("resource exhausted")) {
+          throw new AppError(`Stitch rate limit reached: ${providerMsg.slice(0, 150)}`, 429, "AI_RATE_LIMIT");
+        }
+        if (audit.status === 400 || lowerMsg.includes("invalid") || lowerMsg.includes("not found") || lowerMsg.includes("unsupported") || lowerMsg.includes("bad request") || lowerMsg.includes("model")) {
+          throw new AppError(`Stitch request was invalid: ${providerMsg.slice(0, 200)}`, 400, "AI_BAD_REQUEST");
+        }
+        if (audit.status && audit.status >= 500) {
+          throw new AppError(`Stitch provider is temporarily unavailable: ${providerMsg.slice(0, 150)}`, 503, "AI_PROVIDER_UNAVAILABLE");
+        }
+        throw new AppError(`Stitch operation rejected: ${providerMsg.slice(0, 200)}`, 503, "AI_PROVIDER_UNAVAILABLE");
       }
       if (result.structuredContent) return result.structuredContent as T;
       const content = result.content as Array<{ type: string; text?: string }>;
@@ -84,8 +117,12 @@ export class PrivateStitchClient extends StitchToolClient {
         throw new AppError("Stitch returned empty content", 502, "AI_INVALID_OUTPUT");
       }
       return JSON.parse(text) as T;
-    } catch (error) {
-      if (error instanceof AppError) throw error;
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        console.error(`[STITCH TOOL ERROR]:`, error.code, error.message);
+        throw error;
+      }
+      console.error(`[STITCH TOOL EXCEPTION]: status=${audit.status}`, error?.message || error);
       if (audit.status === 401 || audit.status === 403) {
         throw new AppError("Stitch authentication failed", 401, "AI_AUTH_ERROR");
       }

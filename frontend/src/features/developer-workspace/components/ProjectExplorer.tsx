@@ -187,10 +187,14 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({
             )}
 
             {node.isProtected && (
-              <Shield className="w-3 h-3 text-amber-400 shrink-0" title="Protected manual code" />
+              <span title="Protected manual code" className="shrink-0 flex items-center">
+                <Shield className="w-3 h-3 text-amber-400" />
+              </span>
             )}
             {node.isGenerated && (
-              <FileCheck className="w-3 h-3 text-blue-400/60 shrink-0" title="Generated file" />
+              <span title="Generated file" className="shrink-0 flex items-center">
+                <FileCheck className="w-3 h-3 text-blue-400/60" />
+              </span>
             )}
           </div>
 

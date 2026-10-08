@@ -11,8 +11,8 @@ export interface ApiConfigEntity {
   allowedOperations: Array<"GET" | "POST" | "PATCH" | "DELETE">;
   requireAuth: boolean;
   rateLimitPerMin: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface GeneratedApiEndpoint {

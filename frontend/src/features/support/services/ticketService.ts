@@ -12,15 +12,17 @@ const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...options.headers,
-    },
+    headers,
     credentials: "include",
   });
 

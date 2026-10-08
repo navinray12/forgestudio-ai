@@ -5,7 +5,7 @@ import { encryptPrompt } from "../prompt-vault.js";
 export const designConfigSchema = z.object({
   provider: z.enum(["stitch", "stitch-claude"]).default("stitch-claude"),
   claudeModel: z.string().min(1).max(100),
-  stitchModel: z.enum(["MODEL_ID_UNSPECIFIED", "GEMINI_3_PRO", "GEMINI_3_FLASH", "GEMINI_3_1_PRO", "GEMINI_3_8_FLASH", "GEMINI_3_5_FLASH_LITE"]),
+  stitchModel: z.string().min(1).max(100).default("MODEL_ID_UNSPECIFIED"),
   maxPages: z.number().int().min(1).max(8),
   dailyUnits: z.number().int().min(1).max(10000),
 });
@@ -13,7 +13,7 @@ export type DesignConfig = z.infer<typeof designConfigSchema>;
 export function designConfig(): DesignConfig {
   let claudeModel = process.env.AI_CLAUDE_DESIGN_MODEL || process.env.AI_MODEL_PLANNER;
   if (!claudeModel || claudeModel.startsWith("sk-ant-")) {
-    claudeModel = "claude-3-7-sonnet-20250219";
+    claudeModel = "claude-3-5-sonnet-20241022";
   }
   const result = designConfigSchema.safeParse({
     provider: process.env.AI_DESIGN_PROVIDER || "stitch-claude",

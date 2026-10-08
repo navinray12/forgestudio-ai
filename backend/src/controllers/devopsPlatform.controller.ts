@@ -8,6 +8,13 @@ import { developerObservabilityService } from "../modules/devops-platform/observ
 import { applicationSecurityService } from "../modules/devops-platform/security/applicationSecurity.service.js";
 import { featureFlagsService } from "../modules/devops-platform/feature-flags/featureFlags.service.js";
 
+function paramStr(param: string | string[] | undefined, fallback: string = ""): string {
+  if (Array.isArray(param)) {
+    return param[0] ?? fallback;
+  }
+  return param ?? fallback;
+}
+
 export class DevOpsPlatformController {
   // ------------------------------------------------------------
   // Module 53: Preview Environments
@@ -15,7 +22,7 @@ export class DevOpsPlatformController {
 
   static async listPreviewEnvironments(req: Request, res: Response, next: NextFunction) {
     try {
-      const environments = await previewEnvironmentService.listPreviewEnvironments(req.params.id);
+      const environments = await previewEnvironmentService.listPreviewEnvironments(paramStr(req.params.id));
       res.json({ success: true, environments });
     } catch (err) {
       next(err);
@@ -25,8 +32,8 @@ export class DevOpsPlatformController {
   static async getPreviewEnvironment(req: Request, res: Response, next: NextFunction) {
     try {
       const environment = await previewEnvironmentService.getPreviewEnvironment(
-        req.params.id,
-        req.params.envId
+        paramStr(req.params.id),
+        paramStr(req.params.envId)
       );
       res.json({ success: true, environment });
     } catch (err) {
@@ -37,7 +44,7 @@ export class DevOpsPlatformController {
   static async createPreviewEnvironment(req: Request, res: Response, next: NextFunction) {
     try {
       const environment = await previewEnvironmentService.createPreviewEnvironment(
-        req.params.id,
+        paramStr(req.params.id),
         req.body
       );
       res.status(201).json({ success: true, environment });
@@ -49,8 +56,8 @@ export class DevOpsPlatformController {
   static async deployPreviewEnvironment(req: Request, res: Response, next: NextFunction) {
     try {
       const environment = await previewEnvironmentService.deployPreviewEnvironment(
-        req.params.id,
-        req.params.envId
+        paramStr(req.params.id),
+        paramStr(req.params.envId)
       );
       res.json({ success: true, environment });
     } catch (err) {
@@ -62,8 +69,8 @@ export class DevOpsPlatformController {
     try {
       const additionalHours = req.body.additionalHours || 24;
       const environment = await previewEnvironmentService.extendTtl(
-        req.params.id,
-        req.params.envId,
+        paramStr(req.params.id),
+        paramStr(req.params.envId),
         additionalHours
       );
       res.json({ success: true, environment });
@@ -75,10 +82,10 @@ export class DevOpsPlatformController {
   static async teardownPreviewEnvironment(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await previewEnvironmentService.teardownPreviewEnvironment(
-        req.params.id,
-        req.params.envId
+        paramStr(req.params.id),
+        paramStr(req.params.envId)
       );
-      res.json({ success: true, ...result });
+      res.json(result);
     } catch (err) {
       next(err);
     }
@@ -88,8 +95,8 @@ export class DevOpsPlatformController {
     try {
       const targetEnvironment = req.body.targetEnvironment || "staging";
       const result = await previewEnvironmentService.promotePreviewEnvironment(
-        req.params.id,
-        req.params.envId,
+        paramStr(req.params.id),
+        paramStr(req.params.envId),
         targetEnvironment
       );
       res.json({ success: true, promotion: result });
@@ -104,7 +111,7 @@ export class DevOpsPlatformController {
 
   static async ingestLog(req: Request, res: Response, next: NextFunction) {
     try {
-      const log = await developerObservabilityService.ingestLog(req.params.id, req.body);
+      const log = await developerObservabilityService.ingestLog(paramStr(req.params.id), req.body);
       res.status(201).json({ success: true, log });
     } catch (err) {
       next(err);
@@ -114,14 +121,14 @@ export class DevOpsPlatformController {
   static async queryLogs(req: Request, res: Response, next: NextFunction) {
     try {
       const filter: any = {
-        environment: req.query.environment as string,
+        environment: typeof req.query.environment === "string" ? req.query.environment : undefined,
         source: req.query.source as any,
         level: req.query.level as any,
-        traceId: req.query.traceId as string,
-        search: req.query.search as string,
-        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+        traceId: typeof req.query.traceId === "string" ? req.query.traceId : undefined,
+        search: typeof req.query.search === "string" ? req.query.search : undefined,
+        limit: req.query.limit ? parseInt(String(req.query.limit), 10) : undefined,
       };
-      const logs = await developerObservabilityService.queryLogs(req.params.id, filter);
+      const logs = await developerObservabilityService.queryLogs(paramStr(req.params.id), filter);
       res.json({ success: true, logs });
     } catch (err) {
       next(err);
@@ -130,7 +137,7 @@ export class DevOpsPlatformController {
 
   static async recordSpan(req: Request, res: Response, next: NextFunction) {
     try {
-      const span = await developerObservabilityService.recordSpan(req.params.id, req.body);
+      const span = await developerObservabilityService.recordSpan(paramStr(req.params.id), req.body);
       res.status(201).json({ success: true, span });
     } catch (err) {
       next(err);
@@ -140,8 +147,8 @@ export class DevOpsPlatformController {
   static async getTrace(req: Request, res: Response, next: NextFunction) {
     try {
       const trace = await developerObservabilityService.getTrace(
-        req.params.id,
-        req.params.traceId
+        paramStr(req.params.id),
+        paramStr(req.params.traceId)
       );
       res.json({ success: true, trace });
     } catch (err) {
@@ -151,7 +158,7 @@ export class DevOpsPlatformController {
 
   static async getApmMetrics(req: Request, res: Response, next: NextFunction) {
     try {
-      const metrics = await developerObservabilityService.getApmMetrics(req.params.id);
+      const metrics = await developerObservabilityService.getApmMetrics(paramStr(req.params.id));
       res.json({ success: true, metrics });
     } catch (err) {
       next(err);
@@ -161,7 +168,7 @@ export class DevOpsPlatformController {
   static async listIssues(req: Request, res: Response, next: NextFunction) {
     try {
       const status = req.query.status as any;
-      const issues = await developerObservabilityService.listIssues(req.params.id, status);
+      const issues = await developerObservabilityService.listIssues(paramStr(req.params.id), status);
       res.json({ success: true, issues });
     } catch (err) {
       next(err);
@@ -171,8 +178,8 @@ export class DevOpsPlatformController {
   static async updateIssueStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const updated = await developerObservabilityService.updateIssueStatus(
-        req.params.id,
-        req.params.issueId,
+        paramStr(req.params.id),
+        paramStr(req.params.issueId),
         req.body.status
       );
       res.json({ success: true, issue: updated });
@@ -184,8 +191,8 @@ export class DevOpsPlatformController {
   static async diagnoseIssue(req: Request, res: Response, next: NextFunction) {
     try {
       const diagnostic = await developerObservabilityService.diagnoseIssueWithAi(
-        req.params.id,
-        req.params.issueId
+        paramStr(req.params.id),
+        paramStr(req.params.issueId)
       );
       res.json({ success: true, diagnostic });
     } catch (err) {
@@ -202,7 +209,7 @@ export class DevOpsPlatformController {
       const scanType = req.body.scanType || "FULL";
       const policy = req.body.policy;
       const scan = await applicationSecurityService.runSecurityScan(
-        req.params.id,
+        paramStr(req.params.id),
         scanType,
         policy
       );
@@ -214,7 +221,7 @@ export class DevOpsPlatformController {
 
   static async getLatestScan(req: Request, res: Response, next: NextFunction) {
     try {
-      const scan = await applicationSecurityService.getLatestScan(req.params.id);
+      const scan = await applicationSecurityService.getLatestScan(paramStr(req.params.id));
       res.json({ success: true, scan });
     } catch (err) {
       next(err);
@@ -223,7 +230,7 @@ export class DevOpsPlatformController {
 
   static async listScans(req: Request, res: Response, next: NextFunction) {
     try {
-      const scans = await applicationSecurityService.listScans(req.params.id);
+      const scans = await applicationSecurityService.listScans(paramStr(req.params.id));
       res.json({ success: true, scans });
     } catch (err) {
       next(err);
@@ -233,8 +240,8 @@ export class DevOpsPlatformController {
   static async generateAiRemediation(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await applicationSecurityService.generateAiRemediation(
-        req.params.id,
-        req.params.findingId
+        paramStr(req.params.id),
+        paramStr(req.params.findingId)
       );
       res.json({ success: true, remediation: result });
     } catch (err) {
@@ -248,7 +255,7 @@ export class DevOpsPlatformController {
 
   static async listFlags(req: Request, res: Response, next: NextFunction) {
     try {
-      const flags = await featureFlagsService.listFlags(req.params.id);
+      const flags = await featureFlagsService.listFlags(paramStr(req.params.id));
       res.json({ success: true, flags });
     } catch (err) {
       next(err);
@@ -257,7 +264,7 @@ export class DevOpsPlatformController {
 
   static async getFlag(req: Request, res: Response, next: NextFunction) {
     try {
-      const flag = await featureFlagsService.getFlag(req.params.id, req.params.key);
+      const flag = await featureFlagsService.getFlag(paramStr(req.params.id), paramStr(req.params.key));
       res.json({ success: true, flag });
     } catch (err) {
       next(err);
@@ -266,7 +273,7 @@ export class DevOpsPlatformController {
 
   static async createFlag(req: Request, res: Response, next: NextFunction) {
     try {
-      const flag = await featureFlagsService.createFlag(req.params.id, req.body);
+      const flag = await featureFlagsService.createFlag(paramStr(req.params.id), req.body);
       res.status(201).json({ success: true, flag });
     } catch (err) {
       next(err);
@@ -276,8 +283,8 @@ export class DevOpsPlatformController {
   static async updateFlag(req: Request, res: Response, next: NextFunction) {
     try {
       const flag = await featureFlagsService.updateFlag(
-        req.params.id,
-        req.params.key,
+        paramStr(req.params.id),
+        paramStr(req.params.key),
         req.body
       );
       res.json({ success: true, flag });
@@ -289,8 +296,8 @@ export class DevOpsPlatformController {
   static async toggleFlag(req: Request, res: Response, next: NextFunction) {
     try {
       const flag = await featureFlagsService.toggleFlag(
-        req.params.id,
-        req.params.key,
+        paramStr(req.params.id),
+        paramStr(req.params.key),
         Boolean(req.body.isEnabled)
       );
       res.json({ success: true, flag });
@@ -301,8 +308,8 @@ export class DevOpsPlatformController {
 
   static async deleteFlag(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await featureFlagsService.deleteFlag(req.params.id, req.params.key);
-      res.json({ success: true, ...result });
+      const result = await featureFlagsService.deleteFlag(paramStr(req.params.id), paramStr(req.params.key));
+      res.json(result);
     } catch (err) {
       next(err);
     }
@@ -315,7 +322,7 @@ export class DevOpsPlatformController {
         environment: req.body.environment,
         attributes: req.body.attributes,
       };
-      const results = await featureFlagsService.evaluateAllFlags(req.params.id, context);
+      const results = await featureFlagsService.evaluateAllFlags(paramStr(req.params.id), context);
       res.json({ success: true, flags: results });
     } catch (err) {
       next(err);
@@ -324,8 +331,8 @@ export class DevOpsPlatformController {
 
   static async listConfigs(req: Request, res: Response, next: NextFunction) {
     try {
-      const env = req.query.environment as string;
-      const configs = await featureFlagsService.listConfigs(req.params.id, env);
+      const env = typeof req.query.environment === "string" ? req.query.environment : undefined;
+      const configs = await featureFlagsService.listConfigs(paramStr(req.params.id), env);
       res.json({ success: true, configs });
     } catch (err) {
       next(err);
@@ -334,7 +341,7 @@ export class DevOpsPlatformController {
 
   static async setConfig(req: Request, res: Response, next: NextFunction) {
     try {
-      const config = await featureFlagsService.setConfig(req.params.id, req.body);
+      const config = await featureFlagsService.setConfig(paramStr(req.params.id), req.body);
       res.json({ success: true, config });
     } catch (err) {
       next(err);
@@ -343,13 +350,13 @@ export class DevOpsPlatformController {
 
   static async deleteConfig(req: Request, res: Response, next: NextFunction) {
     try {
-      const env = req.query.environment as string || "all";
+      const env = typeof req.query.environment === "string" ? req.query.environment : "all";
       const result = await featureFlagsService.deleteConfig(
-        req.params.id,
-        req.params.key,
+        paramStr(req.params.id),
+        paramStr(req.params.key),
         env
       );
-      res.json({ success: true, ...result });
+      res.json(result);
     } catch (err) {
       next(err);
     }

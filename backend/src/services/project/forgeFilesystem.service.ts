@@ -60,6 +60,7 @@ export interface WriteFileOptions {
   isGenerated?: boolean;
   isProtected?: boolean;
   authorId?: string;
+  userId?: string;
   reason?: string;
 }
 
@@ -169,6 +170,7 @@ export async function writeFile(
   const extension = path.posix.extname(cleanPath);
   const encoding = options.encoding || "utf-8";
   const content = options.content ?? "";
+  const effectiveAuthorId = options.authorId || options.userId || null;
   const sizeBytes = Buffer.byteLength(content, encoding);
 
   // Validate file size limit
@@ -218,7 +220,7 @@ export async function writeFile(
           content,
           contentHash,
           changeType: "RESTORE",
-          authorId: options.authorId || null,
+          authorId: effectiveAuthorId,
           reason: options.reason || "Re-created previously deleted file",
         },
       });
@@ -273,7 +275,7 @@ export async function writeFile(
         content,
         contentHash,
         changeType: "UPDATE",
-        authorId: options.authorId || null,
+        authorId: effectiveAuthorId,
         reason: options.reason || "File updated",
       },
     });
@@ -309,7 +311,7 @@ export async function writeFile(
       content,
       contentHash,
       changeType: "CREATE",
-      authorId: options.authorId || null,
+      authorId: effectiveAuthorId,
       reason: options.reason || "Initial file creation",
     },
   });
@@ -633,6 +635,22 @@ export const forgeFilesystemService = {
   getProjectFileTree,
   getFileRevisions,
   createProjectSnapshot,
+  createSnapshot: (
+    projectId: string,
+    optionsOrName: string | { name?: string; description?: string; authorId?: string; userId?: string },
+    description?: string,
+    authorId?: string
+  ) => {
+    if (typeof optionsOrName === "object" && optionsOrName !== null) {
+      return createProjectSnapshot(
+        projectId,
+        optionsOrName.name || "Snapshot",
+        optionsOrName.description,
+        optionsOrName.authorId || optionsOrName.userId
+      );
+    }
+    return createProjectSnapshot(projectId, optionsOrName, description, authorId);
+  },
   listProjectSnapshots,
   sanitizeAndNormalizePath,
   calculateContentHash,

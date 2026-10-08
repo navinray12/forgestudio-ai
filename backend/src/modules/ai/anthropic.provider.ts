@@ -7,7 +7,7 @@ import { resolveAnthropicWorkspaceId } from "./anthropic-workspace.js";
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
-    readonly model = process.env.AI_MODEL_PLANNER || "claude-opus-5-5",
+    readonly model = process.env.AI_MODEL_PLANNER || "claude-3-7-sonnet-20250219",
     private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
@@ -18,7 +18,9 @@ export class AnthropicProvider implements AiProvider {
     const timeout = setTimeout(() => controller.abort(), 60_000);
     const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
     try {
-      const activeModel = this.model?.startsWith("claude-") ? this.model : "claude-3-7-sonnet-20250219";
+      const activeModel = this.model && this.model !== "claude-opus-5-5" && this.model.startsWith("claude-")
+        ? this.model
+        : "claude-3-7-sonnet-20250219";
       const workspaceId = await resolveAnthropicWorkspaceId(this.apiKey);
       const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
       const defaultInstruction = request.operation === "SITE_GENERATION"
@@ -47,7 +49,8 @@ export class AnthropicProvider implements AiProvider {
         }),
       });
       if (!response.ok) {
-        console.error(`[ANTHROPIC ERROR ${response.status}]`);
+        const errorText = await response.text().catch(() => "");
+        console.error(`[ANTHROPIC ERROR ${response.status}]:`, errorText);
         throw new AppError(`AI provider error: ${response.status}`, 503, "AI_PROVIDER_UNAVAILABLE");
       }
       const body = await response.json().catch(() => null) as { stop_reason?: unknown; content?: Array<{ type?: unknown; text?: unknown }>; id?: unknown; model?: unknown } | null;

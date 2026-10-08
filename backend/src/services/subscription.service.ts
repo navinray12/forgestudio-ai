@@ -17,7 +17,40 @@ function requireUserId(userId: string): void {
   }
 }
 
+const DEFAULT_TIERS = [
+  { name: "Free", slug: "free", price: 0, currency: "INR", billingInterval: "monthly", websiteLimit: 1, storageLimitMb: 100, aiCreditLimit: 0, features: ["1 Website", "Basic widgets", "Basic templates", "Preview", "HTML/CSS export"], isActive: true },
+  { name: "Starter", slug: "starter", price: 499, currency: "INR", billingInterval: "monthly", websiteLimit: 3, storageLimitMb: 1000, aiCreditLimit: 100, features: ["3 Websites", "More templates", "More widgets", "Custom CSS", "1 GB storage", "Basic SEO"], isActive: true },
+  { name: "Professional", slug: "professional", price: 999, currency: "INR", billingInterval: "monthly", websiteLimit: 10, storageLimitMb: 10000, aiCreditLimit: 1000, features: ["10 Websites", "All widgets", "Global styles", "AI features", "10 GB storage", "ZIP export", "Priority support"], isActive: true },
+  { name: "Agency", slug: "agency", price: 2499, currency: "INR", billingInterval: "monthly", websiteLimit: 50, storageLimitMb: 50000, aiCreditLimit: 5000, features: ["50 Websites", "Client management", "White-label branding", "5,000 AI Credits", "50 GB storage", "Dedicated SLA"], isActive: true },
+];
+
+export async function ensureDefaultPlans(): Promise<void> {
+  for (const tier of DEFAULT_TIERS) {
+    try {
+      await prisma.subscriptionPlan.upsert({
+        where: { slug: tier.slug },
+        update: { isActive: true },
+        create: {
+          name: tier.name,
+          slug: tier.slug,
+          price: tier.price,
+          currency: tier.currency,
+          billingInterval: tier.billingInterval,
+          websiteLimit: tier.websiteLimit,
+          storageLimitMb: tier.storageLimitMb,
+          aiCreditLimit: tier.aiCreditLimit,
+          features: tier.features,
+          isActive: true,
+        },
+      });
+    } catch {}
+  }
+}
+
 export async function getAllActivePlans() {
+  const plans = await prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { price: "asc" } });
+  if (plans.length > 0) return plans;
+  await ensureDefaultPlans();
   return prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { price: "asc" } });
 }
 
@@ -62,8 +95,13 @@ export async function assignDefaultFreePlan(userId: string): Promise<Subscriptio
   }
 }
 
-/** Compatibility endpoint. Paid changes require an implemented, verified billing
- * adapter; there is deliberately no client flag or test-mode bypass.
+export function isDevPlanSwitchingEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.DEV_PLAN_SWITCHING === "true";
+}
+
+/**
+ * Plan selection endpoint. In production, paid plan changes strictly require verified checkout.
+ * In development with DEV_PLAN_SWITCHING=true, allows developers to switch tiers for testing.
  */
 export async function changeUserPlan(userId: string, planSlug: string): Promise<PlanSelectionResult> {
   requireUserId(userId);
@@ -72,9 +110,61 @@ export async function changeUserPlan(userId: string, planSlug: string): Promise<
   }
   const plan = await prisma.subscriptionPlan.findUnique({ where: { slug: planSlug.toLowerCase() } });
   if (!plan || !plan.isActive) throw new AppError("Invalid or inactive subscription plan", 400, "INVALID_PLAN");
-  if (plan.slug !== "free" || plan.price !== 0) {
+
+  const devAllowed = isDevPlanSwitchingEnabled();
+
+  // Strict production check: No payment bypass in production or when dev flag is disabled
+  if (!devAllowed && (plan.slug !== "free" || plan.price !== 0)) {
     throw new AppError("Paid plan changes require verified checkout", 402, "PAYMENT_VERIFICATION_REQUIRED");
   }
+
+  // Development mode plan override: safely update user subscription to the selected plan
+  if (devAllowed) {
+    const now = new Date();
+    const isFree = plan.slug === "free" && plan.price === 0;
+    // Set 1-year future expiry for paid tiers in development so entitlement checks succeed
+    const currentPeriodEnd = isFree ? null : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+    const subscription = await prisma.$transaction(async (tx) => {
+      const existing = await tx.userSubscription.findUnique({ where: { userId } });
+      let record: SubscriptionWithPlan;
+      if (existing) {
+        record = await tx.userSubscription.update({
+          where: { userId },
+          data: {
+            planId: plan.id,
+            status: "ACTIVE",
+            currentPeriodStart: now,
+            currentPeriodEnd,
+          },
+          include: { plan: true },
+        });
+      } else {
+        record = await tx.userSubscription.create({
+          data: {
+            userId,
+            planId: plan.id,
+            status: "ACTIVE",
+            currentPeriodStart: now,
+            currentPeriodEnd,
+          },
+          include: { plan: true },
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "DEV_PLAN_SWITCHED",
+          targetResource: `subscription:${record.id}`,
+          details: { planId: plan.id, planSlug: plan.slug, devOverride: true },
+        },
+      });
+      return record;
+    });
+    return subscription;
+  }
+
+  // Standard production flow for free plan
   const subscription = await assignDefaultFreePlan(userId);
   if (subscription.plan.slug !== "free" || subscription.plan.price !== 0) {
     throw new AppError("Manage the existing subscription through its billing provider", 409, "BILLING_PROVIDER_REQUIRED");

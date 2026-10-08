@@ -229,7 +229,7 @@ export class ForgeTestRunnerService {
     for (const suite of suites) {
       try {
         const fileContent = await forgeFilesystemService.readFile(projectId, suite.filePath);
-        const execOut = await this.executeTestCode(suite.name, fileContent.content, options.testFilter);
+        const execOut = await this.executeTestCode(suite.name, fileContent.content || "", options.testFilter);
         allResults.push(...execOut.results);
         total += execOut.total;
         passed += execOut.passed;

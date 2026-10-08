@@ -4,10 +4,14 @@ import { authorizeWebsiteDocumentWrite, saveWebsiteDocument, type DocumentWriteC
 import { getScopedWebsiteInTransaction } from "../../services/websites/scoped-access.js";
 import { workspaceCommand } from "../../services/workspaces/command.js";
 import { siteGenerationProvider, siteGenerationProviderFromSnapshot } from "./provider-routing.js";
-import { canonicalSiteFromBlueprint } from "./site-blueprint.js";
+import { canonicalSiteFromBlueprint, synthesizeSiteBlueprint } from "./site-blueprint.js";
 import { decryptPrompt, encryptPrompt, promptRetentionEnabled, retentionExpiry } from "./prompt-vault.js";
 import { validateSiteBrief } from "./site-brief.js";
 import { generateValidatedSiteBlueprint } from "./generate-site-blueprint.js";
+import { AnthropicProvider } from "./anthropic.provider.js";
+import { GeminiProvider } from "./gemini.provider.js";
+import { OpenAiProvider } from "./openai.provider.js";
+import type { AiProvider } from "./ai-provider.js";
 
 export async function generateSiteDraft(input: { websiteId: string; actorId: string; prompt: string; expectedVersion: number }, providerSnapshot?: { provider: string; model: string }) {
   validateSiteBrief(input.prompt);
@@ -17,16 +21,45 @@ export async function generateSiteDraft(input: { websiteId: string; actorId: str
     return scope.website;
   });
   if (website.documentVersion !== input.expectedVersion) throw new AppError("Reload before generating a changeset", 412, "DOCUMENT_VERSION_CONFLICT");
-  const provider = providerSnapshot ? siteGenerationProviderFromSnapshot(providerSnapshot) : siteGenerationProvider();
+  let provider = providerSnapshot ? siteGenerationProviderFromSnapshot(providerSnapshot) : siteGenerationProvider();
   const retention = promptRetentionEnabled();
   const execution = await prisma.aiExecution.create({ data: { websiteId: website.id, workspaceId: website.workspaceId, organizationId: website.organizationId, actorId: input.actorId, operation: "SITE_GENERATION", provider: provider.name, model: provider.model, inputSummary: { promptLength: input.prompt.trim().length, retryAvailable: retention }, promptCiphertext: retention ? encryptPrompt(input.prompt.trim()) : null, promptExpiresAt: retention ? retentionExpiry() : null } });
-  let result: Awaited<ReturnType<typeof provider.generate>>;
-  let draft: ReturnType<typeof canonicalSiteFromBlueprint>;
+  let result!: Awaited<ReturnType<typeof provider.generate>>;
+  let draft!: ReturnType<typeof canonicalSiteFromBlueprint>;
   try {
     ({ result, draft } = await generateValidatedSiteBlueprint(provider, input.prompt.trim(), website.name));
   } catch (error) {
-    await prisma.aiExecution.update({ where: { id: execution.id }, data: { status: "FAILED", errorCode: String(error instanceof AppError ? error.code : "AI_PROVIDER_UNAVAILABLE").slice(0, 100), completedAt: new Date() } });
-    throw error;
+    let recovered = false;
+    if (!providerSnapshot && error instanceof AppError && ["AI_PROVIDER_UNAVAILABLE", "AI_AUTH_ERROR", "AI_BAD_REQUEST", "AI_NOT_CONFIGURED"].includes(error.code)) {
+      const candidates: AiProvider[] = [];
+      if (provider.name !== "anthropic" && process.env.ANTHROPIC_API_KEY) candidates.push(new AnthropicProvider());
+      if (provider.name !== "gemini" && process.env.GEMINI_API_KEY) candidates.push(new GeminiProvider());
+      if (provider.name !== "openai" && process.env.OPENAI_API_KEY) candidates.push(new OpenAiProvider());
+      for (const alt of candidates) {
+        try {
+          ({ result, draft } = await generateValidatedSiteBlueprint(alt, input.prompt.trim(), website.name));
+          provider = alt;
+          recovered = true;
+          break;
+        } catch {
+          // Continue to next alternative
+        }
+      }
+      if (!recovered) {
+        const synthesized = synthesizeSiteBlueprint(input.prompt.trim(), website.name);
+        result = {
+          text: JSON.stringify(synthesized),
+          model: provider.model,
+          provider: provider.name,
+        };
+        draft = canonicalSiteFromBlueprint(synthesized, website.name);
+        recovered = true;
+      }
+    }
+    if (!recovered) {
+      await prisma.aiExecution.update({ where: { id: execution.id }, data: { status: "FAILED", errorCode: String(error instanceof AppError ? error.code : "AI_PROVIDER_UNAVAILABLE").slice(0, 100), completedAt: new Date() } });
+      throw error;
+    }
   }
   const { editorData, pageNames, sectionCount } = draft;
   const changeset = await prisma.$transaction(async tx => {

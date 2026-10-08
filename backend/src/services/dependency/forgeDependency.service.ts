@@ -98,7 +98,7 @@ const POPULAR_PACKAGES: Record<
     license: "MIT",
     peerDeps: { postcss: "^8.4.0" },
   },
-  lucide-react: {
+  "lucide-react": {
     latest: "0.475.0",
     license: "ISC",
     peerDeps: { react: "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" },

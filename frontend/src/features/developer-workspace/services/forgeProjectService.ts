@@ -2,15 +2,17 @@ const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...options.headers,
-    },
+    headers,
     credentials: "include",
   });
 
@@ -706,8 +708,8 @@ export const forgeProjectService = {
   async verifyDomainOwnership(
     projectId: string,
     domainId: string
-  ): Promise<{ success: boolean; result: any }> {
-    return request<{ success: boolean; result: any }>(`/${projectId}/domains/${domainId}/verify`, {
+  ): Promise<{ success: boolean; verified: boolean; domain?: any; result?: any }> {
+    return request<{ success: boolean; verified: boolean; domain?: any; result?: any }>(`/${projectId}/domains/${domainId}/verify`, {
       method: "POST",
     });
   },

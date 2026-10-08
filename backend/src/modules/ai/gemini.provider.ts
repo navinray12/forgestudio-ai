@@ -6,14 +6,14 @@ import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-
 export class GeminiProvider implements AiProvider {
   readonly name = "gemini";
   constructor(private readonly apiKey = process.env.GEMINI_API_KEY,
-    readonly model = process.env.AI_MODEL_GEMINI || "gemini-3.8-flash",
+    readonly model = process.env.AI_MODEL_GEMINI || "gemini-1.5-flash",
     private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
     let activeModel = this.model;
-    if (!activeModel || activeModel.includes("3.5-flash-lite") || activeModel.includes("3.1-flash-lite") || activeModel.includes("2.0-flash")) {
-      activeModel = "gemini-3.8-flash";
+    if (!activeModel || activeModel.includes("3.8-flash") || activeModel.includes("3.5-flash-lite") || activeModel.includes("3.1-flash-lite") || activeModel.includes("2.0-flash")) {
+      activeModel = "gemini-1.5-flash";
     }
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$/.test(activeModel)) {
       throw new AppError("AI model configuration is invalid", 503, "AI_NOT_CONFIGURED");
@@ -45,7 +45,8 @@ export class GeminiProvider implements AiProvider {
         },
       );
       if (!response.ok) {
-        console.error(`[GEMINI ERROR ${response.status}]`);
+        const errorText = await response.text().catch(() => "");
+        console.error(`[GEMINI ERROR ${response.status}]:`, errorText);
         if (response.status === 401 || response.status === 403) {
           throw new AppError("AI provider authentication failed", 401, "AI_AUTH_ERROR");
         }

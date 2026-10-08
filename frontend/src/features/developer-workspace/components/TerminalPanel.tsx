@@ -64,7 +64,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({ projectId }) => {
       setAiExplanation(null);
       setOutputLines((prev) => [...prev, `$ ${cmd}`]);
 
-      const res = await forgeProjectService.executeTerminalCommand(sessionId, cmd, confirmed);
+      const res = await forgeProjectService.executeTerminalCommand(projectId, sessionId, cmd, confirmed);
 
       if (res.requiresConfirmation && !confirmed) {
         setConfirmModal({ command: cmd, reason: res.confirmationReason || "Dangerous operation" });

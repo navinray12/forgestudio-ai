@@ -16,15 +16,18 @@ export function siteGenerationProviderFromSnapshot(snapshot: { provider: string;
 }
 
 export function siteGenerationProvider(): AiProvider {
-  switch (process.env.AI_SITE_PROVIDER || "openai") {
-    // A missing OpenAI key can use a configured Gemini key without sending any
-    // request (or billing) to OpenAI. Runtime provider failures do not silently
-    // cross providers; the actor can retry after resolving the failure.
-    case "openai": return !process.env.OPENAI_API_KEY && process.env.GEMINI_API_KEY
-      ? new GeminiProvider() : new OpenAiProvider();
-    case "anthropic": return new AnthropicProvider();
-    case "gemini": return new GeminiProvider();
-    default: throw new AppError("AI provider configuration is invalid", 503, "AI_NOT_CONFIGURED");
+  const chosen = (process.env.AI_SITE_PROVIDER || "openai").toLowerCase();
+  switch (chosen) {
+    case "anthropic":
+      return new AnthropicProvider();
+    case "gemini":
+      return new GeminiProvider();
+    case "openai":
+    default:
+      if (process.env.OPENAI_API_KEY) return new OpenAiProvider();
+      if (process.env.ANTHROPIC_API_KEY) return new AnthropicProvider();
+      if (process.env.GEMINI_API_KEY) return new GeminiProvider();
+      return new OpenAiProvider();
   }
 }
 export type PlatformAiCapability =

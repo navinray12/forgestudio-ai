@@ -7,9 +7,19 @@ import { pgPool, prisma } from "../config/prisma.js";
 import { startPromptCleanup } from "../modules/ai/prompt-cleanup-scheduler.js";
 import { runDesignExecution } from "../modules/ai/design/pipeline.js";
 
+console.log("[Worker] Forge background worker initializing...");
+
 registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => {
   if (typeof payload?.executionId !== "string") throw new Error("AI_EXECUTION_ID_REQUIRED");
-  return runDesignExecution(payload.executionId, job);
+  console.log(`[Worker] Claimed AI_DESIGN_EXECUTION job ${job.id} (executionId: ${payload.executionId})`);
+  try {
+    const result = await runDesignExecution(payload.executionId, job);
+    console.log(`[Worker] Completed AI_DESIGN_EXECUTION job ${job.id} with status: ${result.status}`);
+    return result;
+  } catch (err: any) {
+    console.error(`[Worker] Failed AI_DESIGN_EXECUTION job ${job.id}:`, err?.message || err);
+    throw err;
+  }
 });
 
 registerJobHandler("FILE_SCAN", async (payload) => {
@@ -42,6 +52,8 @@ registerJobHandler("DOMAIN_EVENT", async (payload) => {
 });
 
 startJobWorker(Number(process.env.JOB_WORKER_INTERVAL_MS || 1000));
+console.log("[Worker] Queue connected and polling for background jobs.");
+console.log("[Worker] Worker ready.");
 const promptCleanup = startPromptCleanup({ onFailure: () => console.error("ai-prompt-cleanup-failed") });
 const outboxTimer=setInterval(()=>{void dispatchOutbox().catch(error=>console.error("outbox-dispatch-failed",error));},Number(process.env.OUTBOX_INTERVAL_MS||1000));
 void dispatchOutbox();
@@ -49,7 +61,7 @@ void dispatchOutbox();
 async function shutdown(signal:string){
   if(stopping) return; stopping=true; clearInterval(outboxTimer);
   await stopJobWorker();
-  console.log("worker-shutdown",signal);
+  console.log(`[Worker] Worker shutdown gracefully on signal: ${signal}`);
   await promptCleanup.stop();
   await prisma.$disconnect().catch(()=>undefined); await pgPool.end().catch(()=>undefined);
   process.exit(0);

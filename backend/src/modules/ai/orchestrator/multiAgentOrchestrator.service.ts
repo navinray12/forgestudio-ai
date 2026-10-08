@@ -49,7 +49,7 @@ export class MultiAgentOrchestratorService {
       taskId,
       runId,
       agentId: descriptor.id,
-      objective: `${step.title}: ${step.description}`,
+      objective: step.description ? `${step.title}: ${step.description}` : step.title,
       files: step.input?.targetFiles || [],
       contextProfile: descriptor.requiredContextProfile as any,
     });
@@ -137,7 +137,7 @@ export class MultiAgentOrchestratorService {
         case "TESTING": {
           let buildResult: any = null;
           try {
-            buildResult = await runProjectBuild(projectId, { id: "system", role: "system" } as any);
+            buildResult = await runProjectBuild({ projectId, userId: "system" });
           } catch (err: any) {
             buildResult = { status: "FAILED", errors: [err?.message || "Build failed"] };
           }

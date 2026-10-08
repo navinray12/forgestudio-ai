@@ -12,8 +12,10 @@ export class StitchDesignProvider implements DesignProvider {
   async createProject(title: string) {
     try {
       const result = await this.client.callTool<{ name?: string; id?: string }>("create_project", { title });
-      const id = result.name?.replace(/^projects\//, "") || result.id;
+      const rawId = result.name || result.id;
+      const id = rawId?.replace(/^projects\//, "");
       if (!id) throw new AppError("Stitch project response was incomplete", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
+      console.log(`[STITCH] created project id=${id}`);
       return id;
     }
     catch (error) {
@@ -23,15 +25,95 @@ export class StitchDesignProvider implements DesignProvider {
   }
   async generate(projectId: string, prompt: string) {
     try {
-      // Discover provider model support before dispatching a paid generation.
       const tools = await this.client.listTools();
-      const tool = tools.tools.find(item => item.name === "generate_screen_from_text");
-      const schema = tool?.inputSchema as { properties?: { modelId?: { enum?: string[] } } } | undefined;
-      if (schema?.properties?.modelId?.enum && !schema.properties.modelId.enum.includes(this.model)) throw new AppError("Configured Stitch model is no longer supported", 400, "AI_BAD_REQUEST");
-      const raw = await this.client.callTool<{ outputComponents?: Array<{ design?: { screens?: Array<{ id?: string; name?: string }> } }>; screens?: Array<{ id?: string; name?: string }> }>("generate_screen_from_text", { projectId, prompt, deviceType: "DESKTOP", modelId: this.model });
+      const tool = tools.tools.find((item: { name: string }) => item.name === "generate_screen_from_text");
+      const schema = tool?.inputSchema as {
+        properties?: {
+          modelId?: { enum?: string[] };
+          deviceType?: { enum?: string[] };
+          [key: string]: unknown;
+        };
+        required?: string[];
+      } | undefined;
+
+      const properties = schema?.properties || {};
+      const required = Array.isArray(schema?.required) ? schema.required : [];
+      const modelIdEnum = properties.modelId?.enum;
+      const deviceTypeEnum = properties.deviceType?.enum;
+      const optionalFields = Object.keys(properties).filter(k => !required.includes(k));
+
+      console.log("[STITCH CAPABILITIES]");
+      console.log("tool: generate_screen_from_text");
+      console.log("modelId enum =", JSON.stringify(modelIdEnum || []));
+      console.log("deviceType enum =", JSON.stringify(deviceTypeEnum || []));
+      console.log("required fields =", JSON.stringify(required));
+      console.log("optional fields =", JSON.stringify(optionalFields));
+
+      // Model Resolution (Rules 4 & 5)
+      const isExplicit = Boolean(this.model && this.model !== "MODEL_ID_UNSPECIFIED" && this.model.trim() !== "");
+      let effectiveModel: string | undefined = undefined;
+
+      if (isExplicit) {
+        if (modelIdEnum && modelIdEnum.includes(this.model)) {
+          effectiveModel = this.model;
+          console.log(`[STITCH] Using configured model: ${effectiveModel}`);
+        } else if (modelIdEnum && modelIdEnum.length > 0) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(`[STITCH] Configured model '${this.model}' is unsupported by live provider. Live supported models: [${modelIdEnum.join(", ")}]`);
+            const fallback = modelIdEnum.find(m => m !== "MODEL_ID_UNSPECIFIED") || modelIdEnum[0];
+            console.log(`[STITCH] Runtime model selected: ${fallback}`);
+            effectiveModel = fallback;
+          } else {
+            throw new AppError(`Configured Stitch model '${this.model}' is invalid. Currently supported models: ${modelIdEnum.join(", ")}`, 400, "AI_BAD_REQUEST");
+          }
+        } else {
+          effectiveModel = this.model;
+        }
+      } else {
+        if (required.includes("modelId")) {
+          if (modelIdEnum?.includes("MODEL_ID_UNSPECIFIED")) {
+            effectiveModel = "MODEL_ID_UNSPECIFIED";
+          } else if (modelIdEnum && modelIdEnum.length > 0) {
+            effectiveModel = modelIdEnum.find(m => m !== "MODEL_ID_UNSPECIFIED") || modelIdEnum[0];
+          }
+          console.log(`[STITCH] modelId is required by tool schema, sending: ${effectiveModel}`);
+        } else {
+          effectiveModel = undefined;
+          console.log(`[STITCH] modelId is optional, omitting to let Stitch use backend default.`);
+        }
+      }
+
+      // Device Type Validation (Rule 6)
+      let effectiveDeviceType = "DESKTOP";
+      if (deviceTypeEnum && deviceTypeEnum.length > 0) {
+        if (deviceTypeEnum.includes("DESKTOP")) {
+          effectiveDeviceType = "DESKTOP";
+        } else {
+          const fallback = deviceTypeEnum.find(d => /desktop|web/i.test(d)) || deviceTypeEnum[0];
+          console.log(`[STITCH] DESKTOP not in enum, using supported deviceType: ${fallback}`);
+          effectiveDeviceType = fallback;
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        projectId,
+        prompt,
+        deviceType: effectiveDeviceType,
+      };
+      if (effectiveModel) {
+        payload.modelId = effectiveModel;
+      }
+
+      console.log(`[STITCH] Dispatching generate_screen_from_text for project=${projectId} deviceType=${effectiveDeviceType}${effectiveModel ? ` modelId=${effectiveModel}` : " (default model)"}`);
+      const raw = await this.client.callTool<{
+        outputComponents?: Array<{ design?: { screens?: Array<{ id?: string; name?: string }> } }>;
+        screens?: Array<{ id?: string; name?: string }>;
+      }>("generate_screen_from_text", payload);
+
       const screen = raw.outputComponents?.find(item => item.design?.screens?.length)?.design?.screens?.[0] || raw.screens?.[0];
       const screenId = screen?.id || screen?.name?.split("/screens/")[1];
       if (!screenId) throw new AppError("Stitch generation response was incomplete", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
+      console.log(`[STITCH] Generated screen id=${screenId}`);
       return { screenId };
     }
     catch (error) {

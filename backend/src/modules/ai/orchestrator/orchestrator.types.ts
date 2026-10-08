@@ -54,6 +54,7 @@ export interface DagNode {
   id: string;
   agentRole: AgentRole;
   title: string;
+  description?: string;
   dependencies: string[];
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "SKIPPED";
   input?: AgentInputPayload;

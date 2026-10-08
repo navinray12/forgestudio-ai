@@ -23,7 +23,7 @@ export class DataApiService {
   public async getApiConfigs(databaseId: string, projectId: string): Promise<ApiConfigEntity[]> {
     const tables = await forgeDatabaseService.listTables(databaseId);
     const existing = await db.forgeApiConfig.findMany({ where: { databaseId } });
-    const existingMap = new Map(existing.map((e: any) => [e.tableName, e]));
+    const existingMap = new Map<string, ApiConfigEntity>(existing.map((e: any) => [e.tableName, e]));
 
     const configs: ApiConfigEntity[] = [];
     for (const t of tables) {
@@ -122,6 +122,19 @@ export class DataApiService {
       sortOrder,
       filters,
     });
+  }
+
+  /**
+   * Execute REST query by project, environment, and tableName
+   */
+  public async executeRestQuery(
+    projectId: string,
+    environment: any = "development",
+    tableName: string,
+    queryParams: any = {}
+  ) {
+    const database = await forgeDatabaseService.getDatabase(projectId, environment);
+    return await this.handleListRows(database.id, tableName, queryParams);
   }
 
   /**

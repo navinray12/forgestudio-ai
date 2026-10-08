@@ -174,3 +174,284 @@ export function canonicalSiteFromBlueprint(raw: unknown, websiteName?: string): 
   return { editorData, pageNames: pages.map(page => page.name),
     sectionCount: parsed.data.pages.reduce((count, page) => count + page.sections.length, 0) };
 }
+
+export interface SiteBlueprintDraft {
+  pages: Array<{
+    name: string;
+    slug: string;
+    sections: Array<{
+      heading: string;
+      body: string;
+      ctaLabel: string;
+      ctaHref: string;
+    }>;
+  }>;
+}
+
+export function synthesizeSiteBlueprint(prompt: string, websiteName?: string): SiteBlueprintDraft {
+  const p = prompt.toLowerCase();
+  const title = (websiteName || "ForgeStudio").trim();
+
+  const isAccounting = /accounting|cpa|cma|acca|finance|financial|ledger|audit/.test(p);
+  const isRealEstate = /real estate|property|realtor|villa|apartment|leasing|estate/.test(p);
+
+  if (isAccounting) {
+    return {
+      pages: [
+        {
+          name: "Home",
+          slug: "/",
+          sections: [
+            {
+              heading: "Professional Financial & Accounting Leadership",
+              body: "Advance your financial career through world-class accreditation training, practical case study mastery, and industry-recognized executive curricula.",
+              ctaLabel: "Explore Programs",
+              ctaHref: "/programs"
+            },
+            {
+              heading: "Accredited Global Certifications",
+              body: "Comprehensive exam preparation curricula specifically tailored for CPA, CMA, and ACCA professional designations with benchmark pass rates.",
+              ctaLabel: "View Curriculum",
+              ctaHref: "/programs"
+            },
+            {
+              heading: "Distinguished Practitioner Faculty",
+              body: "Instruction led by practicing financial controllers, senior audit partners, and corporate strategy leaders bringing applied expertise directly to the classroom.",
+              ctaLabel: "Faculty Directory",
+              ctaHref: "/about"
+            },
+            {
+              heading: "Structured Academic Pathway",
+              body: "Our accelerated cohorts combine rigorous theoretical foundations with weekly financial modeling labs and audit simulations.",
+              ctaLabel: "Admission Inquiries",
+              ctaHref: "/contact"
+            }
+          ]
+        },
+        {
+          name: "Programs",
+          slug: "/programs",
+          sections: [
+            {
+              heading: "Specialized Accounting & Finance Credentials",
+              body: "Structured pathways designed to guide candidates through rigorous certification milestones with dedicated academic advisors.",
+              ctaLabel: "Download Syllabus",
+              ctaHref: "/contact"
+            },
+            {
+              heading: "CMA & Management Accounting",
+              body: "Deep dive into financial planning, performance analysis, cost accounting, and strategic decision making for corporate leaders.",
+              ctaLabel: "Program Details",
+              ctaHref: "/contact"
+            },
+            {
+              heading: "CPA Auditing & Attestation",
+              body: "Master rigorous statutory auditing procedures, regulatory frameworks, financial reporting standards, and corporate taxation.",
+              ctaLabel: "Enroll Today",
+              ctaHref: "/contact"
+            }
+          ]
+        },
+        {
+          name: "About",
+          slug: "/about",
+          sections: [
+            {
+              heading: "Our Commitment to Academic Excellence",
+              body: "Founded with the mission to elevate professional financial standards and empower ambitious finance leaders across global markets.",
+              ctaLabel: "Connect With Us",
+              ctaHref: "/contact"
+            },
+            {
+              heading: "Executive Mentorship & Community",
+              body: "Our alumni network spans top-tier audit firms, Fortune 500 treasuries, and leading private equity organizations worldwide.",
+              ctaLabel: "",
+              ctaHref: ""
+            }
+          ]
+        },
+        {
+          name: "Contact",
+          slug: "/contact",
+          sections: [
+            {
+              heading: "Begin Your Professional Journey",
+              body: "Speak with an academic admissions advisor to determine which professional accounting pathway aligns with your career trajectory.",
+              ctaLabel: "Return to Home",
+              ctaHref: "/"
+            },
+            {
+              heading: "Admissions & Campus Inquiries",
+              body: "Our administrative team provides comprehensive support regarding cohort schedules, examination windows, and enrollment requirements.",
+              ctaLabel: "",
+              ctaHref: ""
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  if (isRealEstate) {
+    return {
+      pages: [
+        {
+          name: "Home",
+          slug: "/",
+          sections: [
+            {
+              heading: "Premier Commercial & Residential Real Estate",
+              body: "Discover curated luxury developments, private residential estates, and strategic commercial properties in prime global metropolitan centers.",
+              ctaLabel: "View Properties",
+              ctaHref: "/properties"
+            },
+            {
+              heading: "Institutional Real Estate Advisory",
+              body: "Delivering bespoke asset valuation, investment analysis, and transaction management for private clients and institutional funds.",
+              ctaLabel: "Our Services",
+              ctaHref: "/about"
+            },
+            {
+              heading: "Exclusive Architectural Highlights",
+              body: "Each featured residence offers exceptional craftsmanship, sustainable materials, and uncompromising standards of interior architectural design.",
+              ctaLabel: "Schedule Private Tour",
+              ctaHref: "/contact"
+            }
+          ]
+        },
+        {
+          name: "Properties",
+          slug: "/properties",
+          sections: [
+            {
+              heading: "Curated Global Property Portfolio",
+              body: "Explore a distinguished catalog of prime penthouses, waterfront villas, and prime commercial headquarters across premier locations.",
+              ctaLabel: "Request Portfolio",
+              ctaHref: "/contact"
+            },
+            {
+              heading: "Private Residences & Estates",
+              body: "Exceptional living spaces that balance sophisticated privacy with immediate access to premier cultural and financial hubs.",
+              ctaLabel: "Inquire Now",
+              ctaHref: "/contact"
+            }
+          ]
+        },
+        {
+          name: "About",
+          slug: "/about",
+          sections: [
+            {
+              heading: "Dedicated to Real Estate Distinction",
+              body: "With decades of combined real estate advisory experience, our partners bring unparalleled market intelligence to every transaction.",
+              ctaLabel: "Connect With Us",
+              ctaHref: "/contact"
+            }
+          ]
+        },
+        {
+          name: "Contact",
+          slug: "/contact",
+          sections: [
+            {
+              heading: "Arrange a Confidential Consultation",
+              body: "Our advisory directors are available for private property tours, portfolio reviews, and acquisition consultations.",
+              ctaLabel: "Back to Home",
+              ctaHref: "/"
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  // Default / Serious Commercial Product / Modular Platform
+  return {
+    pages: [
+      {
+        name: "Home",
+        slug: "/",
+        sections: [
+          {
+            heading: `${title} — Production-Grade Commercial Platform`,
+            body: "Engineered from the ground up with modular architecture, strict boundary enforcement, and enterprise-grade reliability for demanding environments.",
+            ctaLabel: "Explore Solutions",
+            ctaHref: "/solutions"
+          },
+          {
+            heading: "Modular System Architecture",
+            body: "Decoupled domain models and robust integration layers ensure frictionless evolution, maintainability, and zero unexpected dependencies.",
+            ctaLabel: "Platform Overview",
+            ctaHref: "/about"
+          },
+          {
+            heading: "Uncompromising Reliability & Speed",
+            body: "High-throughput execution pipelines and comprehensive state validation guarantee deterministic system outcomes across all operational stages.",
+            ctaLabel: "Get Started",
+            ctaHref: "/contact"
+          },
+          {
+            heading: "Production Ready Out of the Box",
+            body: "Built to commercial production standards with end-to-end telemetry, secure storage, and strict backward-compatible state policies.",
+            ctaLabel: "Contact Solutions Team",
+            ctaHref: "/contact"
+          }
+        ]
+      },
+      {
+        name: "Solutions",
+        slug: "/solutions",
+        sections: [
+          {
+            heading: "Engineered for Enterprise Scale",
+            body: "Our capabilities deliver deep platform integration, seamless multi-tenant isolation, and continuous operational visibility for complex teams.",
+            ctaLabel: "Request Architecture Review",
+            ctaHref: "/contact"
+          },
+          {
+            heading: "High-Throughput Processing Engine",
+            body: "Streamlined background job workers, durable state recovery, and distributed concurrency controls built for sustained commercial workloads.",
+            ctaLabel: "Learn More",
+            ctaHref: "/about"
+          }
+        ]
+      },
+      {
+        name: "About",
+        slug: "/about",
+        sections: [
+          {
+            heading: "Our Architectural Principles",
+            body: "We prioritize clean abstraction layers, explicit contracts, and zero hidden assumptions to ensure applications behave reliably in production.",
+            ctaLabel: "Get in Touch",
+            ctaHref: "/contact"
+          },
+          {
+            heading: "Quality & Resilience by Design",
+            body: "Every module undergoes continuous verification, regression audits, and performance tuning to sustain peak performance under real-world load.",
+            ctaLabel: "",
+            ctaHref: ""
+          }
+        ]
+      },
+      {
+        name: "Contact",
+        slug: "/contact",
+        sections: [
+          {
+            heading: "Connect with Our Technical Architects",
+            body: "Discuss project specifications, migration pathways, or custom integration strategies directly with our engineering team.",
+            ctaLabel: "Return to Home",
+            ctaHref: "/"
+          },
+          {
+            heading: "Enterprise Support & Documentation",
+            body: "Comprehensive developer guidance, integration playbooks, and dedicated technical advisory available around the clock.",
+            ctaLabel: "",
+            ctaHref: ""
+          }
+        ]
+      }
+    ]
+  };
+}

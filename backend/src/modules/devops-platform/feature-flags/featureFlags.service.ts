@@ -182,7 +182,7 @@ export class FeatureFlagsService {
 
     // 3. Evaluate targeting rules
     if (flag.targetingRules && flag.targetingRules.length > 0) {
-      const attributes = {
+      const attributes: Record<string, any> = {
         userId: context.userId,
         ...(context.attributes || {}),
       };
