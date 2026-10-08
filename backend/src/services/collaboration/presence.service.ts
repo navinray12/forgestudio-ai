@@ -44,9 +44,15 @@ function sessionCookie(request: IncomingMessage): string | null {
   if (matches.length !== 1) return null;
   try { return decodeURIComponent(matches[0].slice(AUTH_COOKIE_NAME.length + 1)); } catch { return null; }
 }
-export function initPresenceWebSocketServer(server: HttpServer, deps: Dependencies = {
-  authenticate: authenticateSession, canRead: canReadWebsitePresence, origin: browserOrigin,
-}) {
+export function initPresenceWebSocketServer(
+  server: HttpServer,
+  deps: Dependencies = {
+    authenticate: authenticateSession,
+    canRead: canReadWebsitePresence,
+    origin: browserOrigin,
+  },
+  options: { attachUpgradeListener?: boolean } = { attachUpgradeListener: true }
+) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
   const peers = new Map<WebSocket, { principal: Principal; token: string; state: PeerState | null;
     verifiedAt: number; busy: boolean; lastSeen: number; windowAt: number; messages: number; joins: number }>();
@@ -163,7 +169,10 @@ export function initPresenceWebSocketServer(server: HttpServer, deps: Dependenci
       } finally { pending--; clearTimeout(timer); }
     } catch { reject(); }
   };
-  server.on("upgrade", upgrade);
+  (wss as any).upgrade = upgrade;
+  if (options.attachUpgradeListener !== false) {
+    server.on("upgrade", upgrade);
+  }
   const timer = setInterval(() => {
     for (const [ws, p] of peers) {
       if (Date.now() - p.lastSeen > 45000 || p.principal.expiresAt.getTime() <= Date.now()) { ws.terminate(); continue; }
@@ -176,6 +185,14 @@ export function initPresenceWebSocketServer(server: HttpServer, deps: Dependenci
     }
   }, 1000);
   timer.unref();
-  wss.on("close", () => { clearInterval(timer); server.off("upgrade", upgrade); peers.clear(); rooms.clear(); observe(); });
+  wss.on("close", () => {
+    clearInterval(timer);
+    if (options.attachUpgradeListener !== false) {
+      server.off("upgrade", upgrade);
+    }
+    peers.clear();
+    rooms.clear();
+    observe();
+  });
   return wss;
 }

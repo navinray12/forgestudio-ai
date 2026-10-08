@@ -11,8 +11,31 @@ validateIdentityConfiguration();
 
 const PORT = process.env.PORT || 5000;
 
+import {
+  realtimeWss,
+  handleRealtimeWebSocketConnection,
+} from "./modules/data-platform/data-layer/realtime.service.js";
+
 const server = http.createServer(app);
-initPresenceWebSocketServer(server);
+const presenceWss = initPresenceWebSocketServer(server, undefined, { attachUpgradeListener: false });
+
+server.on("upgrade", (req, socket, head) => {
+  try {
+    const pathname = new URL(req.url ?? "", "http://localhost").pathname;
+    if (pathname.startsWith("/ws/presence") || pathname.startsWith("/ws/collaboration")) {
+      (presenceWss as any).upgrade(req, socket, head);
+    } else if (pathname.startsWith("/ws/realtime")) {
+      realtimeWss.handleUpgrade(req, socket, head, (ws) => {
+        handleRealtimeWebSocketConnection(ws, req);
+      });
+    } else {
+      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+      socket.destroy();
+    }
+  } catch {
+    socket.destroy();
+  }
+});
 
 void ensureDatabaseTables().then(() => {
   server.listen(PORT, () => {

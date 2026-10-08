@@ -30,18 +30,16 @@ function seatLimit(features: unknown): number {
 export async function getOrganizationBillingSummary(organizationId: string, actorId: string) {
   return withTenantTransaction({ organizationId, actorId }, async (client) => {
     await requireOrganizationManagerSql(client, organizationId, actorId);
-    const [subscription, seats, usage, invoices] = await Promise.all([
-      client.query(`SELECT s.*,p.name AS "planName",p.slug AS "planSlug",p.price,p.currency,
+    const subscription = await client.query(`SELECT s.*,p.name AS "planName",p.slug AS "planSlug",p.price,p.currency,
                            p."websiteLimit",p."storageLimitMb",p."aiCreditLimit",p.features
                       FROM organization_subscriptions s
                       JOIN subscription_plans p ON p.id=s."planId"
-                     WHERE s."organizationId"=$1::uuid`, [organizationId]),
-      client.query(`SELECT count(*)::int AS count FROM organization_members WHERE "organizationId"=$1::uuid`, [organizationId]),
-      client.query(`SELECT metric,coalesce(sum(quantity),0)::bigint AS quantity
-                      FROM usage_events WHERE "organizationId"=$1::uuid GROUP BY metric ORDER BY metric`, [organizationId]),
-      client.query(`SELECT id,provider,"providerInvoiceId",amount,currency,status,"periodStart","periodEnd","createdAt"
-                      FROM organization_invoices WHERE "organizationId"=$1::uuid ORDER BY "createdAt" DESC LIMIT 50`, [organizationId]),
-    ]);
+                     WHERE s."organizationId"=$1::uuid`, [organizationId]);
+    const seats = await client.query(`SELECT count(*)::int AS count FROM organization_members WHERE "organizationId"=$1::uuid`, [organizationId]);
+    const usage = await client.query(`SELECT metric,coalesce(sum(quantity),0)::bigint AS quantity
+                      FROM usage_events WHERE "organizationId"=$1::uuid GROUP BY metric ORDER BY metric`, [organizationId]);
+    const invoices = await client.query(`SELECT id,provider,"providerInvoiceId",amount,currency,status,"periodStart","periodEnd","createdAt"
+                      FROM organization_invoices WHERE "organizationId"=$1::uuid ORDER BY "createdAt" DESC LIMIT 50`, [organizationId]);
     return {
       subscription: subscription.rows[0] ?? null,
       seatsUsed: seats.rows[0]?.count ?? 0,

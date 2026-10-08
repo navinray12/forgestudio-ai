@@ -73,6 +73,10 @@ import tenantCapabilityRoutes from "./services/capabilities/tenant-capabilities.
 import aiRoutes from "./routes/ai.routes.js";
 import supportRoutes from "./routes/support.routes.js";
 import forumRoutes from "./routes/forum.routes.js";
+import { storageRoutes } from "./modules/data-platform/storage/storage.routes.js";
+import { databaseRoutes } from "./modules/data-platform/database/database.routes.js";
+import { studioRoutes } from "./modules/data-platform/studio/studio.routes.js";
+import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 
 
@@ -242,6 +246,24 @@ export function createApplication(
   app.use("/api/uploads", uploadRoutes);
   app.use("/api/v1/media", mediaRoutes);
   app.use("/api/media", mediaRoutes);
+
+  // Category F: Data & Application Platform - Object Storage Engine (Module 28)
+  app.use("/api/v1/projects/:projectId/storage", storageRoutes);
+  app.use("/api/projects/:projectId/storage", storageRoutes);
+
+  // Category F: Data & Application Platform - Forge Database Engine (Module 25)
+  app.use("/api/v1/projects/:projectId/database", databaseRoutes);
+  app.use("/api/projects/:projectId/database", databaseRoutes);
+
+  // Category F: Data & Application Platform - Database Studio (Module 26)
+  app.use("/api/v1/projects/:projectId/studio", studioRoutes);
+  app.use("/api/projects/:projectId/studio", studioRoutes);
+
+  // Category F: Data & Application Platform - Data & API Layer (Module 27)
+  app.use("/api/v1/data", dataRoutes);
+  app.use("/api/data", dataRoutes);
+  app.use("/api/v1/projects/:projectId/sdk", sdkRoutes);
+  app.use("/api/projects/:projectId/sdk", sdkRoutes);
 
   // API Keys & Developer Access
   app.use("/api/v1/apikeys", apiKeysRoutes);
