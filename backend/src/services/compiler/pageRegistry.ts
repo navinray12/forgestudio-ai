@@ -207,6 +207,7 @@ export function isRecognizedPageEntry(
     const routeSegments = segments.filter((segment) => !/^\([^/]+\)$/.test(segment));
     const routePath = `/${routeSegments.join("/")}`;
     const lastSegment = routeSegments[routeSegments.length - 1] || "home";
+    if (routeSegments.length === 0) return { isPage: true, pageName: "Home", pageTitle: "Home", routePath: "/", componentName: "HomePage", targetFilePath: cleanPath };
     const title = lastSegment
       .replace(/[-_]/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -281,41 +282,6 @@ export function isRecognizedPageEntry(
     };
   }
 
-  // Root-level page file: e.g. about.tsx, about.jsx, contact.tsx
-  const rootMatch = null; // Arbitrary root JSX files are components, not declared routes.
-  if (rootMatch) {
-    let rawName = rootMatch[1];
-    let baseName = rawName;
-    if (baseName.endsWith("Page") && baseName.length > 4) {
-      baseName = baseName.slice(0, -4);
-    }
-    if (baseName.toLowerCase() === "home" || baseName.toLowerCase() === "index") {
-      return {
-        isPage: true,
-        pageName: "Home",
-        pageTitle: "Home",
-        routePath: "/",
-        componentName: "HomePage",
-        targetFilePath: framework === "nextjs" ? "app/page.tsx" : "src/pages/HomePage.tsx",
-      };
-    }
-    const title = baseName
-      .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .replace(/[-_]/g, " ")
-      .trim()
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    const slug = baseName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-    const compName = `${title.replace(/\s+/g, "")}Page`;
-    return {
-      isPage: true,
-      pageName: title,
-      pageTitle: title,
-      routePath: `/${slug}`,
-      componentName: compName,
-      targetFilePath: framework === "nextjs" ? `app/${slug}/page.tsx` : `src/pages/${compName}.tsx`,
-    };
-  }
-
+  // Root-level JSX is not automatically a route. Explicitly register it first.
   return { isPage: false };
 }
-
