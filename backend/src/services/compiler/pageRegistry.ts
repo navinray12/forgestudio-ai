@@ -205,6 +205,7 @@ export function isRecognizedPageEntry(
     const segments = cleanSegment.split("/");
     if (segments.some((segment) => segment.startsWith("_") || segment.startsWith("@") || /^\(\.{1,3}\)/.test(segment))) return { isPage: false };
     const routeSegments = segments.filter((segment) => !/^\([^/]+\)$/.test(segment));
+    if (routeSegments.some((segment) => segment === "." || segment === "..")) return { isPage: false };
     const routePath = `/${routeSegments.join("/")}`;
     const lastSegment = routeSegments[routeSegments.length - 1] || "home";
     if (routeSegments.length === 0) return { isPage: true, pageName: "Home", pageTitle: "Home", routePath: "/", componentName: "HomePage", targetFilePath: cleanPath };
@@ -225,6 +226,7 @@ export function isRecognizedPageEntry(
   const pagesRouterMatch = framework === "nextjs" ? cleanPath.match(/^(?:src\/)?pages\/(.+)\.(tsx|jsx)$/) : null;
   if (pagesRouterMatch) {
     const rawName = pagesRouterMatch[1];
+    if (rawName.split("/").some((segment) => segment.startsWith("_") || segment === "." || segment === "..")) return { isPage: false };
     if (rawName.startsWith("api/") || ["_app", "_document", "_error", "404", "500"].includes(rawName)) return { isPage: false };
     if (rawName === "index") {
       return {
@@ -241,7 +243,7 @@ export function isRecognizedPageEntry(
       isPage: true,
       pageName: title,
       pageTitle: title,
-      routePath: `/${rawName.toLowerCase()}`,
+      routePath: `/${rawName.replace(/\/index$/, "").toLowerCase()}`,
       componentName: `${title.replace(/\s+/g, "")}Page`,
       targetFilePath: cleanPath,
     };
@@ -270,7 +272,7 @@ export function isRecognizedPageEntry(
       .replace(/[-_]/g, " ")
       .trim()
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    const slug = baseName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+    const slug = baseName.replace(/([a-z])([A-Z])/g, "$1-$2").replace(/_/g, "-").toLowerCase();
     const compName = `${title.replace(/\s+/g, "")}Page`;
     return {
       isPage: true,
