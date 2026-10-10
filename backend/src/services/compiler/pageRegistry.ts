@@ -188,7 +188,7 @@ export function isRecognizedPageEntry(
   }
 
   // Next.js App Router: app/**/page.(tsx|jsx)
-  const appRouterMatch = cleanPath.match(/^app\/(.*?)\/?page\.(tsx|jsx)$/);
+  const appRouterMatch = framework === "nextjs" ? cleanPath.match(/^(?:src\/)?app\/(.*?)\/?page\.(tsx|jsx)$/) : null;
   if (appRouterMatch) {
     const rawSegment = appRouterMatch[1];
     if (!rawSegment || rawSegment === "") {
@@ -202,25 +202,29 @@ export function isRecognizedPageEntry(
       };
     }
     const cleanSegment = rawSegment.replace(/^[/\\]+|[/\\]+$/g, "");
-    const title = cleanSegment
-      .split("/")
-      .pop()!
+    const segments = cleanSegment.split("/");
+    if (segments.some((segment) => segment.startsWith("_") || segment.startsWith("@") || /^\(\.{1,3}\)/.test(segment))) return { isPage: false };
+    const routeSegments = segments.filter((segment) => !/^\([^/]+\)$/.test(segment));
+    const routePath = `/${routeSegments.join("/")}`;
+    const lastSegment = routeSegments[routeSegments.length - 1] || "home";
+    const title = lastSegment
       .replace(/[-_]/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
     return {
       isPage: true,
       pageName: title,
       pageTitle: title,
-      routePath: `/${cleanSegment}`,
+      routePath,
       componentName: `${title.replace(/\s+/g, "")}Page`,
       targetFilePath: cleanPath,
     };
   }
 
   // Next.js Pages router or pages dir: pages/*.(tsx|jsx)
-  const pagesRouterMatch = cleanPath.match(/^pages\/(.+)\.(tsx|jsx)$/);
+  const pagesRouterMatch = framework === "nextjs" ? cleanPath.match(/^(?:src\/)?pages\/(.+)\.(tsx|jsx)$/) : null;
   if (pagesRouterMatch) {
     const rawName = pagesRouterMatch[1];
+    if (rawName.startsWith("api/") || ["_app", "_document", "_error", "404", "500"].includes(rawName)) return { isPage: false };
     if (rawName === "index") {
       return {
         isPage: true,
@@ -243,7 +247,7 @@ export function isRecognizedPageEntry(
   }
 
   // React/Vite Pages: src/pages/*.(tsx|jsx)
-  const srcPagesMatch = cleanPath.match(/^src\/pages\/(.+)\.(tsx|jsx)$/);
+  const srcPagesMatch = framework === "react" ? cleanPath.match(/^src\/pages\/(.+)\.(tsx|jsx)$/) : null;
   if (srcPagesMatch) {
     let rawName = srcPagesMatch[1];
     let baseName = rawName;
@@ -278,7 +282,7 @@ export function isRecognizedPageEntry(
   }
 
   // Root-level page file: e.g. about.tsx, about.jsx, contact.tsx
-  const rootMatch = cleanPath.match(/^([A-Za-z0-9_-]+)\.(tsx|jsx)$/);
+  const rootMatch = null; // Arbitrary root JSX files are components, not declared routes.
   if (rootMatch) {
     let rawName = rootMatch[1];
     let baseName = rawName;
