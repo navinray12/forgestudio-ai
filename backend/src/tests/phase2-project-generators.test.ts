@@ -213,7 +213,7 @@ export const UserWidget = () => {
 
   const reactPlan = await buildReactGenerationPlan(mockProjectIR);
   assert.equal(reactPlan.framework, "react");
-  assert.ok(reactPlan.files.length >= 15, `React plan must generate complete project tree (got ${reactPlan.files.length})`);
+  assert.ok(reactPlan.files.length >= 12, `React plan must generate complete project tree (got ${reactPlan.files.length})`);
 
   // Verify critical files exist in plan
   const planPaths = new Set(reactPlan.files.map((f) => f.path));
@@ -225,37 +225,31 @@ export const UserWidget = () => {
   assert.ok(planPaths.has("src/App.tsx"), "Must scaffold src/App.tsx root shell");
   assert.ok(planPaths.has("src/routes/AppRoutes.tsx"), "Must scaffold AppRoutes.tsx");
   assert.ok(planPaths.has("src/components/ErrorBoundary.tsx"), "Must scaffold ErrorBoundary.tsx");
-  assert.ok(planPaths.has("src/contexts/AppContext.tsx"), "Must scaffold AppContext.tsx");
-  assert.ok(planPaths.has("src/hooks/useResponsive.ts"), "Must scaffold useResponsive hook");
-  assert.ok(planPaths.has("src/hooks/useApi.ts"), "Must scaffold useApi hook");
-  assert.ok(planPaths.has("src/services/apiClient.ts"), "Must scaffold apiClient.ts");
-  assert.ok(planPaths.has("src/components/LoadingSpinner.tsx"), "Must scaffold LoadingSpinner.tsx");
-  assert.ok(planPaths.has("src/components/EmptyState.tsx"), "Must scaffold EmptyState.tsx");
+  assert.strictEqual(planPaths.has("src/contexts/AppContext.tsx"), false, "Must not scaffold AppContext.tsx");
+  assert.strictEqual(planPaths.has("src/hooks/useResponsive.ts"), false, "Must not scaffold useResponsive hook");
+  assert.strictEqual(planPaths.has("src/hooks/useApi.ts"), false, "Must not scaffold useApi hook");
+  assert.strictEqual(planPaths.has("src/services/apiClient.ts"), false, "Must not scaffold apiClient.ts");
+  assert.strictEqual(planPaths.has("src/components/LoadingSpinner.tsx"), false, "Must not scaffold LoadingSpinner.tsx");
+  assert.strictEqual(planPaths.has("src/components/EmptyState.tsx"), false, "Must not scaffold EmptyState.tsx");
   assert.ok(planPaths.has("src/pages/NotFoundPage.tsx"), "Must scaffold NotFoundPage.tsx");
-  assert.ok(planPaths.has("src/tests/App.test.tsx"), "Must scaffold App.test.tsx test harness");
+  assert.strictEqual(planPaths.has("src/tests/App.test.tsx"), false, "Must not scaffold App.test.tsx test harness");
   assert.ok(planPaths.has(".env.example"), "Must scaffold .env.example");
-  logPass("Scaffolded all 17 required React project structure files, hooks, services, and tests");
+  logPass("Scaffolded all required React project structure files without unused boilerplate or fake empty components");
 
   // Verify Entrypoint Provider Hierarchy
   const mainFile = reactPlan.files.find((f) => f.path === "src/main.tsx");
   assert.ok(mainFile?.content.includes("<ErrorBoundary>"), "Entrypoint must wrap app in ErrorBoundary");
-  assert.ok(mainFile?.content.includes("<AppProvider>"), "Entrypoint must wrap app in AppProvider state context");
+  assert.strictEqual(mainFile?.content.includes("<AppProvider>"), false, "Entrypoint must not inject dummy AppProvider");
   assert.ok(mainFile?.content.includes("<BrowserRouter>"), "Entrypoint must mount BrowserRouter");
-  logPass("Entrypoint implements correct provider ordering: ErrorBoundary -> AppProvider -> BrowserRouter -> App");
+  logPass("Entrypoint implements correct provider ordering: ErrorBoundary -> BrowserRouter -> App");
 
   // Verify Routing Architecture
   const routesFile = reactPlan.files.find((f) => f.path === "src/routes/AppRoutes.tsx");
   assert.ok(routesFile?.content.includes('<Route path="/" element={<HomePage />} />'), "AppRoutes must map Home route");
   assert.ok(routesFile?.content.includes('<Route path="/about" element={<AboutPage />} />'), "AppRoutes must map About route");
   assert.ok(routesFile?.content.includes('<Route path="*" element={<NotFoundPage />} />'), "AppRoutes must wire 404 Catch-All");
-  logPass("AppRoutes.tsx generates dynamic and static routes with 404 fallback");
-
-  // Verify API Client Wiring
-  const apiFile = reactPlan.files.find((f) => f.path === "src/services/apiClient.ts");
-  assert.ok(apiFile?.content.includes("class ApiClient"), "Must generate typed ApiClient class");
-  assert.ok(apiFile?.content.includes("Authorization"), "API client must inject auth token");
-  assert.ok(apiFile?.content.includes("retries"), "API client must support retry handling");
-  logPass("src/services/apiClient.ts generates production-grade fetch client with retry and auth headers");
+  assert.strictEqual(routesFile?.content.includes("LoadingSpinner"), false, "AppRoutes must not import LoadingSpinner");
+  logPass("AppRoutes.tsx generates dynamic and static routes with 404 fallback without unnecessary Suspense");
 
   // Verify Accessibility & Responsive Output in Components
   const homeFile = reactPlan.files.find((f) => f.path === "src/pages/HomePage.tsx");

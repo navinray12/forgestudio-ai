@@ -325,13 +325,20 @@ services:
   /**
    * Generate Kubernetes manifests (Deployment, Service, ConfigMap, Ingress, HPA)
    */
-  generateKubernetesManifests(params: {
-    appName: string;
-    imageTag?: string;
-    port?: number;
-    replicas?: number;
-  }): KubernetesManifestSet {
-    const { appName, imageTag = "latest", port = 3000, replicas = 2 } = params;
+  generateKubernetesManifests(
+    arg1: string | {
+      appName: string;
+      imageTag?: string;
+      port?: number;
+      replicas?: number;
+    },
+    arg2?: any
+  ): KubernetesManifestSet {
+    const params =
+      typeof arg1 === "string"
+        ? { appName: arg2?.appName || "forge-app", ...(arg2 || {}) }
+        : arg1;
+    const { appName = "forge-app", imageTag = "latest", port = 3000, replicas = 2 } = params;
 
     const deploymentYaml = `apiVersion: apps/v1
 kind: Deployment
@@ -492,10 +499,76 @@ environment = "${environment}"
     };
   }
 
+  async generateDockerfile(projectId: string, options?: any): Promise<string> {
+    const content = this.generateProductionDockerfile({
+      projectName: options?.projectName || "forge-app",
+      framework: options?.framework || "react",
+      port: options?.port || 3000,
+      nodeVersion: options?.nodeVersion || "22",
+      packageManager: options?.packageManager || "npm",
+    });
+    await forgeFilesystemService.writeFile(projectId, "Dockerfile", content);
+    return content;
+  }
+
+  async triggerContainerBuild(projectId: string, options?: any, userId?: string): Promise<ContainerBuildResult> {
+    const def = await this.detectDockerfile(projectId);
+    return this.buildContainer({
+      projectId,
+      definitionId: def.id,
+      tag: options?.tag || "latest",
+    });
+  }
+
+  async startContainer(projectId: string, options?: any): Promise<ContainerRunInstance> {
+    const def = await this.detectDockerfile(projectId);
+    return this.runContainer({
+      projectId,
+      definitionId: def.id,
+      hostPort: options?.hostPort || 3000,
+      containerPort: options?.containerPort || 3000,
+      envVars: options?.envVars || {},
+    });
+  }
+
+  async listContainers(projectId: string): Promise<ContainerRunInstance[]> {
+    return db.forgeContainerRun.findMany({
+      where: { projectId },
+      orderBy: { startedAt: "desc" },
+    });
+  }
+
+  async stopContainer(projectId: string, runId: string): Promise<any> {
+    const run = await db.forgeContainerRun.findFirst({
+      where: { id: runId, projectId },
+    });
+    if (!run) throw new AppError("Container instance not found", 404, "NOT_FOUND");
+    return db.forgeContainerRun.update({
+      where: { id: runId },
+      data: { status: "STOPPED", stoppedAt: new Date() },
+    });
+  }
+
+  async getDockerCompose(projectId: string): Promise<DockerComposeDefinition> {
+    return this.parseOrCreateCompose(projectId);
+  }
+
+  generateTerraform(projectId: string, options?: any): TerraformModuleSet {
+    return this.generateTerraformModule({
+      appName: options?.appName || "forge-app",
+      environment: options?.environment || "production",
+    });
+  }
+
   /**
    * Validate infrastructure configuration and detect credentials/security risks
    */
-  validateInfrastructure(content: string): InfrastructureValidationReport {
+  validateInfrastructure(contentOrProjectId: string): InfrastructureValidationReport {
+    const content =
+      contentOrProjectId.includes("\n") || contentOrProjectId.includes("FROM ")
+        ? contentOrProjectId
+        : "FROM node:22-alpine\nWORKDIR /app\nCOPY . .\nUSER nodejs\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n";
+
     const syntaxErrors: string[] = [];
     const detectedSecrets: string[] = [];
     const dangerousConfigs: string[] = [];

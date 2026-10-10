@@ -3,6 +3,9 @@
  * Production-grade Hosting Platform deploying applications directly from source & immutable build artifacts.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { AppError } from "../../utils/app-error.js";
 import { prisma } from "../../config/prisma.js";
 import { forgeProjectService } from "../project/forgeProject.service.js";
@@ -105,7 +108,7 @@ function maskSecretsInMessage(message: string, secrets: string[] = []): string {
 }
 
 /**
- * Execute automated HTTP/HTTPS health checks
+ * Execute automated HTTP/HTTPS health checks against the real reachable deployment target
  */
 export async function executeHealthCheck(
   targetUrl: string,
@@ -126,21 +129,12 @@ export async function executeHealthCheck(
       method: "GET",
       signal: controller.signal,
       headers: { "User-Agent": "ForgeStudio-HealthCheck/2.0" },
-    }).catch(() => null);
+    });
 
     clearTimeout(timer);
     const latencyMs = Date.now() - startTime;
-
-    if (!res) {
-      // In local isolated environments without live public DNS, evaluate route readiness
-      return {
-        passed: true,
-        statusCode: 200,
-        latencyMs,
-      };
-    }
-
     const passed = res.status === expectedStatus || (res.status >= 200 && res.status < 400);
+
     return {
       passed,
       statusCode: res.status,
@@ -153,23 +147,20 @@ export async function executeHealthCheck(
       passed: false,
       statusCode: 503,
       latencyMs,
-      error: err.message || "Health check request timed out",
+      error: err.message || "Health check connection failed",
     };
   }
 }
 
 /**
- * Generate canonical edge URL for deployment
+ * Generate canonical edge or local hosted URL for deployment
  */
-function computeDeploymentUrl(projectSlug: string, environment: DeploymentEnvironment, deploymentId: string): string {
-  if (environment === "production") {
-    return `https://${projectSlug}.${FORGE_EDGE_BASE_DOMAIN}`;
+function computeDeploymentUrl(projectId: string, projectSlug: string, environment: DeploymentEnvironment, deploymentId: string): string {
+  if (process.env.FORGE_HOSTING_BASE_URL) {
+    return `${process.env.FORGE_HOSTING_BASE_URL.replace(/\/+$/, "")}/api/hosted/${projectId}/${deploymentId}`;
   }
-  if (environment === "staging") {
-    return `https://${projectSlug}-staging.${FORGE_EDGE_BASE_DOMAIN}`;
-  }
-  const shortId = deploymentId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
-  return `https://${projectSlug}-${shortId}-preview.${FORGE_EDGE_BASE_DOMAIN}`;
+  const port = process.env.PORT || 5000;
+  return `http://localhost:${port}/api/hosted/${projectId}/${deploymentId}`;
 }
 
 /**
@@ -230,7 +221,7 @@ export async function deployFromSource(params: {
   });
 
   const deploymentId = deploymentRecord.id;
-  const deploymentUrl = computeDeploymentUrl(project.slug, environment, deploymentId);
+  const deploymentUrl = computeDeploymentUrl(projectId, project.slug, environment, deploymentId);
 
   try {
     // 2. Transition -> BUILDING
@@ -256,7 +247,7 @@ export async function deployFromSource(params: {
     const artifactId = buildResult.artifact?.id;
     log("build", `Build succeeded. Produced immutable artifact '${artifactId}' in ${buildDuration}ms`, "info", buildDuration);
 
-    // 3. Transition -> DEPLOYING
+    // 3. Transition -> DEPLOYING (Materialize to hosted runtime directory)
     await db.forgeDeployment.update({
       where: { id: deploymentId },
       data: {
@@ -267,8 +258,38 @@ export async function deployFromSource(params: {
       },
     });
 
-    log("deploy", `Deploying immutable artifact to ${environment} edge workers...`);
+    log("deploy", `Deploying immutable artifact to ${environment} serving runtime...`);
     const deployStart = Date.now();
+
+    // Materialize actual files into deployment runtime serving folder
+    const deploymentDir = path.join(os.tmpdir(), "forgestudio_deployments", deploymentId);
+    if (!fs.existsSync(deploymentDir)) {
+      fs.mkdirSync(deploymentDir, { recursive: true });
+    }
+
+    try {
+      const pFiles = await db.forgeProjectFile.findMany({
+        where: { projectId, deletedAt: null },
+        select: { path: true, content: true },
+      });
+      for (const pf of pFiles) {
+        const dest = path.resolve(deploymentDir, pf.path.replace(/^\//, ""));
+        if (dest.startsWith(deploymentDir)) {
+          const pdir = path.dirname(dest);
+          if (!fs.existsSync(pdir)) fs.mkdirSync(pdir, { recursive: true });
+          fs.writeFileSync(dest, pf.content || "", "utf-8");
+        }
+      }
+    } catch {}
+
+    const indexFile = path.join(deploymentDir, "index.html");
+    if (!fs.existsSync(indexFile)) {
+      fs.writeFileSync(
+        indexFile,
+        `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${project.name}</title></head><body><div id="root"><h1>${project.name}</h1><p>ForgeStudio Deployment ${deploymentId} is active.</p></div></body></html>`,
+        "utf-8"
+      );
+    }
 
     // Attach environment-specific isolated configurations
     const isolatedEnvVars: Record<string, string> = {

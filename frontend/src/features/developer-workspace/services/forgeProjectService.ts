@@ -1,6 +1,8 @@
+import { downloadAuthenticatedFile } from "../../../utils/downloadFile";
+
 const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/v1/projects`;
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit & { allowFailure?: boolean } = {}): Promise<T> {
   const token = typeof localStorage !== "undefined" ? localStorage.getItem("token") : null;
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type")) {
@@ -27,6 +29,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     }
   }
 
+  // Some operations report a structured, non-successful outcome (diagnostics,
+  // conflicts) that the caller needs in full rather than as a thrown message
+  if (options.allowFailure && data && typeof data === "object") {
+    return data;
+  }
+
   if (!res.ok || (data && data.success === false)) {
     const errorMsg =
       data?.error?.message ||
@@ -44,7 +52,88 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data;
 }
 
+export interface SyncDiagnostic {
+  severity: "error" | "warning" | "info";
+  code: string;
+  message: string;
+  filePath?: string;
+  line?: number;
+  col?: number;
+  suggestedAction?: string;
+}
+
+export type CodeSyncStatus =
+  | "synced"
+  | "unchanged"
+  | "not-a-page"
+  | "unsupported"
+  | "invalid"
+  | "conflict"
+  | "reverted"
+  | "error";
+
+/** Outcome of reconciling a saved source file with the visual document */
+export interface CodeSyncResult {
+  success: boolean;
+  status?: CodeSyncStatus;
+  message?: string;
+  page?: ProjectPage;
+  appliedChangesCount: number;
+  conflicts: Array<{ filePath: string; reason: string }>;
+  diagnostics: SyncDiagnostic[];
+  /** Paths whose persisted content changed because of the sync */
+  updatedFiles: string[];
+  documentVersion?: number;
+}
+
+export interface ProjectPage {
+  key: string;
+  pageId: string | null;
+  name: string;
+  title: string;
+  routePath: string;
+  filePath: string;
+  componentName: string;
+  isHome: boolean;
+  fileExists?: boolean;
+  ownership?: "generated" | "code" | "missing";
+  sync?: { status: string; message?: string; diagnostics?: SyncDiagnostic[]; updatedAt?: string } | null;
+}
+
+export interface VisualSyncState {
+  synced: boolean;
+  stale: boolean;
+  error?: string;
+  /** Page files that kept hand-written code instead of the latest visual design */
+  conflicts?: string[];
+}
+
+export interface PageMutationResult {
+  success: boolean;
+  message?: string;
+  code?: string;
+  page?: ProjectPage | null;
+  pages?: ProjectPage[];
+  visualSync?: VisualSyncState;
+  preservedFile?: string;
+  diagnostics?: SyncDiagnostic[];
+}
+
+export interface SourcePreview {
+  success: boolean;
+  html: string;
+  framework: "react" | "nextjs";
+  route: string;
+  routes: string[];
+  errors: Array<{ file?: string; line?: number; column?: number; message: string }>;
+  warnings: string[];
+  mode: "local" | "cdn";
+  sourceHash: string;
+}
+
 export interface ForgeProject {
+  /** Present when opened through a website: whether source was regenerated from the saved design */
+  visualSync?: VisualSyncState;
   id: string;
   slug: string;
   name: string;
@@ -185,8 +274,8 @@ export const forgeProjectService = {
       isProtected?: boolean;
       reason?: string;
     }
-  ): Promise<{ file: ProjectFile }> {
-    return request<{ file: ProjectFile }>(`/${projectId}/files`, {
+  ): Promise<{ file: ProjectFile; sync?: CodeSyncResult | null }> {
+    return request<{ file: ProjectFile; sync?: CodeSyncResult | null }>(`/${projectId}/files`, {
       method: "POST",
       body: JSON.stringify({ path: filePath, ...payload }),
     });
@@ -268,22 +357,67 @@ export const forgeProjectService = {
     );
   },
 
+  /**
+   * Reconcile a saved source file into the visual document. `resolve` settles a
+   * reported conflict by keeping the code or the visual version.
+   */
   async syncCodeToVisual(
     projectId: string,
-    filePath: string
-  ): Promise<{
-    success: boolean;
-    appliedChangesCount: number;
-    conflicts: any[];
-    diagnostics: any[];
-    reconciledEditorData?: any;
-  }> {
-    return request(
+    filePath: string,
+    resolve?: "code" | "visual"
+  ): Promise<CodeSyncResult> {
+    const result = await request<CodeSyncResult & { message?: string }>(
       `/${projectId}/sync/code-to-visual`,
       {
         method: "POST",
-        body: JSON.stringify({ filePath }),
+        body: JSON.stringify({ filePath, resolve }),
+        allowFailure: true,
       }
+    );
+    // A transport-level failure has no sync status
+    if (!result.status) throw new Error(result.message || "Synchronisation failed");
+    return result;
+  },
+
+  // Visual pages: the registry behind routes, page files and the Visual Editor page list
+  async listPages(projectId: string): Promise<{ pages: ProjectPage[] }> {
+    return request<{ pages: ProjectPage[] }>(`/${projectId}/pages`);
+  },
+
+  async createPage(
+    projectId: string,
+    payload: { name: string; route?: string; sourcePath?: string }
+  ): Promise<PageMutationResult> {
+    return request<PageMutationResult>(`/${projectId}/pages`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      allowFailure: true,
+    });
+  },
+
+  async updatePage(
+    projectId: string,
+    pageKey: string,
+    payload: { name?: string; route?: string }
+  ): Promise<PageMutationResult> {
+    return request<PageMutationResult>(`/${projectId}/pages/${encodeURIComponent(pageKey)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      allowFailure: true,
+    });
+  },
+
+  async deletePage(projectId: string, pageKey: string): Promise<PageMutationResult> {
+    return request<PageMutationResult>(`/${projectId}/pages/${encodeURIComponent(pageKey)}`, {
+      method: "DELETE",
+      allowFailure: true,
+    });
+  },
+
+  /** A runnable document built from the project's persisted source files */
+  async getSourcePreview(projectId: string, route = "/"): Promise<{ preview: SourcePreview }> {
+    return request<{ preview: SourcePreview }>(
+      `/${projectId}/preview/source?route=${encodeURIComponent(route)}`
     );
   },
 
@@ -528,6 +662,11 @@ export const forgeProjectService = {
       method: "POST",
       body: JSON.stringify({ options }),
     });
+  },
+
+  /** Download the project's persisted source files (including manual edits) as a ZIP */
+  async exportProjectZip(projectId: string, fallbackName: string): Promise<string> {
+    return downloadAuthenticatedFile(`${API_BASE}/${projectId}/export/zip`, `${fallbackName}.zip`);
   },
 
   async getGenerationPlan(

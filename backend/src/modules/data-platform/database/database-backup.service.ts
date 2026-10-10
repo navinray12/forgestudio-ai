@@ -2,15 +2,14 @@ import { spawn } from "node:child_process";
 import zlib from "node:zlib";
 import crypto from "node:crypto";
 import type { Readable } from "node:stream";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { prisma } from "../../../config/prisma.js";
-import { decryptCredential } from "../common/crypto.utils.js";
-import { TenantPoolManager } from "../common/pool-manager.js";
 import {
-  getS3Client,
+  putObject,
   ensureBucketExists,
   getObjectStream,
 } from "../storage/s3-client.js";
+import { prisma } from "../../../config/prisma.js";
+import { decryptCredential } from "../common/crypto.utils.js";
+import { TenantPoolManager } from "../common/pool-manager.js";
 import { AppError } from "../../../utils/app-error.js";
 import type {
   DatabaseEnvironment,
@@ -192,14 +191,11 @@ export async function createBackup(
   const storageKey = `backups/${projectId}/${timestamp}-${dbRecord.dbName}.sql.gz`;
 
   // 4. Upload compressed snapshot to S3
-  const s3Client = getS3Client();
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: BACKUP_BUCKET,
-      Key: storageKey,
-      Body: compressedBuffer,
-      ContentType: "application/gzip",
-    })
+  await putObject(
+    BACKUP_BUCKET,
+    storageKey,
+    compressedBuffer,
+    "application/gzip"
   );
 
   // 5. Record backup in Prisma transaction

@@ -78,6 +78,10 @@ import { databaseRoutes } from "./modules/data-platform/database/database.routes
 import { studioRoutes } from "./modules/data-platform/studio/studio.routes.js";
 import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.routes.js";
 import projectRoutes from "./routes/project.routes.js";
+import codeIntelligenceRoutes from "./routes/codeIntelligence.routes.js";
+import knowledgeGraphRoutes from "./routes/knowledgeGraph.routes.js";
+import designSystemRoutes from "./routes/designSystem.routes.js";
+import hostedRoutes from "./routes/hosted.routes.js";
 
 
 const authRateLimiter = rateLimit({
@@ -211,6 +215,7 @@ export function createApplication(
   app.use("/api/forum", forumRoutes);
 
   // Phase 2: Forge Project Model, Persistent Filesystem, Manifest, Compiler, Sync & Workspace
+  app.use("/api/hosted", hostedRoutes);
   app.use("/api/v1/projects", projectRoutes);
   app.use("/api/projects", projectRoutes);
 
@@ -270,6 +275,16 @@ export function createApplication(
   app.use("/api/apikeys", apiKeysRoutes);
   app.use("/api/v1/developer", developerRoutes);
   app.use("/api/developer", developerRoutes);
+
+  // Milestone 1: Feature 35 & 36 - Code Intelligence & Repository Knowledge Graph
+  app.use("/api/v1/intelligence", codeIntelligenceRoutes);
+  app.use("/api/intelligence", codeIntelligenceRoutes);
+  app.use("/api/v1/knowledge-graph", knowledgeGraphRoutes);
+  app.use("/api/knowledge-graph", knowledgeGraphRoutes);
+
+  // Milestone A: Features 34, 33, 32 - Design System, Component Registry & Project Templates
+  app.use("/api/v1/design-system", designSystemRoutes);
+  app.use("/api/design-system", designSystemRoutes);
 
   // Editor & Custom Content
   app.use("/api/v1/composer", composerRoutes);

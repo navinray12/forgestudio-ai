@@ -146,6 +146,17 @@ const MODEL_TO_TABLE: Record<string, string> = {
   forgeComposeDefinition: "forge_compose_definitions",
   forgeInfrastructureDefinition: "forge_infrastructure_definitions",
   forgeInfrastructureValidation: "forge_infrastructure_validations",
+  // Milestone 1: Feature 35 & 36
+  forgeCodeSymbol: "forge_code_symbols",
+  forgeCodeReference: "forge_code_references",
+  forgeFileDependency: "forge_file_dependencies",
+  forgeIndexStatus: "forge_index_status",
+  forgeKnowledgeGraphNode: "forge_knowledge_graph_nodes",
+  forgeKnowledgeGraphEdge: "forge_knowledge_graph_edges",
+  // Milestone A: Features 34, 33, 32
+  forgeDesignToken: "forge_design_tokens",
+  forgeComponentRegistry: "forge_component_registry",
+  forgeProjectTemplate: "forge_project_templates",
 };
 
 function quoteCol(col: string): string {
@@ -844,8 +855,11 @@ export function createFallbackModelDelegate(modelName: string) {
         setParts.push(`${quoteCol(key)} = $${values.length}`);
       }
 
-      // Add updatedAt if table supports it
-      setParts.push(`"updatedAt" = now()`);
+      // Add updatedAt if table supports it (unless the caller set it: Postgres rejects
+      // a statement that assigns the same column twice)
+      if (args.data.updatedAt === undefined) {
+        setParts.push(`"updatedAt" = now()`);
+      }
 
       const whereClause = buildWhereClause(args.where, values);
       const sql = `UPDATE ${table} SET ${setParts.join(", ")} ${whereClause} RETURNING *`;

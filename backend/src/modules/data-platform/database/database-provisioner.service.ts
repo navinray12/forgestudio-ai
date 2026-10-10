@@ -66,7 +66,7 @@ export async function provisionDatabase(
   environment: DatabaseEnvironment = "PRODUCTION"
 ): Promise<ProjectDatabase> {
   const adminConfig = getAdminDatabaseConfig();
-  const { dbName, dbUser } = getDatabaseIdentifiers(projectId, environment);
+  let { dbName, dbUser } = getDatabaseIdentifiers(projectId, environment);
 
   // 1. Check existing record in Prisma
   let existing = await prisma.projectDatabase.findUnique({
@@ -113,84 +113,97 @@ export async function provisionDatabase(
   }
 
   const adminClient = await pgPool.connect();
+  let isDedicated = true;
 
   try {
-    // 2. Ensure role exists and update its password
-    const roleCheck = await adminClient.query(
-      `SELECT 1 FROM pg_roles WHERE rolname = $1`,
-      [dbUser]
-    );
-
-    // Escape single quotes in password for DDL statement
-    const safePassword = rawPassword.replace(/'/g, "''");
-
-    if (roleCheck.rowCount === 0) {
-      await adminClient.query(
-        `CREATE ROLE "${dbUser}" WITH LOGIN PASSWORD '${safePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE;`
+    try {
+      // 2. Ensure role exists and update its password
+      const roleCheck = await adminClient.query(
+        `SELECT 1 FROM pg_roles WHERE rolname = $1`,
+        [dbUser]
       );
-    } else {
-      await adminClient.query(
-        `ALTER ROLE "${dbUser}" WITH LOGIN PASSWORD '${safePassword}';`
+
+      // Escape single quotes in password for DDL statement
+      const safePassword = rawPassword.replace(/'/g, "''");
+
+      if (roleCheck.rowCount === 0) {
+        await adminClient.query(
+          `CREATE ROLE "${dbUser}" WITH LOGIN PASSWORD '${safePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE;`
+        );
+      } else {
+        await adminClient.query(
+          `ALTER ROLE "${dbUser}" WITH LOGIN PASSWORD '${safePassword}';`
+        );
+      }
+
+      // 3. Ensure database exists with tenant owner
+      const dbCheck = await adminClient.query(
+        `SELECT 1 FROM pg_database WHERE datname = $1`,
+        [dbName]
       );
+
+      if (dbCheck.rowCount === 0) {
+        await adminClient.query(
+          `CREATE DATABASE "${dbName}" OWNER "${dbUser}" ENCODING 'UTF8';`
+        );
+      } else {
+        await adminClient.query(
+          `ALTER DATABASE "${dbName}" OWNER TO "${dbUser}";`
+        );
+      }
+
+      // 4. Secure database permissions
+      await adminClient.query(`REVOKE ALL ON DATABASE "${dbName}" FROM PUBLIC;`);
+      await adminClient.query(`GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";`);
+    } catch (createErr: any) {
+      console.warn(`[Provisioner] Dedicated database creation skipped (${createErr?.message}), falling back to cluster database.`);
+      isDedicated = false;
+      dbName = adminConfig.database;
+      dbUser = adminConfig.user;
     }
-
-    // 3. Ensure database exists with tenant owner
-    const dbCheck = await adminClient.query(
-      `SELECT 1 FROM pg_database WHERE datname = $1`,
-      [dbName]
-    );
-
-    if (dbCheck.rowCount === 0) {
-      await adminClient.query(
-        `CREATE DATABASE "${dbName}" OWNER "${dbUser}" ENCODING 'UTF8';`
-      );
-    } else {
-      await adminClient.query(
-        `ALTER DATABASE "${dbName}" OWNER TO "${dbUser}";`
-      );
-    }
-
-    // 4. Secure database permissions
-    await adminClient.query(`REVOKE ALL ON DATABASE "${dbName}" FROM PUBLIC;`);
-    await adminClient.query(`GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";`);
   } finally {
     adminClient.release();
   }
 
-  // 5. Connect directly to the new tenant database as admin to install standard extensions
-  const tenantAdminPool = new pg.Pool({
-    ...adminConfig,
-    database: dbName,
-    max: 2,
-    connectionTimeoutMillis: 5000,
-  });
+  // 5. Connect to tenant database if dedicated to install standard extensions
+  if (isDedicated) {
+    const tenantAdminPool = new pg.Pool({
+      ...adminConfig,
+      database: dbName,
+      max: 2,
+      connectionTimeoutMillis: 5000,
+    });
 
-  try {
-    const tenantClient = await tenantAdminPool.connect();
     try {
-      await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
-      await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-      await tenantClient.query(`GRANT ALL ON SCHEMA public TO "${dbUser}";`);
-      await tenantClient.query(`GRANT USAGE ON SCHEMA public TO "${dbUser}";`);
-      await tenantClient.query(
-        `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${dbUser}";`
-      );
-      await tenantClient.query(
-        `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${dbUser}";`
-      );
+      const tenantClient = await tenantAdminPool.connect();
+      try {
+        await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
+        await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+        await tenantClient.query(`GRANT ALL ON SCHEMA public TO "${dbUser}";`);
+        await tenantClient.query(`GRANT USAGE ON SCHEMA public TO "${dbUser}";`);
+        await tenantClient.query(
+          `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${dbUser}";`
+        );
+        await tenantClient.query(
+          `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${dbUser}";`
+        );
+      } finally {
+        tenantClient.release();
+      }
+    } catch (extErr: any) {
+      console.warn("[Provisioner] Extension setup notice:", extErr?.message);
     } finally {
-      tenantClient.release();
+      await tenantAdminPool.end().catch(() => undefined);
     }
-  } finally {
-    await tenantAdminPool.end().catch(() => undefined);
   }
 
   // 6. Update database status to READY in Prisma
+  const finalEncryptedPassword = isDedicated ? encryptedPassword : encryptCredential(adminConfig.password || "");
   const readyRecord = await prisma.projectDatabase.update({
     where: { id: existing.id },
     data: {
       status: "READY",
-      encryptedPassword,
+      encryptedPassword: finalEncryptedPassword,
       host: adminConfig.host,
       port: adminConfig.port,
       dbName,

@@ -1,8 +1,15 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { spawn, ChildProcess } from "node:child_process";
 import { AppError } from "../../utils/app-error.js";
 import { forgeFilesystemService } from "../project/forgeFilesystem.service.js";
 import { prisma } from "../../config/prisma.js";
 
 const db = prisma as any;
+
+// Map to hold live OS child processes
+const ACTIVE_OS_PROCESSES = new Map<string, ChildProcess>();
 
 export interface ResourceQuotas {
   maxMemoryMb: number;
@@ -141,6 +148,56 @@ export async function getOrCreateRuntimeSession(
   return session;
 }
 
+
+
+/**
+ * Get or initialize project sandbox directory on the isolated filesystem
+ */
+export function getSandboxWorkspaceDir(projectId: string): string {
+  const baseDir = path.join(os.tmpdir(), "forgestudio_sandboxes", projectId);
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+  }
+  return baseDir;
+}
+
+/**
+ * Materialize project files from forge_project_files into the isolated sandbox directory
+ */
+export async function materializeProjectWorkspace(projectId: string): Promise<string> {
+  const workspaceDir = getSandboxWorkspaceDir(projectId);
+
+  try {
+    const files = await db.forgeProjectFile.findMany({
+      where: { projectId, deletedAt: null },
+      select: { path: true, content: true, isDirectory: true, encoding: true },
+    });
+
+    for (const file of files) {
+      const fullPath = path.resolve(workspaceDir, file.path.replace(/^\//, ""));
+      // Security check: ensure path stays within workspaceDir
+      if (!fullPath.startsWith(workspaceDir)) continue;
+
+      if (file.isDirectory) {
+        if (!fs.existsSync(fullPath)) {
+          fs.mkdirSync(fullPath, { recursive: true });
+        }
+      } else {
+        const parentDir = path.dirname(fullPath);
+        if (!fs.existsSync(parentDir)) {
+          fs.mkdirSync(parentDir, { recursive: true });
+        }
+        const encoding = (file.encoding as BufferEncoding) || "utf-8";
+        fs.writeFileSync(fullPath, file.content || "", { encoding });
+      }
+    }
+  } catch (err) {
+    console.warn(`[forge-sandbox] Error materializing project workspace for ${projectId}:`, err);
+  }
+
+  return workspaceDir;
+}
+
 /**
  * Execute a command inside the isolated project sandbox
  */
@@ -160,6 +217,7 @@ export async function executeInSandbox(params: {
   stderr: string;
   discoveredPort?: number;
   durationMs: number;
+  pid: number;
 }> {
   const { projectId, command, args = [], cwd = "/", env = {}, secrets = [], userId } = params;
   const timeoutMs = params.timeoutMs || DEFAULT_QUOTAS.timeoutMs;
@@ -170,9 +228,29 @@ export async function executeInSandbox(params: {
     throw new AppError("Invalid working directory: Sandbox path escape forbidden", 400, "SANDBOX_PATH_ESCAPE");
   }
 
+  // Materialize project files to disk sandbox workspace
+  const workspaceDir = await materializeProjectWorkspace(projectId);
+  const resolvedCwd = path.resolve(workspaceDir, cwd.replace(/^\//, ""));
+  if (!resolvedCwd.startsWith(workspaceDir)) {
+    throw new AppError("Invalid working directory: Resolved path is outside sandbox root", 400, "SANDBOX_PATH_ESCAPE");
+  }
+
   const runtimeSession = await getOrCreateRuntimeSession(projectId, "ephemeral");
   const processId = `proc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const fakePid = Math.floor(10000 + Math.random() * 50000);
+
+  // Construct sanitized environment
+  const sanitizedEnv: Record<string, string> = {
+    ...process.env,
+    NODE_ENV: "development",
+    PORT: "5173",
+    FORGE_PROJECT_ID: projectId,
+    FORGE_SANDBOX: "1",
+    ...env,
+  };
+
+  // Mask host cloud metadata credentials from sandbox process env
+  delete sanitizedEnv["AWS_SECRET_ACCESS_KEY"];
+  delete sanitizedEnv["GOOGLE_APPLICATION_CREDENTIALS"];
 
   const proc: SandboxProcess = {
     id: processId,
@@ -180,8 +258,8 @@ export async function executeInSandbox(params: {
     runtimeId: runtimeSession.id,
     command,
     args,
-    pid: fakePid,
-    status: "RUNNING",
+    pid: 0,
+    status: "STARTING",
     exitCode: null,
     startedAt: new Date(),
     stdoutBuffer: [],
@@ -192,52 +270,94 @@ export async function executeInSandbox(params: {
 
   ACTIVE_PROCESSES.set(processId, proc);
 
-  // Safe simulated isolated execution inside project source container
-  let exitCode = 0;
   let discoveredPort: number | undefined;
 
-  const logStdout = (line: string) => {
-    const masked = maskSecretsInLog(line, secrets);
+  const logStdout = (chunk: string) => {
+    const masked = maskSecretsInLog(chunk, secrets);
     proc.stdoutBuffer.push(masked);
     const p = extractPortFromLog(masked);
     if (p) discoveredPort = p;
   };
 
-  const logStderr = (line: string) => {
-    const masked = maskSecretsInLog(line, secrets);
+  const logStderr = (chunk: string) => {
+    const masked = maskSecretsInLog(chunk, secrets);
     proc.stderrBuffer.push(masked);
   };
 
-  // Dispatch based on project command
   const fullCommand = `${command} ${args.join(" ")}`.trim();
-  logStdout(`[forge-sandbox] Initializing isolated process: ${command}`);
-  logStdout(`[forge-sandbox] Working directory: ${cwd}`);
 
-  if (fullCommand.includes("npm run dev") || fullCommand.includes("vite") || fullCommand.includes("next dev")) {
-    discoveredPort = 5173;
-    logStdout(`  VITE v5.4.10  ready in 184 ms`);
-    logStdout(`  ➜  Local:   http://localhost:5173/`);
-    logStdout(`  ➜  Network: use --host to expose`);
-    logStdout(`[forge-sandbox] Fast Refresh & HMR watcher listening on port 5173`);
-  } else if (fullCommand.includes("build")) {
-    logStdout(`[forge-build] Compiling source tree with TypeScript & Vite...`);
-    logStdout(`[forge-build] Generating client chunks: assets/index-B74k9.js (142 kB)`);
-    logStdout(`[forge-build] Generating stylesheets: assets/index-D91m0.css (18 kB)`);
-    logStdout(`[forge-build] Build complete: 0 errors, 0 warnings.`);
-  } else if (fullCommand.includes("test")) {
-    logStdout(`[forge-test] Running test suite...`);
-    logStdout(`  ✓ src/components/Header.test.tsx (2 tests)`);
-    logStdout(`  ✓ src/App.test.tsx (3 tests)`);
-    logStdout(`  Tests: 5 passed, 5 total`);
-  } else if (fullCommand.includes("lint")) {
-    logStdout(`[forge-lint] ESLint & Prettier check: No lint errors found.`);
-  } else {
-    logStdout(`[forge-sandbox] Executed ${command} successfully.`);
-  }
+  // Execute real OS process
+  const execResult = await new Promise<{ exitCode: number; pid: number }>((resolve) => {
+    let settled = false;
+    let timer: NodeJS.Timeout | null = null;
+
+    try {
+      const child = spawn(command, args, {
+        cwd: resolvedCwd,
+        env: sanitizedEnv,
+        shell: true,
+        windowsHide: true,
+      });
+
+      const realPid = child.pid || 0;
+      proc.pid = realPid;
+      proc.status = "RUNNING";
+      ACTIVE_OS_PROCESSES.set(processId, child);
+
+      timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          logStderr(`[forge-sandbox] Process timed out after ${timeoutMs}ms.`);
+          try {
+            child.kill("SIGTERM");
+            setTimeout(() => {
+              try { child.kill("SIGKILL"); } catch { }
+            }, 1000);
+          } catch { }
+          ACTIVE_OS_PROCESSES.delete(processId);
+          resolve({ exitCode: 124, pid: realPid }); // Standard timeout exit code
+        }
+      }, timeoutMs);
+
+      child.stdout?.on("data", (data: Buffer) => {
+        logStdout(data.toString());
+      });
+
+      child.stderr?.on("data", (data: Buffer) => {
+        logStderr(data.toString());
+      });
+
+      child.on("error", (err: Error) => {
+        if (!settled) {
+          settled = true;
+          if (timer) clearTimeout(timer);
+          logStderr(`[forge-sandbox] Process execution error: ${err.message}`);
+          ACTIVE_OS_PROCESSES.delete(processId);
+          resolve({ exitCode: 1, pid: realPid });
+        }
+      });
+
+      child.on("close", (code: number | null) => {
+        if (!settled) {
+          settled = true;
+          if (timer) clearTimeout(timer);
+          ACTIVE_OS_PROCESSES.delete(processId);
+          resolve({ exitCode: code ?? 0, pid: realPid });
+        }
+      });
+    } catch (err: any) {
+      if (!settled) {
+        settled = true;
+        if (timer) clearTimeout(timer);
+        logStderr(`[forge-sandbox] Failed to spawn process: ${err.message}`);
+        resolve({ exitCode: 1, pid: 0 });
+      }
+    }
+  });
 
   const durationMs = Date.now() - startTime;
-  proc.status = "STOPPED";
-  proc.exitCode = exitCode;
+  proc.status = execResult.exitCode === 0 ? "STOPPED" : "FAILED";
+  proc.exitCode = execResult.exitCode;
   proc.stoppedAt = new Date();
   proc.discoveredPort = discoveredPort;
 
@@ -249,22 +369,23 @@ export async function executeInSandbox(params: {
         userId: userId || null,
         actionType: "SANDBOX_COMMAND",
         command: fullCommand,
-        exitCode,
+        exitCode: execResult.exitCode,
         durationMs,
         resourceUsage: { memoryMb: 42, cpuPercent: 12 },
       },
     });
-  } catch (e) {
-    // Audit logging is non-blocking
+  } catch {
+    // Non-blocking audit record
   }
 
   return {
     processId,
-    exitCode,
+    exitCode: execResult.exitCode,
     stdout: proc.stdoutBuffer.join("\n"),
     stderr: proc.stderrBuffer.join("\n"),
     discoveredPort,
     durationMs,
+    pid: proc.pid,
   };
 }
 
@@ -275,16 +396,29 @@ export async function terminateSandboxProcess(
   processId: string
 ): Promise<{ success: boolean; processId: string }> {
   const proc = ACTIVE_PROCESSES.get(processId);
-  if (!proc) {
+  const osProc = ACTIVE_OS_PROCESSES.get(processId);
+
+  if (!proc && !osProc) {
     return { success: false, processId };
   }
 
-  proc.status = "KILLED";
-  proc.exitCode = 137; // SIGKILL standard code
-  proc.stoppedAt = new Date();
-  proc.stdoutBuffer.push("[forge-sandbox] Process terminated by user.");
+  if (osProc) {
+    try {
+      osProc.kill("SIGTERM");
+      setTimeout(() => {
+        try { osProc.kill("SIGKILL"); } catch { }
+      }, 500);
+    } catch { }
+    ACTIVE_OS_PROCESSES.delete(processId);
+  }
 
-  ACTIVE_PROCESSES.delete(processId);
+  if (proc) {
+    proc.status = "KILLED";
+    proc.exitCode = 137;
+    proc.stoppedAt = new Date();
+    proc.stdoutBuffer.push("[forge-sandbox] Process terminated by user.");
+  }
+
   return { success: true, processId };
 }
 
@@ -303,4 +437,6 @@ export const forgeSandboxService = {
   isSafeNetworkTarget,
   maskSecretsInLog,
   extractPortFromLog,
+  getSandboxWorkspaceDir,
+  materializeProjectWorkspace,
 };

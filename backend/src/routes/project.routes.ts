@@ -19,12 +19,18 @@ import {
   getManifestHandler,
   updateManifestHandler,
   compileProjectHandler,
+  listPagesHandler,
+  createPageHandler,
+  updatePageHandler,
+  deletePageHandler,
+  getSourcePreviewHandler,
   syncVisualToCodeHandler,
   syncCodeToVisualHandler,
   generateReactProjectHandler,
   generateNextJsProjectHandler,
   getGenerationPlanHandler,
   regenerateScopeHandler,
+  exportProjectZipHandler,
   getWorkspaceStateHandler,
   saveWorkspaceStateHandler,
   getDependenciesHandler,
@@ -206,6 +212,9 @@ import { QualityPlatformController } from "../controllers/qualityPlatform.contro
 import { DevOpsPlatformController } from "../controllers/devopsPlatform.controller.js";
 import { IntelligencePlatformController } from "../controllers/intelligencePlatform.controller.js";
 import { DeveloperPlatformController } from "../controllers/developerPlatform.controller.js";
+import { CodeIntelligenceController } from "../modules/code-intelligence/codeIntelligence.controller.js";
+import { KnowledgeGraphController } from "../modules/knowledge-graph/knowledgeGraph.controller.js";
+import { DesignSystemPlatformController } from "../modules/design-system/designSystem.controller.js";
 
 const router = Router();
 
@@ -250,11 +259,19 @@ router.post("/:id/compile", compileProjectHandler);
 router.post("/:id/sync/visual-to-code", syncVisualToCodeHandler);
 router.post("/:id/sync/code-to-visual", syncCodeToVisualHandler);
 
+// Visual pages (registry, routes and their source files) & preview of the persisted source
+router.get("/:id/pages", listPagesHandler);
+router.post("/:id/pages", createPageHandler);
+router.patch("/:id/pages/:pageId", updatePageHandler);
+router.delete("/:id/pages/:pageId", deletePageHandler);
+router.get("/:id/preview/source", getSourcePreviewHandler);
+
 // Project Generators (Modules 08 & 09)
 router.post("/:id/generate/react", generateReactProjectHandler);
 router.post("/:id/generate/next", generateNextJsProjectHandler);
 router.get("/:id/generate/plan", getGenerationPlanHandler);
 router.post("/:id/generate/scope", regenerateScopeHandler);
+router.get("/:id/export/zip", exportProjectZipHandler);
 
 // Developer Workspace State (Module 04)
 router.get("/:id/workspace-state", getWorkspaceStateHandler);
@@ -681,6 +698,45 @@ router.get("/:id/containers/compose", DeveloperPlatformController.getCompose);
 router.post("/:id/infra/kubernetes/generate", DeveloperPlatformController.generateKubernetes);
 router.post("/:id/infra/terraform/generate", DeveloperPlatformController.generateTerraform);
 router.get("/:id/infra/validate", DeveloperPlatformController.validateInfrastructure);
+
+// =========================================================================
+// Milestone 1: Features 35 & 36
+// =========================================================================
+
+// Module 35: Code Intelligence & Semantic Index
+router.get("/:id/intelligence/symbols", CodeIntelligenceController.getSymbols);
+router.get("/:id/intelligence/definition", CodeIntelligenceController.getDefinition);
+router.get("/:id/intelligence/references", CodeIntelligenceController.getReferences);
+router.get("/:id/intelligence/files/:fileId", CodeIntelligenceController.getFileDependencies);
+router.post("/:id/intelligence/index", CodeIntelligenceController.indexProject);
+router.get("/:id/intelligence/status", CodeIntelligenceController.getStatus);
+
+// Module 36: Repository Knowledge Graph
+router.get("/:id/knowledge-graph/query", KnowledgeGraphController.queryGraph);
+router.post("/:id/knowledge-graph/query", KnowledgeGraphController.queryGraph);
+router.post("/:id/knowledge-graph/build", KnowledgeGraphController.buildGraph);
+router.get("/:id/knowledge-graph", KnowledgeGraphController.getGraph);
+
+// =========================================================================
+// Milestone A: Features 34, 33, 32
+// =========================================================================
+
+// Module 34: Design System Engine
+router.get("/:id/design-system/tokens", DesignSystemPlatformController.getTokens);
+router.post("/:id/design-system/tokens", DesignSystemPlatformController.setToken);
+router.delete("/:id/design-system/tokens/:category/:name", DesignSystemPlatformController.deleteToken);
+router.get("/:id/design-system/tokens/compile", DesignSystemPlatformController.compileTokens);
+router.post("/:id/design-system/tokens/apply", DesignSystemPlatformController.applyTokens);
+
+// Module 33: Component Registry
+router.post("/:id/components/discover", DesignSystemPlatformController.discoverComponents);
+router.get("/:id/components", DesignSystemPlatformController.listComponents);
+router.get("/:id/components/:componentId", DesignSystemPlatformController.getComponent);
+router.get("/:id/components/:componentId/export", DesignSystemPlatformController.exportComponent);
+
+// Module 32: Project Template Engine
+router.get("/templates", DesignSystemPlatformController.listTemplates);
+router.post("/:id/templates/:templateId/scaffold", DesignSystemPlatformController.scaffoldTemplate);
 
 export default router;
 

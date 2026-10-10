@@ -30,6 +30,7 @@ interface DeveloperModalProps {
   onSave: (val: any) => void;
   title?: string;
   targetElement?: any;
+  websiteId?: string;
 }
 
 export default function DeveloperModal({
@@ -40,6 +41,7 @@ export default function DeveloperModal({
   onSave,
   title,
   targetElement,
+  websiteId,
 }: DeveloperModalProps) {
   const [value, setValue] = useState<any>(initialValue);
   const [codeLanguage, setCodeLanguage] = useState<"js" | "ts" | "jsx" | "tsx">("tsx");
@@ -174,7 +176,7 @@ export default function DeveloperModal({
       case "css-classes": return "Custom CSS Classes";
       case "css-selectors": return "CSS Selectors";
       case "custom-attributes": return "Custom Attributes";
-      case "export-code": return "Dev Mode — Two-Way Code ↔ Canvas Sync";
+      case "export-code": return `Dev Mode — Component Inspector (${targetElement?.name || targetElement?.type || "Element"})`;
       default: return "Developer Settings";
     }
   };
@@ -204,6 +206,22 @@ export default function DeveloperModal({
         <div className="p-5 flex-1 min-h-[380px] flex flex-col bg-slate-50">
           {mode === "export-code" && (
             <div className="flex-1 flex flex-col gap-3">
+              <div className="bg-blue-50/90 border border-blue-200 rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs text-blue-900 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-blue-950">Component Inspector & Live 2-Way Sync:</span>
+                  <span className="text-blue-700 hidden sm:inline">Inspect or edit TSX for this component. Changes sync directly to the canvas.</span>
+                </div>
+                {websiteId && (
+                  <a
+                    href={`/workspace/website/${websiteId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-bold text-blue-700 hover:text-blue-950 underline shrink-0 ml-2"
+                  >
+                    Open Full Project in Code Workspace →
+                  </a>
+                )}
+              </div>
               <div className="flex items-center justify-between bg-slate-200/80 p-1.5 rounded-lg border border-slate-300">
                 <div className="flex items-center gap-1">
                   {(["tsx", "jsx", "ts", "js"] as const).map((lang) => (

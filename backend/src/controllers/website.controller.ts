@@ -1,3 +1,4 @@
+import { syncBridgedProjectForWebsite } from "../services/project/forgeProject.service.js";
 import { documentWriteContext } from "../services/websites/document-request.js";
 import { documentETag } from "../services/websites/document-policy.js";
 import type { Request, Response, NextFunction } from "express";
@@ -170,10 +171,19 @@ export async function updateWebsiteHandler(
     res.setHeader("ETag", documentETag(website.id, website.documentVersion));
     res.setHeader("Cache-Control", "no-store");
 
+    // A website that has a developer project keeps its source in step with every
+    // saved design. The save itself has succeeded; a generation problem is
+    // reported alongside it rather than hidden.
+    let codeSync: Awaited<ReturnType<typeof syncBridgedProjectForWebsite>> = null;
+    if (req.body && req.body.editorData !== undefined) {
+      codeSync = await syncBridgedProjectForWebsite(websiteId, { id: user.id }, { snapshot: false });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Website saved successfully",
       website,
+      ...(codeSync ? { codeSync } : {}),
     });
   } catch (error) {
     next(error);

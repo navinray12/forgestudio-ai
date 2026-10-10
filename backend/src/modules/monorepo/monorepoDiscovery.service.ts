@@ -246,6 +246,13 @@ export class MonorepoDiscoveryService {
   }
 
   /**
+   * Alias for getAffectedPackages
+   */
+  async findAffectedPackages(projectId: string, changedFiles: string[]): Promise<string[]> {
+    return this.getAffectedPackages(projectId, changedFiles);
+  }
+
+  /**
    * Provision or update per-service runtime configs with port allocation
    */
   async configureServiceRuntime(params: {
@@ -353,6 +360,13 @@ export class MonorepoDiscoveryService {
     });
 
     return plan;
+  }
+
+  /**
+   * Alias for planCoordinatedDeployment
+   */
+  async generateDeployPlan(projectId: string, targetServices?: string[]): Promise<CoordinatedDeploymentPlan> {
+    return this.planCoordinatedDeployment({ projectId, targetServices });
   }
 }
 

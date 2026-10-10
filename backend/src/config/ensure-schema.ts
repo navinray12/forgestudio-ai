@@ -2857,6 +2857,320 @@ export async function ensureDatabaseTables(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_forge_infra_val_proj ON forge_infrastructure_validations("projectId");
   `);
 
+  // =========================================================================
+  // Milestone 1: Feature 35 (Code Intelligence) & Feature 36 (Knowledge Graph)
+  // =========================================================================
+  await execSafe("forge_code_symbols table", `
+    CREATE TABLE IF NOT EXISTS forge_code_symbols (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "fileId" UUID NOT NULL REFERENCES forge_project_files(id) ON DELETE CASCADE,
+      "filePath" VARCHAR(1000) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      kind VARCHAR(50) NOT NULL,
+      "containerName" VARCHAR(255),
+      "startLine" INTEGER NOT NULL,
+      "startCol" INTEGER NOT NULL,
+      "endLine" INTEGER NOT NULL,
+      "endCol" INTEGER NOT NULL,
+      "startOffset" INTEGER NOT NULL,
+      "endOffset" INTEGER NOT NULL,
+      signature TEXT,
+      documentation TEXT,
+      "isExported" BOOLEAN NOT NULL DEFAULT false,
+      "isDefaultExport" BOOLEAN NOT NULL DEFAULT false,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_sym_proj ON forge_code_symbols("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_sym_file ON forge_code_symbols("fileId");
+    CREATE INDEX IF NOT EXISTS idx_forge_sym_name ON forge_code_symbols("projectId", name);
+    CREATE INDEX IF NOT EXISTS idx_forge_sym_kind ON forge_code_symbols("projectId", kind);
+    CREATE INDEX IF NOT EXISTS idx_forge_sym_path ON forge_code_symbols("projectId", "filePath");
+  `);
+
+  await execSafe("forge_code_references table", `
+    CREATE TABLE IF NOT EXISTS forge_code_references (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "sourceFileId" UUID NOT NULL REFERENCES forge_project_files(id) ON DELETE CASCADE,
+      "sourceFilePath" VARCHAR(1000) NOT NULL,
+      "targetSymbolId" UUID REFERENCES forge_code_symbols(id) ON DELETE CASCADE,
+      "symbolName" VARCHAR(255) NOT NULL,
+      kind VARCHAR(50) NOT NULL,
+      line INTEGER NOT NULL,
+      col INTEGER NOT NULL,
+      snippet TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_ref_proj ON forge_code_references("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_ref_file ON forge_code_references("sourceFileId");
+    CREATE INDEX IF NOT EXISTS idx_forge_ref_target ON forge_code_references("targetSymbolId");
+    CREATE INDEX IF NOT EXISTS idx_forge_ref_sym ON forge_code_references("projectId", "symbolName");
+  `);
+
+  await execSafe("forge_file_dependencies table", `
+    CREATE TABLE IF NOT EXISTS forge_file_dependencies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "sourceFileId" UUID NOT NULL REFERENCES forge_project_files(id) ON DELETE CASCADE,
+      "sourceFilePath" VARCHAR(1000) NOT NULL,
+      "targetFilePath" VARCHAR(1000) NOT NULL,
+      "targetFileId" UUID REFERENCES forge_project_files(id) ON DELETE SET NULL,
+      specifier VARCHAR(1000) NOT NULL,
+      "isExternal" BOOLEAN NOT NULL DEFAULT false,
+      "importedSymbols" JSONB DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_fdep_proj ON forge_file_dependencies("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_fdep_src ON forge_file_dependencies("sourceFileId");
+    CREATE INDEX IF NOT EXISTS idx_forge_fdep_tgt ON forge_file_dependencies("projectId", "targetFilePath");
+  `);
+
+  await execSafe("forge_index_status table", `
+    CREATE TABLE IF NOT EXISTS forge_index_status (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL UNIQUE REFERENCES forge_projects(id) ON DELETE CASCADE,
+      status VARCHAR(50) NOT NULL DEFAULT 'IDLE',
+      "totalFiles" INTEGER NOT NULL DEFAULT 0,
+      "indexedFiles" INTEGER NOT NULL DEFAULT 0,
+      "totalSymbols" INTEGER NOT NULL DEFAULT 0,
+      "parserErrors" JSONB DEFAULT '[]'::jsonb,
+      "fileHashes" JSONB DEFAULT '{}'::jsonb,
+      "lastIndexedAt" TIMESTAMPTZ,
+      "durationMs" INTEGER DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_idx_status_proj ON forge_index_status("projectId");
+  `);
+
+  await execSafe("forge_knowledge_graph_nodes table", `
+    CREATE TABLE IF NOT EXISTS forge_knowledge_graph_nodes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "nodeKey" VARCHAR(500) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      "nodeType" VARCHAR(50) NOT NULL,
+      "filePath" VARCHAR(1000),
+      "symbolId" UUID REFERENCES forge_code_symbols(id) ON DELETE CASCADE,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", "nodeKey")
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_nodes_proj ON forge_knowledge_graph_nodes("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_nodes_type ON forge_knowledge_graph_nodes("projectId", "nodeType");
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_nodes_sym ON forge_knowledge_graph_nodes("symbolId");
+  `);
+
+  await execSafe("forge_knowledge_graph_edges table", `
+    CREATE TABLE IF NOT EXISTS forge_knowledge_graph_edges (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "sourceNodeId" UUID NOT NULL REFERENCES forge_knowledge_graph_nodes(id) ON DELETE CASCADE,
+      "targetNodeId" UUID NOT NULL REFERENCES forge_knowledge_graph_nodes(id) ON DELETE CASCADE,
+      "edgeType" VARCHAR(50) NOT NULL,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", "sourceNodeId", "targetNodeId", "edgeType")
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_edges_proj ON forge_knowledge_graph_edges("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_edges_src ON forge_knowledge_graph_edges("sourceNodeId");
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_edges_tgt ON forge_knowledge_graph_edges("targetNodeId");
+    CREATE INDEX IF NOT EXISTS idx_forge_kg_edges_type ON forge_knowledge_graph_edges("edgeType");
+  `);
+
+  // =========================================================================
+  // Milestone A: Features 34, 33, 32 (Design System, Component Registry, Project Templates)
+  // =========================================================================
+  await execSafe("forge_design_tokens table", `
+    CREATE TABLE IF NOT EXISTS forge_design_tokens (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      category VARCHAR(50) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      value JSONB NOT NULL,
+      "resolvedValue" JSONB,
+      theme VARCHAR(50) NOT NULL DEFAULT 'default',
+      description TEXT,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", category, name, theme)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_tokens_proj ON forge_design_tokens("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_tokens_cat ON forge_design_tokens("projectId", category);
+  `);
+
+  await execSafe("forge_component_registry table", `
+    CREATE TABLE IF NOT EXISTS forge_component_registry (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      "filePath" VARCHAR(1000) NOT NULL,
+      version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+      description TEXT,
+      "propsSchema" JSONB DEFAULT '{}'::jsonb,
+      variants JSONB DEFAULT '[]'::jsonb,
+      dependencies TEXT[] DEFAULT '{}',
+      tags TEXT[] DEFAULT '{}',
+      "previewSnippet" TEXT,
+      "isExported" BOOLEAN NOT NULL DEFAULT true,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("projectId", name, "filePath")
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_comp_reg_proj ON forge_component_registry("projectId");
+    CREATE INDEX IF NOT EXISTS idx_forge_comp_reg_name ON forge_component_registry("projectId", name);
+  `);
+
+  await execSafe("forge_project_templates table", `
+    CREATE TABLE IF NOT EXISTS forge_project_templates (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "templateId" VARCHAR(100) UNIQUE NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      framework VARCHAR(50) NOT NULL,
+      category VARCHAR(50) NOT NULL,
+      version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+      dependencies JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "devDependencies" JSONB NOT NULL DEFAULT '{}'::jsonb,
+      files JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "defaultConfig" JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_proj_tmpl_id ON forge_project_templates("templateId");
+  `);
+
+  // 38. Data Platform Tables (Module 25 - 28)
+  await execSafe("data platform enums", `
+    DO $$ BEGIN
+      CREATE TYPE "DatabaseEnvironment" AS ENUM ('PRODUCTION', 'STAGING', 'DEVELOPMENT');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$;
+    DO $$ BEGIN
+      CREATE TYPE "DatabaseProvisioningStatus" AS ENUM ('PENDING', 'PROVISIONING', 'READY', 'FAILED', 'SUSPENDED');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$;
+    DO $$ BEGIN
+      CREATE TYPE "BucketVisibility" AS ENUM ('PUBLIC', 'PRIVATE');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$;
+    DO $$ BEGIN
+      CREATE TYPE "ApiKeyType" AS ENUM ('ANON', 'SERVICE_ROLE');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$;
+  `);
+
+  await execSafe("project_databases table", `
+    CREATE TABLE IF NOT EXISTS project_databases (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      environment "DatabaseEnvironment" NOT NULL DEFAULT 'PRODUCTION',
+      status "DatabaseProvisioningStatus" NOT NULL DEFAULT 'PENDING',
+      "dbName" VARCHAR(63) NOT NULL,
+      "dbUser" VARCHAR(63) NOT NULL,
+      "encryptedPassword" VARCHAR(500) NOT NULL,
+      host VARCHAR(255) NOT NULL,
+      port INTEGER NOT NULL DEFAULT 5432,
+      "connectionPoolMax" INTEGER NOT NULL DEFAULT 10,
+      "connectionPoolIdleMs" INTEGER NOT NULL DEFAULT 10000,
+      "storageSizeBytes" BIGINT NOT NULL DEFAULT 0,
+      "lastBackupAt" TIMESTAMPTZ,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_project_databases_website_env UNIQUE ("websiteId", environment)
+    );
+    CREATE INDEX IF NOT EXISTS idx_project_databases_status ON project_databases(status);
+  `);
+
+  await execSafe("project_database_backups table", `
+    CREATE TABLE IF NOT EXISTS project_database_backups (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+      "backupName" VARCHAR(255) NOT NULL,
+      "storageKey" VARCHAR(1000) NOT NULL,
+      "sizeBytes" BIGINT NOT NULL,
+      "checksumSha256" VARCHAR(64) NOT NULL,
+      "completedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_project_db_backups_db ON project_database_backups("databaseId", "completedAt");
+  `);
+
+  await execSafe("database_migration_records table", `
+    CREATE TABLE IF NOT EXISTS database_migration_records (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+      "migrationName" VARCHAR(255) NOT NULL,
+      "batchNumber" INTEGER NOT NULL DEFAULT 1,
+      "appliedByUserId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      checksum VARCHAR(64) NOT NULL,
+      "sqlScript" TEXT NOT NULL,
+      "executionTimeMs" INTEGER NOT NULL,
+      "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_db_mig_records_db_name UNIQUE ("databaseId", "migrationName")
+    );
+    CREATE INDEX IF NOT EXISTS idx_db_mig_records_db_batch ON database_migration_records("databaseId", "batchNumber");
+  `);
+
+  await execSafe("project_api_keys table", `
+    CREATE TABLE IF NOT EXISTS project_api_keys (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      "keyType" "ApiKeyType" NOT NULL DEFAULT 'ANON',
+      "tokenHash" VARCHAR(128) UNIQUE NOT NULL,
+      prefix VARCHAR(16) NOT NULL,
+      scopes JSONB NOT NULL DEFAULT '["data:read", "data:write"]'::jsonb,
+      "rateLimitRpm" INTEGER NOT NULL DEFAULT 120,
+      "expiresAt" TIMESTAMPTZ,
+      "lastUsedAt" TIMESTAMPTZ,
+      "revokedAt" TIMESTAMPTZ,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_project_api_keys_db_type ON project_api_keys("databaseId", "keyType");
+  `);
+
+  await execSafe("storage_buckets table", `
+    CREATE TABLE IF NOT EXISTS storage_buckets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      name VARCHAR(63) NOT NULL,
+      visibility "BucketVisibility" NOT NULL DEFAULT 'PRIVATE',
+      "maxSizeBytes" BIGINT NOT NULL DEFAULT 524288000,
+      "usedSizeBytes" BIGINT NOT NULL DEFAULT 0,
+      "allowedMimeTypes" JSONB NOT NULL DEFAULT '["*/*"]'::jsonb,
+      "corsRules" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_storage_buckets_website_name UNIQUE ("websiteId", name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_storage_buckets_website ON storage_buckets("websiteId");
+  `);
+
+  await execSafe("storage_objects table", `
+    CREATE TABLE IF NOT EXISTS storage_objects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "bucketId" UUID NOT NULL REFERENCES storage_buckets(id) ON DELETE CASCADE,
+      "objectKey" VARCHAR(900) NOT NULL,
+      "originalName" VARCHAR(255) NOT NULL,
+      "mimeType" VARCHAR(150) NOT NULL,
+      "sizeBytes" BIGINT NOT NULL,
+      "checksumSha256" VARCHAR(64) NOT NULL,
+      "eTag" VARCHAR(100),
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
   console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
 }
 

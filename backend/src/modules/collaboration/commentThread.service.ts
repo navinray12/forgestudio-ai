@@ -24,19 +24,12 @@ export class CommentThreadService {
   /**
    * Create a new file or line comment
    */
-  async createComment(params: {
-    projectId: string;
-    filePath: string;
-    authorId: string;
-    content: string;
-    parentCommentId?: string | null;
-    startLine?: number;
-    endLine?: number;
-    startColumn?: number;
-    endColumn?: number;
-    selectedCodeSnippet?: string;
-  }): Promise<FileComment> {
-    const { projectId, filePath, authorId, content, parentCommentId, startLine, endLine, startColumn, endColumn, selectedCodeSnippet } = params;
+  async createComment(
+    arg1: any,
+    arg2?: any
+  ): Promise<FileComment> {
+    const params = typeof arg1 === "string" ? { projectId: arg1, ...(arg2 || {}) } : arg1;
+    const { projectId, filePath = "", authorId = "anonymous", content, parentCommentId, startLine, endLine, startColumn, endColumn, selectedCodeSnippet } = params;
 
     if (!content || !content.trim()) {
       throw new AppError("Comment content cannot be empty", 400, "VALIDATION_ERROR");
@@ -105,6 +98,37 @@ export class CommentThreadService {
     }
 
     return rootComments;
+  }
+
+  /**
+   * Alias for getComments
+   */
+  async listComments(projectId: string, filePath?: string): Promise<FileComment[]> {
+    return this.getComments(projectId, filePath);
+  }
+
+  /**
+   * Reply to an existing comment
+   */
+  async replyComment(commentId: string, data: any): Promise<FileComment> {
+    const parent = await db.forgeFileComment.findUnique({ where: { id: commentId } });
+    if (!parent) {
+      throw new AppError("Parent comment not found", 404, "NOT_FOUND");
+    }
+    return this.createComment({
+      projectId: parent.projectId,
+      filePath: parent.filePath,
+      authorId: data.authorId || "anonymous",
+      content: data.content,
+      parentCommentId: commentId,
+    });
+  }
+
+  /**
+   * Resolve comment
+   */
+  async resolveComment(commentId: string, userId: string = "anonymous"): Promise<FileComment> {
+    return this.updateStatus(commentId, "RESOLVED", userId);
   }
 
   /**

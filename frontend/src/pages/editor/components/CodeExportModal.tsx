@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { downloadAuthenticatedFile, API_ORIGIN } from "../../../utils/downloadFile";
 
 interface CodeExportModalProps {
   isOpen: boolean;
@@ -25,10 +26,10 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
     setLoading(true);
     setError(null);
 
-    fetch(`/api/websites/${websiteId}/export/preview`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-      },
+    const token = localStorage.getItem("token");
+    fetch(`${API_ORIGIN}/api/v1/websites/${websiteId}/export/preview`, {
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
       .then((res) => res.json())
       .then((data) => {
@@ -95,17 +96,16 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
   };
 
   const handleDownloadZip = (type: "static" | "react" | "tailwind" | "nextjs") => {
-    const link = document.createElement("a");
-    link.href = `/api/websites/${websiteId}/export/zip?type=${type}`;
-    link.setAttribute("download", `${websiteName.toLowerCase().replace(/[^a-z0-9]/g, "_")}-${type}-export.zip`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setError(null);
+    downloadAuthenticatedFile(
+      `${API_ORIGIN}/api/v1/websites/${websiteId}/export/zip?type=${type}`,
+      `${websiteName.toLowerCase().replace(/[^a-z0-9]/g, "_")}-${type}-export.zip`
+    ).catch((err: Error) => setError(`ZIP export failed: ${err.message}`));
   };
 
   const handleDownloadHelloTheme = () => {
     const link = document.createElement("a");
-    link.href = `/api/plugins/wordpress/hello-theme/download`;
+    link.href = `${API_ORIGIN}/api/v1/plugins/wordpress/hello-theme/download`;
     link.setAttribute("download", "hello-forgestudio-theme.zip");
     document.body.appendChild(link);
     link.click();
@@ -298,6 +298,25 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
             >
               Download Hello Theme (WP)
             </button>
+            <a
+              href={`/workspace/website/${websiteId}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                padding: "8px 14px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 700,
+                backgroundColor: "#7c3aed",
+                color: "#ffffff",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              💻 Open in Code Workspace
+            </a>
           </div>
         </div>
       </div>

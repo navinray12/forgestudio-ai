@@ -1,14 +1,16 @@
 import { Request, Response } from "express";
 import { prisma } from "../config/prisma.js";
-import { generateAllCodeOutputs, buildProjectZipStream } from "../services/codeGenerator.service.js";
+import { generateAllCodeOutputs, buildProjectZipStream, EXPORT_TYPES, ExportType } from "../services/codeGenerator.service.js";
 import { buildHelloThemeZipStream, generateHelloThemeFiles } from "../services/helloTheme.service.js";
 
 const db = prisma as any;
 
 async function getAuthorizedWebsite(websiteId: string, userId?: string) {
+  // Fail closed: an export is never served without an authenticated user
+  if (!userId) return null;
   const website = await db.website.findUnique({ where: { id: websiteId } });
   if (!website) return null;
-  if (userId && website.userId !== userId) {
+  if (website.userId !== userId) {
     const collab = await db.websiteCollaborator?.findFirst?.({ where: { websiteId, userId } });
     if (!collab) {
       const user = await db.user.findUnique({ where: { id: userId } });
@@ -59,20 +61,66 @@ export async function downloadProjectZip(req: Request, res: Response) {
   try {
     const websiteId = String(req.params.websiteId || "");
     const userId = res.locals.user?.id || (req as any).user?.id;
-    const exportType = (req.query.type as any) || "static";
+    const exportType = String(req.query.type || "static") as ExportType;
+    if (!EXPORT_TYPES.includes(exportType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported export type. Use one of: ${EXPORT_TYPES.join(", ")}`,
+      });
+    }
     const scope = (req.query.scope as any) === "component" ? "component" : "full";
     const componentId = req.query.componentId ? String(req.query.componentId) : undefined;
 
     const website = await getAuthorizedWebsite(websiteId, userId);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
-    const editorData = typeof website.editorData === "string"
-      ? JSON.parse(website.editorData)
-      : (website.editorData || {});
+    let editorData: any;
+    try {
+      editorData = typeof website.editorData === "string"
+        ? JSON.parse(website.editorData)
+        : (website.editorData || {});
+    } catch {
+      return res.status(422).json({ success: false, message: "The website's saved editor data is not valid JSON" });
+    }
 
-    const zipBuffer = await buildProjectZipStream(editorData, exportType, scope, componentId);
+    let zipBuffer: Buffer;
+    const bridgedProject = scope === "full" && (exportType === "react" || exportType === "nextjs")
+      ? await db.forgeProject.findFirst({ where: { websiteId, deletedAt: null } })
+      : null;
+
+    if (bridgedProject && bridgedProject.framework === exportType) {
+      // Export what the project holds for the latest saved design, including code edits
+      const { syncBridgedProjectForWebsite } = await import("../services/project/forgeProject.service.js");
+      const sync = await syncBridgedProjectForWebsite(websiteId, { id: userId });
+      if (sync?.stale) {
+        return res.status(409).json({
+          success: false,
+          message: `The project source could not be brought up to date with the visual design, so it was not exported: ${
+            sync.error || "generation failed"
+          }`,
+        });
+      }
+      const { listFiles } = await import("../services/project/forgeFilesystem.service.js");
+      const { buildZipFromFiles } = await import("../services/codeGenerator.service.js");
+      const persistedFiles = (await listFiles(bridgedProject.id)).filter((f: any) => !f.isDirectory);
+      if (persistedFiles.length > 0) {
+        zipBuffer = await buildZipFromFiles(persistedFiles);
+      } else {
+        zipBuffer = await buildProjectZipStream(editorData, exportType, scope, componentId, {
+          projectName: website.name,
+          projectSlug: website.slug || website.name,
+        });
+      }
+    } else {
+      zipBuffer = await buildProjectZipStream(editorData, exportType, scope, componentId, {
+        projectName: website.name,
+        projectSlug: website.slug || website.name,
+        projectId: bridgedProject?.id,
+      });
+    }
     const safeSlug = (website.slug || website.name || "project").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = scope === "component" ? `component-${componentId || "export"}.zip` : `${safeSlug}-${exportType}-export.zip`;
+    const safeComponentId = String(componentId || "export").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = scope === "component" ? `component-${safeComponentId}.zip` : `${safeSlug}-${exportType}-export.zip`;
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

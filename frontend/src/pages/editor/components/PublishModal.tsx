@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { PublishingState, DeploymentConfig, PageConfig, DeploymentRecord } from "../types";
 import { publishingService } from "../../../features/publishing/services/publishingService";
+import { downloadAuthenticatedFile, API_ORIGIN } from "../../../utils/downloadFile";
 
 interface PublishModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({
   const [activeTab, setActiveTab] = useState<"internal" | "wordpress" | "sftp" | "zip">("internal");
   const [isPublishing, setIsPublishing] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
+  const [zipExportError, setZipExportError] = useState<string | null>(null);
   const [customDomain, setCustomDomain] = useState(deployment?.customDomain || "");
   const [webhookUrl, setWebhookUrl] = useState(deployment?.webhookUrl || "");
   const [saveFeedback, setSaveFeedback] = useState("");
@@ -3482,13 +3484,24 @@ export const PublishModal: React.FC<PublishModalProps> = ({
               </div>
 
               <div className="flex flex-col gap-3 pt-2">
-                <a
-                  href={`/api/websites/${websiteId}/export/zip`}
-                  download
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZipExportError(null);
+                    downloadAuthenticatedFile(
+                      `${API_ORIGIN}/api/v1/websites/${websiteId}/export/zip?type=static`,
+                      "website-static-export.zip"
+                    ).catch((err: Error) => setZipExportError(err.message));
+                  }}
                   className="w-full text-center rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-3 shadow-lg shadow-purple-600/30 transition cursor-pointer"
                 >
                   📦 Download Static Website Bundle (.zip)
-                </a>
+                </button>
+                {zipExportError && (
+                  <p role="alert" className="text-xs text-red-400">
+                    Export failed: {zipExportError}
+                  </p>
+                )}
                 <a
                   href="/api/plugins/wordpress/download"
                   download

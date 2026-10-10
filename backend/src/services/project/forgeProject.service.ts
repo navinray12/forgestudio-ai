@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { prisma, pgPool } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
 import { recordAuditLog } from "../audit.service.js";
+import { buildSyncBaseline, toProjectFramework } from "../compiler/pageRegistry.js";
 
 const db = prisma as any;
 
@@ -293,6 +294,168 @@ export async function getForgeProjectById(
 }
 
 /**
+ * Stable fingerprint of a website's saved editor document, used to detect
+ * when the visual design has changed since code was last generated from it.
+ */
+export function hashEditorData(editorData: unknown): string {
+  const raw = typeof editorData === "string" ? editorData : JSON.stringify(editorData ?? {});
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+function parseWebsiteEditorData(site: any): any {
+  if (typeof site?.editorData !== "string") return site?.editorData || {};
+  try {
+    return JSON.parse(site.editorData);
+  } catch {
+    throw new AppError("The website's saved editor data is not valid JSON", 422, "INVALID_EDITOR_DATA");
+  }
+}
+
+async function assertWebsiteAccess(site: any, user: { id: string; role: string }): Promise<void> {
+  const isPrivileged = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role);
+  if (isPrivileged || site.userId === user.id) return;
+  throw new AppError("You do not have permission to access this website", 403, "FORBIDDEN");
+}
+
+export interface VisualSyncResult {
+  synced: boolean;
+  stale: boolean;
+  error?: string;
+  /** Page files that kept hand-written code instead of the latest visual design */
+  conflicts?: string[];
+}
+
+/**
+ * Regenerate the project's source files from the website's saved design when
+ * the design has changed since the last sync (or the project has no files yet).
+ * Preservation rules apply: user-authored files and protected regions are kept.
+ */
+export async function syncProjectFromWebsite(
+  project: ForgeProjectEntity,
+  site: any,
+  user: { id: string },
+  options: { snapshot?: boolean } = {}
+): Promise<VisualSyncResult> {
+  const editorData = parseWebsiteEditorData(site);
+  const sourceHash = hashEditorData(editorData);
+  const framework = toProjectFramework(project.framework);
+  const metadata = (project.metadata && typeof project.metadata === "object" ? project.metadata : {}) as Record<
+    string,
+    any
+  >;
+
+  const fileCount = await db.forgeProjectFile.count({ where: { projectId: project.id, deletedAt: null } });
+  if (fileCount > 0 && metadata.visualSync?.sourceHash === sourceHash) {
+    return { synced: false, stale: false };
+  }
+
+  const { compileAndSyncProject } = await import("../compiler/unifiedCompiler.service.js");
+  const { createProjectSnapshot, moveOrRenameFile } = await import("./forgeFilesystem.service.js");
+
+  if (fileCount > 0 && options.snapshot !== false) {
+    await createProjectSnapshot(
+      project.id,
+      "Before visual design sync",
+      "Automatic checkpoint taken before regenerating source from the updated visual design",
+      user.id
+    );
+  }
+
+  // A renamed or re-routed page keeps its file (and the custom code in it):
+  // the file moves to its new path before the page is regenerated there
+  const baseline = buildSyncBaseline(editorData, framework);
+  const previous = metadata.visualSync || {};
+  const previousPages = (previous.pages || {}) as Record<string, { filePath: string }>;
+  if (previous.framework === undefined || previous.framework === framework) {
+    for (const [key, next] of Object.entries(baseline.pages)) {
+      const previousPath = previousPages[key]?.filePath;
+      if (!previousPath || previousPath === next.filePath) continue;
+      const [source, target] = await Promise.all([
+        db.forgeProjectFile.findFirst({ where: { projectId: project.id, path: previousPath, deletedAt: null } }),
+        db.forgeProjectFile.findFirst({ where: { projectId: project.id, path: next.filePath, deletedAt: null } }),
+      ]);
+      if (source && !target) await moveOrRenameFile(project.id, previousPath, next.filePath, user.id);
+    }
+  }
+
+  const pagePaths = new Set(Object.values(baseline.pages).map((page) => page.filePath));
+
+  const result = await compileAndSyncProject(
+    project.id,
+    editorData,
+    {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      framework,
+    },
+    user.id,
+    { unholdPaths: pagePaths }
+  );
+
+  if (!result.success) {
+    const firstError = result.diagnostics.find((d) => d.severity === "error");
+    return { synced: false, stale: true, error: firstError?.message || "Source generation failed" };
+  }
+
+  const current = await db.forgeProject.findUnique({ where: { id: project.id } });
+  const currentMetadata = (
+    current?.metadata && typeof current.metadata === "object" ? current.metadata : metadata
+  ) as Record<string, any>;
+
+  let nextCodeSync = currentMetadata.codeSync ? { ...currentMetadata.codeSync } : undefined;
+  if (nextCodeSync) {
+    for (const p of pagePaths) {
+      delete nextCodeSync[p];
+    }
+    if (Object.keys(nextCodeSync).length === 0) {
+      nextCodeSync = undefined;
+    }
+  }
+
+  await db.forgeProject.update({
+    where: { id: project.id },
+    data: {
+      metadata: {
+        ...currentMetadata,
+        visualSync: baseline,
+        codeSync: nextCodeSync,
+      },
+    },
+  });
+
+  const conflicts = (result.heldBackPaths || []).filter((path) => pagePaths.has(path));
+  return { synced: true, stale: false, ...(conflicts.length > 0 ? { conflicts } : {}) };
+}
+
+/**
+ * Bring a website's developer project (if it has one) in step with the saved
+ * visual document. Returns null when the website has no project yet.
+ * A generation failure is reported in the result, never thrown.
+ */
+export async function syncBridgedProjectForWebsite(
+  websiteId: string,
+  user: { id: string },
+  options: { snapshot?: boolean } = {}
+): Promise<(VisualSyncResult & { projectId: string }) | null> {
+  const project: ForgeProjectEntity | null = await db.forgeProject.findFirst({
+    where: { websiteId, deletedAt: null },
+  });
+  if (!project) return null;
+  try {
+    const site = await db.website.findUnique({ where: { id: websiteId } });
+    if (!site) return null;
+    const result = await syncProjectFromWebsite(project, site, user, options);
+    return { ...result, projectId: project.id };
+  } catch (err: any) {
+    return { synced: false, stale: true, error: err?.message || "Source generation failed", projectId: project.id };
+  }
+}
+
+// One in-flight bridge per website: concurrent first opens must not create two projects
+const websiteBridgeInFlight = new Map<string, Promise<ForgeProjectEntity>>();
+
+/**
  * Get or automatically provision a Forge Project for a Website.
  * This bridges existing visual builder websites seamlessly to the Phase 2 developer platform!
  */
@@ -300,36 +463,64 @@ export async function getOrCreateProjectForWebsite(
   websiteId: string,
   user: { id: string; role: string }
 ): Promise<ForgeProjectEntity> {
-  // Check if project already exists for this website
-  const existing = await db.forgeProject.findFirst({
-    where: { websiteId, deletedAt: null },
-  });
-  if (existing) {
-    return existing;
-  }
-
-  // Verify website exists and user has access
+  // Verify website exists and the caller may access it before anything is returned
   const site = await db.website.findUnique({ where: { id: websiteId } });
   if (!site) {
     throw new AppError("Website not found", 404, "NOT_FOUND");
   }
+  await assertWebsiteAccess(site, user);
 
-  const isPrivileged = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role);
-  if (!isPrivileged && site.userId !== user.id) {
-    throw new AppError("You do not have permission to access this website", 403, "FORBIDDEN");
+  const key = String(websiteId);
+  const pending = websiteBridgeInFlight.get(key);
+  if (pending) return pending;
+
+  const work = (async () => {
+    let project: ForgeProjectEntity | null = await db.forgeProject.findFirst({
+      where: { websiteId, deletedAt: null },
+    });
+
+    if (!project) {
+      // Create project bridging the website
+      project = await createForgeProject({
+        name: site.name,
+        slug: generateProjectSlug(site.slug || site.name),
+        description: `Developer project for website: ${site.name}`,
+        projectType: "VISUAL_WEBSITE",
+        ownerId: site.userId,
+        websiteId: site.id,
+        workspaceId: site.workspaceId,
+        organizationId: site.organizationId,
+      });
+    } else if (site.name && project.name !== site.name) {
+      project = await db.forgeProject.update({
+        where: { id: project.id },
+        data: {
+          name: site.name,
+          slug: generateProjectSlug(site.slug || site.name),
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    // Keep generated source in step with the latest saved design. A failure here
+    // must not hide the project, but it is reported to the caller, not swallowed.
+    let visualSync: VisualSyncResult;
+    try {
+      visualSync = await syncProjectFromWebsite(project as ForgeProjectEntity, site, user);
+    } catch (syncErr: any) {
+      visualSync = { synced: false, stale: true, error: syncErr?.message || "Source generation failed" };
+    }
+
+    const fresh = (await db.forgeProject.findUnique({ where: { id: (project as ForgeProjectEntity).id } })) || project;
+    return { ...(fresh as ForgeProjectEntity), visualSync } as ForgeProjectEntity;
+  })();
+
+  websiteBridgeInFlight.set(key, work);
+  try {
+    return await work;
+  } finally {
+    websiteBridgeInFlight.delete(key);
   }
-
-  // Create project bridging the website
-  return createForgeProject({
-    name: site.name,
-    slug: generateProjectSlug(site.slug || site.name),
-    description: `Developer project for website: ${site.name}`,
-    projectType: "VISUAL_WEBSITE",
-    ownerId: site.userId,
-    websiteId: site.id,
-    workspaceId: site.workspaceId,
-    organizationId: site.organizationId,
-  });
 }
 
 /**

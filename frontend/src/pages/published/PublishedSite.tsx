@@ -829,9 +829,15 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
         prev.elementClassMap.get(prev.el.id) === next.elementClassMap.get(next.el.id);
 });
 
-function PublishedSite() {
+function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
     const { websiteId, pageSlug } = useParams<{ websiteId: string; pageSlug?: string }>();
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+    const isPreview = Boolean(isPreviewMode) || 
+        (typeof window !== "undefined" && (
+            window.location.pathname.startsWith("/preview/") || 
+            new URLSearchParams(window.location.search).get("preview") === "true"
+        ));
 
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
@@ -917,14 +923,25 @@ function PublishedSite() {
         const fetchWebsite = async () => {
             try {
                 setLoading(true);
-                let res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
-                if (!res.ok && res.status !== 404) {
-                    const fallback = await fetch(`${apiUrl}/api/websites/public/${websiteId}`);
-                    if (fallback.ok) res = fallback;
+                let res: Response;
+                if (isPreview) {
+                    res = await fetch(`${apiUrl}/api/websites/${websiteId}`, { credentials: "include" });
+                    if (!res.ok) {
+                        res = await fetch(`${apiUrl}/api/v1/websites/${websiteId}`, { credentials: "include" });
+                    }
+                    if (!res.ok) {
+                        res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
+                    }
+                } else {
+                    res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
+                    if (!res.ok && res.status !== 404) {
+                        const fallback = await fetch(`${apiUrl}/api/websites/public/${websiteId}`);
+                        if (fallback.ok) res = fallback;
+                    }
                 }
                 const data = await res.json();
 
-                if (!res.ok) throw new Error("This website is unavailable.");
+                if (!res.ok) throw new Error(data?.message || "This website is unavailable.");
 
                 const site = data.website || data;
                 let rawEditorData = site?.editorData;
@@ -935,7 +952,9 @@ function PublishedSite() {
                         rawEditorData = {};
                     }
                 }
-                const editorData = rawEditorData?.publishedData || rawEditorData || {};
+                const editorData = isPreview 
+                    ? (rawEditorData || {}) 
+                    : (rawEditorData?.publishedData || rawEditorData || {});
 
                 if (editorData?.siteParts) setSitePartsState(editorData.siteParts);
                 const loadedSiteParts = editorData?.siteParts;
@@ -1072,12 +1091,39 @@ function PublishedSite() {
         if (websiteId) {
             const isHome = page.isHome || page.slug === "/" || page.id === "home";
             const cleanSlug = page.slug ? page.slug.replace(/^\//, "") : page.id;
-            const newPath = isHome ? `/site/${websiteId}` : `/site/${websiteId}/${cleanSlug}`;
+            const prefix = isPreview ? `/preview/site/${websiteId}` : `/site/${websiteId}`;
+            const newPath = isHome ? prefix : `${prefix}/${cleanSlug}`;
             if (window.location.pathname !== newPath) {
                 window.history.pushState({ pageId: page.id }, "", newPath);
             }
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: "forge:preview:route-changed",
+                    route: isHome ? "/" : `/${cleanSlug}`,
+                    pageId: page.id,
+                }, "*");
+            }
         }
     };
+
+    useEffect(() => {
+        const handleParentMessage = (e: MessageEvent) => {
+            if (e.data?.type === "forge:preview:set-route") {
+                const target = e.data.route;
+                if (!target || !pages || pages.length === 0) return;
+                const matched = findTargetPage(pages, target);
+                if (matched && matched.id !== activePageId) {
+                    setActivePageId(matched.id);
+                    setElements(matched.elements || []);
+                }
+            } else if (e.data?.type === "forge:preview:reload") {
+                fetchWebsite();
+            }
+        };
+
+        window.addEventListener("message", handleParentMessage);
+        return () => window.removeEventListener("message", handleParentMessage);
+    }, [pages, activePageId]);
 
     useEffect(() => {
         const handlePopState = () => {
@@ -1293,7 +1339,7 @@ function PublishedSite() {
         );
     }
 
-    if (siteStatus === "MAINTENANCE") {
+    if (!isPreview && siteStatus === "MAINTENANCE") {
         return (
             <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center">
                 <div className="text-6xl mb-4">🚧</div>
@@ -1515,10 +1561,10 @@ class PublishedSiteErrorBoundary extends React.Component<{ children: React.React
     }
 }
 
-export default function PublishedSiteWithBoundary() {
+export default function PublishedSiteWithBoundary(props: { isPreviewMode?: boolean }) {
     return (
         <PublishedSiteErrorBoundary>
-            <PublishedSite />
+            <PublishedSite {...props} />
         </PublishedSiteErrorBoundary>
     );
 }

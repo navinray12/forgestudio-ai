@@ -1,12 +1,10 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
 import {
-  getS3Client,
   ensureBucketExists,
   deleteObject,
   getStorageConfig,
+  getPresignedPutUrl,
 } from "./s3-client.js";
 import type { StorageBucket, StorageObject } from "../../../generated/prisma/client.js";
 
@@ -126,18 +124,14 @@ export async function generateUploadPresignedUrl(
   const objectKey = `${params.websiteId}/${Date.now()}-${sanitizedFileName}`;
 
   // 4. Generate Pre-signed PUT URL
-  const client = getS3Client();
-  const command = new PutObjectCommand({
-    Bucket: bucket.name,
-    Key: objectKey,
-    ContentType: params.mimeType,
-    ContentLength: params.sizeBytes,
-  });
-
   const expiresInSeconds = 300;
-  const uploadUrl = await getSignedUrl(client, command, {
-    expiresIn: expiresInSeconds,
-  });
+  const uploadUrl = await getPresignedPutUrl(
+    bucket.name,
+    objectKey,
+    params.mimeType,
+    params.sizeBytes,
+    expiresInSeconds
+  );
 
   const config = getStorageConfig();
   const publicUrl = `${config.endpoint}/${bucket.name}/${objectKey}`;

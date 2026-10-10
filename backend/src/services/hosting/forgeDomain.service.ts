@@ -5,6 +5,7 @@
  */
 
 import crypto from "crypto";
+import dns from "node:dns/promises";
 import { AppError } from "../../utils/app-error.js";
 import { prisma } from "../../config/prisma.js";
 import { forgeProjectService } from "../project/forgeProject.service.js";
@@ -22,6 +23,18 @@ import {
 
 const db = prisma as any;
 
+export type DomainProviderMode = "REAL_PROVIDER" | "CONFIGURATION_MISSING" | "DEV_MODE";
+
+export function getDomainProviderMode(): DomainProviderMode {
+  if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    return "REAL_PROVIDER";
+  }
+  if (process.env.NODE_ENV === "production") {
+    return "CONFIGURATION_MISSING";
+  }
+  return "DEV_MODE";
+}
+
 const FORGE_EDGE_IP = process.env.FORGE_EDGE_IP || "76.76.21.21";
 const FORGE_EDGE_CNAME = process.env.FORGE_EDGE_CNAME || "cname.forge.live";
 
@@ -35,8 +48,8 @@ export class GoDaddyDomainProvider implements DomainProvider {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = process.env.GODADDY_API_KEY || "test_godaddy_key";
-    this.apiSecret = process.env.GODADDY_API_SECRET || "test_godaddy_secret";
+    this.apiKey = process.env.GODADDY_API_KEY || "";
+    this.apiSecret = process.env.GODADDY_API_SECRET || "";
     const env = process.env.GODADDY_ENVIRONMENT || "ote";
     this.baseUrl = env === "production" ? "https://api.godaddy.com" : "https://api.ote-godaddy.com";
   }
@@ -48,9 +61,18 @@ export class GoDaddyDomainProvider implements DomainProvider {
   async checkAvailability(domain: string): Promise<DomainAvailabilityResult> {
     const cleanDomain = domain.trim().toLowerCase();
     const tld = cleanDomain.split(".").pop() || "com";
+    const mode = getDomainProviderMode();
+
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError(
+        "GoDaddy credentials missing. Production domain check cannot proceed without GODADDY_API_KEY and GODADDY_API_SECRET.",
+        422,
+        "DOMAIN_CONFIG_MISSING"
+      );
+    }
 
     // If live credentials are provided, call GoDaddy API
-    if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    if (mode === "REAL_PROVIDER") {
       try {
         const res = await fetch(`${this.baseUrl}/v1/domains/available?domain=${encodeURIComponent(cleanDomain)}`, {
           headers: { Authorization: this.getAuthHeader() },
@@ -70,11 +92,11 @@ export class GoDaddyDomainProvider implements DomainProvider {
           };
         }
       } catch (e) {
-        console.warn("GoDaddy API check error, falling back to mock verification:", e);
+        throw new AppError(`GoDaddy API communication failed: ${String(e)}`, 502, "DOMAIN_PROVIDER_ERROR");
       }
     }
 
-    // High-performance deterministic availability for sandbox / testing
+    // High-performance deterministic availability for sandbox / testing mode
     const isMockAvailable = !cleanDomain.includes("google") && !cleanDomain.includes("github") && !cleanDomain.includes("taken");
     return {
       domain: cleanDomain,
@@ -89,7 +111,12 @@ export class GoDaddyDomainProvider implements DomainProvider {
   }
 
   async getDnsRecords(domain: string): Promise<DnsRecord[]> {
-    if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    const mode = getDomainProviderMode();
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError("Cannot retrieve DNS records: GoDaddy credentials missing in production.", 422, "DOMAIN_CONFIG_MISSING");
+    }
+
+    if (mode === "REAL_PROVIDER") {
       try {
         const res = await fetch(`${this.baseUrl}/v1/domains/${encodeURIComponent(domain)}/records`, {
           headers: { Authorization: this.getAuthHeader() },
@@ -104,12 +131,13 @@ export class GoDaddyDomainProvider implements DomainProvider {
             priority: r.priority,
           }));
         }
+        throw new Error(`GoDaddy API returned HTTP ${res.status}`);
       } catch (e) {
-        console.warn("GoDaddy getDnsRecords error:", e);
+        throw new AppError(`Failed to fetch DNS records from GoDaddy: ${String(e)}`, 502, "DOMAIN_PROVIDER_ERROR");
       }
     }
 
-    // Default existing customer records (including mail/MX to test preservation)
+    // Default development mode baseline records (including mail/MX to test preservation)
     return [
       { type: "A", name: "@", data: "192.0.2.1", ttl: 3600 },
       { type: "CNAME", name: "www", data: domain, ttl: 3600 },
@@ -119,7 +147,12 @@ export class GoDaddyDomainProvider implements DomainProvider {
   }
 
   async updateDnsRecords(domain: string, records: DnsRecord[]): Promise<boolean> {
-    if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    const mode = getDomainProviderMode();
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError("Cannot update DNS records: GoDaddy credentials missing in production.", 422, "DOMAIN_CONFIG_MISSING");
+    }
+
+    if (mode === "REAL_PROVIDER") {
       try {
         const res = await fetch(`${this.baseUrl}/v1/domains/${encodeURIComponent(domain)}/records`, {
           method: "PUT",
@@ -131,14 +164,19 @@ export class GoDaddyDomainProvider implements DomainProvider {
         });
         return res.ok;
       } catch (e) {
-        console.warn("GoDaddy updateDnsRecords error:", e);
+        throw new AppError(`GoDaddy updateDnsRecords failed: ${String(e)}`, 502, "DOMAIN_PROVIDER_ERROR");
       }
     }
     return true;
   }
 
   async addDnsRecord(domain: string, record: DnsRecord): Promise<boolean> {
-    if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    const mode = getDomainProviderMode();
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError("Cannot add DNS record: GoDaddy credentials missing in production.", 422, "DOMAIN_CONFIG_MISSING");
+    }
+
+    if (mode === "REAL_PROVIDER") {
       try {
         const res = await fetch(`${this.baseUrl}/v1/domains/${encodeURIComponent(domain)}/records`, {
           method: "PATCH",
@@ -150,14 +188,19 @@ export class GoDaddyDomainProvider implements DomainProvider {
         });
         return res.ok;
       } catch (e) {
-        console.warn("GoDaddy addDnsRecord error:", e);
+        throw new AppError(`GoDaddy addDnsRecord failed: ${String(e)}`, 502, "DOMAIN_PROVIDER_ERROR");
       }
     }
     return true;
   }
 
   async removeDnsRecord(domain: string, type: string, name: string): Promise<boolean> {
-    if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET) {
+    const mode = getDomainProviderMode();
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError("Cannot remove DNS record: GoDaddy credentials missing in production.", 422, "DOMAIN_CONFIG_MISSING");
+    }
+
+    if (mode === "REAL_PROVIDER") {
       try {
         const res = await fetch(`${this.baseUrl}/v1/domains/${encodeURIComponent(domain)}/records/${type}/${name}`, {
           method: "DELETE",
@@ -165,15 +208,41 @@ export class GoDaddyDomainProvider implements DomainProvider {
         });
         return res.ok;
       } catch (e) {
-        console.warn("GoDaddy removeDnsRecord error:", e);
+        throw new AppError(`GoDaddy removeDnsRecord failed: ${String(e)}`, 502, "DOMAIN_PROVIDER_ERROR");
       }
     }
     return true;
   }
 
   async verifyDnsPropagation(domain: string, expectedType: DnsRecordType, expectedValue: string): Promise<boolean> {
-    // In live production, DNS queries resolve across public nameservers (8.8.8.8)
-    return Boolean(domain && expectedType && expectedValue);
+    const mode = getDomainProviderMode();
+    if (mode === "CONFIGURATION_MISSING") {
+      throw new AppError("Cannot verify DNS propagation: GoDaddy credentials missing in production.", 422, "DOMAIN_CONFIG_MISSING");
+    }
+
+    // Perform actual DNS resolution check using Node's dns resolver
+    try {
+      if (expectedType === "TXT") {
+        const records = await dns.resolveTxt(domain);
+        const flat = records.flat();
+        if (flat.some((r) => r.includes(expectedValue))) return true;
+      } else if (expectedType === "A") {
+        const ips = await dns.resolve4(domain);
+        if (ips.includes(expectedValue)) return true;
+      } else if (expectedType === "CNAME") {
+        const cnames = await dns.resolveCname(domain);
+        if (cnames.some((c) => c.toLowerCase() === expectedValue.toLowerCase())) return true;
+      }
+    } catch {
+      // Public DNS lookup did not resolve or timed out
+    }
+
+    // In DEV_MODE only, allow simulated propagation check
+    if (mode === "DEV_MODE") {
+      return Boolean(domain && expectedType && expectedValue);
+    }
+
+    return false;
   }
 }
 

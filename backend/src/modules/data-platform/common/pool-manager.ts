@@ -1,5 +1,5 @@
 import pg from "pg";
-import { prisma } from "../../../config/prisma.js";
+import { prisma, pgPool } from "../../../config/prisma.js";
 import { decryptCredential } from "./crypto.utils.js";
 import { AppError } from "../../../utils/app-error.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
@@ -13,6 +13,126 @@ interface CachedTenantPool {
 
 const MAX_ACTIVE_POOLS = 50;
 const poolCache = new Map<string, CachedTenantPool>();
+
+let dataTablesEnsured = false;
+export async function ensureDataPlatformTables(): Promise<void> {
+  if (dataTablesEnsured) return;
+  try {
+    await pgPool.query(`
+      DO $$ BEGIN
+        CREATE TYPE "DatabaseEnvironment" AS ENUM ('PRODUCTION', 'STAGING', 'DEVELOPMENT');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+      DO $$ BEGIN
+        CREATE TYPE "DatabaseProvisioningStatus" AS ENUM ('PENDING', 'PROVISIONING', 'READY', 'FAILED', 'SUSPENDED');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+      DO $$ BEGIN
+        CREATE TYPE "BucketVisibility" AS ENUM ('PUBLIC', 'PRIVATE');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+      DO $$ BEGIN
+        CREATE TYPE "ApiKeyType" AS ENUM ('ANON', 'SERVICE_ROLE');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$;
+
+      CREATE TABLE IF NOT EXISTS project_databases (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+        environment "DatabaseEnvironment" NOT NULL DEFAULT 'PRODUCTION',
+        status "DatabaseProvisioningStatus" NOT NULL DEFAULT 'PENDING',
+        "dbName" VARCHAR(63) NOT NULL,
+        "dbUser" VARCHAR(63) NOT NULL,
+        "encryptedPassword" VARCHAR(500) NOT NULL,
+        host VARCHAR(255) NOT NULL,
+        port INTEGER NOT NULL DEFAULT 5432,
+        "connectionPoolMax" INTEGER NOT NULL DEFAULT 10,
+        "connectionPoolIdleMs" INTEGER NOT NULL DEFAULT 10000,
+        "storageSizeBytes" BIGINT NOT NULL DEFAULT 0,
+        "lastBackupAt" TIMESTAMPTZ,
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uq_project_databases_website_env UNIQUE ("websiteId", environment)
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_databases_status ON project_databases(status);
+
+      CREATE TABLE IF NOT EXISTS project_database_backups (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+        "backupName" VARCHAR(255) NOT NULL,
+        "storageKey" VARCHAR(1000) NOT NULL,
+        "sizeBytes" BIGINT NOT NULL,
+        "checksumSha256" VARCHAR(64) NOT NULL,
+        "completedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_db_backups_db ON project_database_backups("databaseId", "completedAt");
+
+      CREATE TABLE IF NOT EXISTS database_migration_records (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+        "migrationName" VARCHAR(255) NOT NULL,
+        "batchNumber" INTEGER NOT NULL DEFAULT 1,
+        "appliedByUserId" UUID REFERENCES users(id) ON DELETE SET NULL,
+        checksum VARCHAR(64) NOT NULL,
+        "sqlScript" TEXT NOT NULL,
+        "executionTimeMs" INTEGER NOT NULL,
+        "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uq_db_mig_records_db_name UNIQUE ("databaseId", "migrationName")
+      );
+      CREATE INDEX IF NOT EXISTS idx_db_mig_records_db_batch ON database_migration_records("databaseId", "batchNumber");
+
+      CREATE TABLE IF NOT EXISTS project_api_keys (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        "keyType" "ApiKeyType" NOT NULL DEFAULT 'ANON',
+        "tokenHash" VARCHAR(128) UNIQUE NOT NULL,
+        prefix VARCHAR(16) NOT NULL,
+        scopes JSONB NOT NULL DEFAULT '["data:read", "data:write"]'::jsonb,
+        "rateLimitRpm" INTEGER NOT NULL DEFAULT 120,
+        "expiresAt" TIMESTAMPTZ,
+        "lastUsedAt" TIMESTAMPTZ,
+        "revokedAt" TIMESTAMPTZ,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_api_keys_db_type ON project_api_keys("databaseId", "keyType");
+
+      CREATE TABLE IF NOT EXISTS storage_buckets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+        name VARCHAR(63) NOT NULL,
+        visibility "BucketVisibility" NOT NULL DEFAULT 'PRIVATE',
+        "maxSizeBytes" BIGINT NOT NULL DEFAULT 524288000,
+        "usedSizeBytes" BIGINT NOT NULL DEFAULT 0,
+        "allowedMimeTypes" JSONB NOT NULL DEFAULT '["*/*"]'::jsonb,
+        "corsRules" JSONB NOT NULL DEFAULT '[]'::jsonb,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uq_storage_buckets_website_name UNIQUE ("websiteId", name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_storage_buckets_website ON storage_buckets("websiteId");
+
+      CREATE TABLE IF NOT EXISTS storage_objects (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "bucketId" UUID NOT NULL REFERENCES storage_buckets(id) ON DELETE CASCADE,
+        "objectKey" VARCHAR(900) NOT NULL,
+        "originalName" VARCHAR(255) NOT NULL,
+        "mimeType" VARCHAR(150) NOT NULL,
+        "sizeBytes" BIGINT NOT NULL,
+        "checksumSha256" VARCHAR(64) NOT NULL,
+        "eTag" VARCHAR(100),
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+    dataTablesEnsured = true;
+  } catch (err: any) {
+    console.error("[PoolManager] Error ensuring data platform tables:", err?.message || err);
+  }
+}
 
 function cacheKey(projectId: string, environment: DatabaseEnvironment): string {
   return `${projectId}:${environment}`;
@@ -65,6 +185,9 @@ export async function getTenantPool(
     return cached.pool;
   }
 
+  // Ensure tables exist before querying Prisma
+  await ensureDataPlatformTables();
+
   // 1. Fetch tenant database record from Prisma
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(projectId)) {
@@ -75,7 +198,7 @@ export async function getTenantPool(
     );
   }
 
-  const dbRecord = await prisma.projectDatabase.findUnique({
+  let dbRecord = await prisma.projectDatabase.findUnique({
     where: {
       websiteId_environment: {
         websiteId: projectId,
@@ -83,6 +206,33 @@ export async function getTenantPool(
       },
     },
   });
+
+  // Check if projectId is a forgeProject id that links to a website
+  if (!dbRecord) {
+    try {
+      const forgeProj = await (prisma as any).forgeProject?.findUnique?.({ where: { id: projectId } });
+      if (forgeProj?.websiteId) {
+        dbRecord = await prisma.projectDatabase.findUnique({
+          where: {
+            websiteId_environment: {
+              websiteId: forgeProj.websiteId,
+              environment,
+            },
+          },
+        });
+      }
+    } catch {}
+  }
+
+  // Auto-provision tenant database on demand if missing
+  if (!dbRecord) {
+    try {
+      const { provisionDatabase } = await import("../database/database-provisioner.service.js");
+      dbRecord = await provisionDatabase(projectId, environment);
+    } catch (provErr: any) {
+      console.warn(`[PoolManager] Auto-provision on demand failed for ${projectId}:`, provErr?.message);
+    }
+  }
 
   if (!dbRecord) {
     throw new AppError(

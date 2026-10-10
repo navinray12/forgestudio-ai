@@ -44,6 +44,9 @@ import {
   type ForgeProject,
   type FileTreeNode,
   type ProjectFile,
+  type CodeSyncResult,
+  type ProjectPage,
+  type PageMutationResult,
 } from "../services/forgeProjectService";
 import { ProjectExplorer } from "../components/ProjectExplorer";
 import { MultiFileEditor, type OpenTab } from "../components/MultiFileEditor";
@@ -69,7 +72,213 @@ import { DeveloperPlatformPanel } from "../components/DeveloperPlatformPanel";
 type WorkspaceMode = "code" | "split" | "preview";
 type BottomTab = "ai" | "git" | "terminal" | "build" | "hosting" | "cicd" | "domains" | "dependencies" | "database" | "storage" | "runtime" | "quality" | "devops" | "intelligence" | "platform" | "debug" | "output" | "problems" | "manifest" | "snapshots";
 
+/**
+ * Identify whether a given workspace file path represents a helper component, utility, or non-page asset.
+ * Guarantees that EmptyState.tsx or arbitrary UI atoms are never treated as route pages.
+ */
+export function isHelperOrNonPageFile(filePath: string): boolean {
+  const clean = filePath.replace(/^[/\\]+/, "").replace(/\\/g, "/");
+  const nonPageDirs = [
+    "src/components/",
+    "components/",
+    "src/utils/",
+    "utils/",
+    "src/hooks/",
+    "hooks/",
+    "src/services/",
+    "services/",
+    "src/styles/",
+    "styles/",
+    "src/types/",
+    "types/",
+    "src/lib/",
+    "lib/",
+    "src/api/",
+    "api/",
+    "public/",
+    "assets/",
+    "src/assets/",
+  ];
+  if (nonPageDirs.some((dir) => clean.startsWith(dir) || clean.includes(`/${dir}`))) {
+    return true;
+  }
+  const nonPageFileNames = [
+    "EmptyState.tsx",
+    "EmptyState.jsx",
+    "Button.tsx",
+    "Button.jsx",
+    "ErrorBoundary.tsx",
+    "ErrorBoundary.jsx",
+  ];
+  const base = clean.split("/").pop() || "";
+  return nonPageFileNames.includes(base);
+}
 
+/**
+ * Identify the real entry page from the project manifest, route configuration, and file tree.
+ * Never selects EmptyState.tsx or another helper component as the page source by default.
+ */
+export function resolveDefaultWorkspaceFile(
+  fileTree: FileTreeNode[],
+  manifest: any | null,
+  pages: ProjectPage[] = []
+): string | null {
+  const allFiles: string[] = [];
+  const collectFiles = (nodes: FileTreeNode[]) => {
+    for (const node of nodes) {
+      if (!node.isDirectory) {
+        allFiles.push(node.path);
+      } else if (node.children) {
+        collectFiles(node.children);
+      }
+    }
+  };
+  collectFiles(fileTree);
+
+  if (allFiles.length === 0) return null;
+  const hasFile = (p: string) => allFiles.includes(p);
+
+  // 1. Identify the home/root page from the visual pages registry
+  const homePage = pages.find((p) => p.isHome || p.routePath === "/");
+  if (homePage?.filePath && hasFile(homePage.filePath) && !isHelperOrNonPageFile(homePage.filePath)) {
+    return homePage.filePath;
+  }
+
+  // 2. Identify any other valid page from the visual pages registry
+  for (const page of pages) {
+    if (page.filePath && hasFile(page.filePath) && !isHelperOrNonPageFile(page.filePath)) {
+      return page.filePath;
+    }
+  }
+
+  // 3. Check project manifest build entryPoint (e.g. app/page.tsx or src/App.tsx)
+  const manifestEntry = manifest?.build?.entryPoint;
+  if (typeof manifestEntry === "string" && hasFile(manifestEntry) && !isHelperOrNonPageFile(manifestEntry)) {
+    return manifestEntry;
+  }
+
+  // 4. Well-known Next.js page entry files
+  const nextCandidates = [
+    "app/page.tsx",
+    "app/page.jsx",
+    "pages/index.tsx",
+    "pages/index.jsx",
+    "src/app/page.tsx",
+    "src/app/page.jsx",
+  ];
+  for (const candidate of nextCandidates) {
+    if (hasFile(candidate)) return candidate;
+  }
+
+  // 5. Well-known React page files in src/pages/
+  const reactHomeCandidates = [
+    "src/pages/HomePage.tsx",
+    "src/pages/HomePage.jsx",
+    "src/pages/IndexPage.tsx",
+    "src/pages/IndexPage.jsx",
+  ];
+  for (const candidate of reactHomeCandidates) {
+    if (hasFile(candidate)) return candidate;
+  }
+
+  // Any other page in src/pages/ (excluding helper components)
+  const srcPage = allFiles.find(
+    (f) =>
+      (f.startsWith("src/pages/") || f.startsWith("pages/")) &&
+      /\.(tsx|jsx)$/.test(f) &&
+      !isHelperOrNonPageFile(f)
+  );
+  if (srcPage) return srcPage;
+
+  // 6. Application shells (App.tsx / main.tsx)
+  const appCandidates = [
+    "src/App.tsx",
+    "src/App.jsx",
+    "App.tsx",
+    "App.jsx",
+    "src/main.tsx",
+    "src/main.jsx",
+    "src/index.tsx",
+    "src/index.jsx",
+    "index.html",
+  ];
+  for (const candidate of appCandidates) {
+    if (hasFile(candidate)) return candidate;
+  }
+
+  // 7. Any root-level or source file that is NOT a helper component
+  const fallback = allFiles.find(
+    (f) =>
+      !isHelperOrNonPageFile(f) &&
+      /\.(tsx|jsx|ts|js|html)$/.test(f) &&
+      !f.includes(".test.") &&
+      !f.includes(".spec.")
+  );
+  return fallback || null;
+}
+
+/**
+ * Resolve the page source file corresponding to a route path from pages registry and file tree.
+ * Excludes helper and utility components like EmptyState.tsx.
+ */
+export function resolveFileForRoute(
+  route: string,
+  fileTree: FileTreeNode[],
+  pages: ProjectPage[] = []
+): string | null {
+  const cleanRoute = (route || "/").trim().toLowerCase();
+
+  // 1. Direct match in visual pages registry
+  const matched = pages.find((p) => p.routePath.toLowerCase() === cleanRoute) ||
+                  (cleanRoute === "/" ? pages.find((p) => p.isHome) : undefined);
+  if (matched?.filePath && !isHelperOrNonPageFile(matched.filePath)) {
+    return matched.filePath;
+  }
+
+  // Flatten file list
+  const allFiles: string[] = [];
+  const collectFiles = (nodes: FileTreeNode[]) => {
+    for (const node of nodes) {
+      if (!node.isDirectory) {
+        allFiles.push(node.path);
+      } else if (node.children) {
+        collectFiles(node.children);
+      }
+    }
+  };
+  collectFiles(fileTree);
+
+  const segment = cleanRoute === "/" ? "home" : cleanRoute.replace(/^\/+/, "").replace(/\/+$/, "");
+
+  // Heuristic candidates (React and Next.js page conventions)
+  const candidates = [
+    `src/pages/${segment.charAt(0).toUpperCase() + segment.slice(1)}Page.tsx`,
+    `src/pages/${segment.charAt(0).toUpperCase() + segment.slice(1)}Page.jsx`,
+    `src/pages/${segment}.tsx`,
+    `src/pages/${segment}.jsx`,
+    `pages/${segment}.tsx`,
+    `pages/${segment}.jsx`,
+    `app/${segment}/page.tsx`,
+    `src/app/${segment}/page.tsx`,
+  ];
+  if (cleanRoute === "/") {
+    candidates.push(
+      "src/pages/HomePage.tsx",
+      "src/pages/IndexPage.tsx",
+      "src/pages/AbcPage.tsx",
+      "app/page.tsx",
+      "src/app/page.tsx",
+      "pages/index.tsx"
+    );
+  }
+
+  for (const c of candidates) {
+    const found = allFiles.find((f) => f.toLowerCase() === c.toLowerCase());
+    if (found && !isHelperOrNonPageFile(found)) return found;
+  }
+
+  return null;
+}
 
 export const DeveloperWorkspace: React.FC = () => {
   const { projectId, websiteId } = useParams<{ projectId?: string; websiteId?: string }>();
@@ -84,13 +293,98 @@ export const DeveloperWorkspace: React.FC = () => {
   // Editor tabs state
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
+  const [currentRoute, setCurrentRoute] = useState<string>("/");
 
   // Workspace layout state
   const [mode, setMode] = useState<WorkspaceMode>("code");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [bottomDrawerOpen, setBottomDrawerOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [bottomDrawerOpen, setBottomDrawerOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("output");
-  const [bottomDrawerHeight, setBottomDrawerHeight] = useState(200);
+  const [bottomDrawerHeight, setBottomDrawerHeight] = useState(190);
+
+  const isResizingSplit = useRef(false);
+  const isResizingDrawer = useRef(false);
+  const isResizingSidebar = useRef(false);
+
+  // Resizing functions
+  const startSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingSidebar.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingSidebar.current) return;
+      const newWidth = Math.max(180, Math.min(500, moveEvent.clientX));
+      setSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isResizingSidebar.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const startSplitResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingSplit.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingSplit.current) return;
+      const container = document.getElementById("workspace-split-container");
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const offsetX = moveEvent.clientX - rect.left;
+      const ratio = Math.max(0.2, Math.min(0.8, offsetX / rect.width));
+      setSplitRatio(ratio);
+    };
+
+    const onMouseUp = () => {
+      isResizingSplit.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const startDrawerResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingDrawer.current = true;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingDrawer.current) return;
+      const newHeight = Math.max(100, Math.min(window.innerHeight * 0.7, window.innerHeight - moveEvent.clientY));
+      setBottomDrawerHeight(newHeight);
+      setBottomDrawerOpen(true);
+    };
+
+    const onMouseUp = () => {
+      isResizingDrawer.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, []);
 
   // Modals & Popups
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -108,12 +402,28 @@ export const DeveloperWorkspace: React.FC = () => {
   const [compiling, setCompiling] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "diverged">("synced");
+  // Bumped whenever persisted source changes, so the preview rebuilds from it
+  const [previewVersion, setPreviewVersion] = useState(0);
+  // A page whose code and visual versions both changed; neither is overwritten until the user chooses
+  const [syncConflict, setSyncConflict] = useState<{ path: string; message: string } | null>(null);
+  // A file that changed on the server after it was opened here
+  const [staleFilePath, setStaleFilePath] = useState<string | null>(null);
+
+  // Pages (visual page registry)
+  const [pagesModalOpen, setPagesModalOpen] = useState(false);
+  const [pages, setPages] = useState<ProjectPage[]>([]);
+  const [newPageName, setNewPageName] = useState("");
+  const [newPageRoute, setNewPageRoute] = useState("");
+  const [pageBusy, setPageBusy] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // Generator Modal state (Modules 08 & 09)
   const [generatorModalOpen, setGeneratorModalOpen] = useState(false);
   const [selectedFramework, setSelectedFramework] = useState<"react" | "nextjs">("react");
   const [generationScopeType, setGenerationScopeType] = useState<"full" | "page">("full");
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [generationPlan, setGenerationPlan] = useState<any>(null);
   const [loadingPlan, setLoadingPlan] = useState(false);
 
@@ -121,6 +431,36 @@ export const DeveloperWorkspace: React.FC = () => {
     const time = new Date().toLocaleTimeString();
     setLogs((prev) => [...prev.slice(-150), { id: Math.random().toString(), time, text, type }]);
   }, []);
+
+  const mapFileToRoute = useCallback((filePath: string, currentPages: ProjectPage[] = pages): string | null => {
+    if (isHelperOrNonPageFile(filePath)) return null;
+
+    const matched = currentPages.find((p) => p.filePath === filePath);
+    if (matched) return matched.routePath;
+
+    // Next.js App Router
+    const nextMatch = filePath.match(/^app\/(.*?)\/?page\.(tsx|jsx)$/);
+    if (nextMatch) {
+      const seg = nextMatch[1];
+      return !seg ? "/" : `/${seg.replace(/^[/\\]+|[/\\]+$/g, "")}`;
+    }
+
+    // React/Vite Pages: src/pages/*
+    const reactMatch = filePath.match(/^src\/pages\/(.+)\.(tsx|jsx)$/);
+    if (reactMatch) {
+      let raw = reactMatch[1];
+      if (raw.endsWith("Page") && raw.length > 4) raw = raw.slice(0, -4);
+      if (raw.toLowerCase() === "home" || raw.toLowerCase() === "index") return "/";
+      const slug = raw.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+      return `/${slug}`;
+    }
+
+    if (filePath === "src/App.tsx" || filePath === "src/main.tsx" || filePath === "index.html") {
+      return "/";
+    }
+
+    return null;
+  }, [pages]);
 
   // 1. Initial Load: Fetch or bridge project
   useEffect(() => {
@@ -144,36 +484,46 @@ export const DeveloperWorkspace: React.FC = () => {
         if (!isMounted) return;
         setProject(currentProj);
         addLog(`Loaded project: ${currentProj.name} (${currentProj.framework})`, "info");
+        if (currentProj.visualSync?.synced) {
+          addLog("Source files regenerated from the latest saved visual design", "success");
+        } else if (currentProj.visualSync?.stale) {
+          addLog(
+            `Source files are out of date with the visual design: ${currentProj.visualSync.error || "sync failed"}`,
+            "error"
+          );
+        }
 
         // Load file tree
         const treeRes = await forgeProjectService.getFileTree(currentProj.id);
-        if (isMounted) setFileTree(treeRes.tree || []);
+        const loadedTree = treeRes.tree || [];
+        if (isMounted) setFileTree(loadedTree);
 
         // Load manifest
+        let loadedManifest: any = null;
         try {
           const mRes = await forgeProjectService.getManifest(currentProj.id);
-          if (isMounted) setManifest(mRes.manifest);
+          loadedManifest = mRes.manifest;
+          if (isMounted) setManifest(loadedManifest);
         } catch (e) {
           console.warn("Could not load manifest:", e);
         }
 
-        // Open default file (e.g. src/App.tsx or index.html)
-        const findDefaultFile = (nodes: FileTreeNode[]): string | null => {
-          for (const node of nodes) {
-            if (!node.isDirectory && (node.path.includes("App.tsx") || node.path.includes("main.tsx") || node.path.includes("index.html"))) {
-              return node.path;
-            }
-            if (node.children) {
-              const found = findDefaultFile(node.children);
-              if (found) return found;
-            }
-          }
-          return nodes.find((n) => !n.isDirectory)?.path || null;
-        };
+        // Load visual pages registry
+        let loadedPages: ProjectPage[] = [];
+        try {
+          const pRes = await forgeProjectService.listPages(currentProj.id);
+          loadedPages = pRes.pages || [];
+          if (isMounted) setPages(loadedPages);
+        } catch (e) {
+          console.warn("Could not load pages registry:", e);
+        }
 
-        const defaultPath = findDefaultFile(treeRes.tree || []);
+        // Open default entry page file (manifest/routes derived, never EmptyState.tsx)
+        const defaultPath = resolveDefaultWorkspaceFile(loadedTree, loadedManifest, loadedPages);
         if (defaultPath && isMounted) {
           openFileByPath(currentProj.id, defaultPath);
+          const mapped = mapFileToRoute(defaultPath, loadedPages);
+          if (mapped) setCurrentRoute(mapped);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -193,10 +543,24 @@ export const DeveloperWorkspace: React.FC = () => {
 
   // Open file helper
   const openFileByPath = async (pId: string, filePath: string) => {
-    // If tab is already open, simply activate it
+    // If tab is already open, activate it and refresh content if not dirty
     const existing = openTabs.find((t) => t.path === filePath);
     if (existing) {
       setActivePath(filePath);
+      if (!existing.isDirty) {
+        try {
+          const { file } = await forgeProjectService.readFile(pId, filePath);
+          if (file && file.content !== existing.content) {
+            setOpenTabs((prev) =>
+              prev.map((t) =>
+                t.path === filePath
+                  ? { ...t, file, content: file.content || "", savedContent: file.content || "", isDirty: false }
+                  : t
+              )
+            );
+          }
+        } catch {}
+      }
       return;
     }
 
@@ -263,6 +627,100 @@ export const DeveloperWorkspace: React.FC = () => {
     );
   };
 
+  // Synchronize active code file -> preview route
+  useEffect(() => {
+    if (!activePath) return;
+    const mapped = mapFileToRoute(activePath, pages);
+    if (mapped && mapped.toLowerCase() !== currentRoute.toLowerCase()) {
+      setCurrentRoute(mapped);
+    }
+  }, [activePath, mapFileToRoute, pages, currentRoute]);
+
+  // Synchronize preview route -> active code file
+  const handlePreviewRouteChange = useCallback((newRoute: string) => {
+    setCurrentRoute(newRoute);
+    if (!project) return;
+    const targetFile = resolveFileForRoute(newRoute, fileTree, pages);
+    if (targetFile) {
+      openFileByPath(project.id, targetFile);
+    }
+  }, [project, pages, fileTree]);
+
+  // Ensure Split Preview always has an active page open matching currentRoute
+  useEffect(() => {
+    if (mode === "split" && project) {
+      if (openTabs.length === 0) {
+        const targetPath =
+          resolveFileForRoute(currentRoute, fileTree, pages) ||
+          resolveDefaultWorkspaceFile(fileTree, manifest, pages);
+        if (targetPath) {
+          openFileByPath(project.id, targetPath);
+        }
+      } else if (!activePath && openTabs.length > 0) {
+        setActivePath(openTabs[0].path);
+      }
+    }
+  }, [mode, project, openTabs.length, activePath, currentRoute, pages, fileTree, manifest, fileTree]);
+
+  // Cross-tab synchronization: receive changes saved in the Visual Editor
+  useEffect(() => {
+    if (!project) return;
+
+    const refreshFromVisualEditor = async () => {
+      try {
+        await handleRefreshTree();
+        await loadPages();
+        await reloadChangedFiles(openTabs.map((t) => t.path));
+        setPreviewVersion((v) => v + 1);
+        addLog("Source files and pages refreshed from Visual Editor changes", "info");
+      } catch (err: any) {
+        console.warn("Could not refresh from visual editor changes:", err);
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("forge_workspace_sync");
+      channel.onmessage = (event) => {
+        if (project.websiteId && event.data?.websiteId === project.websiteId && event.data?.type === "visual_saved") {
+          refreshFromVisualEditor();
+        }
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "forge_workspace_sync_event" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (project.websiteId && parsed.websiteId === project.websiteId && parsed.type === "visual_saved") {
+            refreshFromVisualEditor();
+          }
+        } catch {}
+      }
+    };
+
+    const handleFocus = () => {
+      refreshFromVisualEditor();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshFromVisualEditor();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [project, openTabs]);
+
   const handleContentChange = (path: string, newContent: string) => {
     setOpenTabs((prev) =>
       prev.map((t) =>
@@ -278,7 +736,114 @@ export const DeveloperWorkspace: React.FC = () => {
     setSyncStatus("diverged");
   };
 
-  // File save with optimistic concurrency
+  // Re-read files whose persisted content changed on the server (regenerated source)
+  const reloadChangedFiles = async (paths: string[]) => {
+    if (!project || paths.length === 0) return;
+    const changed = new Set(paths);
+    const reloaded = new Map<string, ProjectFile | null>();
+    for (const tab of openTabs) {
+      if (!changed.has(tab.path)) continue;
+      try {
+        const { file } = await forgeProjectService.readFile(project.id, tab.path);
+        reloaded.set(tab.path, file);
+      } catch {
+        reloaded.set(tab.path, null); // the file no longer exists
+      }
+    }
+    if (reloaded.size === 0) return;
+    setOpenTabs((prev) =>
+      prev
+        .filter((t) => reloaded.get(t.path) !== null)
+        .map((t) => {
+          const file = reloaded.get(t.path);
+          // Unsaved edits in another tab are never replaced
+          if (!file || t.isDirty) return t;
+          return { ...t, file, content: file.content || "", savedContent: file.content || "", isDirty: false };
+        })
+    );
+  };
+
+  // Report the outcome of reconciling a saved file with the visual document
+  const applySyncResult = async (path: string, sync: CodeSyncResult | null | undefined) => {
+    if (!sync || sync.status === "not-a-page") {
+      setSyncStatus("synced");
+      return;
+    }
+
+    const problems = (sync.diagnostics || [])
+      .filter((d) => d.severity !== "info")
+      .map((d) => ({ file: d.filePath || path, line: d.line, message: `[${d.code}] ${d.message}`, severity: d.severity }));
+    setDiagnostics((prev) => [...prev.filter((d) => d.file !== path), ...problems]);
+    for (const info of (sync.diagnostics || []).filter((d) => d.severity === "info")) addLog(info.message, "info");
+
+    switch (sync.status) {
+      case "synced":
+        addLog(sync.message || `Synchronised ${path} into the Visual Editor`, "success");
+        setSyncStatus("synced");
+        setSyncConflict(null);
+        await loadPages();
+        if (project?.websiteId) {
+          try {
+            const channel = new BroadcastChannel("forge_workspace_sync");
+            channel.postMessage({
+              type: "code_synced",
+              websiteId: project.websiteId,
+              documentVersion: (sync as any).documentVersion,
+              filePath: path,
+              timestamp: Date.now(),
+            });
+            channel.close();
+          } catch {}
+          try {
+            localStorage.setItem(
+              "forge_workspace_sync_event",
+              JSON.stringify({
+                websiteId: project.websiteId,
+                documentVersion: (sync as any).documentVersion,
+                filePath: path,
+                timestamp: Date.now(),
+              })
+            );
+          } catch {}
+        }
+        break;
+      case "unchanged":
+        addLog(`${path} matches the visual document`, "info");
+        setSyncStatus("synced");
+        setSyncConflict(null);
+        break;
+      case "reverted":
+        addLog(sync.message || `${path} was regenerated from the visual document`, "success");
+        setSyncStatus("synced");
+        setSyncConflict(null);
+        break;
+      case "conflict":
+        addLog(sync.message || `${path} conflicts with a change made in the Visual Editor`, "warn");
+        setSyncStatus("diverged");
+        setSyncConflict({ path, message: sync.message || "This page was changed in both the Visual Editor and the code." });
+        break;
+      case "unsupported":
+      case "invalid":
+        addLog(sync.message || `${path} could not be synchronised with the Visual Editor`, "warn");
+        for (const d of problems.slice(0, 5)) addLog(`${d.file}${d.line ? `:${d.line}` : ""} ${d.message}`, "warn");
+        setSyncStatus("diverged");
+        setActiveBottomTab("problems");
+        setBottomDrawerOpen(true);
+        break;
+      default:
+        addLog(sync.message || `Synchronisation of ${path} failed`, "error");
+        setSyncStatus("diverged");
+    }
+
+    if (sync.updatedFiles && sync.updatedFiles.length > 0) {
+      await reloadChangedFiles(sync.updatedFiles);
+      await handleRefreshTree();
+    }
+    setPreviewVersion((v) => v + 1);
+  };
+
+  // File save with optimistic concurrency. The server reconciles a saved page
+  // with the visual document as part of the save and reports the outcome.
   const handleSaveFile = async (path: string) => {
     if (!project) return;
     const tab = openTabs.find((t) => t.path === path);
@@ -296,17 +861,43 @@ export const DeveloperWorkspace: React.FC = () => {
             ? {
                 ...t,
                 file: res.file,
-                savedContent: tab.content,
+                content: res.file.content ?? tab.content,
+                savedContent: res.file.content ?? tab.content,
                 isDirty: false,
               }
             : t
         )
       );
+      setStaleFilePath((current) => (current === path ? null : current));
 
       addLog(`Saved ${path} (v${res.file.version})`, "success");
+      await applySyncResult(path, res.sync);
+      setPreviewVersion((v) => v + 1);
     } catch (err: any) {
-      addLog(`Save failed for ${path}: ${err.message}`, "error");
+      if (/concurrency conflict/i.test(err.message || "")) {
+        setStaleFilePath(path);
+        addLog(`${path} was changed on the server after you opened it. Your edits were not saved.`, "error");
+      } else {
+        addLog(`Save failed for ${path}: ${err.message}`, "error");
+      }
       throw err;
+    }
+  };
+
+  // Discard local edits and load the server's current version of a file
+  const handleReloadStaleFile = async (path: string) => {
+    if (!project) return;
+    try {
+      const { file } = await forgeProjectService.readFile(project.id, path);
+      setOpenTabs((prev) =>
+        prev.map((t) =>
+          t.path === path ? { ...t, file, content: file.content || "", savedContent: file.content || "", isDirty: false } : t
+        )
+      );
+      setStaleFilePath(null);
+      addLog(`Reloaded ${path} (v${file.version})`, "info");
+    } catch (err: any) {
+      addLog(`Could not reload ${path}: ${err.message}`, "error");
     }
   };
 
@@ -325,10 +916,25 @@ export const DeveloperWorkspace: React.FC = () => {
   const handleCreateFile = async (filePath: string) => {
     if (!project) return;
     try {
+      const clean = filePath.replace(/^[/\\]+/, "").replace(/\\/g, "/");
+      const isPage =
+        /\.(tsx|jsx)$/.test(clean) &&
+        (clean.startsWith("src/pages/") || clean.startsWith("pages/") || clean.startsWith("app/") || !clean.includes("/"));
+      let initialContent = `// ${filePath}\n`;
+      if (isPage) {
+        const baseName = clean.split("/").pop()!.replace(/\.(tsx|jsx)$/, "");
+        const compName = `${baseName.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\s+/g, "")}${
+          baseName.endsWith("Page") ? "" : "Page"
+        }`;
+        const pageTitle = baseName.replace(/Page$/, "").replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        initialContent = `import React from 'react';\n\nexport default function ${compName}() {\n  return (\n    <div className="min-h-screen p-8">\n      <h1 className="text-3xl font-bold">${pageTitle}</h1>\n      <p className="mt-4 text-gray-600">Welcome to the ${pageTitle} page.</p>\n    </div>\n  );\n}\n`;
+      }
+
       await forgeProjectService.writeFile(project.id, filePath, {
-        content: `// ${filePath}\n`,
+        content: initialContent,
       });
       await handleRefreshTree();
+      await loadPages();
       openFileByPath(project.id, filePath);
       addLog(`Created file: ${filePath}`, "success");
     } catch (err: any) {
@@ -391,6 +997,8 @@ export const DeveloperWorkspace: React.FC = () => {
       setDiagnostics(res.result?.diagnostics || []);
       setSyncStatus("synced");
       await handleRefreshTree();
+      await reloadChangedFiles(openTabs.map((t) => t.path));
+      setPreviewVersion((v) => v + 1);
     } catch (err: any) {
       addLog(`Compilation failed: ${err.message}`, "error");
     } finally {
@@ -413,23 +1021,126 @@ export const DeveloperWorkspace: React.FC = () => {
     }
   };
 
-  const handleSyncCodeToVisual = async () => {
-    if (!project || !activePath || syncing) return;
+  const handleSyncCodeToVisual = async (resolve?: "code" | "visual", targetPath?: string) => {
+    const path = targetPath || activePath;
+    if (!project || !path || syncing) return;
     try {
       setSyncing(true);
-      addLog(`Reconciling code changes in ${activePath} into Visual Builder...`, "info");
-      const res = await forgeProjectService.syncCodeToVisual(project.id, activePath);
-      if (res.success) {
-        addLog(`Reconciled ${res.appliedChangesCount} visual elements without regressions`, "success");
-        setSyncStatus("synced");
-      }
-      if (res.conflicts && res.conflicts.length > 0) {
-        addLog(`Notice: ${res.conflicts.length} manual code conflicts preserved`, "warn");
-      }
+      addLog(
+        resolve === "visual"
+          ? `Regenerating ${path} from the visual document...`
+          : `Reconciling ${path} with the Visual Editor...`,
+        "info"
+      );
+      const res = await forgeProjectService.syncCodeToVisual(project.id, path, resolve);
+      if (res.status === "not-a-page") addLog(res.message || `${path} is not a visual page`, "info");
+      await applySyncResult(path, res);
     } catch (err: any) {
       addLog(`Code to visual reconciliation error: ${err.message}`, "error");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Pages: the visual page registry behind routes, page files and the Visual Editor page list
+  const loadPages = async () => {
+    if (!project) return;
+    try {
+      const res = await forgeProjectService.listPages(project.id);
+      setPages(res.pages || []);
+    } catch (err: any) {
+      setPageError(err.message || "Could not load pages");
+    }
+  };
+
+  const finishPageMutation = async (res: PageMutationResult, successText: string): Promise<boolean> => {
+    if (res.pages) setPages(res.pages);
+    await handleRefreshTree();
+    await reloadChangedFiles(openTabs.map((t) => t.path));
+    setPreviewVersion((v) => v + 1);
+    if (!res.success) {
+      const detail = res.diagnostics?.find((d) => d.severity === "error");
+      const text = `${res.message || "The page change failed"}${detail?.line ? ` (line ${detail.line})` : ""}`;
+      setPageError(text);
+      addLog(text, "error");
+      return false;
+    }
+    setPageError(null);
+    addLog(successText, "success");
+    if (res.preservedFile) {
+      addLog(`${res.preservedFile} contains hand-written code and was kept. Delete it in the explorer if it is no longer needed.`, "warn");
+    }
+    if (res.visualSync?.conflicts?.length) {
+      addLog(`Not regenerated (hand-written code): ${res.visualSync.conflicts.join(", ")}`, "warn");
+    }
+    return true;
+  };
+
+  const handleCreatePage = async (sourcePath?: string) => {
+    if (!project || pageBusy || !newPageName.trim()) return;
+    try {
+      setPageBusy(true);
+      const res = await forgeProjectService.createPage(project.id, {
+        name: newPageName.trim(),
+        route: newPageRoute.trim() || undefined,
+        sourcePath,
+      });
+      const ok = await finishPageMutation(
+        res,
+        `Created page "${res.page?.name}" at ${res.page?.routePath} (${res.page?.filePath})`
+      );
+      if (ok && res.page) {
+        setNewPageName("");
+        setNewPageRoute("");
+        if (sourcePath && sourcePath !== res.page.filePath) {
+          setOpenTabs((prev) => prev.filter((t) => t.path !== sourcePath));
+        }
+        openFileByPath(project.id, res.page.filePath);
+      }
+    } catch (err: any) {
+      setPageError(err.message || "The page could not be created");
+      addLog(`Create page failed: ${err.message}`, "error");
+    } finally {
+      setPageBusy(false);
+    }
+  };
+
+  const handleRenamePage = async (page: ProjectPage) => {
+    if (!project || pageBusy) return;
+    const name = window.prompt("Page name", page.name);
+    if (name === null) return;
+    const route = page.isHome ? undefined : window.prompt("Route", page.routePath);
+    if (route === null) return;
+    try {
+      setPageBusy(true);
+      const res = await forgeProjectService.updatePage(project.id, page.key, { name: name.trim(), route: route?.trim() });
+      const ok = await finishPageMutation(res, `Updated page "${res.page?.name}" (${res.page?.routePath})`);
+      if (ok && res.page && res.page.filePath !== page.filePath) {
+        setOpenTabs((prev) => prev.filter((t) => t.path !== page.filePath));
+        if (activePath === page.filePath) openFileByPath(project.id, res.page.filePath);
+      }
+    } catch (err: any) {
+      setPageError(err.message || "The page could not be updated");
+    } finally {
+      setPageBusy(false);
+    }
+  };
+
+  const handleDeletePage = async (page: ProjectPage) => {
+    if (!project || pageBusy) return;
+    if (!window.confirm(`Delete page "${page.name}" (${page.routePath})? Its route and generated file are removed; a snapshot is taken first.`)) return;
+    try {
+      setPageBusy(true);
+      const res = await forgeProjectService.deletePage(project.id, page.key);
+      const ok = await finishPageMutation(res, `Deleted page "${page.name}"`);
+      if (ok && !res.preservedFile) {
+        setOpenTabs((prev) => prev.filter((t) => t.path !== page.filePath));
+        if (activePath === page.filePath) setActivePath(null);
+      }
+    } catch (err: any) {
+      setPageError(err.message || "The page could not be deleted");
+    } finally {
+      setPageBusy(false);
     }
   };
 
@@ -459,6 +1170,22 @@ export const DeveloperWorkspace: React.FC = () => {
       setSnapshots(res.snapshots || []);
     } catch (e) {
       console.warn("Could not load snapshots:", e);
+    }
+  };
+
+  // Export the persisted project (including manual edits) as a standalone ZIP
+  const handleExportZip = async () => {
+    if (!project || exporting) return;
+    try {
+      setExporting(true);
+      addLog("Packaging project source as ZIP...", "info");
+      const filename = await forgeProjectService.exportProjectZip(project.id, `${project.slug}-${project.framework}`);
+      addLog(`Exported ${filename}`, "success");
+    } catch (err: any) {
+      addLog(`ZIP export failed: ${err.message}`, "error");
+      setExportError(err.message || "ZIP export failed");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -521,6 +1248,22 @@ export const DeveloperWorkspace: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const secondaryTabs: Array<{ id: BottomTab; label: string }> = [
+    { id: "hosting", label: "Hosting" },
+    { id: "cicd", label: "CI/CD" },
+    { id: "domains", label: "Domains" },
+    { id: "database", label: "Database" },
+    { id: "storage", label: "Storage" },
+    { id: "runtime", label: "Runtime" },
+    { id: "quality", label: "Quality" },
+    { id: "devops", label: "DevOps & Security" },
+    { id: "intelligence", label: "Intelligence" },
+    { id: "platform", label: "Platform" },
+    { id: "debug", label: "Debug" },
+    { id: "manifest", label: "Manifest" },
+    { id: "snapshots", label: `Snapshots (${snapshots.length})` },
+  ];
 
   if (loading) {
     return (
@@ -660,9 +1403,36 @@ export const DeveloperWorkspace: React.FC = () => {
             <span>Generate Project</span>
           </button>
 
+          {/* Export ZIP */}
+          <button
+            onClick={handleExportZip}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            title="Download the project source as a standalone ZIP"
+          >
+            <FolderArchive className="w-3.5 h-3.5" />
+            <span>{exporting ? "Exporting..." : "Export ZIP"}</span>
+          </button>
+
+          {/* Pages: create / rename / delete visual pages and their routes */}
+          {project.websiteId && (
+            <button
+              onClick={() => {
+                setPageError(null);
+                setPagesModalOpen(true);
+                loadPages();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-semibold shadow-sm transition"
+              title="Pages: create, rename or delete pages and their routes"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Pages</span>
+            </button>
+          )}
+
           {/* Sync Code → Visual */}
           <button
-            onClick={handleSyncCodeToVisual}
+            onClick={() => handleSyncCodeToVisual()}
             disabled={syncing || !activePath}
             className="flex items-center gap-1 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700/80 px-2.5 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-40"
             title="Reconcile active source code back into Visual Builder"
@@ -695,11 +1465,62 @@ export const DeveloperWorkspace: React.FC = () => {
         </div>
       </header>
 
+      {/* Conflict: the page changed in both the Visual Editor and the code; nothing is overwritten until chosen */}
+      {syncConflict && (
+        <div className="px-3 py-2 bg-amber-950/70 border-b border-amber-800/60 text-xs text-amber-100 flex items-center gap-3 shrink-0">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="flex-1">
+            <span className="font-semibold">{syncConflict.path}</span>: {syncConflict.message}
+          </span>
+          <button
+            onClick={() => handleSyncCodeToVisual("code", syncConflict.path)}
+            disabled={syncing}
+            className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold disabled:opacity-50"
+            title="Apply the saved code to the visual page, replacing the visual changes"
+          >
+            Keep code
+          </button>
+          <button
+            onClick={() => handleSyncCodeToVisual("visual", syncConflict.path)}
+            disabled={syncing}
+            className="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white font-semibold disabled:opacity-50"
+            title="Regenerate this file from the visual page, discarding the code edit"
+          >
+            Keep visual version
+          </button>
+          <button onClick={() => setSyncConflict(null)} className="text-amber-300 hover:text-white" title="Decide later">
+            Later
+          </button>
+        </div>
+      )}
+
+      {staleFilePath && (
+        <div className="px-3 py-2 bg-rose-950/70 border-b border-rose-800/60 text-xs text-rose-100 flex items-center gap-3 shrink-0">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span className="flex-1">
+            <span className="font-semibold">{staleFilePath}</span> was regenerated or edited elsewhere after you opened
+            it. Your edits were not saved; copy anything you need before reloading.
+          </span>
+          <button
+            onClick={() => handleReloadStaleFile(staleFilePath)}
+            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold"
+          >
+            Reload file
+          </button>
+          <button onClick={() => setStaleFilePath(null)} className="text-rose-300 hover:text-white">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* 2. Main Workspace Body: Project Explorer + Editor + Preview */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left: Project Explorer Sidebar */}
-        {sidebarOpen && (
-          <div className="w-64 h-full bg-slate-900 border-r border-slate-800 shrink-0 flex flex-col">
+        {/* Left: Project Explorer Sidebar (Hidden in Full Preview) */}
+        {sidebarOpen && mode !== "preview" && (
+          <div
+            style={{ width: `${sidebarWidth}px` }}
+            className="h-full bg-slate-900 border-r border-slate-800 shrink-0 flex flex-col relative"
+          >
             <ProjectExplorer
               tree={fileTree}
               activeFilePath={activePath || undefined}
@@ -711,11 +1532,17 @@ export const DeveloperWorkspace: React.FC = () => {
               onRefresh={handleRefreshTree}
               loading={loading}
             />
+            {/* Sidebar Resize Handle */}
+            <div
+              onMouseDown={startSidebarResize}
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors z-10"
+              title="Drag to resize file explorer"
+            />
           </div>
         )}
 
-        {/* Center: Multi-File Code Editor */}
-        {mode !== "preview" && (
+        {/* Center/Right: Code Editor & Live Preview Containers */}
+        {mode === "code" && (
           <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
             <MultiFileEditor
               tabs={openTabs}
@@ -732,12 +1559,63 @@ export const DeveloperWorkspace: React.FC = () => {
           </div>
         )}
 
-        {/* Right: Live Preview Panel */}
-        {(mode === "split" || mode === "preview") && (
-          <div className={`${mode === "preview" ? "flex-1" : "w-1/2"} h-full`}>
+        {mode === "split" && (
+          <div id="workspace-split-container" className="flex-1 flex h-full overflow-hidden">
+            <div
+              style={{ width: `${splitRatio * 100}%` }}
+              className="h-full flex flex-col overflow-hidden bg-slate-950 min-w-[280px]"
+            >
+              <MultiFileEditor
+                tabs={openTabs}
+                activePath={activePath}
+                onSelectTab={handleSelectTab}
+                onCloseTab={handleCloseTab}
+                onCloseOtherTabs={handleCloseOtherTabs}
+                onCloseAllTabs={handleCloseAllTabs}
+                onTogglePinTab={handleTogglePinTab}
+                onContentChange={handleContentChange}
+                onSaveFile={handleSaveFile}
+                diagnostics={diagnostics}
+              />
+            </div>
+
+            {/* Splitter Resize Handle */}
+            <div
+              onMouseDown={startSplitResize}
+              className="w-1.5 hover:w-2 bg-slate-800 hover:bg-blue-500 cursor-col-resize transition-all shrink-0 z-10 flex items-center justify-center group"
+              title="Drag to resize Code Editor & Live Preview"
+            >
+              <div className="w-0.5 h-6 bg-slate-600 group-hover:bg-white rounded transition-colors" />
+            </div>
+
+            <div
+              style={{ width: `${(1 - splitRatio) * 100}%` }}
+              className="h-full flex flex-col overflow-hidden min-w-[280px]"
+            >
+              <LivePreviewPanel
+                projectId={project.id}
+                websiteId={project.websiteId}
+                refreshKey={previewVersion}
+                currentRoute={currentRoute}
+                onRouteChange={handlePreviewRouteChange}
+                pages={pages}
+                onInspectElement={(filePath) => {
+                  openFileByPath(project.id, filePath);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {mode === "preview" && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
             <LivePreviewPanel
               projectId={project.id}
               websiteId={project.websiteId}
+              refreshKey={previewVersion}
+              currentRoute={currentRoute}
+              onRouteChange={handlePreviewRouteChange}
+              pages={pages}
               onInspectElement={(filePath) => {
                 openFileByPath(project.id, filePath);
               }}
@@ -746,16 +1624,84 @@ export const DeveloperWorkspace: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Bottom Drawer: Terminal, Build, Dependencies, Debug, Problems, Manifest, Snapshots */}
-      <div
-        className={`bg-slate-900 border-t border-slate-800 flex flex-col transition-all duration-150 shrink-0 ${
-          bottomDrawerOpen ? "" : "h-9"
-        }`}
-        style={{ height: bottomDrawerOpen ? `${bottomDrawerHeight}px` : "36px" }}
-      >
+      {/* 3. Bottom Drawer: Terminal, Build, Diagnostics (Hidden in Full Preview) */}
+      {mode !== "preview" && (
+        <div
+          className={`bg-slate-900 border-t border-slate-800 flex flex-col transition-all duration-150 shrink-0 relative ${
+            bottomDrawerOpen ? "" : "h-9"
+          }`}
+          style={{ height: bottomDrawerOpen ? `${bottomDrawerHeight}px` : "36px" }}
+        >
+        {/* Top Row Resizer Handle */}
+        <div
+          onMouseDown={startDrawerResize}
+          className="h-1 hover:h-1.5 bg-slate-800 hover:bg-blue-500 cursor-row-resize transition-all shrink-0 z-10"
+          title="Drag up/down to resize bottom drawer"
+        />
+
         {/* Drawer Header Tabs */}
-        <div className="h-9 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-3">
-          <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="h-9 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between px-3 select-none">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
+            <button
+              onClick={() => {
+                setActiveBottomTab("output");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "output"
+                  ? "bg-slate-800 text-slate-100 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-blue-400" />
+              <span>Output</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("problems");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "problems"
+                  ? "bg-slate-800 text-slate-100 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Problems {diagnostics.length > 0 && `(${diagnostics.length})`}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("terminal");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "terminal"
+                  ? "bg-slate-800 text-slate-100 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Terminal</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveBottomTab("build");
+                setBottomDrawerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                bottomDrawerOpen && activeBottomTab === "build"
+                  ? "bg-slate-800 text-slate-100 shadow-xs"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Hammer className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Build</span>
+            </button>
+
             <button
               onClick={() => {
                 setActiveBottomTab("ai");
@@ -782,83 +1728,8 @@ export const DeveloperWorkspace: React.FC = () => {
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Git & GitHub</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("terminal");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "terminal"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5 text-blue-400" />
-              <span>Terminal</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("build");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "build"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Hammer className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Build</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("hosting");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "hosting"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Hosting</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("cicd");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "cicd"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Workflow className="w-3.5 h-3.5 text-cyan-400" />
-              <span>CI/CD</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("domains");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "domains"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Link2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Domains</span>
+              <GitBranch className="w-3.5 h-3.5 text-orange-400" />
+              <span>Git</span>
             </button>
 
             <button
@@ -876,171 +1747,33 @@ export const DeveloperWorkspace: React.FC = () => {
               <span>Dependencies</span>
             </button>
 
-            <button
-              onClick={() => {
-                setActiveBottomTab("database");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "database"
-                  ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Database</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("storage");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "storage"
-                  ? "bg-amber-600/30 text-amber-300 border border-amber-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <FolderArchive className="w-3.5 h-3.5 text-amber-400" />
-              <span>Storage</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("runtime");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "runtime"
-                  ? "bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Runtime</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("quality");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "quality"
-                  ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Quality & Testing</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("devops");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "devops"
-                  ? "bg-rose-600/30 text-rose-300 border border-rose-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>DevOps & Security</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("intelligence");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "intelligence"
-                  ? "bg-violet-600/30 text-violet-300 border border-violet-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
-              <span>Intelligence & Arch</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("platform");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "platform"
-                  ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Platform & Collab</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("debug");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "debug"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Bug className="w-3.5 h-3.5 text-purple-400" />
-              <span>Debug</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("problems");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "problems"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Problems ({diagnostics.length})</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("manifest");
-                setBottomDrawerOpen(true);
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "manifest"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <FileJson className="w-3.5 h-3.5 text-teal-400" />
-              <span>Manifest</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveBottomTab("snapshots");
-                setBottomDrawerOpen(true);
-                loadSnapshots();
-              }}
-              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
-                bottomDrawerOpen && activeBottomTab === "snapshots"
-                  ? "bg-slate-800 text-slate-100 shadow-xs"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Camera className="w-3.5 h-3.5 text-rose-400" />
-              <span>Snapshots ({snapshots.length})</span>
-            </button>
+            {/* Secondary Tools Dropdown */}
+            <div className="relative inline-flex items-center ml-2">
+              <select
+                value={secondaryTabs.some((t) => t.id === activeBottomTab) ? activeBottomTab : ""}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setActiveBottomTab(e.target.value as BottomTab);
+                    setBottomDrawerOpen(true);
+                    if (e.target.value === "snapshots") {
+                      loadSnapshots();
+                    }
+                  }
+                }}
+                className={`text-xs font-semibold px-2 py-1 rounded border transition focus:outline-none cursor-pointer ${
+                  secondaryTabs.some((t) => t.id === activeBottomTab) && bottomDrawerOpen
+                    ? "bg-slate-800 text-indigo-300 border-indigo-500/50"
+                    : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
+                }`}
+              >
+                <option value="" disabled>More Tools...</option>
+                {secondaryTabs.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-200">
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1177,6 +1910,7 @@ export const DeveloperWorkspace: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Command Palette Modal */}
       <CommandPaletteModal
@@ -1186,7 +1920,7 @@ export const DeveloperWorkspace: React.FC = () => {
         onSelectFile={handleSelectFile}
         onCompile={handleCompile}
         onSyncVisualToCode={handleSyncVisualToCode}
-        onSyncCodeToVisual={handleSyncCodeToVisual}
+        onSyncCodeToVisual={() => handleSyncCodeToVisual()}
         onCreateSnapshot={() => setSnapshotModalOpen(true)}
         onOpenManifest={() => {
           setActiveBottomTab("manifest");
@@ -1195,6 +1929,111 @@ export const DeveloperWorkspace: React.FC = () => {
       />
 
       {/* Snapshot Modal */}
+      {/* Pages: the visual page registry */}
+      {pagesModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setPagesModalOpen(false)}>
+          <div
+            className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col max-h-[85vh] select-text"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">Pages</h3>
+                <p className="text-[11px] text-slate-400">
+                  A page has a route, a source file and an entry in the Visual Editor. Other component files are never pages.
+                </p>
+              </div>
+              <button onClick={() => setPagesModalOpen(false)} className="text-slate-400 hover:text-white text-xs">
+                Close
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {pages.length === 0 && <p className="text-xs text-slate-500">No pages loaded.</p>}
+              {pages.map((page) => (
+                <div key={page.key} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-slate-100 truncate">{page.name}</span>
+                      <span className="font-mono text-[11px] text-blue-300">{page.routePath}</span>
+                      {page.isHome && <span className="text-[10px] px-1.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">home</span>}
+                      {page.ownership === "code" && (
+                        <span
+                          className="text-[10px] px-1.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60"
+                          title={page.sync?.message || "Hand-written code is kept; visual changes are not written into this file"}
+                        >
+                          code-owned{page.sync?.status ? `: ${page.sync.status}` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        openFileByPath(project.id, page.filePath);
+                        setPagesModalOpen(false);
+                      }}
+                      className="font-mono text-[11px] text-slate-400 hover:text-white truncate"
+                      title="Open the page's source file"
+                    >
+                      {page.filePath}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleRenamePage(page)}
+                    disabled={pageBusy}
+                    className="px-2 py-1 text-[11px] rounded bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-50"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => handleDeletePage(page)}
+                    disabled={pageBusy || page.isHome || pages.length <= 1}
+                    className="px-2 py-1 text-[11px] rounded bg-rose-900/60 hover:bg-rose-800 text-rose-100 disabled:opacity-40"
+                    title={page.isHome ? "The home page cannot be deleted" : "Delete this page"}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  value={newPageName}
+                  onChange={(e) => setNewPageName(e.target.value)}
+                  placeholder="Page name, e.g. About"
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                  value={newPageRoute}
+                  onChange={(e) => setNewPageRoute(e.target.value)}
+                  placeholder="Route (optional), e.g. /about"
+                  className="w-52 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => handleCreatePage()}
+                  disabled={pageBusy || !newPageName.trim()}
+                  className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50"
+                >
+                  {pageBusy ? "Working..." : "Create page"}
+                </button>
+              </div>
+              {activePath && /\.(tsx|jsx)$/.test(activePath) && !pages.some((page) => page.filePath === activePath) && (
+                <button
+                  onClick={() => handleCreatePage(activePath)}
+                  disabled={pageBusy || !newPageName.trim()}
+                  className="text-[11px] text-blue-300 hover:text-white disabled:opacity-40"
+                  title="Convert the open component file into this page. It must be a single component returning static JSX."
+                >
+                  Register the open file ({activePath}) as this page instead of starting empty
+                </button>
+              )}
+              {pageError && <p className="text-[11px] text-rose-400">{pageError}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {snapshotModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-2xl">
@@ -1245,6 +2084,19 @@ export const DeveloperWorkspace: React.FC = () => {
       )}
 
       {/* Project Generator Modal (Modules 08 & 09) */}
+      {exportError && (
+        <div
+          role="alert"
+          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-red-500/50 bg-red-950 px-4 py-3 text-xs text-red-100 shadow-xl"
+        >
+          <div className="font-semibold">ZIP export failed</div>
+          <div className="mt-1 break-words">{exportError}</div>
+          <button onClick={() => setExportError(null)} className="mt-2 font-semibold underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {generatorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-xl p-6 shadow-2xl">

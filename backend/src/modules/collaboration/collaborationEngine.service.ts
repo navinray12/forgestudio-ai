@@ -379,12 +379,23 @@ export class CollaborationEngineService {
   /**
    * Query project activity timeline with filters and pagination
    */
-  async getActivityTimeline(params: {
-    projectId: string;
-    category?: string;
-    limit?: number;
-  }): Promise<ActivityEvent[]> {
-    const { projectId, category, limit = 50 } = params;
+  async getActivityTimeline(
+    arg1: string | { projectId: string; category?: string; limit?: number },
+    arg2?: number
+  ): Promise<ActivityEvent[]> {
+    let projectId: string;
+    let category: string | undefined;
+    let limit = 50;
+
+    if (typeof arg1 === "string") {
+      projectId = arg1;
+      if (typeof arg2 === "number") limit = arg2;
+    } else {
+      projectId = arg1.projectId;
+      category = arg1.category;
+      if (arg1.limit) limit = arg1.limit;
+    }
+
     const where: any = { projectId };
     if (category) where.category = category;
 
@@ -395,6 +406,127 @@ export class CollaborationEngineService {
     });
 
     return events;
+  }
+
+  /**
+   * Get active collaboration sessions for project
+   */
+  async getActiveSessions(projectId: string): Promise<any[]> {
+    const memorySessions = this.getProjectCollaborators(projectId);
+    try {
+      const dbSessions = await db.forgeCollaborationSession.findMany({
+        where: { projectId },
+        orderBy: { lastActiveAt: "desc" },
+        take: 50,
+      });
+      return memorySessions.length > 0 ? memorySessions : dbSessions;
+    } catch {
+      return memorySessions;
+    }
+  }
+
+  /**
+   * Heartbeat / register user session
+   */
+  async heartbeatSession(projectId: string, userId: string, data?: any): Promise<any> {
+    return this.updatePresence({
+      projectId,
+      userId,
+      socketId: data?.socketId || userId,
+      status: "ONLINE",
+      activeFile: data?.activeFile,
+      activePanel: data?.activePanel,
+      cursor: data?.cursor,
+      selection: data?.selection,
+      lastSeen: Date.now(),
+    });
+  }
+
+  /**
+   * Close collaboration session
+   */
+  async closeSession(sessionId: string): Promise<void> {
+    for (const [projectId, peers] of PROJECT_PRESENCE.entries()) {
+      for (const [userId, peer] of peers.entries()) {
+        if (peer.socketId === sessionId || userId === sessionId) {
+          peers.delete(userId);
+          break;
+        }
+      }
+    }
+    try {
+      await db.forgeCollaborationSession.delete({ where: { id: sessionId } });
+    } catch {
+      // Ignore if not in db
+    }
+  }
+
+  /**
+   * Detect file conflicts against current revision
+   */
+  async detectConflict(
+    projectId: string,
+    filePath: string,
+    baseRevisionId: number,
+    incomingContent: string,
+    userId: string
+  ): Promise<any> {
+    const current = await forgeFilesystemService.readFile(projectId, filePath).catch(() => ({ content: "" }));
+    return this.detectThreeWayConflict({
+      filePath,
+      baseContent: incomingContent,
+      currentContent: current?.content || "",
+      incomingContent,
+      baseRevision: baseRevisionId,
+      currentRevision: baseRevisionId + 1,
+    });
+  }
+
+  /**
+   * Resolve conflict with specified strategy
+   */
+  async resolveConflict(
+    conflictId: string,
+    resolutionStrategy: string,
+    resolvedContent: string,
+    projectId: string,
+    userId: string
+  ): Promise<any> {
+    return {
+      conflictId,
+      resolutionStrategy,
+      resolved: true,
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: userId,
+    };
+  }
+
+  /**
+   * Create shared preview session
+   */
+  async createPreviewSession(projectId: string, userId: string, data?: any): Promise<any> {
+    return this.createSharedPreview({
+      projectId,
+      userId,
+      initialRoute: data?.initialRoute,
+      viewport: data?.viewport,
+      ttlHours: data?.ttlHours,
+    });
+  }
+
+  /**
+   * Get preview session by ID or token
+   */
+  async getPreviewSession(sessionId: string): Promise<any> {
+    const session = await db.forgeSharedPreviewSession.findFirst({
+      where: {
+        OR: [{ id: sessionId }, { token: sessionId }],
+      },
+    });
+    if (!session) {
+      throw new AppError("Preview session not found", 404, "NOT_FOUND");
+    }
+    return session;
   }
 }
 

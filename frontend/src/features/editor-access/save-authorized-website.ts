@@ -1,5 +1,7 @@
 export interface DocumentAcknowledgement {
   id: string; name: string; slug: string; status: string; documentVersion: number; updatedAt: string;
+  /** Present when the website has a developer project: outcome of regenerating its source from this save */
+  codeSync?: { synced: boolean; stale: boolean; pending?: boolean; error?: string; conflicts?: string[] };
 }
 export interface DocumentWriteOptions { expectedVersion: number; key: string; signal?: AbortSignal; }
 export class DocumentSaveError extends Error {
@@ -42,5 +44,5 @@ export async function saveAuthorizedWebsite(base: string, websiteId: string, pay
   if (!saved || saved.id !== websiteId || !Number.isInteger(saved.documentVersion) || saved.documentVersion < options.expectedVersion || saved.documentVersion > options.expectedVersion + 1) {
     throw new DocumentSaveError("The server returned an invalid save acknowledgement. Retry the same save.", response.status, "DOCUMENT_OUTCOME_UNKNOWN", true);
   }
-  return saved;
+  return result.codeSync && typeof result.codeSync === "object" ? { ...saved, codeSync: result.codeSync } : saved;
 }

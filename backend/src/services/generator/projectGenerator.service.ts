@@ -9,9 +9,11 @@ import { prisma } from "../../config/prisma.js";
 import {
   writeFile,
   readFile,
+  deleteFile,
   createProjectSnapshot,
   ProjectFileEntity,
 } from "../project/forgeFilesystem.service.js";
+import { findStaleGeneratedFiles, heldCodePaths, holdBackPlannedFiles } from "./sourcePreservation.service.js";
 import { getForgeProjectById } from "../project/forgeProject.service.js";
 import { syncManifestToDisk } from "../project/forgeManifest.service.js";
 import { visualDocumentToIR, ProjectIR } from "../compiler/unifiedCompiler.service.js";
@@ -26,6 +28,7 @@ import {
 import { buildReactGenerationPlan } from "./reactGenerator.service.js";
 import { buildNextJsGenerationPlan } from "./nextjsGenerator.service.js";
 import { recordAuditLog } from "../audit.service.js";
+import { buildSyncBaseline } from "../compiler/pageRegistry.js";
 
 const db = prisma as any;
 
@@ -51,7 +54,7 @@ export function validateGenerationPlan(plan: GenerationPlan): GenerationValidati
   for (const f of plan.files) {
     if (f.path.includes("..") || f.path.startsWith("/") || f.path.includes("\\")) {
       pathsValid = false;
-      errors.push(`Invalid path detected: ${f.path}`);
+      errors.push(`Path traversal or invalid path detected: ${f.path}`);
     }
   }
   checks.push({
@@ -133,10 +136,18 @@ export async function createGenerationPlan(
 ): Promise<GenerationPlan> {
   const project = await getForgeProjectById(projectId);
 
+  if (framework !== "react" && framework !== "nextjs") {
+    throw new AppError(`Unsupported framework '${String(framework)}'. Use 'react' or 'nextjs'.`, 400, "INVALID_FRAMEWORK");
+  }
+
   let editorData = options.editorData;
   if (!editorData && project.websiteId) {
     const site = await db.website.findUnique({ where: { id: project.websiteId } });
-    editorData = typeof site?.editorData === "string" ? JSON.parse(site.editorData) : site?.editorData;
+    try {
+      editorData = typeof site?.editorData === "string" ? JSON.parse(site.editorData) : site?.editorData;
+    } catch {
+      throw new AppError("The website's saved editor data is not valid JSON", 422, "INVALID_EDITOR_DATA");
+    }
   }
 
   const projectIR: ProjectIR = visualDocumentToIR(editorData || { elements: [] }, {
@@ -148,19 +159,22 @@ export async function createGenerationPlan(
 
   const existingFiles = await fetchExistingProjectFiles(projectId);
 
-  if (framework === "react") {
-    return await buildReactGenerationPlan(projectIR, existingFiles, {
-      ...options.reactOptions,
-      scope: options.scope,
-      authorId: options.authorId,
-    });
-  } else {
-    return await buildNextJsGenerationPlan(projectIR, existingFiles, {
-      ...options.nextOptions,
-      scope: options.scope,
-      authorId: options.authorId,
-    });
-  }
+  const plan =
+    framework === "react"
+      ? await buildReactGenerationPlan(projectIR, existingFiles, {
+          ...options.reactOptions,
+          scope: options.scope,
+          authorId: options.authorId,
+        })
+      : await buildNextJsGenerationPlan(projectIR, existingFiles, {
+          ...options.nextOptions,
+          scope: options.scope,
+          authorId: options.authorId,
+        });
+
+  // Page files whose code is awaiting reconciliation keep their content
+  plan.files = holdBackPlannedFiles(plan.files, existingFiles, heldCodePaths(project.metadata));
+  return plan;
 }
 
 /**
@@ -201,6 +215,12 @@ export async function executeGeneration(
   const writtenPaths: string[] = [];
   const diagnostics: Array<{ severity: "info" | "warning" | "error"; message: string; file?: string }> = [];
 
+  // State of every file before this generation, used to undo a partial write
+  const previousFiles = new Map<string, ProjectFileEntity>(
+    (await fetchExistingProjectFiles(projectId)).map((f) => [f.path, { ...f }])
+  );
+  const deletedPaths: string[] = [];
+
   try {
     // 2. Apply planned file operations
     for (const f of plan.files) {
@@ -230,6 +250,31 @@ export async function executeGeneration(
       } else {
         filesWritten++;
       }
+    }
+
+    // 2b. A full generation removes generated files it no longer produces (deleted
+    //     pages, or the previous framework's scaffold), which would otherwise
+    //     stay live routes or break the new project's build.
+    if (plan.scope.type === "full") {
+      const stale = findStaleGeneratedFiles(
+        Array.from(previousFiles.values()),
+        plan.files.map((f) => f.path)
+      );
+      for (const file of stale) {
+        await deleteFile(projectId, file.path, authorId);
+        deletedPaths.push(file.path);
+      }
+      if (deletedPaths.length > 0) {
+        diagnostics.push({
+          severity: "info",
+          message: `Removed ${deletedPaths.length} generated file(s) no longer part of the project: ${deletedPaths
+            .slice(0, 10)
+            .join(", ")}${deletedPaths.length > 10 ? ", ..." : ""}`,
+        });
+      }
+    }
+    for (const message of plan.warnings || []) {
+      diagnostics.push({ severity: "warning", message });
     }
 
     // 3. Update Forge Manifest
@@ -262,6 +307,21 @@ export async function executeGeneration(
 
     await syncManifestToDisk(projectId, manifestData as any, authorId);
 
+    const metadataUpdates: Record<string, any> = {};
+    if (project.websiteId) {
+      const site = await db.website.findUnique({ where: { id: project.websiteId } });
+      if (site) {
+        let editorData = {};
+        try {
+          editorData = typeof site.editorData === "string" ? JSON.parse(site.editorData || "{}") : (site.editorData || {});
+        } catch {
+          editorData = {};
+        }
+        const existingMeta = (project.metadata && typeof project.metadata === "object" ? project.metadata : {}) as Record<string, any>;
+        metadataUpdates.metadata = { ...existingMeta, visualSync: buildSyncBaseline(editorData, plan.framework) };
+      }
+    }
+
     // 4. Update project framework in DB
     await db.forgeProject.update({
       where: { id: projectId },
@@ -270,6 +330,7 @@ export async function executeGeneration(
         frameworkVersion: plan.frameworkVersion,
         projectType: isNext ? "NEXTJS" : "REACT",
         updatedAt: new Date(),
+        ...metadataUpdates,
       },
     });
 
@@ -300,23 +361,54 @@ export async function executeGeneration(
       snapshotId: snapshot.id,
     };
   } catch (err: any) {
-    // 6. Rollback on failure
+    // 6. Rollback on failure: put every touched file back the way it was
+    let rolledBack = true;
+    for (const filePath of [...writtenPaths, ...deletedPaths]) {
+      try {
+        const before = previousFiles.get(filePath);
+        if (before) {
+          await writeFile(projectId, filePath, {
+            content: before.content ?? "",
+            encoding: (before.encoding as "utf-8" | "base64") || "utf-8",
+            isGenerated: false,
+            authorId,
+            reason: `Rollback of failed generation [${generationId}]`,
+          });
+          await db.forgeProjectFile.update({
+            where: { id: before.id },
+            data: { isGenerated: before.isGenerated, isProtected: before.isProtected },
+          });
+        } else {
+          await deleteFile(projectId, filePath, authorId);
+        }
+      } catch (rollbackErr: any) {
+        rolledBack = false;
+        diagnostics.push({
+          severity: "error",
+          message: `Rollback of '${filePath}' failed: ${rollbackErr.message}`,
+          file: filePath,
+        });
+      }
+    }
+
     diagnostics.push({
       severity: "error",
-      message: `Generation aborted: ${err.message}. Snapshot ${snapshot.id} available for full restore.`,
+      message: `Generation aborted: ${err.message}. ${
+        rolledBack ? "All file changes were rolled back." : `Rollback was incomplete; see snapshot ${snapshot.id}.`
+      }`,
     });
 
     return {
       success: false,
       generationId,
       plan,
-      filesWritten,
+      filesWritten: 0,
       filesPreserved,
-      filesMerged,
+      filesMerged: 0,
       conflicts: [{ path: "global", message: err.message }],
       diagnostics,
       snapshotId: snapshot.id,
-      rolledBack: true,
+      rolledBack,
     };
   }
 }

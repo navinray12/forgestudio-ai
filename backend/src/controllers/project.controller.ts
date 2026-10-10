@@ -17,7 +17,9 @@ import {
   getFileRevisions,
   createProjectSnapshot,
   listProjectSnapshots,
+  listFiles,
 } from "../services/project/forgeFilesystem.service.js";
+import { buildZipFromFiles } from "../services/codeGenerator.service.js";
 import {
   getProjectManifest,
   updateProjectManifest,
@@ -35,6 +37,15 @@ import {
   regenerateScope,
 } from "../services/generator/index.js";
 import { prisma } from "../config/prisma.js";
+import { buildSyncBaseline, buildPageRegistry, parseEditorDocument, toProjectFramework } from "../services/compiler/pageRegistry.js";
+import {
+  listProjectPages,
+  createProjectPage,
+  updateProjectPage,
+  deleteProjectPage,
+  PageImportError,
+} from "../services/project/projectPages.service.js";
+import { buildSourcePreview } from "../services/preview/sourcePreview.service.js";
 
 const db = prisma as any;
 
@@ -68,6 +79,17 @@ export async function getProjectHandler(req: Request, res: Response, next: NextF
     const user = getAuthUser(res, req);
     const projectId = String(req.params.id);
     const project = await getForgeProjectById(projectId, user);
+
+    if (project.websiteId) {
+      const site = await db.website.findUnique({ where: { id: project.websiteId } });
+      if (site) {
+        const { syncProjectFromWebsite } = await import("../services/project/forgeProject.service.js");
+        const visualSync = await syncProjectFromWebsite(project, site, user);
+        const fresh = (await db.forgeProject.findUnique({ where: { id: project.id } })) || project;
+        return res.status(200).json({ success: true, project: { ...fresh, visualSync } });
+      }
+    }
+
     res.status(200).json({ success: true, project });
   } catch (err) {
     next(err);
@@ -173,10 +195,10 @@ export async function writeFileHandler(req: Request, res: Response, next: NextFu
   try {
     const user = getAuthUser(res, req);
     const projectId = String(req.params.id);
-    await getForgeProjectById(projectId, user);
-
+    const project = await getForgeProjectById(projectId, user);
     const { path: filePath, content, encoding, expectedVersion, isProtected, reason } = req.body;
-    const file = await writeFile(projectId, filePath, {
+    const previous = await db.forgeProjectFile.findFirst({ where: { projectId, path: String(filePath || ""), deletedAt: null } });
+    let file = await writeFile(projectId, filePath, {
       content,
       encoding,
       expectedVersion,
@@ -184,7 +206,37 @@ export async function writeFileHandler(req: Request, res: Response, next: NextFu
       authorId: user.id,
       reason,
     });
-    res.status(200).json({ success: true, file });
+
+    // A saved source file is reconciled with the visual document as part of the
+    // same request, so a page edit can never sit unsynchronised behind a later
+    // regeneration. Failures are reported in `sync`; the saved file is kept.
+    let sync: any = null;
+    const changed = !previous || previous.contentHash !== file.contentHash;
+    if (project.websiteId && changed && /\.(tsx|jsx)$/.test(file.path)) {
+      try {
+        sync = await syncSourceToVisualWebsite(projectId, project.websiteId, file.path, user.id);
+      } catch (syncErr: any) {
+        sync = {
+          success: false,
+          mode: "CODE_TO_VISUAL",
+          status: "error",
+          message: syncErr?.message || "Synchronisation with the visual document failed",
+          appliedChangesCount: 0,
+          conflicts: [],
+          diagnostics: [],
+          updatedFiles: [],
+        };
+      }
+    }
+
+    // Editing a generated file that is not a visual page makes it the user's own:
+    // regeneration must not silently replace it
+    if (changed && previous?.isGenerated && (!sync || sync.status === "not-a-page")) {
+      await db.forgeProjectFile.update({ where: { id: file.id }, data: { isGenerated: false } });
+    }
+
+    file = (await db.forgeProjectFile.findFirst({ where: { id: file.id } })) || file;
+    res.status(200).json({ success: true, file, sync });
   } catch (err) {
     next(err);
   }
@@ -298,7 +350,11 @@ export async function compileProjectHandler(req: Request, res: Response, next: N
     let editorData = req.body.editorData;
     if (!editorData && project.websiteId) {
       const site = await db.website.findUnique({ where: { id: project.websiteId } });
-      editorData = typeof site?.editorData === "string" ? JSON.parse(site.editorData) : site?.editorData;
+      try {
+        editorData = typeof site?.editorData === "string" ? JSON.parse(site.editorData) : site?.editorData;
+      } catch {
+        return res.status(422).json({ success: false, message: "The website's saved editor data is not valid JSON" });
+      }
     }
 
     const result = await compileAndSyncProject(
@@ -307,6 +363,31 @@ export async function compileProjectHandler(req: Request, res: Response, next: N
       { id: project.id, name: project.name, slug: project.slug, framework: project.framework },
       user.id
     );
+
+    if (!result.success) {
+      const firstError = result.diagnostics.find((d) => d.severity === "error");
+      return res.status(422).json({
+        success: false,
+        message: firstError?.message || "Compilation failed",
+        result,
+      });
+    }
+
+    // Only source generated from the saved document counts as the sync baseline:
+    // an ad-hoc document sent with the request is not what the website holds
+    if (editorData && !req.body.editorData) {
+      const fresh = await db.forgeProject.findUnique({ where: { id: projectId } });
+      const metadata = (fresh?.metadata && typeof fresh.metadata === "object" ? fresh.metadata : {}) as Record<
+        string,
+        any
+      >;
+      await db.forgeProject.update({
+        where: { id: projectId },
+        data: {
+          metadata: { ...metadata, visualSync: buildSyncBaseline(editorData, toProjectFramework(project.framework)) },
+        },
+      });
+    }
 
     res.status(200).json({ success: true, result });
   } catch (err) {
@@ -341,8 +422,14 @@ export async function syncCodeToVisualHandler(req: Request, res: Response, next:
       });
     }
 
-    const { filePath } = req.body;
-    const result = await syncSourceToVisualWebsite(projectId, project.websiteId, filePath, user.id);
+    const { filePath, resolve } = req.body;
+    if (typeof filePath !== "string" || !filePath.trim()) {
+      return res.status(400).json({ success: false, message: "filePath is required" });
+    }
+    if (resolve !== undefined && resolve !== "code" && resolve !== "visual") {
+      return res.status(400).json({ success: false, message: "resolve must be 'code' or 'visual'" });
+    }
+    const result = await syncSourceToVisualWebsite(projectId, project.websiteId, filePath, user.id, { resolve });
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -352,6 +439,68 @@ export async function syncCodeToVisualHandler(req: Request, res: Response, next:
 // ---------------------------------------------------------------------------
 // Project Generators (Modules 08 & 09)
 // ---------------------------------------------------------------------------
+
+function sendGenerationResult(
+  res: Response,
+  result: { success: boolean; diagnostics?: Array<{ severity: string; message: string }> }
+) {
+  if (result.success) {
+    return res.status(200).json({ success: true, result });
+  }
+  const firstError = (result.diagnostics || []).find((d) => d.severity === "error");
+  return res.status(422).json({
+    success: false,
+    message: firstError?.message || "Project generation failed",
+    result,
+  });
+}
+
+/**
+ * GET /api/v1/projects/:id/export/zip
+ * Download the project's persisted source files (including manual edits) as a standalone ZIP.
+ */
+export async function exportProjectZipHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+
+    // The archive must hold source generated from the latest saved design
+    if (project.websiteId) {
+      const { syncBridgedProjectForWebsite } = await import("../services/project/forgeProject.service.js");
+      const sync = await syncBridgedProjectForWebsite(project.websiteId, user);
+      if (sync?.stale) {
+        const existing = await db.forgeProjectFile.count({ where: { projectId, deletedAt: null } });
+        if (existing > 0) {
+          return res.status(409).json({
+            success: false,
+            message: `The project source could not be brought up to date with the visual design, so it was not exported: ${
+              sync.error || "generation failed"
+            }`,
+          });
+        }
+      }
+    }
+
+    const files = (await listFiles(projectId)).filter((f: any) => !f.isDirectory);
+    if (files.length === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "This project has no source files yet. Generate the project before exporting.",
+      });
+    }
+
+    const zipBuffer = await buildZipFromFiles(files);
+    const safeSlug = String(project.slug || "project").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeFramework = String(project.framework || "source").replace(/[^a-zA-Z0-9_-]/g, "_");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeSlug}-${safeFramework}.zip"`);
+    res.setHeader("Content-Length", String(zipBuffer.length));
+    return res.status(200).send(zipBuffer);
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function generateReactProjectHandler(req: Request, res: Response, next: NextFunction) {
   try {
@@ -367,7 +516,7 @@ export async function generateReactProjectHandler(req: Request, res: Response, n
     });
 
     const result = await executeGeneration(projectId, plan, user.id);
-    res.status(200).json({ success: true, result });
+    sendGenerationResult(res, result);
   } catch (err) {
     next(err);
   }
@@ -387,7 +536,7 @@ export async function generateNextJsProjectHandler(req: Request, res: Response, 
     });
 
     const result = await executeGeneration(projectId, plan, user.id);
-    res.status(200).json({ success: true, result });
+    sendGenerationResult(res, result);
   } catch (err) {
     next(err);
   }
@@ -423,7 +572,99 @@ export async function regenerateScopeHandler(req: Request, res: Response, next: 
     }
 
     const result = await regenerateScope(projectId, framework, scope, user.id);
-    res.status(200).json({ success: true, result });
+    sendGenerationResult(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pages (visual page registry) & source preview
+// ---------------------------------------------------------------------------
+
+function sendPageMutation(res: Response, status: number, result: any) {
+  // The page change is saved either way; a failed source generation is not a success
+  if (result.visualSync?.stale) {
+    return res.status(422).json({
+      success: false,
+      message: `The page was saved, but its source could not be generated: ${result.visualSync.error || "generation failed"}`,
+      ...result,
+    });
+  }
+  return res.status(status).json({ success: true, ...result });
+}
+
+export async function listPagesHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const project = await getForgeProjectById(String(req.params.id), user);
+    const pages = await listProjectPages(project);
+    res.status(200).json({ success: true, pages });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createPageHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const project = await getForgeProjectById(String(req.params.id), user);
+    const result = await createProjectPage(project, user, req.body || {});
+    sendPageMutation(res, 201, result);
+  } catch (err) {
+    if (err instanceof PageImportError) {
+      return res.status(422).json({ success: false, message: err.message, code: err.code, diagnostics: err.diagnostics });
+    }
+    next(err);
+  }
+}
+
+export async function updatePageHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const project = await getForgeProjectById(String(req.params.id), user);
+    const result = await updateProjectPage(project, user, String(req.params.pageId), req.body || {});
+    sendPageMutation(res, 200, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deletePageHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const project = await getForgeProjectById(String(req.params.id), user);
+    const result = await deleteProjectPage(project, user, String(req.params.pageId));
+    sendPageMutation(res, 200, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/v1/projects/:id/preview/source?route=/about
+ * A runnable document built from the project's persisted source files.
+ */
+export async function getSourcePreviewHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+    const preview = await buildSourcePreview(projectId, project.framework, req.query.route);
+
+    let routes = preview.routes;
+    if (project.websiteId) {
+      const site = await db.website.findUnique({ where: { id: project.websiteId } });
+      try {
+        routes = buildPageRegistry(parseEditorDocument(site?.editorData), toProjectFramework(project.framework)).map(
+          (page) => page.routePath
+        );
+      } catch {
+        // An unreadable document does not prevent previewing the source that exists
+      }
+    }
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({ success: true, preview: { ...preview, routes } });
   } catch (err) {
     next(err);
   }

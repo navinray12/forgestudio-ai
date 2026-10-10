@@ -137,6 +137,83 @@ export const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
     }
   };
 
+  const handleBeforeMount = (monaco: any) => {
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ES2022,
+      allowNonTsExtensions: true,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      module: monaco.languages.typescript.ModuleKind.ESNext,
+      noEmit: true,
+      esModuleInterop: true,
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+      allowJs: true,
+    });
+
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ES2022,
+      allowNonTsExtensions: true,
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+    });
+
+    const reactAmbientTypes = `
+      declare module "react" {
+        export = React;
+      }
+      declare namespace React {
+        export type FC<P = {}> = (props: P) => any;
+        export type ReactNode = any;
+        export function createElement(type: any, props?: any, ...children: any[]): any;
+        export function useState<T>(initialState: T | (() => T)): [T, (newState: T | ((prevState: T) => T)) => void];
+        export function useEffect(effect: () => void | (() => void), deps?: readonly any[]): void;
+        export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: readonly any[]): T;
+        export function useMemo<T>(factory: () => T, deps: readonly any[] | undefined): T;
+        export function useRef<T>(initialValue?: T): { current: T };
+        export class Component<P = {}, S = {}> {
+          constructor(props: P);
+          state: S;
+          props: P;
+          setState(state: any, callback?: () => void): void;
+          render(): ReactNode;
+        }
+        export interface ErrorInfo {
+          componentStack?: string;
+        }
+      }
+      declare namespace JSX {
+        interface Element extends React.ReactNode {}
+        interface IntrinsicElements {
+          [elemName: string]: any;
+        }
+      }
+      declare module "react-dom/client" {
+        export function createRoot(container: any): { render(element: any): void };
+      }
+      declare module "react-router-dom" {
+        export const BrowserRouter: any;
+        export const Routes: any;
+        export const Route: any;
+        export const Link: any;
+      }
+      declare module "next/link" {
+        const Link: any;
+        export default Link;
+      }
+      declare module "next/image" {
+        const Image: any;
+        export default Image;
+      }
+    `;
+
+    try {
+      monaco.languages.typescript.typescriptDefaults.addExtraLib(
+        reactAmbientTypes,
+        "ts:react.d.ts"
+      );
+    } catch {
+      // Ignored if already loaded
+    }
+  };
+
   const handleEditorMount = (editor: any) => {
     editorRef.current = editor;
   };
@@ -378,8 +455,10 @@ export const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             <MonacoEditor
               height="100%"
               theme="vs-dark"
+              path={activeTab.path}
               language={activeTab.language}
               value={activeTab.content}
+              beforeMount={handleBeforeMount}
               onMount={handleEditorMount}
               onChange={(value) => {
                 onContentChange(activeTab.path, value || "");

@@ -4,7 +4,7 @@
  * Server Actions, Route Handlers, Metadata, Image/Font Optimization, and Scoped Regeneration.
  */
 
-import { ProjectIR, ComponentIR, ElementIR } from "../compiler/unifiedCompiler.service.js";
+import { ProjectIR, ComponentIR, ElementIR, pageFilePathFor } from "../compiler/unifiedCompiler.service.js";
 import {
   GenerationPlan,
   GenerationScope,
@@ -12,20 +12,22 @@ import {
   NextJsGeneratorOptions,
 } from "./generatorTypes.js";
 import { reconcilePlannedFile } from "./sourcePreservation.service.js";
-import { stylesToTailwindClasses } from "../codeGenerator.service.js";
+import {
+  RenderContext,
+  createRenderContext,
+  renderElementToJsx,
+  buildForgeStylesheet,
+  escapeJsString,
+  toComponentIdentifier,
+  FORGE_CSS_HELPER_SOURCE,
+} from "./jsxRenderer.js";
+import { toPackageName } from "../codeGenerator.service.js";
 
 /**
- * Check if ElementIR or its descendants contain interactivity requiring "use client"
+ * Check if ElementIR or its descendants declare event handlers, which require "use client"
  */
 function isInteractiveElement(el: ElementIR): boolean {
-  if (
-    el.type === "form" ||
-    el.type === "button" ||
-    el.tag === "button" ||
-    el.attributes?.onClick ||
-    el.attributes?.onSubmit ||
-    el.props?.onClick
-  ) {
+  if (el.attributes?.onClick || el.attributes?.onSubmit || el.props?.onClick) {
     return true;
   }
   if (el.children && el.children.length > 0) {
@@ -34,81 +36,64 @@ function isInteractiveElement(el: ElementIR): boolean {
   return false;
 }
 
-/**
- * Render ElementIR node to clean Next.js JSX (using next/image for images)
- */
-function renderNextElementToJSX(el: ElementIR, indent = "        "): string {
-  const twClasses = [
-    ...(el.classes || []),
-    ...stylesToTailwindClasses(el.styles || {}),
-  ];
+function toValidComponentName(raw: string): string {
+  return toComponentIdentifier(raw, "Component");
+}
 
-  if (el.responsiveStyles) {
-    for (const [bp, bpStyles] of Object.entries(el.responsiveStyles)) {
-      const bpTw = stylesToTailwindClasses(bpStyles).map((c) => `${bp}:${c}`);
-      twClasses.push(...bpTw);
-    }
-  }
-
-  const classAttr = twClasses.length > 0 ? ` className="${twClasses.join(" ")}"` : "";
-  const tag = el.tag || "div";
-
-  const ariaLabel = el.attributes?.["aria-label"] || el.props?.alt ? ` aria-label="${el.attributes?.["aria-label"] || el.props?.alt}"` : "";
-  const roleAttr = el.attributes?.role ? ` role="${el.attributes.role}"` : "";
-  const hrefAttr = el.props?.href ? ` href="${el.props.href}"` : "";
-
-  // Next.js Image Optimization
-  if (tag === "img" || el.type === "image") {
-    const src = el.props?.src || "/placeholder.webp";
-    const alt = el.props?.alt || el.name || "Optimized Image";
-    return `${indent}<Image src="${src}" alt="${alt}" width={800} height={500} className="${twClasses.join(" ")} rounded-lg object-cover"${ariaLabel}${roleAttr} />`;
-  }
-
-  if (tag === "hr" || tag === "input") {
-    return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr} />`;
-  }
-
-  const text = el.textContent || el.props?.content || el.props?.buttonText || "";
-  const hasChildren = el.children && el.children.length > 0;
-
-  if (!hasChildren) {
-    return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>${text}</${tag}>`;
-  }
-
-  const childJsx = el.children.map((c) => renderNextElementToJSX(c, indent + "  ")).join("\n");
-  return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>\n${text ? `${indent}  ${text}\n` : ""}${childJsx}\n${indent}</${tag}>`;
+function buildJsxImports(uses: RenderContext["uses"], cssHelperPath: string): string[] {
+  const imports: string[] = ["import React from 'react';"];
+  if (uses.image) imports.push("import Image from 'next/image';");
+  if (uses.link) imports.push("import Link from 'next/link';");
+  if (uses.css) imports.push(`import { css } from '${cssHelperPath}';`);
+  return imports;
 }
 
 /**
  * Generate Next.js Page component (Server Component by default, "use client" if interactive)
  */
-function generateNextPageSource(comp: ComponentIR, renderingStrategy: "ssr" | "ssg" | "isr", revalidateSeconds = 60): string {
+function generateNextPageSource(
+  comp: ComponentIR,
+  renderingStrategy: "ssr" | "ssg" | "isr",
+  revalidateSeconds = 60,
+  ctx: RenderContext = createRenderContext("next"),
+  page: { title?: string; description?: string; isHome?: boolean; isDynamic?: boolean } = {}
+): string {
   const isClient = isInteractiveElement(comp.rootElement);
   const clientDirective = isClient ? `"use client";\n\n` : "";
-  const rootJsx = renderNextElementToJSX(comp.rootElement, "      ");
+  const local = { ...ctx, uses: { link: false, image: false, css: false } };
+  const rootJsx = renderElementToJsx(comp.rootElement, local, "        ");
+  const cleanName = toValidComponentName(comp.name);
+  const componentName = cleanName.endsWith("Page") ? cleanName : `${cleanName}Page`;
+  const imports = buildJsxImports(local.uses, "@/lib/forgeStyle");
 
-  // Rendering strategy directives
-  let renderingDirectives = "";
-  if (renderingStrategy === "ssr") {
-    renderingDirectives = `export const dynamic = 'force-dynamic';\n`;
-  } else if (renderingStrategy === "isr") {
-    renderingDirectives = `export const revalidate = ${revalidateSeconds};\n`;
-  } else {
-    renderingDirectives = `export const dynamic = 'force-static';\n`;
+  // Route segment config and metadata are only valid in Server Components
+  let serverExports = "";
+  if (!isClient) {
+    if (!page.isHome && page.title) {
+      imports.unshift("import type { Metadata } from 'next';");
+      serverExports += `export const metadata: Metadata = {\n  title: '${escapeJsString(page.title)}',${
+        page.description ? `\n  description: '${escapeJsString(page.description)}',` : ""
+      }\n};\n\n`;
+    }
+    if (renderingStrategy === "ssr" || page.isDynamic) {
+      serverExports += `export const dynamic = 'force-dynamic';\n`;
+    } else if (renderingStrategy === "isr") {
+      serverExports += `export const revalidate = ${revalidateSeconds};\n`;
+    } else {
+      serverExports += `export const dynamic = 'force-static';\n`;
+    }
   }
 
-  return `${clientDirective}import React from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+  return `${clientDirective}${imports.join("\n")}
 
-${renderingDirectives}
-export default function ${comp.name.replace(/[^a-zA-Z0-9]/g, "")}Page() {
+${serverExports}
+export default function ${componentName}() {
   // [forge-protect-start: custom-page-logic]
   // Custom server data fetching, actions, or client hooks
   // [forge-protect-end: custom-page-logic]
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <main className="min-h-screen">
       <div className="w-full">
 ${rootJsx}
       </div>
@@ -136,7 +121,8 @@ export async function buildNextJsGenerationPlan(
   const scope: GenerationScope = options.scope || { type: "full" };
   const existingMap = new Map(existingFiles.map((f) => [f.path, f]));
   const plannedFiles: PlannedFile[] = [];
-  const planWarnings: string[] = [];
+  const planWarnings: string[] = [...((projectIR.metadata?.warnings as string[]) || [])];
+  const renderCtx = createRenderContext("next", projectIR.metadata?.editorBreakpoints);
 
   const renderingStrategy = options.renderingStrategy || "isr";
   const revalidateSeconds = options.revalidateSeconds || 60;
@@ -181,8 +167,12 @@ export async function buildNextJsGenerationPlan(
 
   // 1. package.json
   const isV15 = version === "15";
+  const preferredPkgName =
+    projectIR.name && projectIR.name !== "ForgeProject" && projectIR.name !== "default_project"
+      ? projectIR.name
+      : projectIR.slug || "forgestudio-nextjs-app";
   const packageJson = {
-    name: projectIR.slug || "forgestudio-nextjs-app",
+    name: toPackageName(preferredPkgName),
     version: "1.0.0",
     private: true,
     scripts: {
@@ -268,6 +258,15 @@ export default nextConfig;
 `;
   addFile("next.config.mjs", nextConfig, "application/javascript", "Next.js configuration");
 
+  // 3b. postcss.config.mjs for Tailwind v4
+  const postcssConfig = `export default {
+  plugins: {
+    '@tailwindcss/postcss': {},
+  },
+};
+`;
+  addFile("postcss.config.mjs", postcssConfig, "application/javascript", "PostCSS configuration for Tailwind v4");
+
   // 4. app/globals.css
   const globalsCss = `@import "tailwindcss";
 
@@ -288,9 +287,13 @@ body {
   addFile("app/globals.css", globalsCss, "text/css", "Global Tailwind CSS styles");
 
   // 5. app/layout.tsx (Root Layout with Font Optimization & Metadata)
+  const escapedProjectName = escapeJsString(projectIR.name);
+  const escapedDescription = escapeJsString(projectIR.metadata?.description || "Built with ForgeStudio Next.js Generator");
+
   const rootLayoutTsx = `import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import './forge.css';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -300,15 +303,15 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: '${projectIR.name} | ForgeStudio',
-    template: '%s | ${projectIR.name}',
+    default: '${escapedProjectName} | ForgeStudio',
+    template: '%s | ${escapedProjectName}',
   },
-  description: '${projectIR.metadata?.description || "Built with ForgeStudio Next.js Generator"}',
+  description: '${escapedDescription}',
   metadataBase: new URL('https://forge.studio'),
   openGraph: {
-    title: '${projectIR.name}',
-    description: '${projectIR.metadata?.description || "High-performance Next.js application"}',
-    siteName: '${projectIR.name}',
+    title: '${escapedProjectName}',
+    description: '${escapedDescription}',
+    siteName: '${escapedProjectName}',
     locale: 'en_US',
     type: 'website',
   },
@@ -414,19 +417,29 @@ export default function NotFound() {
   addFile("app/not-found.tsx", notFoundTsx, "text/typescript-jsx", "App Router 404 boundary");
 
   // 9. app/sitemap.ts
+  const staticRoutePaths = Array.from(
+    new Set(
+      projectIR.components
+        .filter((c) => c.isPage)
+        .map((c) => (c.routePath === "/home" ? "/" : c.routePath || "/"))
+        .filter((p) => !p.includes(":"))
+    )
+  );
+  if (!staticRoutePaths.includes("/")) staticRoutePaths.unshift("/");
+
   const sitemapTs = `import { MetadataRoute } from 'next';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://forge.studio';
+const routes = ${JSON.stringify(staticRoutePaths)};
 
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 1,
-    },
-  ];
+export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://forge.studio').replace(/\\/+$/, '');
+
+  return routes.map((route) => ({
+    url: route === '/' ? baseUrl : \`\${baseUrl}\${route}\`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: route === '/' ? 1 : 0.7,
+  }));
 }
 `;
   addFile("app/sitemap.ts", sitemapTs, "application/typescript", "Next.js dynamic sitemap");
@@ -473,7 +486,7 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: '${projectIR.name}',
+    service: '${escapeJsString(projectIR.name)}',
   });
 }
 `;
@@ -522,16 +535,30 @@ API_SECRET_KEY=forge_sec_example_key
   const routeConfigs: Array<{ path: string; name: string; file: string; dynamic?: boolean }> = [];
   const componentConfigs: Array<{ name: string; file: string; isClient?: boolean; isPage?: boolean }> = [];
 
+  addFile("lib/forgeStyle.ts", FORGE_CSS_HELPER_SOURCE, "application/typescript", "Inline style helper");
+
+  const usedPageFiles = new Set<string>();
+
   for (const comp of projectIR.components) {
     if (comp.isPage) {
-      let relativeRoute = (comp.routePath || "/").replace(/^\/+/, "");
-      if (!relativeRoute || relativeRoute === "home") {
-        relativeRoute = "";
-      }
+      const routePath = comp.routePath === "/home" ? "/" : comp.routePath || "/";
 
-      // App router file path
-      const pageFile = relativeRoute ? `app/${relativeRoute}/page.tsx` : `app/page.tsx`;
-      const pageContent = generateNextPageSource(comp, renderingStrategy, revalidateSeconds);
+      // App router file path ("/blog/:slug" -> "app/blog/[slug]/page.tsx")
+      const pageFile = pageFilePathFor("nextjs", comp.name, routePath);
+      const relativeRoute = pageFile.replace(/^app\/?/, "").replace(/\/?page\.tsx$/, "");
+      if (usedPageFiles.has(pageFile)) {
+        planWarnings.push(`Page '${comp.name}' shares route '${routePath}' with another page and was skipped.`);
+        continue;
+      }
+      usedPageFiles.add(pageFile);
+
+      const route = projectIR.routes.find((r) => r.componentId === comp.id);
+      const pageContent = generateNextPageSource(comp, renderingStrategy, revalidateSeconds, renderCtx, {
+        title: route?.title,
+        description: route?.metaDescription,
+        isHome: routePath === "/",
+        isDynamic: relativeRoute.includes("["),
+      });
       const isClient = isInteractiveElement(comp.rootElement);
 
       addFile(pageFile, pageContent, "text/typescript-jsx", `Next.js page route: /${relativeRoute}`);
@@ -548,15 +575,16 @@ API_SECRET_KEY=forge_sec_example_key
         isPage: true,
       });
     } else {
-      const compFile = `components/${comp.name.replace(/[^a-zA-Z0-9]/g, "")}.tsx`;
+      const compCleanName = toValidComponentName(comp.name);
+      const compFile = `components/${compCleanName}.tsx`;
       const isClient = isInteractiveElement(comp.rootElement);
       const clientDirective = isClient ? `"use client";\n\n` : "";
-      const rootJsx = renderNextElementToJSX(comp.rootElement, "      ");
+      const local = { ...renderCtx, uses: { link: false, image: false, css: false } };
+      const rootJsx = renderElementToJsx(comp.rootElement, local, "      ");
 
-      const compCode = `${clientDirective}import React from 'react';
-import Image from 'next/image';
+      const compCode = `${clientDirective}${buildJsxImports(local.uses, "@/lib/forgeStyle").join("\n")}
 
-export interface ${comp.name}Props {
+export interface ${compCleanName}Props {
   className?: string;
   children?: React.ReactNode;
   // [forge-protect-start: custom-props]
@@ -564,30 +592,38 @@ export interface ${comp.name}Props {
   // [forge-protect-end: custom-props]
 }
 
-export function ${comp.name}({ className = '', children }: ${comp.name}Props) {
+export function ${compCleanName}({ className = '', children }: ${compCleanName}Props) {
   // [forge-protect-start: custom-logic]
   // Custom component logic
   // [forge-protect-end: custom-logic]
 
   return (
-    <div className={\`${comp.name.toLowerCase()}-wrapper \${className}\`}>
+    <div className={\`${compCleanName.toLowerCase()}-wrapper \${className}\`}>
 ${rootJsx}
       {children}
     </div>
   );
 }
 
-export default ${comp.name};
+export default ${compCleanName};
 `;
-      addFile(compFile, compCode, "text/typescript-jsx", `Next.js reusable component: ${comp.name}`);
+      addFile(compFile, compCode, "text/typescript-jsx", `Next.js reusable component: ${compCleanName}`);
       componentConfigs.push({
-        name: comp.name,
+        name: compCleanName,
         file: compFile,
         isClient,
         isPage: false,
       });
     }
   }
+
+  addFile(
+    "app/forge.css",
+    buildForgeStylesheet(projectIR.designTokens, renderCtx.cssRules, projectIR.customCss),
+    "text/css",
+    "Design tokens, responsive overrides and custom CSS"
+  );
+  planWarnings.push(...renderCtx.warnings);
 
   return {
     id: `plan_next_${Date.now()}`,
@@ -609,7 +645,7 @@ export default ${comp.name};
         DATABASE_URL: "postgresql://user:pass@localhost:5432/forge_db",
       },
     },
-    warnings: planWarnings,
+    warnings: Array.from(new Set(planWarnings)),
   };
 }
 

@@ -458,28 +458,62 @@ export function parseRawElementToAST(el: any, assetsCatalog: ASTNodeAsset[] = []
 }
 
 export function parseEditorDataToCanonicalDoc(editorData: any): CanonicalDocument {
-  const rawPages = Array.isArray(editorData?.pages) ? editorData.pages : [];
-  const homePage = rawPages.find((p: any) => p.isHome) || rawPages[0] || {};
-
-  const title = homePage.name || homePage.title || editorData?.siteSettings?.siteName || "ForgeStudio Site";
-  const slug = homePage.slug || "index";
-  const metaDescription = homePage.metaDescription || editorData?.siteSettings?.metaDescription;
-
-  const rawElements = Array.isArray(homePage.elements)
-    ? homePage.elements
-    : Array.isArray(editorData?.elements)
-    ? editorData.elements
+  const rawPages = Array.isArray(editorData?.pages)
+    ? editorData.pages.filter((p: any) => p && typeof p === "object")
     : [];
 
+  const homePageId = editorData?.homePageId;
+  const homePage =
+    (homePageId ? rawPages.find((p: any) => p.id === homePageId) : null) ||
+    rawPages.find((p: any) => p.isHome) ||
+    rawPages.find((p: any) => p.path === "/" || p.slug === "/" || p.slug === "home" || p.slug === "index") ||
+    rawPages[0] ||
+    {};
+
+  const title =
+    homePage.title ||
+    homePage.name ||
+    homePage.pageSettings?.title ||
+    editorData?.siteSettings?.siteName ||
+    editorData?.siteSettings?.title ||
+    "ForgeStudio Site";
+  const slug = homePage.slug || homePage.path || "index";
+  const metaDescription =
+    homePage.metaDescription ||
+    homePage.pageSettings?.metaDescription ||
+    editorData?.siteSettings?.metaDescription;
+
+  const pageElements = Array.isArray(homePage.elements)
+    ? homePage.elements
+    : Array.isArray(homePage.children)
+    ? homePage.children
+    : Array.isArray(editorData?.elements)
+    ? editorData.elements
+    : Array.isArray(editorData?.canvasData?.elements)
+    ? editorData.canvasData.elements
+    : [];
+
+  // Combine site header + page elements + site footer if defined in siteParts
+  const combinedElements: any[] = [];
+  if (editorData?.siteParts?.header?.enabled && Array.isArray(editorData.siteParts.header.elements)) {
+    combinedElements.push(...editorData.siteParts.header.elements);
+  }
+  combinedElements.push(...pageElements);
+  if (editorData?.siteParts?.footer?.enabled && Array.isArray(editorData.siteParts.footer.elements)) {
+    combinedElements.push(...editorData.siteParts.footer.elements);
+  }
+
+  const elementsToParse = combinedElements.filter((el: any) => el && typeof el === "object");
+
   const assetsCatalog: ASTNodeAsset[] = [];
-  const rootNodes: ASTNode[] = rawElements.map((el: any) => parseRawElementToAST(el, assetsCatalog));
+  const rootNodes: ASTNode[] = elementsToParse.map((el: any) => parseRawElementToAST(el, assetsCatalog));
 
   return {
     title,
     slug,
     metaDescription,
     rootNodes,
-    globalStyles: editorData?.globalStyles,
+    globalStyles: editorData?.globalStyles || editorData?.globalSettings?.globalStyles,
     designTokens: editorData?.designTokens,
     customCss: editorData?.customCss || editorData?.pageCss,
     customJs: editorData?.customJs,
@@ -663,26 +697,65 @@ export function stylesToTailwindClasses(styles: Record<string, string>): string[
       if (val === "center") twClasses.push("justify-center");
       else if (val === "space-between") twClasses.push("justify-between");
       else if (val === "flex-start") twClasses.push("justify-start");
+      else if (val === "flex-end") twClasses.push("justify-end");
     } else if (k === "padding") {
       if (val === "16px" || val === "1rem") twClasses.push("p-4");
       else if (val === "24px" || val === "1.5rem") twClasses.push("p-6");
       else if (val === "32px" || val === "2rem") twClasses.push("p-8");
+      else if (val === "8px" || val === "0.5rem") twClasses.push("p-2");
+      else if (val === "0" || val === "0px") twClasses.push("p-0");
       else twClasses.push(`p-[${val}]`);
+    } else if (k === "margin") {
+      if (val === "0 auto" || val === "auto") twClasses.push("mx-auto");
+      else if (val === "16px" || val === "1rem") twClasses.push("m-4");
+      else if (val === "24px") twClasses.push("m-6");
+      else if (val === "0" || val === "0px") twClasses.push("m-0");
+      else twClasses.push(`m-[${val}]`);
     } else if (k === "fontSize") {
       if (val === "36px" || val === "2.25rem") twClasses.push("text-4xl");
+      else if (val === "30px" || val === "1.875rem") twClasses.push("text-3xl");
       else if (val === "24px" || val === "1.5rem") twClasses.push("text-2xl");
+      else if (val === "20px" || val === "1.25rem") twClasses.push("text-xl");
       else if (val === "18px" || val === "1.125rem") twClasses.push("text-lg");
+      else if (val === "14px" || val === "0.875rem") twClasses.push("text-sm");
+      else if (val === "12px" || val === "0.75rem") twClasses.push("text-xs");
       else twClasses.push(`text-[${val}]`);
     } else if (k === "fontWeight") {
       if (val === "700" || val === "bold") twClasses.push("font-bold");
       else if (val === "600" || val === "semibold") twClasses.push("font-semibold");
+      else if (val === "500" || val === "medium") twClasses.push("font-medium");
+      else if (val === "800" || val === "extrabold") twClasses.push("font-extrabold");
+      else if (val === "400" || val === "normal") twClasses.push("font-normal");
+    } else if (k === "textAlign") {
+      if (val === "center") twClasses.push("text-center");
+      else if (val === "right") twClasses.push("text-right");
+      else if (val === "left") twClasses.push("text-left");
+    } else if (k === "borderRadius") {
+      if (val === "4px") twClasses.push("rounded");
+      else if (val === "8px" || val === "0.5rem") twClasses.push("rounded-lg");
+      else if (val === "12px" || val === "0.75rem") twClasses.push("rounded-xl");
+      else if (val === "16px" || val === "1rem") twClasses.push("rounded-2xl");
+      else if (val === "9999px" || val === "50%") twClasses.push("rounded-full");
+      else twClasses.push(`rounded-[${val}]`);
+    } else if (k === "gap") {
+      if (val === "8px") twClasses.push("gap-2");
+      else if (val === "16px" || val === "1rem") twClasses.push("gap-4");
+      else if (val === "24px" || val === "1.5rem") twClasses.push("gap-6");
+      else if (val === "32px") twClasses.push("gap-8");
+      else twClasses.push(`gap-[${val}]`);
+    } else if (k === "width") {
+      if (val === "100%") twClasses.push("w-full");
+      else if (val === "auto") twClasses.push("w-auto");
+      else twClasses.push(`w-[${val}]`);
     } else if (k === "backgroundColor") {
       if (val === "#ffffff" || val === "white") twClasses.push("bg-white");
-      else if (val === "#111827") twClasses.push("bg-gray-900");
+      else if (val === "#111827" || val === "#0f172a") twClasses.push("bg-slate-900");
+      else if (val === "transparent") twClasses.push("bg-transparent");
       else twClasses.push(`bg-[${val}]`);
     } else if (k === "color") {
       if (val === "#ffffff" || val === "white") twClasses.push("text-white");
-      else if (val === "#111827") twClasses.push("text-gray-900");
+      else if (val === "#111827" || val === "#0f172a") twClasses.push("text-slate-900");
+      else if (val === "#6b7280" || val === "#64748b") twClasses.push("text-slate-500");
       else twClasses.push(`text-[${val}]`);
     }
   }
@@ -690,7 +763,53 @@ export function stylesToTailwindClasses(styles: Record<string, string>): string[
   return twClasses;
 }
 
+export function renderASTNodeToTailwindHtml(node: ASTNode, indentLevel = 0): string {
+  const indent = "  ".repeat(indentLevel);
+  const tag = escapeHtml(node.tag || "div");
+
+  const twClasses = [
+    ...node.classes,
+    ...stylesToTailwindClasses(node.styles || {}),
+  ];
+
+  if (node.responsiveStyles) {
+    for (const [bp, bpStyles] of Object.entries(node.responsiveStyles)) {
+      const bpTw = stylesToTailwindClasses(bpStyles).map((c) => `${bp}:${c}`);
+      twClasses.push(...bpTw);
+    }
+  }
+
+  const classAttr = twClasses.length > 0 ? ` class="${escapeAttribute(twClasses.join(" "))}"` : "";
+  const ariaLabel = node.attributes?.["aria-label"] || node.props?.alt ? ` aria-label="${escapeAttribute(node.attributes?.["aria-label"] || node.props?.alt || "")}"` : "";
+  const roleAttr = node.attributes?.role ? ` role="${escapeAttribute(node.attributes.role)}"` : "";
+  const hrefAttr = node.props?.href || node.attributes?.href ? ` href="${escapeAttribute(node.props?.href || node.attributes?.href || "")}"` : "";
+
+  const VOID_TAGS = new Set(["img", "input", "br", "hr"]);
+  if (VOID_TAGS.has(tag.toLowerCase())) {
+    const srcAttr = node.attributes?.src || node.props?.src ? ` src="${escapeAttribute(node.attributes?.src || node.props?.src || "")}"` : "";
+    const altAttr = node.props?.alt || node.attributes?.alt ? ` alt="${escapeAttribute(node.props?.alt || node.attributes?.alt || "")}"` : "";
+    return `${indent}<${tag}${classAttr}${srcAttr}${altAttr}${hrefAttr}${ariaLabel}${roleAttr} />\n`;
+  }
+
+  const text = node.textContent || node.props?.content || node.props?.buttonText || "";
+  const escapedText = escapeHtml(text);
+
+  if (node.children.length === 0) {
+    return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>${escapedText}</${tag}>\n`;
+  }
+
+  const childrenHtml = node.children
+    .map((child) => renderASTNodeToTailwindHtml(child, indentLevel + 1))
+    .join("");
+
+  return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>\n${escapedText ? `${indent}  ${escapedText}\n` : ""}${childrenHtml}${indent}</${tag}>\n`;
+}
+
 export function generateTailwindOutput(doc: CanonicalDocument): GeneratedCodeResult["tailwindCode"] {
+  const contentHtml = doc.rootNodes.length > 0
+    ? doc.rootNodes.map((n) => renderASTNodeToTailwindHtml(n, 2)).join("\n")
+    : `    <div class="text-center py-12">\n      <h1 class="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">${escapeHtml(doc.title)}</h1>\n    </div>`;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -701,12 +820,7 @@ export function generateTailwindOutput(doc: CanonicalDocument): GeneratedCodeRes
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans antialiased">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <header class="mb-8">
-      <h1 class="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">${escapeHtml(doc.title)}</h1>
-    </header>
-    <main class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-      <p class="text-lg text-gray-600">Tailwind CSS output generated cleanly by ForgeStudio Engine.</p>
-    </main>
+${contentHtml}
   </div>
 </body>
 </html>`;
@@ -829,20 +943,69 @@ import { ${compName} } from './${compName}';
   };
 }
 
+export function renderASTNodeToJSX(node: ASTNode, indentLevel = 0, isNextJs = false): string {
+  const indent = "  ".repeat(indentLevel);
+  const tag = escapeHtml(node.tag || "div");
+
+  const twClasses = [
+    ...node.classes,
+    ...stylesToTailwindClasses(node.styles || {}),
+  ];
+
+  if (node.responsiveStyles) {
+    for (const [bp, bpStyles] of Object.entries(node.responsiveStyles)) {
+      const bpTw = stylesToTailwindClasses(bpStyles).map((c) => `${bp}:${c}`);
+      twClasses.push(...bpTw);
+    }
+  }
+
+  const classAttr = twClasses.length > 0 ? ` className="${escapeAttribute(twClasses.join(" "))}"` : "";
+
+  // Aria and accessibility
+  const ariaLabel = node.attributes?.["aria-label"] || node.props?.alt ? ` aria-label="${escapeAttribute(node.attributes?.["aria-label"] || node.props?.alt || "")}"` : "";
+  const roleAttr = node.attributes?.role ? ` role="${escapeAttribute(node.attributes.role)}"` : "";
+  const hrefAttr = node.props?.href || node.attributes?.href ? ` href="${escapeAttribute(node.props?.href || node.attributes?.href || "")}"` : "";
+
+  // Next.js Image optimization
+  if (isNextJs && (tag.toLowerCase() === "img" || node.type === "image")) {
+    const src = node.attributes?.src || node.props?.src || "/placeholder.webp";
+    const alt = node.props?.alt || node.attributes?.alt || node.name || "Optimized Image";
+    return `${indent}<Image src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}" width={800} height={500}${classAttr}${ariaLabel}${roleAttr} />\n`;
+  }
+
+  const VOID_TAGS = new Set(["img", "input", "br", "hr"]);
+  if (VOID_TAGS.has(tag.toLowerCase())) {
+    const srcAttr = node.attributes?.src || node.props?.src ? ` src="${escapeAttribute(node.attributes?.src || node.props?.src || "")}"` : "";
+    const altAttr = node.props?.alt || node.attributes?.alt ? ` alt="${escapeAttribute(node.props?.alt || node.attributes?.alt || "")}"` : "";
+    return `${indent}<${tag}${classAttr}${srcAttr}${altAttr}${hrefAttr}${ariaLabel}${roleAttr} />\n`;
+  }
+
+  const text = node.textContent || node.props?.content || node.props?.buttonText || "";
+  const escapedText = escapeHtml(text);
+
+  if (node.children.length === 0) {
+    return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>${escapedText}</${tag}>\n`;
+  }
+
+  const childrenJsx = node.children
+    .map((child) => renderASTNodeToJSX(child, indentLevel + 1, isNextJs))
+    .join("");
+
+  return `${indent}<${tag}${classAttr}${hrefAttr}${ariaLabel}${roleAttr}>\n${escapedText ? `${indent}  ${escapedText}\n` : ""}${childrenJsx}${indent}</${tag}>\n`;
+}
+
 export function generateReactOutput(doc: CanonicalDocument): GeneratedCodeResult["reactCode"] {
+  const renderedJsx = doc.rootNodes.length > 0
+    ? doc.rootNodes.map((n) => renderASTNodeToJSX(n, 4, false)).join("")
+    : `      <div className="p-8 text-center">\n        <h1 className="text-3xl font-bold">${escapeHtml(doc.title)}</h1>\n      </div>\n`;
+
   const appTsx = `import React from 'react';
 import './styles.css';
 
 export default function App() {
   return (
-    <div className="forgestudio-app-container">
-      <header className="py-6 px-4 border-b">
-        <h1 className="text-3xl font-bold">${escapeHtml(doc.title)}</h1>
-      </header>
-      <main className="p-8">
-        <p className="text-gray-700">Production React component generated by ForgeStudio.</p>
-      </main>
-    </div>
+    <div className="forgestudio-app-container min-h-screen bg-white">
+${renderedJsx}    </div>
   );
 }`;
 
@@ -851,13 +1014,25 @@ export default function App() {
       name: doc.slug || "forgestudio-react-export",
       version: "1.0.0",
       private: true,
+      scripts: {
+        dev: "vite",
+        build: "tsc && vite build",
+        preview: "vite preview",
+      },
       dependencies: {
-        react: "^18.2.0",
-        "react-dom": "^18.2.0",
+        react: "^19.0.0",
+        "react-dom": "^19.0.0",
+        "lucide-react": "^1.40.0",
       },
       devDependencies: {
-        "@types/react": "^18.2.0",
-        typescript: "^5.0.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react": "^4.3.4",
+        typescript: "^5.7.0",
+        vite: "^6.0.0",
+        tailwindcss: "^3.4.17",
+        autoprefixer: "^10.4.20",
+        postcss: "^8.4.49",
       },
     },
     null,
@@ -887,15 +1062,19 @@ function hasInteractiveNodes(nodes: ASTNode[]): boolean {
 
 export function generateNextJsOutput(doc: CanonicalDocument): GeneratedCodeResult["nextJsCode"] {
   const hasInteractiveInteractions = hasInteractiveNodes(doc.rootNodes);
+  const isClient = hasInteractiveInteractions;
 
-  const pageTsx = `${hasInteractiveInteractions ? "'use client';\n" : ""}import React from 'react';
+  const renderedJsx = doc.rootNodes.length > 0
+    ? doc.rootNodes.map((n) => renderASTNodeToJSX(n, 4, true)).join("")
+    : `      <div className="p-8 text-center">\n        <h1 className="text-3xl font-bold">${escapeHtml(doc.title)}</h1>\n      </div>\n`;
+
+  const pageTsx = `${isClient ? "'use client';\n\n" : ""}import React from 'react';
+import Image from 'next/image';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-background p-8">
-      <h1 className="text-3xl font-bold tracking-tight">${escapeHtml(doc.title)}</h1>
-      <p className="mt-4 text-muted-foreground">Generated Next.js App Router project export from ForgeStudio.</p>
-    </main>
+    <main className="min-h-screen bg-background">
+${renderedJsx}    </main>
   );
 }`;
 
@@ -910,7 +1089,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }`;
@@ -918,7 +1097,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const nextConfig = `/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
+  },
 };
+
 module.exports = nextConfig;`;
 
   const packageJson = JSON.stringify(
@@ -932,13 +1118,19 @@ module.exports = nextConfig;`;
         start: "next start",
       },
       dependencies: {
-        next: "14.1.0",
-        react: "^18.2.0",
-        "react-dom": "^18.2.0",
+        next: "15.1.0",
+        react: "^19.0.0",
+        "react-dom": "^19.0.0",
+        "lucide-react": "^1.40.0",
       },
       devDependencies: {
-        typescript: "^5.0.0",
-        "@types/react": "^18.2.0",
+        typescript: "^5.7.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@types/node": "^20.0.0",
+        tailwindcss: "^3.4.17",
+        autoprefixer: "^10.4.20",
+        postcss: "^8.4.49",
       },
     },
     null,
@@ -1013,14 +1205,123 @@ export function generateAllCodeOutputs(
 // 13. F-752: Full Project & Component-Level ZIP Exporter
 // ---------------------------------------------------------------------------
 
+export const EXPORT_TYPES = ["static", "react", "tailwind", "nextjs"] as const;
+export type ExportType = (typeof EXPORT_TYPES)[number];
+
+/** npm-safe package name derived from arbitrary user text */
+export function toPackageName(raw: string): string {
+  const name = String(raw || "")
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7F]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^[-._]+|[-._]+$/g, "")
+    .slice(0, 100);
+  return name || "forgestudio-app";
+}
+
+// Files that must never leave the platform inside a downloadable archive
+function isSecretFilePath(filePath: string): boolean {
+  const base = filePath.split("/").pop() || "";
+  if (/^\.env(\..+)?$/.test(base)) return !/^\.env\.(example|sample|template)$/.test(base);
+  return /\.(pem|key|p12|pfx)$/i.test(base) || base === "id_rsa" || base === ".npmrc";
+}
+
+/**
+ * Build a ZIP archive from a flat list of project files.
+ * Entry names are validated so an archive can never write outside its extraction folder.
+ */
+export async function buildZipFromFiles(
+  files: Array<{ path: string; content?: string | null; encoding?: string | null }>
+): Promise<Buffer> {
+  const entries: Array<{ name: string; data: Buffer }> = [];
+  const seen = new Set<string>();
+
+  for (const file of files) {
+    const name = String(file.path || "").replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!name || name.endsWith("/")) continue;
+    if (name.split("/").some((part) => part === ".." || part === "." || part === "") || /^[a-zA-Z]:/.test(name) || name.includes("\0")) {
+      throw new Error(`Refusing to archive unsafe path '${file.path}'`);
+    }
+    if (name.split("/").includes("node_modules") || isSecretFilePath(name) || seen.has(name)) continue;
+    seen.add(name);
+    entries.push({
+      name,
+      data: Buffer.from(file.content ?? "", file.encoding === "base64" ? "base64" : "utf-8"),
+    });
+  }
+
+  if (entries.length === 0) {
+    throw new Error("There are no files to export");
+  }
+
+  return new Promise((resolve, reject) => {
+    const archive = createArchiverInstance({ zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
+    const sink = new Writable({
+      write(chunk, encoding, next) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+        next();
+      },
+    });
+
+    archive.on("error", (err: any) => reject(err));
+    sink.on("error", (err) => reject(err));
+    sink.on("finish", () => resolve(Buffer.concat(chunks)));
+    archive.pipe(sink);
+    for (const entry of entries) archive.append(entry.data, { name: entry.name });
+    archive.finalize();
+  });
+}
+
 export async function buildProjectZipStream(
   editorData: any,
-  exportType: "static" | "react" | "tailwind" | "nextjs" = "static",
+  exportType: ExportType = "static",
   scope: "full" | "component" = "full",
-  componentId?: string
+  componentId?: string,
+  options: { projectName?: string; projectSlug?: string; projectId?: string } = {}
 ): Promise<Buffer> {
+  if (!EXPORT_TYPES.includes(exportType)) {
+    throw new Error(`Unsupported export type '${String(exportType)}'`);
+  }
+
   const codeRes = generateAllCodeOutputs(editorData, { scope, componentId });
   const doc = parseEditorDataToCanonicalDoc(editorData);
+
+  // Full React / Next.js exports are the same multi-page project the Code Workspace generates.
+  // A generator failure rejects the export: falling back to a single-page stub would hand
+  // the user an archive that silently lacks their pages.
+  if (scope === "full" && (exportType === "react" || exportType === "nextjs")) {
+    const targetProjectId = (options as any)?.projectId;
+    if (targetProjectId) {
+      try {
+        const { listFiles } = await import("./project/forgeFilesystem.service.js");
+        const persisted = (await listFiles(targetProjectId)).filter((f: any) => !f.isDirectory);
+        if (persisted.length > 0) {
+          return buildZipFromFiles(persisted.map((f: any) => ({ path: f.path, content: f.content })));
+        }
+      } catch {}
+    }
+    const { visualDocumentToIR } = await import("./compiler/unifiedCompiler.service.js");
+    const projectIR = visualDocumentToIR(editorData, {
+      id: `export_${exportType}_${Date.now()}`,
+      name: options.projectName || doc.title,
+      slug: toPackageName(options.projectSlug || options.projectName || doc.slug || doc.title),
+      framework: exportType,
+    });
+    const plan =
+      exportType === "react"
+        ? await (await import("./generator/reactGenerator.service.js")).buildReactGenerationPlan(projectIR, [], {
+            scope: { type: "full" },
+          })
+        : await (await import("./generator/nextjsGenerator.service.js")).buildNextJsGenerationPlan(projectIR, [], {
+            scope: { type: "full" },
+          });
+    if (!plan || !Array.isArray(plan.files) || plan.files.length === 0) {
+      throw new Error(`The ${exportType} generator produced no files`);
+    }
+    return buildZipFromFiles(plan.files.map((f) => ({ path: f.path, content: f.content })));
+  }
 
   return new Promise((resolve, reject) => {
     const archive = createArchiverInstance({ zlib: { level: 9 } });
@@ -1054,7 +1355,11 @@ export async function buildProjectZipStream(
       archive.append(codeRes.reactCode?.packageJson || "{}", { name: "package.json" });
       archive.append(codeRes.reactCode?.appTsx || "", { name: "src/App.tsx" });
       archive.append(codeRes.css, { name: "src/styles.css" });
-      archive.append(`# ${doc.title} — React TSX Export\n\nRun \`npm install\` then \`npm start\`.`, { name: "README.md" });
+      archive.append(`import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\nimport './styles.css';\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n`, { name: "src/main.tsx" });
+      archive.append(`<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>${escapeHtml(doc.title)}</title>\n</head>\n<body>\n  <div id="root"></div>\n  <script type="module" src="/src/main.tsx"></script>\n</body>\n</html>\n`, { name: "index.html" });
+      archive.append(`import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n});\n`, { name: "vite.config.ts" });
+      archive.append(JSON.stringify({ compilerOptions: { target: "ES2022", useDefineForClassFields: true, lib: ["ES2022", "DOM", "DOM.Iterable"], module: "ESNext", skipLibCheck: true, moduleResolution: "bundler", allowImportingTsExtensions: false, resolveJsonModule: true, isolatedModules: true, noEmit: true, jsx: "react-jsx", strict: true }, include: ["src"] }, null, 2), { name: "tsconfig.json" });
+      archive.append(`# ${doc.title} — React TSX Export\n\nRun \`npm install\` then \`npm run build\` or \`npm run dev\`.`, { name: "README.md" });
     } else if (exportType === "tailwind") {
       archive.append(codeRes.tailwindCode?.html || "", { name: "index.html" });
       archive.append(codeRes.tailwindCode?.tailwindConfig || "", { name: "tailwind.config.js" });
@@ -1063,8 +1368,9 @@ export async function buildProjectZipStream(
       archive.append(codeRes.nextJsCode?.packageJson || "{}", { name: "package.json" });
       archive.append(codeRes.nextJsCode?.pageTsx || "", { name: "app/page.tsx" });
       archive.append(codeRes.nextJsCode?.layoutTsx || "", { name: "app/layout.tsx" });
-      archive.append(codeRes.nextJsCode?.nextConfig || "", { name: "next.config.js" });
+      archive.append(codeRes.nextJsCode?.nextConfig || "", { name: "next.config.mjs" });
       archive.append(codeRes.css, { name: "app/globals.css" });
+      archive.append(JSON.stringify({ compilerOptions: { target: "ES2022", lib: ["dom", "dom.iterable", "esnext"], allowJs: true, skipLibCheck: true, strict: true, noEmit: true, esModuleInterop: true, module: "esnext", moduleResolution: "bundler", resolveJsonModule: true, isolatedModules: true, jsx: "preserve", incremental: true, plugins: [{ name: "next" }], paths: { "@/*": ["./*"] } }, include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"], exclude: ["node_modules"] }, null, 2), { name: "tsconfig.json" });
       archive.append(`# ${doc.title} — Next.js App Router Export\n\nRun \`npm install\` then \`npm run dev\`.`, { name: "README.md" });
     }
 

@@ -1,26 +1,37 @@
+import crypto from "node:crypto";
+import { ts } from "./tsCompiler.js";
 import { AppError } from "../../utils/app-error.js";
-import { readFile, writeFile } from "../project/forgeFilesystem.service.js";
-import {
-  visualElementToIR,
-  irElementToVisual,
-  ElementIR,
-  ProjectIR,
-} from "./unifiedCompiler.service.js";
+import { readFile, writeFile, listFiles, sanitizeAndNormalizePath } from "../project/forgeFilesystem.service.js";
 import { prisma } from "../../config/prisma.js";
+import { extractProtectedRegions, injectProtectedRegions } from "../generator/sourcePreservation.service.js";
+import { escapeJsxText } from "../generator/jsxRenderer.js";
+import { compileAndSyncProject } from "./unifiedCompiler.service.js";
+import {
+  buildPageRegistry,
+  buildSyncBaseline,
+  hashPage,
+  hashSharedParts,
+  isRecognizedPageEntry,
+  parseEditorDocument,
+  toProjectFramework,
+  RegisteredPage,
+} from "./pageRegistry.js";
+import {
+  JsxNode,
+  SyncDiagnostic,
+  PageSyncStatus,
+  parseJsxSource,
+  parseSyntax,
+  reconcilePageSource,
+} from "./pageSourceSync.js";
+import { saveDocumentFromCode } from "../websites/documentGateway.js";
 
 const db = prisma as any;
 
-export type SyncMode = "VISUAL_TO_CODE" | "CODE_TO_VISUAL" | "BIDIRECTIONAL" | "MANUAL";
+export type { SyncDiagnostic } from "./pageSourceSync.js";
+export { extractProtectedRegions, injectProtectedRegions };
 
-export interface SyncDiagnostic {
-  severity: "error" | "warning" | "info";
-  code: string;
-  message: string;
-  elementId?: string;
-  filePath?: string;
-  line?: number;
-  suggestedAction?: string;
-}
+export type SyncMode = "VISUAL_TO_CODE" | "CODE_TO_VISUAL" | "BIDIRECTIONAL" | "MANUAL";
 
 export interface SyncConflict {
   elementId?: string;
@@ -30,64 +41,36 @@ export interface SyncConflict {
   reason: string;
 }
 
+/**
+ * Outcome of reconciling a saved source file with the visual document:
+ * - synced: the document was updated and the source regenerated from it
+ * - unchanged: the code already matches the document
+ * - not-a-page: the file is not a registered page, nothing to reconcile
+ * - unsupported / invalid: the code cannot be represented; it is preserved as hand-written code
+ * - conflict: the visual page changed since this code was generated; nothing was overwritten
+ * - reverted: the code edit was discarded in favour of the visual document
+ * - error: the document was updated but its source could not be regenerated
+ */
+export type CodeSyncStatus = PageSyncStatus | "conflict" | "reverted" | "error";
+
 export interface VisualCodeSyncResult {
   success: boolean;
   mode: SyncMode;
+  status?: CodeSyncStatus;
+  message?: string;
+  page?: RegisteredPage;
   appliedChangesCount: number;
   conflicts: SyncConflict[];
   diagnostics: SyncDiagnostic[];
+  /** Paths whose persisted content changed as a result of the sync */
   updatedFiles: string[];
+  documentVersion?: number;
   reconciledEditorData?: any;
 }
 
-/**
- * Regular expressions for protected manual code regions
- * Comments formatted as:
- *   // [forge-protect-start: custom-logic]
- *   ...
- *   // [forge-protect-end: custom-logic]
- */
-const PROTECTED_REGION_REGEX =
-  /\/\/\s*\[forge-protect-start:\s*([\w-]+)\]([\s\S]*?)\/\/\s*\[forge-protect-end:\s*\1\]/g;
-
-/**
- * Extract protected developer-owned code regions from source code
- */
-export function extractProtectedRegions(sourceCode: string): Map<string, string> {
-  const regions = new Map<string, string>();
-  let match: RegExpExecArray | null;
-
-  while ((match = PROTECTED_REGION_REGEX.exec(sourceCode)) !== null) {
-    const regionId = match[1];
-    const regionContent = match[2];
-    regions.set(regionId, regionContent);
-  }
-
-  return regions;
-}
-
-/**
- * Re-inject protected regions into generated code
- */
-export function injectProtectedRegions(generatedCode: string, regions: Map<string, string>): string {
-  let result = generatedCode;
-
-  for (const [id, content] of regions.entries()) {
-    const regionMarker = `// [forge-protect-start: ${id}]`;
-    const endMarker = `// [forge-protect-end: ${id}]`;
-
-    if (result.includes(regionMarker)) {
-      const regex = new RegExp(
-        `\\/\\/\\s*\\[forge-protect-start:\\s*${id}\\][\\s\\S]*?\\/\\/\\s*\\[forge-protect-end:\\s*${id}\\]`
-      );
-      result = result.replace(regex, `${regionMarker}${content}${endMarker}`);
-    } else {
-      // Append if placeholder is not found
-      result = `${result}\n\n${regionMarker}${content}${endMarker}\n`;
-    }
-  }
-
-  return result;
+export interface CodeSyncOptions {
+  /** Resolve a detected conflict by keeping the saved code or the visual document */
+  resolve?: "code" | "visual";
 }
 
 /**
@@ -107,7 +90,189 @@ export function extractElementIdsFromSource(code: string): Set<string> {
 }
 
 /**
- * Perform safe Visual -> Code targeted reconciliation for an updated element
+ * Hash editor data deterministically
+ */
+export function hashEditorData(editorData: any): string {
+  const raw = typeof editorData === "string" ? editorData : JSON.stringify(editorData ?? {});
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+/**
+ * Validate syntax using TypeScript compiler AST
+ */
+export function validateSourceSyntax(code: string, fileName = "component.tsx"): {
+  isValid: boolean;
+  sourceFile?: any;
+  diagnostics: SyncDiagnostic[];
+} {
+  const { sourceFile, diagnostics } = parseSyntax(code, fileName);
+  return { isValid: !!sourceFile && diagnostics.length === 0, sourceFile, diagnostics };
+}
+
+/**
+ * Detect unsupported React/JS constructs that cannot be visually manipulated
+ */
+export function detectUnsupportedConstructs(sourceFile: any, filePath = ""): SyncDiagnostic[] {
+  const diagnostics: SyncDiagnostic[] = [];
+  if (!ts || !sourceFile) return diagnostics;
+
+  function visit(node: any) {
+    // Detect React Hooks usage (useState, useEffect, custom hooks)
+    if (ts.isCallExpression(node)) {
+      const exprText = node.expression.getText(sourceFile);
+      if (/^use[A-Z0-9]/.test(exprText) && !["useRef"].includes(exprText)) {
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+        diagnostics.push({
+          severity: "warning",
+          code: "UNSUPPORTED_HOOK",
+          message: `Hook '${exprText}' is code-only logic and cannot be edited visually on the canvas.`,
+          filePath,
+          line: line + 1,
+          col: character + 1,
+          suggestedAction: "Preserved in source file as protected code-only logic.",
+        });
+      }
+    }
+
+    // Detect loops / control flow inside JSX expressions
+    if (ts.isIterationStatement(node, false)) {
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+      diagnostics.push({
+        severity: "warning",
+        code: "UNSUPPORTED_LOOP",
+        message: "Imperative loops cannot be directly rendered on visual canvas.",
+        filePath,
+        line: line + 1,
+        col: character + 1,
+        suggestedAction: "Preserved in source file.",
+      });
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return diagnostics;
+}
+
+/**
+ * Build a lookup map of existing elements by ID
+ */
+function buildExistingElementMap(elements: any[]): Map<string, any> {
+  const map = new Map<string, any>();
+  function walk(list: any[]) {
+    if (!Array.isArray(list)) return;
+    for (const el of list) {
+      if (el && el.id) map.set(el.id, el);
+      if (el && Array.isArray(el.children)) walk(el.children);
+      if (el && Array.isArray(el.elements)) walk(el.elements);
+    }
+  }
+  walk(elements);
+  return map;
+}
+
+/** Best-effort conversion of an arbitrary JSX node to an editor element (no validation) */
+function looseElementFromNode(node: JsxNode, existingMap: Map<string, any>): any {
+  const id = node.forgeId || `el_${crypto.randomBytes(4).toString("hex")}`;
+  const existing = existingMap.get(id);
+  const styles: Record<string, string> = { ...(existing?.styles || {}), ...node.style };
+  const classes = node.classes;
+  const text = node.text;
+  const base = { ...(existing || {}), id, styles, classes };
+
+  if (/^h[1-6]$/.test(node.tag)) {
+    return {
+      ...base,
+      type: "heading",
+      headingLevel: node.tag,
+      content: text || existing?.content || existing?.textContent || "Heading",
+      textContent: text || existing?.textContent || existing?.content || "Heading",
+    };
+  }
+  if (node.tag === "p" || node.tag === "span") {
+    return {
+      ...base,
+      type: "text",
+      content: text || existing?.content || existing?.textContent || "",
+      textContent: text || existing?.textContent || existing?.content || "",
+    };
+  }
+  if (node.tag === "button" || node.tag === "a") {
+    return {
+      ...base,
+      type: "button",
+      content: text || existing?.content || existing?.buttonText || "Button",
+      buttonText: text || existing?.buttonText || existing?.content || "Button",
+      textContent: text || existing?.textContent || existing?.content || "Button",
+      href: node.attrs.href || existing?.href || "#",
+    };
+  }
+  if (node.tag === "img") {
+    return { ...base, type: "image", content: "", src: node.attrs.src || existing?.src || "", alt: node.attrs.alt || existing?.alt || "" };
+  }
+  if (node.tag === "video") return { ...base, type: "video", content: "", src: node.attrs.src || existing?.src || "" };
+  if (node.tag === "hr") return { ...base, type: "divider", content: "" };
+
+  const children = node.children.map((child) => looseElementFromNode(child, existingMap));
+  const layout: Record<string, any> = { ...(existing?.layout || {}) };
+  if (node.style.flexDirection) layout.direction = node.style.flexDirection === "row" ? "row" : "column";
+  if (node.style.justifyContent) layout.justifyContent = node.style.justifyContent;
+  if (node.style.alignItems) layout.alignItems = node.style.alignItems;
+  if (node.style.gap) layout.gap = parseInt(node.style.gap, 10) || 0;
+  return {
+    ...base,
+    type: "container",
+    tag: node.tag,
+    content: children.length === 0 ? text : "",
+    layout: Object.keys(layout).length > 0 ? layout : { direction: "column", gap: 16 },
+    children,
+    elements: children,
+  };
+}
+
+/**
+ * Parse TSX/JSX source code into an EditorElement tree.
+ *
+ * This is a best-effort reader for arbitrary components: constructs that have no
+ * visual equivalent are reported as warnings and skipped. Synchronising a page
+ * into the saved visual document goes through `syncSourceToVisualWebsite`, which
+ * validates the result and refuses anything it cannot represent.
+ */
+export function parseSourceCodeToElements(
+  sourceCode: string,
+  existingElements: any[] = [],
+  filePath = ""
+): {
+  success: boolean;
+  elements: any[];
+  diagnostics: SyncDiagnostic[];
+} {
+  const parsed = parseJsxSource(sourceCode, filePath || "component.tsx");
+  if (!parsed.valid) {
+    return { success: false, elements: existingElements, diagnostics: parsed.diagnostics };
+  }
+
+  const diagnostics: SyncDiagnostic[] = parsed.diagnostics.map((d) =>
+    d.code === "NO_JSX_ROOT" ? d : { ...d, severity: "warning" as const }
+  );
+  diagnostics.push(...detectUnsupportedConstructs(parsed.sourceFile, filePath));
+
+  if (!parsed.root) {
+    return { success: false, elements: existingElements, diagnostics };
+  }
+
+  const existingMap = buildExistingElementMap(existingElements);
+  const roots = parsed.root.tag === "#fragment" ? parsed.root.children : [parsed.root];
+  return {
+    success: true,
+    elements: roots.map((node) => looseElementFromNode(node, existingMap)),
+    diagnostics,
+  };
+}
+
+/**
+ * Target Visual -> Code targeted reconciliation for an updated element
  */
 export async function syncVisualElementToSource(
   projectId: string,
@@ -122,7 +287,6 @@ export async function syncVisualElementToSource(
     throw new AppError(`Target source file '${filePath}' is empty`, 400, "EMPTY_SOURCE_FILE");
   }
 
-  // Check if file is protected from visual sync
   if (file.isProtected) {
     diagnostics.push({
       severity: "warning",
@@ -133,7 +297,7 @@ export async function syncVisualElementToSource(
     return { success: false, diagnostics, content: file.content };
   }
 
-  // Preserve any manual developer code regions
+  // Preserve protected manual code regions
   const protectedRegions = extractProtectedRegions(file.content);
 
   const elementId = element.id;
@@ -142,27 +306,26 @@ export async function syncVisualElementToSource(
   }
 
   let updatedContent = file.content;
+  const newText = element.textContent || element.content || element.buttonText;
 
-  // Targeted attribute / text replacement if element exists in source
-  const searchPattern = new RegExp(
-    `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${elementId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
+  // Search by data-forge-id
+  const safeId = String(elementId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${safeId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
   );
 
-  if (searchPattern.test(updatedContent)) {
-    // If element has text content update
-    if (typeof element.content === "string") {
-      updatedContent = updatedContent.replace(searchPattern, `$1${element.content}$3`);
-    }
+  if (typeof newText === "string" && pattern.test(updatedContent)) {
+    const text = escapeJsxText(newText);
+    updatedContent = updatedContent.replace(pattern, (_m, open: string, _old: string, close: string) => `${open}${text}${close}`);
   }
 
-  // Re-inject protected manual regions
+  // Re-inject protected regions
   updatedContent = injectProtectedRegions(updatedContent, protectedRegions);
 
-  // Write updated source atomically with revision tracking
+  // Persist updated source
   await writeFile(projectId, filePath, {
     content: updatedContent,
     expectedVersion: file.version,
-    isGenerated: false,
     authorId,
     reason: `Visual sync for element: ${elementId}`,
   });
@@ -174,74 +337,350 @@ export async function syncVisualElementToSource(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Code -> Visual: reconcile a persisted source file into the saved visual document
+// ---------------------------------------------------------------------------
+
+interface CodeSyncEntry {
+  status: CodeSyncStatus;
+  /** Fingerprints of the visual page / shared parts this code was last in step with */
+  basePageHash?: string;
+  baseSharedHash?: string;
+  message?: string;
+  diagnostics?: SyncDiagnostic[];
+  updatedAt: string;
+}
+
+function projectMetadata(project: any): Record<string, any> {
+  return project?.metadata && typeof project.metadata === "object" ? project.metadata : {};
+}
+
+async function updateProjectMetadata(projectId: string, mutate: (metadata: Record<string, any>) => void) {
+  const project = await db.forgeProject.findUnique({ where: { id: projectId } });
+  if (!project) return;
+  const metadata = { ...projectMetadata(project) };
+  mutate(metadata);
+  await db.forgeProject.update({ where: { id: projectId }, data: { metadata } });
+}
+
+/** Ownership decides whether regeneration may rewrite the file */
+async function setFileGenerated(file: { id: string; isGenerated: boolean }, isGenerated: boolean) {
+  if (file.isGenerated === isGenerated) return;
+  await db.forgeProjectFile.update({ where: { id: file.id }, data: { isGenerated } });
+}
+
 /**
- * Reconcile Code -> Visual: Inspects source file and updates the visual Website editorData
+ * Reconcile Code -> Visual: parses the saved source with the TypeScript AST and
+ * updates the canonical visual document. The document is only written when the
+ * code is fully representable and neither side has moved on since they last agreed.
  */
 export async function syncSourceToVisualWebsite(
   projectId: string,
   websiteId: string,
   filePath: string,
-  authorId?: string
+  authorId?: string,
+  options: CodeSyncOptions = {}
 ): Promise<VisualCodeSyncResult> {
-  const file = await readFile(projectId, filePath);
+  const cleanPath = sanitizeAndNormalizePath(filePath);
+  const file = await readFile(projectId, cleanPath);
+  const project = await db.forgeProject.findUnique({ where: { id: projectId } });
   const website = await db.website.findUnique({ where: { id: websiteId } });
 
-  if (!website) {
-    throw new AppError("Associated website not found", 404, "NOT_FOUND");
+  if (!project) throw new AppError("Project not found", 404, "NOT_FOUND");
+  if (!website) throw new AppError("Associated website not found", 404, "NOT_FOUND");
+
+  const editorData = parseEditorDocument(website.editorData);
+  const framework = toProjectFramework(project.framework);
+  const identity = { id: project.id, name: project.name, slug: project.slug };
+  const actorId = authorId || project.ownerId;
+  const metadata = projectMetadata(project);
+
+  const result = (
+    status: CodeSyncStatus,
+    extra: Partial<VisualCodeSyncResult> = {}
+  ): VisualCodeSyncResult => ({
+    success: status === "synced" || status === "unchanged" || status === "not-a-page" || status === "reverted",
+    mode: "CODE_TO_VISUAL",
+    status,
+    appliedChangesCount: 0,
+    conflicts: [],
+    diagnostics: [],
+    updatedFiles: [],
+    ...extra,
+  });
+
+  const regenerate = async (document: any) => {
+    // The file is handed back to the generator here, so any hold on it is lifted first
+    await updateProjectMetadata(projectId, (meta) => {
+      if (meta.codeSync?.[cleanPath]) {
+        const { [cleanPath]: _released, ...rest } = meta.codeSync;
+        meta.codeSync = rest;
+      }
+    });
+    const before = new Map((await listFiles(projectId)).map((f: any) => [f.path, f.contentHash]));
+    const compiled = await compileAndSyncProject(projectId, document, { ...identity, framework }, actorId);
+    const after = await listFiles(projectId);
+    const updatedFiles = after.filter((f: any) => before.get(f.path) !== f.contentHash).map((f: any) => f.path);
+    for (const path of before.keys()) {
+      if (!after.some((f: any) => f.path === path)) updatedFiles.push(path);
+    }
+    if (compiled.success) {
+      await updateProjectMetadata(projectId, (meta) => {
+        meta.visualSync = buildSyncBaseline(document, framework);
+        if (meta.codeSync) {
+          const { [cleanPath]: _resolved, ...rest } = meta.codeSync;
+          meta.codeSync = rest;
+        }
+      });
+    }
+    return { compiled, updatedFiles };
+  };
+
+  let page = buildPageRegistry(editorData, framework).find((p) => p.filePath === cleanPath);
+  const pageEntry = !page ? isRecognizedPageEntry(cleanPath, framework) : null;
+  if (!page && pageEntry && pageEntry.isPage) {
+    page = buildPageRegistry(editorData, framework).find(
+      (p) =>
+        p.routePath.toLowerCase() === pageEntry.routePath.toLowerCase() ||
+        p.name.toLowerCase() === pageEntry.pageName.toLowerCase() ||
+        p.filePath === pageEntry.targetFilePath
+    );
   }
 
-  const editorData = typeof website.editorData === "string"
-    ? JSON.parse(website.editorData)
-    : (website.editorData || { elements: [] });
+  if (!page) {
+    if (!pageEntry || !pageEntry.isPage) {
+      return result("not-a-page", {
+        message: `${cleanPath} is not a registered page, so there is nothing to reconcile with the Visual Editor.`,
+      });
+    }
 
-  const diagnostics: SyncDiagnostic[] = [];
-  const conflicts: SyncConflict[] = [];
+    // Dynamic Page Registration: The developer created a new page file in the workspace
+    // (e.g. about.tsx, src/pages/AboutPage.tsx, or app/about/page.tsx)
+    const nextDoc = JSON.parse(JSON.stringify(editorData ?? {}));
+    if (!Array.isArray(nextDoc.pages) || nextDoc.pages.length === 0) {
+      const defaultTitle = String(nextDoc.pageSettings?.title || nextDoc.title || nextDoc.name || "Home");
+      nextDoc.pages = [
+        {
+          id: "home",
+          name: defaultTitle,
+          slug: "/",
+          elements: Array.isArray(nextDoc.elements) ? nextDoc.elements : [],
+          pageSettings: { ...(nextDoc.pageSettings || {}), title: defaultTitle, path: "/" },
+          isHome: true,
+        },
+      ];
+      nextDoc.homePageId = "home";
+    }
 
-  // Extract source IDs
-  const sourceIds = extractElementIdsFromSource(file.content || "");
+    // The file becomes the page's generated source, so it is registered only when
+    // everything in it can be represented. Otherwise it stays the hand-written file
+    // it is: no placeholder content is invented and nothing is overwritten.
+    const { importPageElements } = await import("./pageSourceSync.js");
+    const imported = importPageElements(file.content || "", cleanPath, nextDoc, framework);
+    if (!imported.ok) {
+      return result("unsupported", {
+        message: `${cleanPath} was saved but not registered as a visual page: it contains code the Visual Editor cannot represent.`,
+        diagnostics: imported.diagnostics,
+      });
+    }
+    const importedElements: any[] = imported.elements;
 
-  // Update elements in editorData
-  let changesCount = 0;
-  function updateTree(elements: any[]): any[] {
-    return elements.map((el) => {
-      if (sourceIds.has(el.id)) {
-        changesCount++;
-      }
-      if (el.elements && Array.isArray(el.elements)) {
-        return { ...el, elements: updateTree(el.elements) };
-      }
-      return el;
+    const pageId = `page_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newPageObj = {
+      id: pageId,
+      name: pageEntry.pageTitle,
+      slug: pageEntry.routePath,
+      elements: importedElements,
+      pageSettings: {
+        title: pageEntry.pageTitle,
+        path: pageEntry.routePath,
+        description: "",
+        backgroundColor: "#ffffff",
+        isMaintenanceMode: false,
+        siteLanguage: "en",
+      },
+      isHome: pageEntry.routePath === "/",
+    };
+    nextDoc.pages.push(newPageObj);
+
+    let documentVersion: number;
+    try {
+      const saved = await saveDocumentFromCode(websiteId, actorId, nextDoc, website.documentVersion ?? 1);
+      documentVersion = saved.documentVersion;
+    } catch (err: any) {
+      return result("error", {
+        message: `Failed to register page ${pageEntry.pageTitle}: ${err?.message || "Document save error"}`,
+      });
+    }
+
+    await setFileGenerated(file, true);
+    const freshSite = await db.website.findUnique({ where: { id: websiteId } });
+    const persistedDoc = parseEditorDocument(freshSite?.editorData ?? nextDoc);
+    const { compiled, updatedFiles } = await regenerate(persistedDoc);
+    if (!compiled.success) {
+      const firstError = compiled.diagnostics.find((d) => d.severity === "error");
+      return result("error", {
+        documentVersion,
+        updatedFiles,
+        message: `Page "${pageEntry.pageTitle}" was registered, but its source could not be generated: ${
+          firstError?.message || "generation failed"
+        }`,
+      });
+    }
+
+    const registeredPage = buildPageRegistry(persistedDoc, framework).find(
+      (p) => p.pageId === pageId || p.routePath.toLowerCase() === pageEntry.routePath.toLowerCase()
+    );
+
+    return result("synced", {
+      page: registeredPage,
+      documentVersion,
+      appliedChangesCount: importedElements.length,
+      diagnostics: [],
+      updatedFiles,
+      reconciledEditorData: persistedDoc,
+      message: `Registered new page "${pageEntry.pageTitle}" (${pageEntry.routePath}) and synchronized routes.`,
     });
   }
 
-  const updatedElements = updateTree(editorData.elements || []);
-  const reconciledEditorData = {
-    ...editorData,
-    elements: updatedElements,
+  const baseline = metadata.visualSync || {};
+  const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
+  const basePageHash: string | undefined = baseline.pages?.[page.key]?.hash ?? previousEntry?.basePageHash;
+  const baseSharedHash: string | undefined = baseline.sharedHash ?? previousEntry?.baseSharedHash;
+
+  /** Keep the saved code as hand-written source until the two sides agree again */
+  const holdAsCode = async (status: CodeSyncStatus, message: string, diagnostics: SyncDiagnostic[]) => {
+    await setFileGenerated(file, false);
+    await updateProjectMetadata(projectId, (meta) => {
+      const entry: CodeSyncEntry = {
+        status,
+        basePageHash,
+        baseSharedHash,
+        message,
+        diagnostics: diagnostics.filter((d) => d.severity === "error").slice(0, 20),
+        updatedAt: new Date().toISOString(),
+      };
+      meta.codeSync = { ...(meta.codeSync || {}), [cleanPath]: entry };
+    });
   };
 
-  // Persist updated editorData back to Website
-  await db.website.update({
-    where: { id: websiteId },
-    data: {
-      editorData: reconciledEditorData,
-      documentVersion: (website.documentVersion || 1) + 1,
-    },
+  // Discard the code edit: regenerate this page from the visual document
+  if (options.resolve === "visual") {
+    await setFileGenerated(file, true);
+    const { compiled, updatedFiles } = await regenerate(editorData);
+    if (!compiled.success) {
+      const firstError = compiled.diagnostics.find((d) => d.severity === "error");
+      return result("error", { page, message: firstError?.message || "Source regeneration failed", updatedFiles });
+    }
+    return result("reverted", {
+      page,
+      updatedFiles,
+      message: `${cleanPath} was regenerated from the visual document.`,
+    });
+  }
+
+  // The visual page moved on after this code was generated: applying the code would undo that work
+  if (options.resolve !== "code" && options.resolve !== "overwrite") {
+    const pageChanged = !!basePageHash && basePageHash !== hashPage(editorData, page.key);
+    const sharedChanged = !!baseSharedHash && baseSharedHash !== hashSharedParts(editorData);
+    if (pageChanged || sharedChanged) {
+      const reason = pageChanged
+        ? `Page "${page.name}" was changed in the Visual Editor after this source was generated.`
+        : "The shared header or footer was changed in the Visual Editor after this source was generated.";
+      await holdAsCode("conflict", reason, []);
+      return result("conflict", {
+        page,
+        message: `${reason} Neither side was overwritten: keep the code or keep the visual version.`,
+        conflicts: [{ filePath: cleanPath, visualValue: "visual document", sourceValue: "saved source", reason }],
+      });
+    }
+  }
+
+  const outcome = await reconcilePageSource({
+    source: file.content || "",
+    filePath: cleanPath,
+    editorData,
+    framework,
+    project: identity,
   });
 
-  return {
-    success: true,
-    mode: "CODE_TO_VISUAL",
-    appliedChangesCount: changesCount,
-    conflicts,
-    diagnostics,
-    updatedFiles: [filePath],
-    reconciledEditorData,
-  };
+  if (outcome.status === "invalid" || outcome.status === "unsupported") {
+    const message =
+      outcome.status === "invalid"
+        ? `${cleanPath} has syntax errors. The file was saved; the visual document was not changed.`
+        : `${cleanPath} contains code the Visual Editor cannot represent. The file was saved and is preserved as hand-written code; the visual document was not changed.`;
+    await holdAsCode(outcome.status, message, outcome.diagnostics);
+    return result(outcome.status, { page, message, diagnostics: outcome.diagnostics });
+  }
+
+  if (outcome.status === "unchanged") {
+    await setFileGenerated(file, true);
+    if (previousEntry) {
+      await updateProjectMetadata(projectId, (meta) => {
+        const { [cleanPath]: _resolved, ...rest } = meta.codeSync || {};
+        meta.codeSync = rest;
+      });
+    }
+    return result("unchanged", {
+      page,
+      diagnostics: outcome.diagnostics,
+      message: "The source already matches the visual document.",
+    });
+  }
+
+  // Persist the canonical document first; the source is then regenerated from what was saved
+  let documentVersion: number;
+  try {
+    const saved = await saveDocumentFromCode(websiteId, actorId, outcome.editorData, website.documentVersion ?? 1);
+    documentVersion = saved.documentVersion;
+  } catch (err: any) {
+    if (err?.code === "DOCUMENT_VERSION_CONFLICT") {
+      const reason = "The website was saved in the Visual Editor while this source was being synchronised.";
+      await holdAsCode("conflict", reason, []);
+      return result("conflict", {
+        page,
+        message: `${reason} Neither side was overwritten.`,
+        conflicts: [{ filePath: cleanPath, visualValue: "visual document", sourceValue: "saved source", reason }],
+      });
+    }
+    throw err;
+  }
+
+  await setFileGenerated(file, true);
+  const fresh = await db.website.findUnique({ where: { id: websiteId } });
+  const persisted = parseEditorDocument(fresh?.editorData ?? outcome.editorData);
+  const { compiled, updatedFiles } = await regenerate(persisted);
+
+  if (!compiled.success) {
+    const firstError = compiled.diagnostics.find((d) => d.severity === "error");
+    return result("error", {
+      page,
+      documentVersion,
+      updatedFiles,
+      diagnostics: outcome.diagnostics,
+      message: `The visual document was updated, but its source could not be regenerated: ${
+        firstError?.message || "generation failed"
+      }`,
+    });
+  }
+
+  return result("synced", {
+    page,
+    documentVersion,
+    appliedChangesCount: outcome.changedElements,
+    diagnostics: outcome.diagnostics,
+    updatedFiles,
+    reconciledEditorData: persisted,
+    message: `Synchronised ${outcome.changedElements} element change(s) into page "${page.name}".`,
+  });
 }
 
 export const syncVisualToCode = syncVisualElementToSource;
 
+/**
+ * Dual signature for unit tests and direct callers:
+ * syncCodeToVisual(projectId, filePath, editorDataOrWebsiteId, authorId)
+ */
 export const syncCodeToVisual = async (
   projectId: string,
   filePath: string,
@@ -254,42 +693,46 @@ export const syncCodeToVisual = async (
 
   const file = await readFile(projectId, filePath);
   const editorData = editorDataOrWebsiteId || { elements: [] };
-  const diagnostics: SyncDiagnostic[] = [];
-  const conflicts: SyncConflict[] = [];
-  const sourceIds = extractElementIdsFromSource(file.content || "");
 
-  let changesCount = 0;
-  function updateTree(elements: any[]): any[] {
-    return elements.map((el) => {
-      if (sourceIds.has(el.id)) {
-        changesCount++;
-      }
-      if (el.elements && Array.isArray(el.elements)) {
-        return { ...el, elements: updateTree(el.elements) };
-      }
-      if (el.children && Array.isArray(el.children)) {
-        return { ...el, children: updateTree(el.children) };
-      }
-      return el;
-    });
+  const existingElements = Array.isArray(editorData.elements)
+    ? editorData.elements
+    : Array.isArray(editorData.pages?.[0]?.elements)
+    ? editorData.pages[0].elements
+    : [];
+
+  const parseResult = parseSourceCodeToElements(file.content || "", existingElements, filePath);
+
+  if (!parseResult.success) {
+    return {
+      success: false,
+      mode: "CODE_TO_VISUAL",
+      appliedChangesCount: 0,
+      conflicts: [],
+      diagnostics: parseResult.diagnostics,
+      updatedFiles: [filePath],
+      reconciledEditorData: editorData,
+    };
   }
 
+  // Update pages and elements
   const pages = editorData.pages
-    ? editorData.pages.map((p: any) => ({ ...p, elements: updateTree(p.elements || []) }))
+    ? editorData.pages.map((p: any, idx: number) =>
+        idx === 0 ? { ...p, elements: parseResult.elements } : p
+      )
     : undefined;
-  const elements = editorData.elements ? updateTree(editorData.elements) : undefined;
+
   const reconciledEditorData = {
     ...editorData,
+    elements: parseResult.elements,
     ...(pages ? { pages } : {}),
-    ...(elements ? { elements } : {}),
   };
 
   return {
     success: true,
     mode: "CODE_TO_VISUAL",
-    appliedChangesCount: changesCount > 0 ? changesCount : 1,
-    conflicts,
-    diagnostics,
+    appliedChangesCount: parseResult.elements.length > 0 ? parseResult.elements.length : 1,
+    conflicts: [],
+    diagnostics: parseResult.diagnostics,
     updatedFiles: [filePath],
     reconciledEditorData,
   };
@@ -303,6 +746,8 @@ export const visualCodeSyncService = {
   extractProtectedRegions,
   injectProtectedRegions,
   extractElementIdsFromSource,
+  parseSourceCodeToElements,
+  validateSourceSyntax,
+  detectUnsupportedConstructs,
+  hashEditorData,
 };
-
-

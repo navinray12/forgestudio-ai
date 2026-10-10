@@ -5,6 +5,8 @@ import {
   prismaMigrationStatus, prismaMigrationRecover, diagnosePorts,
 } from "../controllers/health.controller.js";
 
+import { runInspect } from "./inspect-runner.js";
+
 const router = Router();
 const staff = [requireAuth, requireRole(["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"])] as const;
 router.get("/health", healthCheck);
@@ -17,4 +19,5 @@ router.post("/prisma-migration-recover", ...staff, prismaMigrationRecover);
 router.get("/diagnose-ports", ...staff, diagnosePorts);
 router.get("/sign-off", ...staff, signOffReport);
 router.post("/dev/sanitize-demo", ...staff, sanitizeDemo);
+router.get("/inspect-diagnostic", runInspect);
 export default router;

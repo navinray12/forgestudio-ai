@@ -14,7 +14,7 @@ import { ReadingGuideBar } from "../../components/accessibility/ReadingGuideBar"
 import { DesignNotesOverlay } from "./components/notes/DesignNotesOverlay";
 import { VariablesManagerModal } from "./components/VariablesManagerModal";
 import { ClassManagerModal } from "./components/ClassManagerModal";
-import { validateSlug, generateSlug, safeDeletePage } from "./utils/pageManagerService";
+import { validateSlug, generateSlug, safeDeletePage, createStarterPages } from "./utils/pageManagerService";
 import { matchesThemeCondition, type SitePartsConfig, type PublishingState, type DeploymentConfig, type CanonicalWebsiteData, type ThemeBuilderScope, resolveDynamicTokens, type DynamicContext } from "./types";
 import { SaveTemplateDialog, ReplaceTemplateDialog, ImportWebsiteKitDialog, useSaveTemplate, useTemplateLibrary, TemplateLibrary, exportWebsiteKitAsJson, type Template } from "../../features/templates";
 import { RevisionHistoryPanel, revisionHistoryService } from "../../features/revision-history";
@@ -1465,6 +1465,29 @@ export default function WebsiteEditor() {
       return;
     }
 
+    // Sync current page canvas elements if editing a page before switching
+    let currentPagesSnapshot = [...pages];
+    if (canvasMode === "page") {
+      currentPagesSnapshot = currentPagesSnapshot.map((p) =>
+        p.id === activePageId
+          ? {
+              ...p,
+              elements,
+              pageSettings,
+              name: pageSettings.title || p.name,
+              slug: pageSettings.path || p.slug,
+            }
+          : p
+      );
+    }
+
+    // Check if starter template elements match (About, Contact, Services, etc.)
+    const starters = createStarterPages(website?.name || "ForgeStudio");
+    const starterMatch = starters.find(
+      (s) => s.slug.toLowerCase() === validation.slug.toLowerCase() || s.name.toLowerCase().includes(rawTitle.toLowerCase())
+    );
+    const initialElements = starterMatch?.elements && starterMatch.elements.length > 0 ? starterMatch.elements : [];
+
     const newPageObj: PageConfig = {
       id: `page_${Date.now()}_${Math.random()
         .toString(36)
@@ -1473,30 +1496,35 @@ export default function WebsiteEditor() {
       name: rawTitle,
       slug: validation.slug,
 
-      elements: [],
+      elements: initialElements,
 
       pageSettings: {
         title: rawTitle,
         path: validation.slug,
-        description: "",
+        description: starterMatch?.pageSettings?.description || "",
         backgroundColor: "#ffffff",
         isMaintenanceMode: false,
         siteLanguage: "en",
       },
 
-      isHome: pages.length === 0,
+      isHome: currentPagesSnapshot.length === 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    const updatedPages = [...pages, newPageObj];
+    const updatedPages = [...currentPagesSnapshot, newPageObj];
 
     setPages(updatedPages);
     setActivePageId(newPageObj.id);
 
-    setElements([]);
+    setElements(initialElements);
     setPageSettings(newPageObj.pageSettings);
 
     setSelectedId(null);
     setSelectedIds([]);
+    setCanvasMode("page");
+    setHistory([initialElements]);
+    setHistoryIndex(0);
 
     setNewPageName("");
     setNewPageSlug("");
@@ -1506,6 +1534,81 @@ export default function WebsiteEditor() {
 
     setSaveMessage(`Page "${rawTitle}" created!`);
 
+    setTimeout(() => setSaveMessage(""), 3000);
+  };
+
+  const handleQuickCreateOrSwitchPage = (pageName: string, preferredSlug?: string) => {
+    const defaultSlug = preferredSlug || `/${pageName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+
+    // Check if a page with matching slug or name already exists
+    const existing = pages.find(
+      (p) => p.slug.toLowerCase() === defaultSlug.toLowerCase() || p.name.toLowerCase() === pageName.toLowerCase()
+    );
+
+    if (existing) {
+      handleSwitchEditingPage(existing.id);
+      setIsPageSelectorOpen(false);
+      setSaveMessage(`Switched to "${existing.name}" page`);
+      setTimeout(() => setSaveMessage(""), 2500);
+      return;
+    }
+
+    // Sync current page canvas elements if editing a page before switching
+    let currentPagesSnapshot = [...pages];
+    if (canvasMode === "page") {
+      currentPagesSnapshot = currentPagesSnapshot.map((p) =>
+        p.id === activePageId
+          ? {
+              ...p,
+              elements,
+              pageSettings,
+              name: pageSettings.title || p.name,
+              slug: pageSettings.path || p.slug,
+            }
+          : p
+      );
+    }
+
+    const starters = createStarterPages(website?.name || "ForgeStudio");
+    const starterMatch = starters.find(
+      (s) => s.slug.toLowerCase() === defaultSlug.toLowerCase() || s.name.toLowerCase().includes(pageName.toLowerCase())
+    );
+
+    const newSlug = generateSlug(pageName, currentPagesSnapshot.map((p) => p.slug));
+    const newId = `page_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const starterElements = starterMatch?.elements && starterMatch.elements.length > 0 ? starterMatch.elements : [];
+
+    const newPageObj: PageConfig = {
+      id: newId,
+      name: pageName,
+      slug: newSlug,
+      elements: starterElements,
+      pageSettings: {
+        title: pageName,
+        path: newSlug,
+        description: starterMatch?.pageSettings?.description || `${pageName} page`,
+        backgroundColor: "#ffffff",
+        isMaintenanceMode: false,
+        siteLanguage: "en",
+      },
+      isHome: currentPagesSnapshot.length === 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedPages = [...currentPagesSnapshot, newPageObj];
+    setPages(updatedPages);
+    setActivePageId(newPageObj.id);
+    setElements(starterElements);
+    setPageSettings(newPageObj.pageSettings);
+    setSelectedId(null);
+    setSelectedIds([]);
+    setCanvasMode("page");
+    setHistory([starterElements]);
+    setHistoryIndex(0);
+    setIsPageSelectorOpen(false);
+
+    setSaveMessage(`Created and opened "${pageName}" page!`);
     setTimeout(() => setSaveMessage(""), 3000);
   };
 
@@ -2024,6 +2127,143 @@ export default function WebsiteEditor() {
     persistDocument,
   });
 
+  // Real-Time Workspace Synchronization: listen for Code Workspace updates
+  const activePageIdRef = useRef(activePageId);
+  activePageIdRef.current = activePageId;
+  const hasUnsavedRef = useRef(hasUnsavedDocumentChanges);
+  hasUnsavedRef.current = hasUnsavedDocumentChanges;
+  const websiteDocVerRef = useRef(website?.documentVersion ?? 1);
+  websiteDocVerRef.current = website?.documentVersion ?? 1;
+
+  const reloadWebsiteFromWorkspace = useCallback(async (forced = false) => {
+    if (!websiteId) return;
+    try {
+      const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, AbortSignal.timeout(15000));
+      if (!loadedSite) return;
+
+      const serverVer = loadedSite.documentVersion ?? 1;
+      if (!forced && serverVer <= websiteDocVerRef.current) return;
+
+      if (hasUnsavedRef.current && !forced) {
+        setSaveMessage(`Code Workspace updated (v${serverVer}). Save or switch pages to merge.`);
+        setTimeout(() => setSaveMessage(""), 5000);
+        return;
+      }
+
+      documentWriter.initialize(serverVer);
+      setWebsite(loadedSite);
+
+      let initialPages: PageConfig[] = [];
+      if (loadedSite?.editorData?.pages && Array.isArray(loadedSite.editorData.pages) && loadedSite.editorData.pages.length > 0) {
+        initialPages = loadedSite.editorData.pages.map((p: any, idx: number) => ({
+          id: p.id || `page_${idx + 1}`,
+          name: p.name || p.title || (idx === 0 ? "Home" : `Page ${idx + 1}`),
+          slug: p.slug || p.path || (idx === 0 ? "/" : `/${(p.name || p.title || `page-${idx + 1}`).toLowerCase().replace(/\s+/g, "-")}`),
+          elements: Array.isArray(p.elements) ? p.elements : [],
+          pageSettings: p.pageSettings || { title: p.name || p.title || "Page", path: p.slug || p.path || "/" },
+          customCss: p.customCss || "",
+          isHome: Boolean(p.isHome || p.slug === "/" || p.path === "/" || idx === 0),
+        }));
+      } else {
+        const defaultPageTitle = loadedSite?.editorData?.pageSettings?.title || loadedSite?.name || "Home";
+        const defaultPagePath = loadedSite?.editorData?.pageSettings?.path || "/";
+        initialPages = [
+          {
+            id: "home",
+            name: defaultPageTitle,
+            slug: defaultPagePath,
+            elements: loadedSite?.editorData?.elements || [],
+            pageSettings: loadedSite?.editorData?.pageSettings || { title: defaultPageTitle, path: defaultPagePath },
+            isHome: true,
+          },
+        ];
+      }
+      setPages(initialPages);
+
+      // Keep active page or fallback to home
+      const currentActive = initialPages.find((p) => p.id === activePageIdRef.current) || initialPages[0];
+      if (currentActive) {
+        setActivePageId(currentActive.id);
+        setActivePreviewPageId(currentActive.id);
+        setElements(currentActive.elements || []);
+        if (currentActive.pageSettings) {
+          setPageSettings((prev) => ({ ...prev, ...currentActive.pageSettings }));
+        }
+      }
+
+      if (loadedSite?.editorData?.breakpoints && Array.isArray(loadedSite.editorData.breakpoints)) {
+        setBreakpoints(loadedSite.editorData.breakpoints);
+      }
+      if (loadedSite?.editorData?.homePageId) {
+        setHomePageId(loadedSite.editorData.homePageId);
+      }
+      if (updateAutosaveBaseline) {
+        updateAutosaveBaseline(
+          currentActive?.elements || [],
+          currentActive?.pageSettings || {},
+          initialPages,
+          loadedSite?.editorData?.homePageId || initialPages[0]?.id || "home",
+          siteParts,
+          globalSettings,
+          globalSettings?.globalStyles,
+          publishing,
+          deployment,
+          breakpoints,
+          popups,
+          pageCss
+        );
+      }
+    } catch (err) {
+      console.warn("Failed to reload website after workspace sync:", err);
+    }
+  }, [websiteId, apiUrl, documentWriter, updateAutosaveBaseline, siteParts, globalSettings, publishing, deployment, breakpoints, popups, pageCss]);
+
+  useEffect(() => {
+    if (!websiteId) return;
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("forge_workspace_sync");
+      channel.onmessage = (event) => {
+        if (event.data?.websiteId === websiteId) {
+          reloadWebsiteFromWorkspace(false);
+        }
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "forge_workspace_sync_event" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed.websiteId === websiteId) {
+            reloadWebsiteFromWorkspace(false);
+          }
+        } catch {}
+      }
+    };
+
+    const handleFocus = () => {
+      reloadWebsiteFromWorkspace(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reloadWebsiteFromWorkspace(false);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [websiteId, reloadWebsiteFromWorkspace]);
+
   // F-322 / F-334 Save & Update Template Integration
   const {
     isOpen: isSaveTemplateOpen,
@@ -2517,6 +2757,40 @@ export default function WebsiteEditor() {
 
       setSaveMessage("Saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
+
+      try {
+        const channel = new BroadcastChannel("forge_workspace_sync");
+        channel.postMessage({
+          type: "visual_saved",
+          websiteId,
+          documentVersion: acknowledged.documentVersion,
+          timestamp: Date.now(),
+        });
+        channel.close();
+      } catch {}
+      try {
+        localStorage.setItem(
+          "forge_workspace_sync_event",
+          JSON.stringify({
+            type: "visual_saved",
+            websiteId,
+            documentVersion: acknowledged.documentVersion,
+            timestamp: Date.now(),
+          })
+        );
+      } catch {}
+
+      // The design is saved; say so separately if the Code Workspace source could not follow it
+      const codeSync = acknowledged.codeSync;
+      if (codeSync?.stale) {
+        setErrorMessage(
+          `Saved. The Code Workspace source could not be regenerated from this design: ${codeSync.error || "generation failed"}`
+        );
+      } else if (codeSync?.conflicts?.length) {
+        setErrorMessage(
+          `Saved. These page files hold hand-written code and were not regenerated: ${codeSync.conflicts.join(", ")}. Resolve them in the Code Workspace.`
+        );
+      }
       return acknowledged;
     } catch (err: any) {
       setSaveMessage("Save failed — changes remain unsaved");
@@ -7005,9 +7279,9 @@ export default function WebsiteEditor() {
               </button>
 
               {isPageSelectorOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-64 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
+                <div className="absolute top-full left-0 mt-1.5 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
                   <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
-                    <span>Site Pages</span>
+                    <span>Site Pages ({pages.length})</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -7019,7 +7293,7 @@ export default function WebsiteEditor() {
                       Manage All ⚙️
                     </button>
                   </div>
-                  <div className="max-h-60 overflow-y-auto py-1">
+                  <div className="max-h-52 overflow-y-auto py-1">
                     {pages.map((p) => (
                       <button
                         key={p.id}
@@ -7034,27 +7308,106 @@ export default function WebsiteEditor() {
                         <div className="flex items-center gap-2 truncate">
                           <span>{p.id === homePageId ? "🏠" : "📄"}</span>
                           <span className="truncate">{p.name}</span>
+                          {p.id === homePageId && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-bold">Home</span>
+                          )}
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono">{p.slug}</span>
                       </button>
                     ))}
                   </div>
-                  <div className="p-1.5 border-t border-slate-800 bg-slate-950/40">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPageSelectorOpen(false);
-                        setIsPageManagerModalOpen(true);
-                      }}
-                      className="w-full text-left px-2.5 py-1.5 text-xs text-blue-400 hover:bg-blue-900/30 rounded-lg flex items-center gap-1.5 transition font-semibold cursor-pointer"
-                    >
-                      <span>➕</span>
-                      <span>Add / Manage Pages...</span>
-                    </button>
+
+                  {/* Quick Add Presets: About, Contact, Services, Pricing */}
+                  <div className="p-2 border-t border-slate-800 bg-slate-950/60">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Quick Add Page</span>
+                      <span className="text-[9px] text-slate-500 font-normal">1-click create</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickCreateOrSwitchPage("About Us", "/about")}
+                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
+                        title="Create or switch to About Us page"
+                      >
+                        <span className="text-blue-400">ℹ️</span>
+                        <span>+ About</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickCreateOrSwitchPage("Contact", "/contact")}
+                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
+                        title="Create or switch to Contact page"
+                      >
+                        <span className="text-emerald-400">✉️</span>
+                        <span>+ Contact</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickCreateOrSwitchPage("Services", "/services")}
+                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
+                        title="Create or switch to Services page"
+                      >
+                        <span className="text-purple-400">🛠️</span>
+                        <span>+ Services</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickCreateOrSwitchPage("Pricing", "/pricing")}
+                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
+                        title="Create or switch to Pricing page"
+                      >
+                        <span className="text-amber-400">🏷️</span>
+                        <span>+ Pricing</span>
+                      </button>
+                    </div>
+
+                    <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPageSelectorOpen(false);
+                          setNewPageName("");
+                          setNewPageSlug("");
+                          setIsAddPageModalOpen(true);
+                        }}
+                        className="flex-1 text-center px-2 py-1 text-xs text-blue-400 hover:bg-blue-900/30 rounded-lg flex items-center justify-center gap-1 transition font-semibold cursor-pointer border border-blue-500/20"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Custom Page...</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPageSelectorOpen(false);
+                          setIsPageManagerModalOpen(true);
+                        }}
+                        className="px-2 py-1 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition font-medium cursor-pointer border border-slate-700/60"
+                        title="Open full page manager"
+                      >
+                        All Pages
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Direct Quick Add Page Button beside abc Home */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewPageName("");
+                setNewPageSlug("");
+                setIsAddPageModalOpen(true);
+              }}
+              className="h-8 px-2 text-xs font-semibold text-blue-400 bg-blue-950/40 hover:bg-blue-900/60 hover:text-blue-300 rounded-lg border border-blue-500/30 transition flex items-center gap-1 shadow-sm cursor-pointer"
+              title="Add New Website Page (About, Contact, etc.)"
+              aria-label="Add New Page"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline font-bold">Page</span>
+            </button>
 
             {/* Scope Switcher Dropdown (Page / Header / Footer / Single / Archive / 404 / Search Results) */}
             <div className="relative" ref={scopeDropdownRef}>
@@ -7436,9 +7789,17 @@ export default function WebsiteEditor() {
             {/* Code Workspace Button */}
             <button
               type="button"
-              onClick={() => navigate(`/workspace/website/${websiteId}`)}
+              onClick={async () => {
+                // The workspace generates code from the saved document, so an unconfirmed
+                // save must not navigate: handleSave reports the failure in the editor.
+                if (userAccess.canEditContent) {
+                  const saved = await handleSave();
+                  if (!saved) return;
+                }
+                navigate(`/workspace/website/${websiteId}`);
+              }}
               className="h-8 px-3 rounded-lg border border-purple-500/60 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 hover:text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              title="Open Developer Code Workspace (Phase 2)"
+              title="Open Developer Code Workspace (Full Project IDE, React & Next.js Generation)"
               aria-label="Developer Code Workspace"
             >
               <Code2 className="w-3.5 h-3.5 text-purple-400" />
@@ -20233,6 +20594,7 @@ export default function WebsiteEditor() {
         isOpen={!!devModalMode}
         onClose={() => setDevModalMode(null)}
         mode={devModalMode}
+        websiteId={websiteId}
         targetElement={selectedElement || elements[0]}
         initialValue={
           devModalMode === "element-css" ? selectedElement?.customCss :
@@ -20418,6 +20780,36 @@ export default function WebsiteEditor() {
               >
                 ✕
               </button>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-400">Quick Presets:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: "About Us", slug: "/about" },
+                  { name: "Contact", slug: "/contact" },
+                  { name: "Services", slug: "/services" },
+                  { name: "Pricing", slug: "/pricing" },
+                  { name: "Blog", slug: "/blog" },
+                ].map((preset) => (
+                  <button
+                    key={preset.slug}
+                    type="button"
+                    onClick={() => {
+                      setNewPageName(preset.name);
+                      setNewPageSlug(preset.slug);
+                    }}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition font-medium cursor-pointer ${
+                      newPageName === preset.name
+                        ? "bg-blue-600 text-white border-blue-500 font-bold"
+                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
+                    }`}
+                  >
+                    + {preset.name}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-3">

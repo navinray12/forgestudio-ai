@@ -23,6 +23,8 @@ export interface PlannedFile {
   newHash: string;
   isProtected?: boolean;
   diff?: string;
+  /** Existing hand-written or locked file kept although the design generates different content */
+  heldBack?: boolean;
 }
 
 export interface GenerationScope {

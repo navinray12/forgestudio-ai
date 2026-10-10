@@ -260,6 +260,24 @@ function App() {
             element={<PublishedSite />}
           />
 
+          {/* ================= AUTHENTICATED DRAFT PREVIEW ================= */}
+          <Route
+            path="/preview/site/:websiteId"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <PublishedSite isPreviewMode={true} />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/preview/site/:websiteId/:pageSlug"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <PublishedSite isPreviewMode={true} />
+              </RoleRoute>
+            }
+          />
+
           {/* ================= PLATFORM CONTROL (separate auth audience/cookie) ================= */}
           <Route path="/platform-control" element={<PlatformControlPage />} />
 

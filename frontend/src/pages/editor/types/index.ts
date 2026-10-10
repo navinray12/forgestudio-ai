@@ -1877,6 +1877,8 @@ export interface WebsiteData {
   status: string;
   userPermission?: string;
   editorData?: CanonicalWebsiteData | any;
+  documentVersion?: number;
+  approvalWorkflowEnabled?: boolean;
 }
 
 // ==========================================

@@ -134,18 +134,22 @@ async function runExporterTests() {
   assert.ok(compZip.length > 300);
   console.log("✓ F-753 & Component Export verified (PASS)");
 
-  // --- 8. F-755: Next.js App Router Client Directive ---
-  console.log("Testing F-755: Next.js App Router Client Directive Auto-Detection...");
+  // --- 8. F-755: Next.js App Router & React TSX AST Output ---
+  console.log("Testing F-755: Next.js App Router Client Directive & Real Component AST Code...");
   assert.ok(res.nextJsCode?.pageTsx.includes("'use client'"), "Interactive page must include 'use client' directive");
-  console.log("✓ F-755 Next.js App Router Client Directive verified (PASS)");
+  assert.ok(res.nextJsCode?.pageTsx.includes("Welcome to Universal Export Engine"), "Next.js pageTsx must render real visual canvas content");
+  assert.ok(res.reactCode?.appTsx.includes("Welcome to Universal Export Engine"), "React appTsx must render real visual canvas content");
+  console.log("✓ F-755 Next.js App Router & React AST Output verified (PASS)");
 
   // --- 9. F-752: Full Project ZIP Exports ---
   console.log("Testing F-752: Full Project ZIP Exports...");
   const staticZip = await buildProjectZipStream(mockEditorData, "static", "full");
   const nextjsZip = await buildProjectZipStream(mockEditorData, "nextjs", "full");
-  assert.ok(staticZip.length > 500);
-  assert.ok(nextjsZip.length > 500);
-  console.log("✓ F-752 Full Project ZIP Exports verified (PASS)");
+  const reactZip = await buildProjectZipStream(mockEditorData, "react", "full");
+  assert.ok(staticZip.length > 500, "Static ZIP length must be > 500");
+  assert.ok(nextjsZip.length > 500, "Next.js ZIP length must be > 500");
+  assert.ok(reactZip.length > 500, "React ZIP length must be > 500");
+  console.log("✓ F-752 Full Project ZIP Exports (Static, React & Next.js) verified (PASS)");
 
   // --- 10. X-786: Hello Theme WordPress Companion ---
   console.log("Testing X-786: Hello Theme WordPress Companion...");

@@ -19,13 +19,32 @@ export class RepositoryAcquisitionService {
   /**
    * Start a new project import pipeline
    */
-  async startImport(params: {
-    sourceType: ImportSourceType;
-    sourceUrl?: string;
-    projectName?: string;
-    ownerId: string;
-    files?: Array<{ path: string; content: string }>;
-  }) {
+  async startImport(
+    arg1: any,
+    arg2?: any,
+    arg3?: string
+  ) {
+    let params: {
+      sourceType: ImportSourceType;
+      sourceUrl?: string;
+      projectName?: string;
+      ownerId: string;
+      files?: Array<{ path: string; content: string }>;
+    };
+
+    if (typeof arg1 === "object" && arg1 !== null && !arg2) {
+      params = arg1;
+    } else {
+      const body = arg2 || {};
+      params = {
+        sourceType: body.sourceType || "GIT",
+        sourceUrl: body.sourceUrl,
+        projectName: body.projectName || arg1,
+        ownerId: arg3 || "anonymous",
+        files: body.files || [],
+      };
+    }
+
     const { sourceType, sourceUrl, projectName = "imported-app", ownerId, files = [] } = params;
 
     // Stage 1: DISCOVER

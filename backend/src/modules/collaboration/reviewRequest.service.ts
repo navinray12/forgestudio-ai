@@ -57,6 +57,14 @@ export class ReviewRequestService {
   }
 
   /**
+   * Alias for createReviewRequest
+   */
+  async createReview(arg1: any, arg2?: any): Promise<ReviewRequest> {
+    const params = typeof arg1 === "string" ? { projectId: arg1, ...(arg2 || {}) } : arg1;
+    return this.createReviewRequest(params);
+  }
+
+  /**
    * List review requests for a project
    */
   async listReviews(projectId: string, status?: string): Promise<ReviewRequest[]> {
@@ -119,12 +127,21 @@ export class ReviewRequestService {
   /**
    * Submit review decision (approve, request changes, dismiss)
    */
-  async submitReviewDecision(params: {
-    reviewId: string;
-    reviewerId: string;
-    decision: "APPROVED" | "CHANGES_REQUESTED" | "DISMISSED";
-    feedback?: string;
-  }): Promise<ReviewApproval> {
+  async submitReviewDecision(
+    arg1: any,
+    arg2?: string,
+    arg3?: any,
+    arg4?: string
+  ): Promise<ReviewApproval> {
+    const params =
+      typeof arg1 === "object" && arg1 !== null
+        ? arg1
+        : {
+            reviewId: arg1,
+            reviewerId: arg2!,
+            decision: arg3 || "APPROVED",
+            feedback: arg4,
+          };
     const { reviewId, reviewerId, decision, feedback } = params;
 
     const review = await db.forgeReviewRequest.findUnique({ where: { id: reviewId } });

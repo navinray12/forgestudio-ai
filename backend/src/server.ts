@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "dotenv/config"; // tsx reload trigger 5
 import http from "http";
 import app from "./app.js";
 import { startScheduler } from "./services/scheduleWorker.js";
@@ -15,6 +15,10 @@ import {
   realtimeWss,
   handleRealtimeWebSocketConnection,
 } from "./modules/data-platform/data-layer/realtime.service.js";
+import {
+  terminalWss,
+  handleTerminalWebSocketConnection,
+} from "./services/terminal/forgeTerminal.service.js";
 
 const server = http.createServer(app);
 const presenceWss = initPresenceWebSocketServer(server, undefined, { attachUpgradeListener: false });
@@ -27,6 +31,10 @@ server.on("upgrade", (req, socket, head) => {
     } else if (pathname.startsWith("/ws/realtime")) {
       realtimeWss.handleUpgrade(req, socket, head, (ws) => {
         handleRealtimeWebSocketConnection(ws, req);
+      });
+    } else if (pathname.startsWith("/ws/terminal")) {
+      terminalWss.handleUpgrade(req, socket, head, (ws) => {
+        handleTerminalWebSocketConnection(ws, req);
       });
     } else {
       socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
@@ -65,3 +73,4 @@ async function shutdown(signal: string) {
 }
 process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
 process.once("SIGINT", () => { void shutdown("SIGINT"); });
+// trigger tsx watch reload 2
