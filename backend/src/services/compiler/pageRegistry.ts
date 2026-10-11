@@ -280,7 +280,7 @@ export function isRecognizedPageEntry(
       pageTitle: title,
       routePath: `/${slug}`,
       componentName: compName,
-      targetFilePath: `src/pages/${compName}.tsx`,
+      targetFilePath: cleanPath,
     };
   }
 
