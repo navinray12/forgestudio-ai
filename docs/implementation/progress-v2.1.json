@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "blueprint": "ForgeStudio Execution Blueprint v2.1 (sections 01-50 preserved)",
+  "asOf": "2026-10-11",
+  "branch": "main",
+  "baselineCommit": "b6b3aecc02287f711a2db6d1fa2bf82b3e699541",
+  "metricPolicy": "Count a work package only after its full exit contract is evidenced; no effort-weighted estimate is established. This is not release authorization.",
+  "workPackages": [
+    {
+      "id": "WP-01",
+      "name": "Baseline and traceability",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-02",
+      "name": "Identity, policy and source protection",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-03",
+      "name": "Contracts and release skeleton",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-04",
+      "name": "Component/compiler convergence",
+      "status": "in_progress",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-05",
+      "name": "Automatic CMS and blog",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-06",
+      "name": "Forms and lead operations",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-07",
+      "name": "Secure custom components",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-08",
+      "name": "Verified hosting and export",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-09",
+      "name": "SEO, offers and media evidence",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-10",
+      "name": "Measurement and context",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-11",
+      "name": "Experiments and growth operations",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-12",
+      "name": "WordPress local profile",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-13",
+      "name": "Agency, commercial and scale profiles",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-14",
+      "name": "Migration, pilot and independent assurance",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-15",
+      "name": "Selected industry lifecycles",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-16",
+      "name": "Current-state integration map",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-17",
+      "name": "Application/workspace contracts",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-18",
+      "name": "Bidirectional sync coordinator",
+      "status": "in_progress",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-19",
+      "name": "Page lifecycle and source cleanup",
+      "status": "in_progress",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-20",
+      "name": "General app model and backend emitter",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-21",
+      "name": "Environment and connection boundaries",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-22",
+      "name": "Schema Studio and migration planner",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-23",
+      "name": "Real AI orchestration",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-24",
+      "name": "Frontend/API/database qualification",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-25",
+      "name": "Safe application release and portability",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-26",
+      "name": "Combined CMS/application regression",
+      "status": "not_assessed",
+      "exitEvidence": null
+    },
+    {
+      "id": "WP-27",
+      "name": "Pilot, operator training and support",
+      "status": "not_assessed",
+      "exitEvidence": null
+    }
+  ],
+  "latestScopedVerification": {
+    "report": "docs/implementation/page-registration-increment.md",
+    "command": "node --test backend/scripts/verify-page-registration.cjs",
+    "passed": 106,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "path/preflight unit tests and actual sync service with mocked persistence/parser/compiler boundaries",
+    "fullWorkPackageCompletion": false,
+    "node": "22.16.0",
+    "typescriptAvailable": "5.8.3",
+    "fullLockedProjectBuild": "not executed",
+    "realDatabaseAndBrowser": "not executed"
+  }
+}

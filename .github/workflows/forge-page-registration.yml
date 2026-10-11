@@ -1,0 +1,35 @@
+name: Forge page registration regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/services/compiler/**'
+      - 'backend/scripts/verify-page-registration.cjs'
+      - 'backend/scripts/report-blueprint-progress.cjs'
+      - 'docs/implementation/progress-v2.1.json'
+      - '.github/workflows/forge-page-registration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: forge-page-registration-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scoped-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install isolated test compiler (not the application dependency graph)
+        run: npm install --prefix "$RUNNER_TEMP/forge-page-tools" --ignore-scripts --no-audit --no-fund --save-exact typescript@5.8.3
+      - name: Check dependency-free recognition types
+        run: node "$RUNNER_TEMP/forge-page-tools/node_modules/typescript/lib/tsc.js" --noEmit --strict --noUncheckedIndexedAccess --target ES2022 --module commonjs backend/src/services/compiler/pageRecognition.ts
+      - name: Run unit and mocked-service regressions
+        run: NODE_PATH="$RUNNER_TEMP/forge-page-tools/node_modules" node --test backend/scripts/verify-page-registration.cjs
+      - name: Report blueprint progress (not release approval)
+        run: node backend/scripts/report-blueprint-progress.cjs
