@@ -252,8 +252,9 @@ export function isRecognizedPageEntry(
   // React/Vite Pages: src/pages/*.(tsx|jsx)
   const srcPagesMatch = framework === "react" ? cleanPath.match(/^src\/pages\/(.+)\.(tsx|jsx)$/) : null;
   if (srcPagesMatch) {
-    let rawName = srcPagesMatch[1];
-    let baseName = rawName;
+    const rawName = srcPagesMatch[1];
+    if (rawName.split("/").some((part) => part.startsWith("_") || part === "." || part === "..")) return { isPage: false };
+    let baseName = rawName.split("/").pop()!;
     if (baseName.endsWith("Page") && baseName.length > 4) {
       baseName = baseName.slice(0, -4);
     }
@@ -272,7 +273,7 @@ export function isRecognizedPageEntry(
       .replace(/[-_]/g, " ")
       .trim()
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    const slug = baseName.replace(/([a-z])([A-Z])/g, "$1-$2").replace(/_/g, "-").toLowerCase();
+    const slug = rawName.replace(/Page$/, "").replace(/([a-z])([A-Z])/g, "$1-$2").replace(/_/g, "-").toLowerCase();
     const compName = `${title.replace(/\s+/g, "")}Page`;
     return {
       isPage: true,
