@@ -827,7 +827,7 @@ Flags:
         } else {
           const graph = await monorepoDiscoveryService.discoverMonorepo(projId);
           resultData = { graph };
-          stdout = `Monorepo Workspaces (${graph.manager}):\n` +
+          stdout = `Monorepo Workspaces (${graph.packages.length} packages):\n` +
             graph.packages.map((p: any) => `* [${p.type}] ${p.name} -> ${p.path}`).join("\n");
         }
         break;
@@ -852,12 +852,12 @@ Flags:
             hostPort: 3000,
           });
           resultData = { run };
-          stdout = `Container started: ${run.id} [port: ${run.hostPort} -> ${run.containerPort}]`;
+          stdout = `Container started: ${run.id} [port bindings: ${JSON.stringify(run.portBindings)}]`;
         } else if (subCommand === "list" || !subCommand) {
           const runs = await dockerfileGeneratorService.listContainers(projId);
           resultData = { runs };
           stdout = `Running Containers (${runs.length}):\n` +
-            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
+            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port bindings: ${JSON.stringify(r.portBindings)} [status: ${r.status}]`).join("\n");
         } else if (subCommand === "stop") {
           const runId = subArgs[0];
           if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");
@@ -876,7 +876,7 @@ Flags:
         if (subCommand === "validate") {
           const validation = await dockerfileGeneratorService.validateInfrastructure(projId);
           resultData = { validation };
-          stdout = `Infrastructure Validation:\n* Valid: ${validation.valid}\n* Errors (${validation.errors.length}): ${validation.errors.join(", ") || "None"}\n* Warnings (${validation.warnings.length}): ${validation.warnings.join(", ") || "None"}`;
+          stdout = `Infrastructure Validation:\n* Valid: ${validation.isValid}\n* Syntax errors (${validation.syntaxErrors.length}): ${validation.syntaxErrors.join(", ") || "None"}\n* Dangerous configurations (${validation.dangerousConfigs.length}): ${validation.dangerousConfigs.join(", ") || "None"}\n* Detected secret references: ${validation.detectedSecrets.length}`;
         } else if (subCommand === "kubernetes") {
           const manifests = await dockerfileGeneratorService.generateKubernetesManifests(projId, {
             serviceName: "web",

@@ -77,8 +77,8 @@ export class FullStackGeneratorService {
     else if (framework === "fullstack") templateId = "react-vite"; // base react with backend api endpoints
 
     const scaffoldRes = await projectTemplateService.scaffoldTemplate(projectId, templateId, {
-      projectName,
-      authorId,
+      customVariables: { name: projectName },
+      userId: authorId,
     });
 
     // 3. For fullstack, enrich with server routes if needed
@@ -115,7 +115,7 @@ app.listen(PORT, () => {
         authorId,
         reason: "Full-stack Node/Express API entrypoint",
       });
-      scaffoldRes.filesWritten += 1;
+      scaffoldRes.filesCreated.push("server/index.ts");
     }
 
     await recordAuditLog({
@@ -125,7 +125,7 @@ app.listen(PORT, () => {
       details: {
         framework,
         strategy,
-        filesCreated: scaffoldRes.filesWritten,
+        filesCreated: scaffoldRes.filesCreated.length,
         aiAttemptFailed,
       },
     });
@@ -135,7 +135,7 @@ app.listen(PORT, () => {
       projectId,
       framework,
       strategy,
-      filesCreated: scaffoldRes.filesWritten,
+      filesCreated: scaffoldRes.filesCreated.length,
       manifestUpdated: true,
       diagnostics,
     };

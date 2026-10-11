@@ -80,7 +80,6 @@ import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.r
 import projectRoutes from "./routes/project.routes.js";
 import codeIntelligenceRoutes from "./routes/codeIntelligence.routes.js";
 import knowledgeGraphRoutes from "./routes/knowledgeGraph.routes.js";
-import designSystemRoutes from "./routes/designSystem.routes.js";
 import hostedRoutes from "./routes/hosted.routes.js";
 
 

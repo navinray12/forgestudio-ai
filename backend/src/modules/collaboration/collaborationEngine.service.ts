@@ -429,9 +429,13 @@ export class CollaborationEngineService {
    * Heartbeat / register user session
    */
   async heartbeatSession(projectId: string, userId: string, data?: any): Promise<any> {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+    if (!user) throw new AppError("Authenticated collaborator not found", 401, "UNAUTHENTICATED");
     return this.updatePresence({
       projectId,
       userId,
+      name: user.fullName || "Collaborator",
+      color: `#${crypto.createHash("sha256").update(userId).digest("hex").slice(0, 6)}`,
       socketId: data?.socketId || userId,
       status: "ONLINE",
       activeFile: data?.activeFile,

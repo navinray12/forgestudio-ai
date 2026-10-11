@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('typescript');
+const ts = require('./test-typescript-api.cjs');
 const root = path.resolve(__dirname, '../..');
 const read = file => fs.readFileSync(path.join(root,file),'utf8');
 function evaluate(code, globals={}) {

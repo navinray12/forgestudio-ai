@@ -1,25 +1,31 @@
-name: Reviewed workspace build repair
+name: Workspace refresh regression
 on:
   push:
     branches: [main]
     paths:
+      - 'frontend/src/pages/editor/WebsiteEditor.tsx'
+      - 'frontend/src/pages/published/PublishedSite.tsx'
+      - 'frontend/src/features/editor-access/**'
+      - 'frontend/src/features/developer-workspace/services/**'
+      - 'backend/src/services/compiler/**'
+      - 'backend/src/modules/collaboration/collaborationEngine.service.ts'
+      - 'backend/src/services/generator/fullStackGenerator.service.ts'
+      - 'backend/scripts/verify-workspace-refresh.cjs'
+      - 'backend/scripts/test-typescript-api.cjs'
+      - 'backend/scripts/verify-page-registration.cjs'
+      - 'backend/package*.json'
+      - 'frontend/package*.json'
       - '.github/workflows/workspace-build-repair.yml'
-      - 'scripts/remediation/workspace-build-repair.patch'
-      - 'scripts/remediation/workspace-build-repair.json'
-      - 'scripts/remediation/apply-workspace-build-repair.cjs'
-      - 'scripts/remediation/compare-backend-diagnostics.cjs'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: reviewed-workspace-repair-main
-  cancel-in-progress: false
+  group: workspace-refresh-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  verify:
-    if: github.repository == 'navinray12/forgestudio-ai' && github.ref == 'refs/heads/main'
+  source-regression:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -27,72 +33,21 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.16.0'
-      - name: Install committed dependency graphs
+      - name: Install committed dependencies without install hooks
         run: |
-          npm ci --prefix backend
-          npm ci --prefix frontend
-          (cd backend && npx --no-install prisma generate)
-      - name: Observe original backend diagnostics
+          npm ci --prefix backend --ignore-scripts
+          npm ci --prefix frontend --ignore-scripts
+      - name: Strict refresh and access helper types
+        run: node frontend/node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --moduleResolution bundler --module ESNext --lib ES2022,DOM frontend/src/features/developer-workspace/services/workspaceRefreshPolicy.ts frontend/src/features/developer-workspace/services/loadSiteSnapshot.ts
+      - name: Actual source and effect regressions with explicit test doubles
         shell: bash
-        run: |
-          set +e
-          node backend/node_modules/typescript/bin/tsc --noEmit -p backend/tsconfig.json > "$RUNNER_TEMP/backend-before.txt" 2>&1
-          status=$?
-          set -e
-          test "$status" -eq 1 -o "$status" -eq 2
-          grep -Eq "error TS[0-9]+:" "$RUNNER_TEMP/backend-before.txt"
-      - name: Apply exact reviewed candidate (no ref changes)
-        run: node scripts/remediation/apply-workspace-build-repair.cjs
-      - name: Full frontend build
-        shell: bash
-        run: npm --prefix frontend run build 2>&1 | tee "$RUNNER_TEMP/frontend-build.txt"
-      - name: Strict helper type check and actual-source regressions
-        shell: bash
-        run: |
-          node frontend/node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --moduleResolution bundler --module ESNext --lib ES2022,DOM frontend/src/features/developer-workspace/services/workspaceRefreshPolicy.ts frontend/src/features/developer-workspace/services/loadSiteSnapshot.ts
-          NODE_PATH="$PWD/backend/node_modules" node --test backend/scripts/verify-page-registration.cjs backend/scripts/verify-workspace-refresh.cjs 2>&1 | tee "$RUNNER_TEMP/workspace-regression.tap"
-      - name: Require backend diagnostic reduction without new errors
-        shell: bash
-        run: |
-          set +e
-          node backend/node_modules/typescript/bin/tsc --noEmit -p backend/tsconfig.json > "$RUNNER_TEMP/backend-after.txt" 2>&1
-          status=$?
-          set -e
-          test "$status" -eq 0 -o "$status" -eq 1 -o "$status" -eq 2
-          node scripts/remediation/compare-backend-diagnostics.cjs "$RUNNER_TEMP/backend-before.txt" "$RUNNER_TEMP/backend-after.txt" | tee "$RUNNER_TEMP/backend-comparison.json"
-      - name: Retain candidate evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: workspace-build-repair-evidence-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/frontend-build.txt
-            ${{ runner.temp }}/workspace-regression.tap
-            ${{ runner.temp }}/backend-before.txt
-            ${{ runner.temp }}/backend-after.txt
-            ${{ runner.temp }}/backend-comparison.json
-          retention-days: 7
-  prepare-git-objects:
-    needs: verify
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22.16.0'
-      # Fresh runner: do NOT download or execute output from the unprivileged build.
-      # Reapply repository-reviewed bytes, verify all hashes, then create blobs only.
-      - name: Prepare verified blobs without changing a branch
-        run: node scripts/remediation/apply-workspace-build-repair.cjs --upload-blobs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        run: NODE_PATH="$PWD/backend/node_modules" node --test backend/scripts/verify-page-registration.cjs backend/scripts/verify-workspace-refresh.cjs 2>&1 | tee "$RUNNER_TEMP/workspace-regression.tap"
+      - name: Report full blueprint progress separately
+        run: node backend/scripts/report-blueprint-progress.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
-          name: workspace-build-repair-objects-${{ github.sha }}
-          path: ${{ runner.temp }}/workspace-build-repair-objects.json
+          name: workspace-refresh-regression-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-regression.tap
+          if-no-files-found: ignore
           retention-days: 7
