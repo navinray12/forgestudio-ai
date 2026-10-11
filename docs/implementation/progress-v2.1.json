@@ -179,7 +179,39 @@
     "fullWorkPackageCompletion": false,
     "node": "22.16.0",
     "typescriptAvailable": "5.8.3",
-    "fullLockedProjectBuild": "not executed",
-    "realDatabaseAndBrowser": "not executed"
+    "fullLockedProjectBuild": "executed in GitHub Actions: frontend and backend failed",
+    "realDatabaseAndBrowser": "not executed",
+    "hostedScopedRegression": "passed: 106 tests, strict recognition types, and progress report"
+  },
+  "postPushCI": {
+    "sourceCommit": "7ca6aee3bfba93af8d74bbfae6120e157e0ac80f",
+    "scopedRegression": {
+      "runId": 38120313632,
+      "jobId": 114413489740,
+      "conclusion": "success",
+      "passed": 106,
+      "failed": 0,
+      "skipped": 0
+    },
+    "productionBuild": {
+      "runId": 38120313580,
+      "backendJobId": 114413489572,
+      "frontendJobId": 114413489731,
+      "backend": "failure",
+      "frontend": "failure"
+    },
+    "representativeBuildBlockers": [
+      "backend/src/app.ts: duplicate designSystemRoutes identifier",
+      "backend: missing services/build/forgeBuild.service.js imports",
+      "backend/src/controllers/developerPlatform.controller.ts: missing RepositoryAcquisitionService methods",
+      "backend/src/modules/collaboration/collaborationEngine.service.ts: PeerPresence missing name and color",
+      "backend/src/services/cli/forgeCli.service.ts: service/result type mismatches",
+      "backend/src/services/generator/fullStackGenerator.service.ts: scaffold options/result contract mismatch",
+      "backend/src/services/hosting/forgeHosting.service.ts: wrong argument count",
+      "frontend/src/pages/editor/WebsiteEditor.tsx: always-true function condition",
+      "frontend/src/pages/published/PublishedSite.tsx: fetchWebsite is not defined"
+    ],
+    "limitations": "These are observed hosted build failures outside the changed runtime files. Their remediation and baseline attribution are not completed. Passing scoped CI does not mean the complete application builds.",
+    "dependencyAudit": "Hosted npm installation reported vulnerabilities; detailed exploitability/dependency triage is not performed. No force upgrades were applied."
   }
 }

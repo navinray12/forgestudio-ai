@@ -77,10 +77,11 @@ In the implementation container: Node 22.16.0; available TypeScript 5.8.3.
 The container could not resolve github.com for git clone or download project
 packages. GitHub source was read using the connected API; original file bytes were
 reconstructed locally and checked against their Git blob hashes before modification.
-No complete locked dependency install, project-wide TypeScript build, existing
-regression suite, real-database test, browser test or production test was run.
+Before pushing, no complete locked dependency install, project-wide TypeScript
+build, existing regression suite, real-database test, browser test or production
+test was run in the local container.
 The available compiler version is NOT represented as the repository's resolved
-TypeScript version. Hosted CI results must be observed separately after pushing.
+TypeScript version. The post-push observations below record hosted CI separately.
 
 ## Requirement mapping and overall progress
 
@@ -112,3 +113,34 @@ Official framework references consulted 11 October 2026:
 - https://nextjs.org/docs/app/api-reference/file-conventions/intercepting-routes
 - https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes
 - https://reactrouter.com/start/declarative/routing
+
+
+## Post-push hosted CI observations
+
+Source commit: `7ca6aee3bfba93af8d74bbfae6120e157e0ac80f`.
+
+The new **Forge page registration regression** workflow passed on GitHub Actions:
+run `38120313632`, job `114413489740`, Node 22.16.0, isolated TypeScript 5.8.3,
+106 tests passed / 0 failed / 0 skipped, strict recognition type check passed.
+Its progress reporter retained 0 fully verified work packages of 27.
+
+The existing **Production build validation** workflow also ran on that commit:
+run `38120313580`. Both application dependency installations succeeded and the
+backend generated Prisma Client 7.10.0. However, **both full builds failed**.
+Backend job `114413489572` reported duplicate `designSystemRoutes`, missing
+`forgeBuild.service.js` imports, missing repository-acquisition methods,
+collaboration presence fields, CLI/hosting result-signature mismatches, and the
+full-stack generator's scaffold option/result mismatch. Frontend job
+`114413489731` reported an always-true function condition in `WebsiteEditor.tsx`
+and undefined `fetchWebsite` in `PublishedSite.tsx`.
+
+These failures are outside this increment's changed runtime files; baseline
+attribution and remediation are not completed by this report. They remain build
+blockers. The npm install audit also reported vulnerable dependencies requiring
+separate triage; no blind major-version or force upgrades were performed.
+No real database, browser or production deployment qualification has been added
+by the passing scoped workflow. The follow-up commit records evidence only.
+
+Observed run URLs:
+- https://github.com/navinray12/forgestudio-ai/actions/runs/38120313632
+- https://github.com/navinray12/forgestudio-ai/actions/runs/38120313580
