@@ -5,7 +5,8 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const root=path.resolve(__dirname,'../..');process.chdir(root);
 const git=(...args)=>cp.execFileSync('git',args,{encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
 const files=[
- 'backend/scripts/verify-workspace-refresh.cjs','backend/src/app.ts',
+ 'backend/scripts/verify-workspace-refresh.cjs','backend/scripts/verify-page-registration.cjs',
+ 'backend/scripts/test-typescript-api.cjs','backend/src/app.ts',
  'backend/src/modules/collaboration/collaborationEngine.service.ts','backend/src/services/cli/forgeCli.service.ts',
  'backend/src/services/generator/fullStackGenerator.service.ts',
  'frontend/src/features/developer-workspace/services/loadSiteSnapshot.ts',
@@ -14,12 +15,14 @@ const files=[
 ];
 const manifest=JSON.parse(fs.readFileSync('scripts/remediation/workspace-build-repair.json','utf8'));
 const patch=fs.readFileSync('scripts/remediation/workspace-build-repair.patch');
+const supplemental=fs.readFileSync('scripts/remediation/compiler-test-loader.patch');
 function requireThat(ok,message){if(!ok)throw Error(message);}
 function blob(data){return crypto.createHash('sha1').update(`blob ${data.length}\0`).update(data).digest('hex');}
 function digest(data){return crypto.createHash('sha256').update(data).digest('hex');}
 requireThat(manifest.version===1&&manifest.repository==='navinray12/forgestudio-ai','Wrong manifest');
 requireThat(manifest.files.length===files.length&&new Set(manifest.files.map(x=>x.path)).size===files.length,'Wrong manifest file count');
 requireThat(digest(patch)===manifest.patchSha256,'Patch digest mismatch');
+requireThat(digest(supplemental)===manifest.supplementalPatchSha256,'Supplemental patch digest mismatch');
 requireThat(!git('diff','--name-only')&&!git('diff','--cached','--name-only'),'Refusing a dirty checkout');
 for(const row of manifest.files){
  requireThat(files.includes(row.path)&&row.mode==='100644'&&/^[0-9a-f]{40}$/.test(row.after),'Unexpected path/mode/hash');
@@ -29,8 +32,9 @@ for(const row of manifest.files){
   requireThat(blob(fs.readFileSync(row.path))===row.before,`Base file changed: ${row.path}`);
  }
 }
-git('apply','--check','--index','scripts/remediation/workspace-build-repair.patch');
-git('apply','--index','scripts/remediation/workspace-build-repair.patch');
+for(const file of ['scripts/remediation/workspace-build-repair.patch','scripts/remediation/compiler-test-loader.patch']){
+ git('apply','--check','--index',file);git('apply','--index',file);
+}
 const changed=git('diff','--cached','--name-only').split('\n').sort();
 const expectedChanges=manifest.files.filter(row=>row.before!==row.after).map(row=>row.path).sort();
 requireThat(JSON.stringify(changed)===JSON.stringify(expectedChanges),'Unexpected changed paths');
@@ -50,7 +54,7 @@ async function upload(){
   const result=await response.json();requireThat(result.sha===row.after,`Remote blob mismatch: ${row.path}`);
   entries.push({path:row.path,mode:row.mode,type:'blob',sha:result.sha});
  }
- const evidence={sourceCommit:process.env.GITHUB_SHA,patchSha256:manifest.patchSha256,entries,branchUpdated:false};
+ const evidence={sourceCommit:process.env.GITHUB_SHA,patchSha256:manifest.patchSha256,supplementalPatchSha256:manifest.supplementalPatchSha256,entries,branchUpdated:false};
  fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'workspace-build-repair-objects.json'),JSON.stringify(evidence,null,2));
  console.log(JSON.stringify(evidence,null,2));
 }

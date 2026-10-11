@@ -7,7 +7,7 @@
     {
       "path": "backend/scripts/verify-workspace-refresh.cjs",
       "before": "393607b5f80626ddf3bae8f0865617291eb88d64",
-      "after": "393607b5f80626ddf3bae8f0865617291eb88d64",
+      "after": "e5e4c72e80b2f7c15f5469c4a806511ec7d9bc12",
       "mode": "100644"
     },
     {
@@ -57,7 +57,20 @@
       "before": "096744a5519c8cfe514be520512cd5f5961cd83b",
       "after": "bdbdfaf946e6eb7c837544199df627c6138c655c",
       "mode": "100644"
+    },
+    {
+      "path": "backend/scripts/verify-page-registration.cjs",
+      "before": "ff0efa624214e7ae7c3bd96ae707c5ee2844afa0",
+      "after": "ee88366551b4cdbc8a87e0fc7b3e682f406e457c",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/scripts/test-typescript-api.cjs",
+      "before": "b43814690f01f0998bdcd3229879f6b7a74bb336",
+      "after": "b43814690f01f0998bdcd3229879f6b7a74bb336",
+      "mode": "100644"
     }
   ],
-  "scope": "Frontend refresh/persistence boundary and existing backend contract repairs. Not a full-stack generator or complete blueprint exit."
+  "scope": "Frontend refresh/persistence boundary and existing backend contract repairs. Not a full-stack generator or complete blueprint exit.",
+  "supplementalPatchSha256": "a40490d9dc4658bc30a3cb605618c0991d2914388e0008a49b4734a433aa449b"
 }
