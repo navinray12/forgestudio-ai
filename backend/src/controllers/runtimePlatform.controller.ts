@@ -80,6 +80,10 @@ export class RuntimePlatformController {
           query: req.query as Record<string, string>,
         }
       );
+      if (result.statusCode && result.statusCode >= 400) {
+        res.status(result.statusCode).json({ error: result.error, result });
+        return;
+      }
       res.json({ result });
     } catch (err: any) {
       res.status(err.statusCode || 500).json({ error: err.message });

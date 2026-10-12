@@ -7,6 +7,9 @@ import {
   createWebsiteHandler,
   updateWebsiteHandler,
   deleteWebsiteHandler,
+  getTrashedWebsitesHandler,
+  restoreWebsiteHandler,
+  purgeWebsiteHandler,
   getWebsiteRolesHandler,
   updateWebsiteRoleHandler,
   inviteWebsiteMemberHandler,
@@ -210,11 +213,14 @@ router.post("/bulk/sync", bulkSyncHandler);
 router.post("/bulk/delete", bulkDeleteHandler);
 
 router.get("/", getWebsitesHandler);
+router.get("/trash/list", getTrashedWebsitesHandler);
 router.post("/", createWebsiteHandler);
 router.get("/:id", authorizeCapability("VIEW"), getWebsiteByIdHandler);
 router.get("/:id/managed-details", authorizeCapability("VIEW"), getManagedWebsiteDetailsHandler);
 router.put("/:id", authorizeCapability("EDIT"), updateWebsiteHandler);
 router.delete("/:id", authorizeCapability("DELETE"), deleteWebsiteHandler);
+router.post("/:id/restore", authorizeCapability("DELETE"), restoreWebsiteHandler);
+router.delete("/:id/purge", authorizeCapability("DELETE"), purgeWebsiteHandler);
 
 // Cookie Consent (F-438)
 router.get("/:id/cookie-consent", authorizeCapability("VIEW"), getCookieConsentHandler);

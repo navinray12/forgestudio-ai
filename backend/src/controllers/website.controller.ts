@@ -11,6 +11,9 @@ import {
   updateWebsite,
   deleteWebsite,
   getWebsiteRoles,
+  getTrashedWebsites,
+  restoreWebsite,
+  purgeWebsite,
 } from "../services/website.service.js";
 
 /**
@@ -203,12 +206,77 @@ export async function deleteWebsiteHandler(
     const user = res.locals.user;
     const websiteId = req.params.id as string;
 
-    await deleteWebsite(websiteId, user.id);
+    const result = await deleteWebsite(websiteId, user.id);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/websites/trash/list
+ * Fetch all trashed websites for current authenticated user
+ */
+export async function getTrashedWebsitesHandler(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websites = await getTrashedWebsites(user.id);
 
     return res.status(200).json({
       success: true,
-      message: "Website deleted successfully",
+      websites,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/websites/:id/restore
+ * Restore a website from trash
+ */
+export async function restoreWebsiteHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websiteId = req.params.id as string;
+
+    const result = await restoreWebsite(websiteId, user.id);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/websites/:id/purge
+ * Permanently purge a website and its cascading records
+ */
+export async function purgeWebsiteHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websiteId = req.params.id as string;
+    const { confirmNameOrSlug, forceImmediatePurge } = req.body || {};
+
+    const result = await purgeWebsite(websiteId, user.id, {
+      confirmNameOrSlug: confirmNameOrSlug || (req.query.confirm as string),
+      forceImmediatePurge: Boolean(forceImmediatePurge || req.query.force === "true"),
+    });
+
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }

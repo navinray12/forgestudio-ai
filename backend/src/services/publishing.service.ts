@@ -8,6 +8,12 @@ import { publishToWordPress } from "./wordpress/connector.service.js";
 import { destinationRegistry } from "./destinations/registry.js";
 import { enqueueJob, cancelJob, getJobById } from "./jobs/jobRunner.js";
 import { recordAuditLog } from "./audit.service.js";
+import {
+  extractContractFromEditorData,
+  validateWebsiteOperatingContract,
+} from "./websites/websiteContract.js";
+import { evaluateProfileReleaseGate } from "./capabilities/releaseGate.js";
+import { ReleaseEvidenceManifestService } from "./authoritative/record6-release-manifest.service.js";
 
 const db = prisma as any;
 
@@ -67,7 +73,8 @@ export interface PublishResult {
 export async function validateWebsiteForPublish(
   websiteId: string,
   userId: string,
-  candidateData?: any
+  candidateData?: any,
+  validationOptions?: { allowUnreviewedClaims?: boolean; profile?: string }
 ): Promise<ValidationResult> {
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
@@ -78,6 +85,15 @@ export async function validateWebsiteForPublish(
     errors.push({
       field: "websiteId",
       message: "Website not found or unavailable",
+      severity: "ERROR",
+    });
+    return { valid: false, errors, warnings };
+  }
+
+  if (website.status === "TRASH" || website.deletedAt) {
+    errors.push({
+      field: "status",
+      message: "Cannot validate or publish a website that is currently in the trash",
       severity: "ERROR",
     });
     return { valid: false, errors, warnings };
@@ -217,6 +233,68 @@ export async function validateWebsiteForPublish(
     }
   }
 
+  // 5. Point 04: Website Operating Contract & Truthful Claims Validation
+  if (data && (Array.isArray(data.pages) && data.pages.length > 0 || data.operatingContract)) {
+    try {
+      const contract = extractContractFromEditorData(data, {
+        websiteId,
+        websiteName: website.name || "Website",
+        ownerId: website.userId || userId,
+        workspaceId: website.workspaceId || undefined,
+        organizationId: website.organizationId || undefined,
+      });
+
+      const contractValidation = validateWebsiteOperatingContract(contract, {
+        strictClaimsPolicy: !validationOptions?.allowUnreviewedClaims,
+      });
+
+      for (const err of contractValidation.errors) {
+        errors.push({
+          field: err.field,
+          message: `[Contract] ${err.message}`,
+          severity: "ERROR",
+        });
+      }
+      for (const warn of contractValidation.warnings) {
+        warnings.push({
+          field: warn.field,
+          message: `[Contract] ${warn.message}`,
+          severity: "WARNING",
+        });
+      }
+    } catch (contractErr: any) {
+      warnings.push({
+        field: "operatingContract",
+        message: `Failed to evaluate operating contract: ${contractErr.message}`,
+        severity: "WARNING",
+      });
+    }
+  }
+
+  // 6. Point 05: Profile-Aware Mandatory Capability Release Gate
+  const targetProfile = validationOptions?.profile || data?.siteSettings?.profile;
+  if (targetProfile) {
+    try {
+      const activeCaps = Array.isArray(data?.activeCapabilities) ? data.activeCapabilities : [];
+      const gateResult = evaluateProfileReleaseGate(websiteId, targetProfile, activeCaps);
+      if (!gateResult.canPublish) {
+        for (const blocker of gateResult.blockers) {
+          errors.push({
+            field: "capabilityReleaseGate",
+            message: `[ReleaseGate] ${blocker}`,
+            severity: "ERROR",
+          });
+        }
+      }
+    } catch (gateErr: any) {
+      warnings.push({
+        field: "capabilityReleaseGate",
+        message: `Failed to evaluate capability release gate: ${gateErr.message}`,
+        severity: "WARNING",
+      });
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -244,6 +322,9 @@ export async function publishWebsite(
 ): Promise<PublishResult> {
   // 1. Authorization check
   const website = await getWebsiteById(websiteId, userId);
+  if (website.status === "TRASH" || website.deletedAt) {
+    throw new AppError("This website is in the trash. Restore it before publishing.", 410, "WEBSITE_IN_TRASH");
+  }
   const canPublish = await canUserAccessResource(userId, websiteId, "*", "PUBLISH");
   if (!canPublish) {
     throw new AppError("You do not have permission to publish this website.", 403, "FORBIDDEN");
@@ -820,6 +901,36 @@ export async function recordWebsiteRelease(websiteId: string, release: Deploymen
       editorData: updatedEditorData,
     },
   });
+
+  // Point 06 Authoritative Record 6 linkage
+  try {
+    const candidate = await ReleaseEvidenceManifestService.assembleCandidateManifest({
+      websiteId,
+      tenantId: website.userId || "tenant_default",
+      environment: (release.environment as any) || "PRODUCTION",
+      siteSpecVersion: release.version || 1,
+      siteSpecDigest: release.deployHash,
+      businessFactRevision: 1,
+      businessFactDigest: release.deployHash,
+      sourceManifestRevision: 1,
+      sourceManifestHash: release.deployHash,
+      contentSchemaVersions: {},
+      contentSnapshotHash: release.deployHash,
+      capabilityManifestVersion: "1.0.0",
+      profile: ed.siteSettings?.profile || "PROFESSIONAL_SERVICES",
+      artifacts: {
+        bundleHash: release.deployHash,
+        cssHash: release.deployHash,
+        htmlHash: release.deployHash,
+        overallDeployHash: release.deployHash,
+      },
+      actorId: release.createdBy,
+      notes: release.notes,
+    });
+    await ReleaseEvidenceManifestService.publishCandidate(candidate.releaseId, release.createdBy, release.notes);
+  } catch (manifestErr) {
+    console.warn("[publishing] ReleaseEvidenceManifest registration notice:", manifestErr);
+  }
 }
 
 /**
