@@ -103,6 +103,9 @@ export async function updateProjectMetadataAtomic(
   });
 }
 
+/** PostgreSQL notification channel announcing a newly committed checkpoint. */
+export const WORKSPACE_CHECKPOINT_CHANNEL = "forge_workspace_checkpoint";
+
 export interface RecordCheckpointInput {
   projectId: string;
   websiteId?: string | null;
@@ -162,6 +165,12 @@ export async function recordCheckpoint(input: RecordCheckpointInput): Promise<Wo
         input.actorId ?? null,
       ]
     );
+    // Delivered when this transaction commits, to every server instance: the workspace sync
+    // gateway uses it only as a wake-up and reads the checkpoint itself from this table.
+    await client.query(`SELECT pg_notify($1, $2)`, [
+      WORKSPACE_CHECKPOINT_CHANNEL,
+      JSON.stringify({ projectId: input.projectId, sequence: Number(rows[0].sequence) }),
+    ]);
     return toCheckpoint(rows[0]);
   });
 }
@@ -203,4 +212,62 @@ export async function listCheckpointsAfter(projectId: string, afterSequence: num
     [projectId, Math.max(0, Math.floor(afterSequence) || 0), Math.min(Math.max(limit, 1), 500)]
   );
   return rows.map(toCheckpoint);
+}
+
+/**
+ * Recovery for a change that was written without a checkpoint (the file write committed and the
+ * checkpoint insert did not, e.g. the connection dropped between the two). Compares the stored
+ * files with the manifest of the latest checkpoint and, when they differ, records a checkpoint
+ * for the difference, which announces it to every subscriber like any other change.
+ *
+ * `graceMs` leaves alone changes that are still inside their own request (a write whose
+ * checkpoint is about to be recorded). Returns null when there is nothing to recover.
+ */
+export async function reconcileUnannouncedChanges(
+  projectId: string,
+  options: { graceMs?: number; websiteId?: string | null } = {}
+): Promise<WorkspaceCheckpoint | null> {
+  const graceMs = options.graceMs ?? 5000;
+  const pending = await inTransaction(async (client) => {
+    // Same lock as recordCheckpoint: no checkpoint can be inserted while we compare.
+    const locked = await client.query(`SELECT id FROM forge_projects WHERE id = $1 FOR UPDATE`, [projectId]);
+    if (!locked.rows[0]) return null;
+    const latest = await client.query(
+      `SELECT "sourceManifest" FROM forge_workspace_checkpoints WHERE "projectId" = $1 ORDER BY sequence DESC LIMIT 1`,
+      [projectId]
+    );
+    // Without any checkpoint there is no announced state to compare with.
+    if (!latest.rows[0]) return null;
+    const announced = new Map<string, number>(
+      (latest.rows[0].sourceManifest ?? []).map((f: { path: string; version: number }) => [f.path, f.version])
+    );
+    const files = await client.query(
+      `SELECT path, version, "updatedAt", "deletedAt", (now() - GREATEST("updatedAt", COALESCE("deletedAt", "updatedAt"))) < ($2 || ' milliseconds')::interval AS recent
+         FROM forge_project_files WHERE "projectId" = $1 AND "isDirectory" = false`,
+      [projectId, String(graceMs)]
+    );
+    const changed: string[] = [];
+    let recent = false;
+    for (const file of files.rows) {
+      const known = announced.get(file.path);
+      const differs = file.deletedAt ? known !== undefined : known !== file.version;
+      if (!differs) continue;
+      changed.push(file.path);
+      if (file.recent) recent = true;
+    }
+    if (changed.length === 0 || (graceMs > 0 && recent)) return null;
+    return changed.sort();
+  });
+  if (!pending) return null;
+
+  // recordCheckpoint re-reads the files under the same lock, so the manifest it stores is current
+  // even if another change landed in between.
+  return recordCheckpoint({
+    projectId,
+    websiteId: options.websiteId ?? null,
+    origin: "CODE",
+    kind: "SOURCE_ONLY",
+    filePath: pending.length === 1 ? pending[0] : null,
+    message: `Recovered ${pending.length} change(s) saved without a checkpoint: ${pending.slice(0, 5).join(", ")}${pending.length > 5 ? ", …" : ""}`,
+  });
 }

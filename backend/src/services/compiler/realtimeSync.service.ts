@@ -20,7 +20,9 @@ import crypto from "node:crypto";
 import { AppError } from "../../utils/app-error.js";
 import { prisma } from "../../config/prisma.js";
 import { WorkspaceCoordinatorService, WorkspaceCheckpoint } from "../workspace/workspaceCoordinator.service.js";
-import { updateJsxElementViaAst, validateSourceSyntax } from "./visualCodeSync.service.js";
+import { updateJsxElementViaAst, validateSourceSyntax, syncVisualElementToSource } from "./visualCodeSync.service.js";
+import { findCommittedChangeSet, recordCheckpoint, reconcileUnannouncedChanges } from "../workspace/workspaceCheckpoints.service.js";
+import { readFile as readProjectFile } from "../project/forgeFilesystem.service.js";
 import type { JsxMutation, JsxMutationCode } from "./jsxAstMutation.js";
 
 const db = prisma as any;
@@ -110,7 +112,160 @@ export interface InverseOperation {
   timestamp: string;
 }
 
+/** The part of an editor operation that describes the edit itself. */
+export type SemanticOperation = Pick<VisualOperationPayload, "operationType" | "propertyKey" | "newValue" | "reorderIndex" | "parentNodeId">;
+
+export interface DurableOperationInput {
+  projectId: string;
+  websiteId?: string | null;
+  actorId: string;
+  /** Client-generated; a repeat with the same ID returns the stored acknowledgement. */
+  operationId: string;
+  viewId?: string;
+  filePath: string;
+  elementId: string;
+  /** Either an explicit mutation or a semantic editor operation. */
+  mutation?: JsxMutation;
+  operation?: SemanticOperation;
+  /** The file version the edit was made against. */
+  expectedRevision: number;
+}
+
+export interface OperationAck {
+  operationId: string;
+  /**
+   * applied: the source changed and a checkpoint was recorded. unchanged: the source already
+   * matched. rejected: the edit is not acceptable (see code). conflict: the file is at another
+   * version (see version). error: the server could not complete the operation.
+   */
+  status: "applied" | "unchanged" | "rejected" | "conflict" | "error";
+  filePath: string;
+  elementId: string;
+  viewId?: string;
+  /** The file version after the operation (for a conflict: the current version). */
+  version?: number;
+  /** Sequence of the checkpoint recorded for an applied operation. */
+  sequence?: number | null;
+  code?: string;
+  message?: string;
+  changedRange?: { startLine: number; endLine: number };
+  replayed?: boolean;
+}
+
+/**
+ * NOTE: the Maps below, and WorkspaceCoordinatorService's in-memory revision store used by
+ * processVisualOperation, are process-local. They back the single-process simulation exercised by
+ * the Point 34 unit tests and the reference benchmark only. The live path is
+ * commitDurableOperation: file versions, checkpoints, sequence numbers and idempotency all live in
+ * PostgreSQL, so it holds no state of its own and survives a restart.
+ */
 export class RealtimeSyncService {
+  /**
+   * Applies one visual operation to a persisted source file and records it durably.
+   * Idempotency: the checkpoint row carries the operation ID (unique per project).
+   * Ordering: the edit is bound to `expectedRevision` by an atomic compare-and-set on the file.
+   * Never throws for an operation-level outcome; the acknowledgement says what happened.
+   */
+  public static async commitDurableOperation(
+    input: DurableOperationInput,
+    deps: { recordCheckpoint: typeof recordCheckpoint; reconcile: typeof reconcileUnannouncedChanges } = {
+      recordCheckpoint,
+      reconcile: reconcileUnannouncedChanges,
+    }
+  ): Promise<OperationAck> {
+    const { projectId, operationId, filePath, elementId, viewId } = input;
+    const base = { operationId, filePath, elementId, ...(viewId ? { viewId } : {}) };
+    const changeSetId = `op:${operationId}`.slice(0, 128);
+    const replay = async (): Promise<OperationAck | null> => {
+      const committed = await findCommittedChangeSet(projectId, changeSetId);
+      return committed ? { ...(committed.response as OperationAck), sequence: committed.checkpoint.sequence, replayed: true } : null;
+    };
+    const currentVersion = async () => {
+      try { return (await readProjectFile(projectId, filePath)).version as number; } catch { return undefined; }
+    };
+
+    try {
+      const earlier = await replay();
+      if (earlier) return earlier;
+
+      const mutation = input.mutation ?? (input.operation ? this.toJsxMutation(input.operation) : null);
+      if (!mutation) {
+        return { ...base, status: "rejected", code: "UNSUPPORTED", message: "The operation does not describe a supported source edit." };
+      }
+      if (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 1) {
+        return { ...base, status: "rejected", code: "REVISION_REQUIRED", message: "expectedRevision (the file version the edit was made against) is required." };
+      }
+
+      let result;
+      try {
+        result = await syncVisualElementToSource(projectId, filePath, { id: elementId }, {
+          authorId: input.actorId,
+          expectedRevision: input.expectedRevision,
+          mutation,
+        });
+      } catch (err: any) {
+        if (err instanceof AppError && (err.code === "REVISION_CONFLICT" || err.code === "CONCURRENCY_CONFLICT")) {
+          // A concurrent duplicate of this very operation (possibly on another instance) may be
+          // committing right now: its file write is done and its checkpoint is about to land.
+          for (let attempt = 0; attempt < 4; attempt++) {
+            const duplicate = await replay();
+            if (duplicate) return duplicate;
+            await new Promise((resolve) => setTimeout(resolve, 75));
+          }
+          return { ...base, status: "conflict", code: "REVISION_CONFLICT", message: err.message, version: await currentVersion() };
+        }
+        if (err instanceof AppError && err.statusCode < 500) {
+          return { ...base, status: "rejected", code: err.code, message: err.message };
+        }
+        throw err;
+      }
+
+      if (!result.updated) {
+        if (result.success) return (await replay()) ?? { ...base, status: "unchanged", code: "NO_CHANGE", version: result.version };
+        return { ...base, status: "rejected", code: result.code ?? "REJECTED", message: result.diagnostics[0]?.message, version: result.version };
+      }
+
+      // The file is written. The checkpoint is what announces the change and makes the operation
+      // idempotent, and it is a second statement: if it cannot be recorded now, the change must
+      // not stay unannounced. Try again, then fall back to the recovery checkpoint, which any
+      // instance also records later for whatever is still missing (see reconcileUnannouncedChanges).
+      const ack: OperationAck = { ...base, status: "applied", version: result.version, changedRange: result.changedRange };
+      let failure: unknown;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const checkpoint = await deps.recordCheckpoint({
+            projectId,
+            websiteId: input.websiteId ?? null,
+            origin: "VISUAL",
+            kind: "SOURCE_ONLY",
+            filePath,
+            message: `Visual ${mutation.type} on ${elementId}`,
+            changeSetId,
+            response: ack,
+            actorId: input.actorId,
+          });
+          return { ...ack, sequence: checkpoint.sequence };
+        } catch (err) {
+          failure = err;
+          await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+        }
+      }
+      console.error("[workspace-sync] checkpoint not recorded after a committed write:", (failure as any)?.message || failure);
+      try {
+        const recovered = await deps.reconcile(projectId, { graceMs: 0, websiteId: input.websiteId ?? null });
+        if (recovered) return { ...ack, sequence: recovered.sequence, code: "CHECKPOINT_RECOVERED" };
+      } catch (err: any) {
+        console.error("[workspace-sync] recovery checkpoint failed:", err?.message || err);
+      }
+      // Stored but not yet announced; the gateway's periodic recovery will announce it.
+      return { ...ack, status: "error", code: "CHECKPOINT_PENDING", sequence: null, message: "The edit was saved, but it has not been announced to other clients yet." };
+    } catch (err: any) {
+      console.error("[workspace-sync] operation failed:", err?.message || err);
+      // The file may or may not have been written; the client must re-read the file version.
+      return { ...base, status: "error", code: "PERSISTENCE_ERROR", message: "The operation could not be completed.", version: await currentVersion() };
+    }
+  }
+
   /** Map of project sequence counters: projectId -> currentSequenceNumber */
   private static projectSequences = new Map<string, number>();
 
@@ -201,7 +356,7 @@ export class RealtimeSyncService {
    * Maps a semantic editor operation to a source mutation, or null when the payload does not
    * describe one (for example a free-position drag with no target parent or index).
    */
-  private static toJsxMutation(payload: VisualOperationPayload): JsxMutation | null {
+  public static toJsxMutation(payload: SemanticOperation): JsxMutation | null {
     const { operationType, propertyKey, newValue, reorderIndex, parentNodeId } = payload;
     switch (operationType) {
       case "TEXT_EDIT":

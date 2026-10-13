@@ -475,8 +475,28 @@ export async function syncVisualToCodeHandler(req: Request, res: Response, next:
       expectedRevision: expectedRevision !== undefined ? Number(expectedRevision) : undefined,
       mutation,
     });
+    // An applied edit is a committed workspace change: record it so that other clients of the
+    // project are told (workspace sync gateway) and can resume from it after a disconnect.
+    let checkpoint: { id: string; sequence: number; kind: string } | undefined;
+    if (result.updated) {
+      try {
+        const project = await getForgeProjectById(projectId, user);
+        const cp = await recordCheckpoint({
+          projectId,
+          websiteId: project.websiteId,
+          origin: "VISUAL",
+          kind: "SOURCE_ONLY",
+          filePath,
+          message: `Visual ${mutation?.type ?? "SET_TEXT"} on ${element?.id}`,
+          actorId: user.id,
+        });
+        checkpoint = { id: cp.id, sequence: cp.sequence, kind: cp.kind };
+      } catch (err: any) {
+        result.diagnostics.push({ severity: "warning", code: "CHECKPOINT_NOT_RECORDED", message: "The edit was saved, but other clients could not be notified.", filePath });
+      }
+    }
     // A rejected edit is reported as such (422) with its diagnostics; the file is untouched.
-    res.status(result.success ? 200 : 422).json(result);
+    res.status(result.success ? 200 : 422).json({ ...result, ...(checkpoint ? { checkpoint } : {}) });
   } catch (err) {
     next(err);
   }
@@ -1077,24 +1097,96 @@ export async function executeUnifiedMigrationHandler(req: Request, res: Response
     const projectId = String(req.params.id);
     await getForgeProjectById(projectId, user);
 
-    const { targetBindingId, namespace, authority, statements } = req.body;
-    const plan = unifiedMigrationAuthority.createMigrationPlan(
+    // Plans a migration for one of the project's databases and runs it through the authority:
+    // preflight, dual rehearsal, approval and execution. Nothing is defaulted: the database, the
+    // statements and the environment must be stated. A production plan stops after the rehearsal
+    // (202) and waits for an explicit approval.
+    const { databaseId, name, statements, dependsOn, environment } = req.body ?? {};
+    if (!databaseId || !name || !Array.isArray(statements)) {
+      throw new AppError("databaseId, name and statements are required", 400, "INVALID_MIGRATION");
+    }
+    const actor = await migrationActor(req, res);
+    const plan = await unifiedMigrationAuthority.createPlan({
+      databaseId: String(databaseId),
       projectId,
-      targetBindingId || `bind_${projectId}_dev`,
-      namespace || `schema_${projectId}`,
-      authority || "FORGE_MANAGED",
-      Array.isArray(statements) ? statements : ["CREATE TABLE app_items (id uuid primary key);"]
-    );
-
-    // Rehearse & Approve
-    const rehearsal = unifiedMigrationAuthority.rehearseMigrationPlan(plan.planId);
-    unifiedMigrationAuthority.approveMigrationPlan(plan.planId, user.id);
-    const result = unifiedMigrationAuthority.executeMigrationPlan(plan.planId);
-
-    res.status(200).json({ success: true, plan, rehearsal, result });
+      name: String(name),
+      statements,
+      dependsOn,
+      requestKey: (req.get("Idempotency-Key") || "").trim() || null,
+      createdById: user.id,
+    });
+    const result = await unifiedMigrationAuthority.runGoverned(plan.id, actor, { databaseId: String(databaseId), projectId, environment });
+    res.status(result.approvalRequired ? 202 : 200).json({ success: true, ...result });
   } catch (err) {
     next(err);
   }
+}
+
+/** The acting user for a migration request; an administrator is the project owner or a platform admin. */
+async function migrationActor(req: Request, res: Response): Promise<{ id: string; canAdminister: boolean }> {
+  const user = getAuthUser(res, req);
+  const project = await getForgeProjectById(String(req.params.id), user);
+  const admin = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(String(user.role || "").toUpperCase());
+  return { id: user.id, canAdminister: admin || project.ownerId === user.id };
+}
+
+/** POST /:id/database/:databaseId/migrations/plan — records an immutable migration plan. */
+export async function planMigrationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = await migrationActor(req, res);
+    const { name, statements, downSql, dependsOn } = req.body ?? {};
+    const migration = await unifiedMigrationAuthority.createPlan({
+      databaseId: String(req.params.databaseId),
+      projectId: String(req.params.id),
+      name,
+      statements,
+      downSql,
+      dependsOn,
+      requestKey: (req.get("Idempotency-Key") || "").trim() || null,
+      createdById: actor.id,
+    });
+    res.status(201).json({ success: true, migration });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /:id/database/:databaseId/migrations/baseline — adopts the schema as found. */
+export async function adoptMigrationBaselineHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const actor = await migrationActor(req, res);
+    const migration = await unifiedMigrationAuthority.adoptBaseline(String(req.params.databaseId), actor, { projectId: String(req.params.id) });
+    res.status(201).json({ success: true, migration });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /:id/database/:databaseId/migrations/:migrationId/{preflight|rehearse|approve|execute|reconcile|retry|cancel}
+ * One step of the migration lifecycle. Every step re-checks that the migration belongs to this
+ * project and database.
+ */
+export function migrationStepHandler(step: "preflight" | "rehearse" | "approve" | "execute" | "reconcile" | "retry" | "cancel") {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = await migrationActor(req, res);
+      const id = String(req.params.migrationId);
+      const scope = { databaseId: String(req.params.databaseId), projectId: String(req.params.id) };
+      const authority = unifiedMigrationAuthority;
+      const migration =
+        step === "preflight" ? await authority.preflight(id, scope)
+        : step === "rehearse" ? await authority.rehearse(id, scope)
+        : step === "approve" ? await authority.approve(id, actor, { ...scope, acknowledgeDestructive: req.body?.acknowledgeDestructive === true })
+        : step === "execute" ? await authority.execute(id, actor, scope)
+        : step === "reconcile" ? await authority.reconcile(id, scope)
+        : step === "retry" ? await authority.retry(id, scope)
+        : await authority.cancel(id, actor, scope);
+      res.status(200).json({ success: true, migration });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 // ---------------------------------------------------------------------------

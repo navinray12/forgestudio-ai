@@ -872,6 +872,21 @@ export function createFallbackModelDelegate(modelName: string) {
       return deserializeRecord(record);
     },
 
+    /** Updates every row matching `where` in one statement; used for compare-and-set writes. */
+    async updateMany(args: { where: any; data: any }): Promise<{ count: number }> {
+      const setParts: string[] = [];
+      const values: any[] = [];
+      for (const [key, val] of Object.entries(args.data)) {
+        if (val === undefined) continue;
+        values.push(serializeColumnValue(key, val));
+        setParts.push(`${quoteCol(key)} = $${values.length}`);
+      }
+      if (args.data.updatedAt === undefined) setParts.push(`"updatedAt" = now()`);
+      const whereClause = buildWhereClause(args.where, values);
+      const { rowCount } = await getPool().query(`UPDATE ${table} SET ${setParts.join(", ")} ${whereClause}`, values);
+      return { count: rowCount ?? 0 };
+    },
+
     async delete(args: { where: any }): Promise<any> {
       const params: any[] = [];
       const whereClause = buildWhereClause(args.where, params);

@@ -2,7 +2,6 @@ import "dotenv/config"; // tsx reload trigger 8
 import http from "http";
 import app from "./app.js";
 import { startScheduler } from "./services/scheduleWorker.js";
-import { initPresenceWebSocketServer } from "./services/collaboration/presence.service.js";
 import { pgPool, prisma } from "./config/prisma.js";
 
 import { validateIdentityConfiguration } from "./modules/identity/composition.js";
@@ -12,39 +11,11 @@ validateIdentityConfiguration();
 
 const PORT = process.env.PORT || 5000;
 
-import {
-  realtimeWss,
-  handleRealtimeWebSocketConnection,
-} from "./modules/data-platform/data-layer/realtime.service.js";
-import {
-  terminalWss,
-  handleTerminalWebSocketConnection,
-} from "./services/terminal/forgeTerminal.service.js";
+import { attachWebSocketGateways } from "./websocketGateways.js";
 
 const server = http.createServer(app);
-const presenceWss = initPresenceWebSocketServer(server, undefined, { attachUpgradeListener: false });
-
-server.on("upgrade", (req, socket, head) => {
-  try {
-    const pathname = new URL(req.url ?? "", "http://localhost").pathname;
-    if (pathname.startsWith("/ws/presence") || pathname.startsWith("/ws/collaboration")) {
-      (presenceWss as any).upgrade(req, socket, head);
-    } else if (pathname.startsWith("/ws/realtime")) {
-      realtimeWss.handleUpgrade(req, socket, head, (ws) => {
-        handleRealtimeWebSocketConnection(ws, req);
-      });
-    } else if (pathname.startsWith("/ws/terminal")) {
-      terminalWss.handleUpgrade(req, socket, head, (ws) => {
-        handleTerminalWebSocketConnection(ws, req);
-      });
-    } else {
-      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-      socket.destroy();
-    }
-  } catch {
-    socket.destroy();
-  }
-});
+// Presence, workspace sync (/ws/workspace-sync), data realtime and terminal gateways.
+const gateways = attachWebSocketGateways(server);
 
 void ensureDatabaseTables().then(async () => {
   const interrupted = await reconcileInterruptedRuns().catch((err) => {
@@ -73,6 +44,7 @@ async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(JSON.stringify({ event: "server.shutdown", signal }));
+  await gateways.close().catch(() => undefined);
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await prisma.$disconnect().catch(() => undefined);
   await pgPool.end().catch(() => undefined);

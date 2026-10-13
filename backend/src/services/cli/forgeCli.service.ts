@@ -341,11 +341,17 @@ Flags:
         } else if (action === "migrate") {
           const migrations = await migrationEngine.listMigrations(dbEntity.id);
           const pending = migrations.filter((m) => m.status === "PENDING");
+          // Each migration goes through the migration authority. A production database is never
+          // migrated from here: the run stops and reports that an approval is required.
+          let applied = 0;
           for (const m of pending) {
-            await migrationEngine.applyMigration(dbEntity.id, m.id);
+            await migrationEngine.applyMigration(dbEntity.id, m.id, {
+              actor: options.userId ? { id: options.userId } : undefined,
+            });
+            applied++;
           }
-          resultData = { applied: pending.length };
-          stdout = `Applied ${pending.length} pending migration(s) successfully.`;
+          resultData = { applied };
+          stdout = `Applied ${applied} pending migration(s).`;
         } else if (action === "backup") {
           const backup = await forgeDatabaseService.createBackup(dbEntity.id, subArgs[0] || "cli-manual-backup");
           resultData = backup;

@@ -33,6 +33,9 @@ import {
   getSourcePreviewHandler,
   syncVisualToCodeHandler,
   planVisualToCodeHandler,
+  planMigrationHandler,
+  adoptMigrationBaselineHandler,
+  migrationStepHandler,
   syncCodeToVisualHandler,
   getWorkspaceCheckpointHandler,
   listWorkspaceCheckpointsHandler,
@@ -577,6 +580,12 @@ router.get("/:id/database/:databaseId/metrics", getDatabaseMetricsHandler);
 router.get("/:id/database/:databaseId/migrations", listMigrationsHandler);
 router.post("/:id/database/:databaseId/migrations/:migrationId/apply", applyMigrationHandler);
 router.post("/:id/database/:databaseId/migrations/:migrationId/rollback", rollbackMigrationHandler);
+// Migration authority lifecycle (blueprint §43): each step is explicit and recorded.
+router.post("/:id/database/:databaseId/migrations/plan", planMigrationHandler);
+router.post("/:id/database/:databaseId/migrations/baseline", adoptMigrationBaselineHandler);
+for (const step of ["preflight", "rehearse", "approve", "execute", "reconcile", "retry", "cancel"] as const) {
+  router.post(`/:id/database/:databaseId/migrations/:migrationId/${step}`, migrationStepHandler(step));
+}
 
 // Module 26: Database Studio
 router.get("/:id/database/:databaseId/tables/:tableName/data", getTableDataHandler);

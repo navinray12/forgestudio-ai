@@ -48,6 +48,7 @@ import {
   type ProjectPage,
   type PageMutationResult,
 } from "../services/forgeProjectService";
+import { connectWorkspaceSync, workspaceSyncUrl } from "../services/workspaceSyncClient";
 import { ProjectExplorer } from "../components/ProjectExplorer";
 import { MultiFileEditor, type OpenTab } from "../components/MultiFileEditor";
 import { CommandPaletteModal } from "../components/CommandPaletteModal";
@@ -304,6 +305,8 @@ export const DeveloperWorkspace: React.FC = () => {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("output");
   const [bottomDrawerHeight, setBottomDrawerHeight] = useState(190);
 
+  // The current "reload what changed" routine, for the live sync connection to call.
+  const workspaceRefreshRef = useRef<(() => Promise<void>) | null>(null);
   const isResizingSplit = useRef(false);
   const isResizingDrawer = useRef(false);
   const isResizingSidebar = useRef(false);
@@ -678,6 +681,8 @@ export const DeveloperWorkspace: React.FC = () => {
       }
     };
 
+    workspaceRefreshRef.current = refreshFromVisualEditor;
+
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel("forge_workspace_sync");
@@ -720,6 +725,33 @@ export const DeveloperWorkspace: React.FC = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [project, openTabs]);
+
+  // Live synchronization: changes committed to this project by anyone, from any browser or
+  // device, arrive as checkpoints over the workspace sync gateway. After a disconnect the client
+  // resumes from the last checkpoint it saw.
+  const liveProjectId = project?.id;
+  useEffect(() => {
+    if (!liveProjectId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const connection = connectWorkspaceSync({
+      url: workspaceSyncUrl(import.meta.env.VITE_API_URL || "http://localhost:5000"),
+      projectId: liveProjectId,
+      onCheckpoint: () => {
+        // Several checkpoints usually arrive together (a save writes many files).
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => void workspaceRefreshRef.current?.(), 300);
+      },
+      onStatus: (status) => {
+        if (status === "online") addLog("Live workspace sync connected", "info");
+        else if (status === "offline") addLog("Live workspace sync disconnected; reconnecting…", "warn");
+        else if (status === "denied") addLog("Live workspace sync stopped: the session or project access is no longer valid", "error");
+      },
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      connection.close();
+    };
+  }, [liveProjectId, addLog]);
 
   const handleContentChange = (path: string, newContent: string) => {
     setOpenTabs((prev) =>

@@ -230,7 +230,13 @@ export async function applyMigrationHandler(req: Request, res: Response, next: N
 
     const dbId = String(req.params.databaseId);
     const migrationId = String(req.params.migrationId);
-    const result = await migrationEngine.applyMigration(dbId, migrationId);
+    const project = await getForgeProjectById(projectId, user);
+    const admin = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(String(user.role || "").toUpperCase());
+    // Runs through the migration authority; the project in the URL must own the database.
+    const result = await migrationEngine.applyMigration(dbId, migrationId, {
+      projectId,
+      actor: { id: user.id, canAdminister: admin || project.ownerId === user.id },
+    });
     res.status(200).json({ success: true, migration: result });
   } catch (err) {
     next(err);
@@ -245,7 +251,7 @@ export async function rollbackMigrationHandler(req: Request, res: Response, next
 
     const dbId = String(req.params.databaseId);
     const migrationId = String(req.params.migrationId);
-    const result = await migrationEngine.rollbackMigration(dbId, migrationId);
+    const result = await migrationEngine.rollbackMigration(dbId, migrationId, { actor: { id: user.id } });
     res.status(200).json({ success: true, migration: result });
   } catch (err) {
     next(err);
