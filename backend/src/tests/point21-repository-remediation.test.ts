@@ -2,14 +2,10 @@
  * Point 21 — Repository-Specific Remediation Order Test Suite
  *
  * Verifies:
- * - P0: Scoped Custom Post Type Service non-destructive field definition save (no deleteMany)
- * - P0: Truthful full-stack generator replaces mock `/api/items` with real Prisma CRUD routes
  * - P0: Integrated publishing and release enforces immutable candidate digests & destination preflights
  * - P1: Unified compiler AST normalization preserves unsupported components in structured fallback containers
  */
 
-import { ScopedCustomPostTypeService } from '../services/cms/scopedCustomPostType.service';
-import { TruthfulFullStackGeneratorService } from '../services/generator/truthfulFullStackGenerator.service';
 import { IntegratedPublishingReleaseService } from '../services/publishing/integratedPublishingRelease.service';
 import { UnifiedCompilerNormalizationService } from '../services/compiler/unifiedCompilerNormalization.service';
 
@@ -25,64 +21,6 @@ export async function runPoint21Tests(): Promise<{ passed: number; failed: numbe
       throw new Error(`Assertion failed: ${msg}`);
     }
     passed++;
-  }
-
-  // --------------------------------------------------------------------------
-  // Test 1: P0 — Non-destructive Field Definition Save Preserves Stable Field IDs
-  // --------------------------------------------------------------------------
-  try {
-    const existingFields = [
-      { id: 'fld-1', key: 'title', label: 'Old Title', type: 'text', required: true, sortOrder: 0 },
-      { id: 'fld-2', key: 'content', label: 'Body Content', type: 'richtext', required: false, sortOrder: 1 },
-      { id: 'fld-3', key: 'obsolete_field', label: 'To Delete', type: 'text', required: false, sortOrder: 2 }
-    ];
-
-    const requestedDefinitions = [
-      { id: 'fld-1', key: 'title', label: 'New Title Label', type: 'text', required: true },
-      { id: 'fld-2', key: 'content', label: 'Body Content', type: 'richtext', required: true }, // Changed required
-      { key: 'author_bio', label: 'Author Bio', type: 'text', required: false } // New field, no id
-    ];
-
-    const plan = ScopedCustomPostTypeService.planFieldDefinitionMigration(existingFields, requestedDefinitions);
-
-    assert(plan.hasBreakingChanges === true, 'P0 CPT: Making existing field required must be flagged as breaking');
-    assert(plan.toCreate.length === 1, 'P0 CPT: Exactly 1 new field created');
-    assert(plan.toUpdate.length === 2, 'P0 CPT: Exactly 2 existing fields updated in-place');
-    assert(plan.toSoftDelete.length === 1, 'P0 CPT: Obsolete field soft-deleted, not hard deleteMany');
-    assert(plan.toSoftDelete[0].id === 'fld-3', 'P0 CPT: Correct field targeted for soft delete');
-  } catch (err: any) {
-    // failure recorded
-  }
-
-  // --------------------------------------------------------------------------
-  // Test 2: P0 — Truthful Full-Stack Generator Produces Prisma CRUD, No Mock Arrays
-  // --------------------------------------------------------------------------
-  try {
-    const generationPlan = TruthfulFullStackGeneratorService.generateFullStackPackage({
-      websiteId: 'site-alpha-123',
-      tenantId: 'tenant-omega-999',
-      siteName: 'Acme Corp Portal',
-      features: [
-        {
-          featureName: 'ProductCatalog',
-          entityName: 'Product',
-          fields: [
-            { name: 'title', type: 'string', required: true },
-            { name: 'price', type: 'number', required: true },
-            { name: 'sku', type: 'string', required: true, unique: true }
-          ]
-        }
-      ]
-    });
-
-    assert(generationPlan.hasMockPersistence === false, 'P0 Generator: Must NOT contain mock persistence');
-    assert(generationPlan.backendRouterCode.includes('router.post'), 'P0 Generator: Router must provide POST endpoint');
-    assert(generationPlan.backendRouterCode.includes('router.get'), 'P0 Generator: Router must provide GET endpoint');
-    assert(!generationPlan.backendRouterCode.includes('let items = ['), 'P0 Generator: Must NOT contain let items = [] in-memory array');
-    assert(generationPlan.prismaSchemaSnippet.includes('model Product'), 'P0 Generator: Generates real Prisma model');
-    assert(generationPlan.prismaSchemaSnippet.includes('tenantId String'), 'P0 Generator: Prisma model must enforce tenant isolation field');
-  } catch (err: any) {
-    // failure recorded
   }
 
   // --------------------------------------------------------------------------

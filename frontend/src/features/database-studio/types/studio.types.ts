@@ -90,3 +90,5 @@ export interface DatabaseStatus {
     lastBackupAt?: string | null;
   } | null;
 }
+
+export type StudioEnvironment = "DEVELOPMENT" | "PREVIEW" | "PRODUCTION";

@@ -44,6 +44,12 @@ import {
   aiHostingRoutes,
   elementorCloudRoutes,
   exportRoutes,
+  serviceObjectivesRoutes,
+  adaptiveInfrastructureRoutes,
+  hostingExportRoutes,
+  releaseIntegrityRoutes,
+  securityAuditRoutes,
+  workflowsCommunicationRoutes,
 } from "./routes/index.js";
 
 import identityRoutes from "./modules/identity/http/oidc.routes.js";
@@ -80,7 +86,6 @@ import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.r
 import projectRoutes from "./routes/project.routes.js";
 import codeIntelligenceRoutes from "./routes/codeIntelligence.routes.js";
 import knowledgeGraphRoutes from "./routes/knowledgeGraph.routes.js";
-import designSystemRoutes from "./routes/designSystem.routes.js";
 import hostedRoutes from "./routes/hosted.routes.js";
 
 
@@ -274,6 +279,21 @@ export function createApplication(
   app.use("/api/v1/apikeys", apiKeysRoutes);
   app.use("/api/apikeys", apiKeysRoutes);
   app.use("/api/v1/developer", developerRoutes);
+  // Blueprint v2 feature routers. Every route requires authentication; website-scoped operations
+  // derive the tenant from verified membership (tenantScope.middleware). Routers that still trust a
+  // client-supplied tenant (forms-leads, owner-experience, marketing-analytics, search-quality,
+  // delivery-governance, components, benchmark, capabilities) stay unmounted.
+  for (const [path, router] of [
+    ["service-objectives", serviceObjectivesRoutes],
+    ["adaptive-infrastructure", adaptiveInfrastructureRoutes],
+    ["hosting-export", hostingExportRoutes],
+    ["release-integrity", releaseIntegrityRoutes],
+    ["security-audit", securityAuditRoutes],
+    ["workflows-communication", workflowsCommunicationRoutes],
+  ] as const) {
+    app.use(`/api/v1/${path}`, router);
+    app.use(`/api/${path}`, router);
+  }
   app.use("/api/developer", developerRoutes);
 
   // Milestone 1: Feature 35 & 36 - Code Intelligence & Repository Knowledge Graph

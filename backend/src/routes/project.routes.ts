@@ -1,6 +1,13 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import {
+  createAppGenerationHandler,
+  listAppGenerationsHandler,
+  getAppGenerationHandler,
+  retryAppGenerationHandler,
+  listAppGenerationTemplatesHandler,
+} from "../controllers/appGeneration.controller.js";
+import {
   createProjectHandler,
   getProjectHandler,
   getProjectByWebsiteHandler,
@@ -26,6 +33,36 @@ import {
   getSourcePreviewHandler,
   syncVisualToCodeHandler,
   syncCodeToVisualHandler,
+  getWorkspaceCheckpointHandler,
+  listWorkspaceCheckpointsHandler,
+  getRoundTripCompatibilityHandler,
+  classifyConstructHandler,
+  createPageLifecycleHandler,
+  movePageLifecycleHandler,
+  retirePageLifecycleHandler,
+  restorePageLifecycleHandler,
+  runReferenceBenchmarkHandler,
+  planSymbolsHandler,
+  evaluateRegenerationHandler,
+  createCleanupPlanHandler,
+  applyCleanupPlanHandler,
+  buildDomainModelSpecHandler,
+  validateDataMutationHandler,
+  introspectExternalDatabaseHandler,
+  generateContractFirstApiHandler,
+  bootstrapApplicationAuthHandler,
+  evaluateUnifiedAuthorizationHandler,
+  getDatabaseStudioViewHandler,
+  resolveEnvironmentBindingHandler,
+  resolveTargetPoolHandler,
+  executeUnifiedMigrationHandler,
+  runReleaseQualificationHandler,
+  getReleaseQualificationRecordHandler,
+  teamProjectTrackerOperationsHandler,
+  validateGeneratedPackageHandler,
+  verifyControlPlaneDiagnosticsHandler,
+
+
   generateReactProjectHandler,
   generateNextJsProjectHandler,
   getGenerationPlanHandler,
@@ -258,6 +295,70 @@ router.put("/:id/manifest", updateManifestHandler);
 router.post("/:id/compile", compileProjectHandler);
 router.post("/:id/sync/visual-to-code", syncVisualToCodeHandler);
 router.post("/:id/sync/code-to-visual", syncCodeToVisualHandler);
+// Durable Visual Editor <-> Code Workspace checkpoints (blueprint §33.3, §34)
+router.get("/:id/workspace/checkpoint", getWorkspaceCheckpointHandler);
+router.get("/:id/workspace/checkpoints", listWorkspaceCheckpointsHandler);
+
+// Blueprint Point 35: Supported Round-Trip and Source Ownership Contract
+router.get("/:id/roundtrip/compatibility", getRoundTripCompatibilityHandler);
+router.post("/:id/roundtrip/classify", classifyConstructHandler);
+
+// Blueprint Point 36: Canonical Page Registry and Lifecycle Operations
+router.post("/:id/pages/lifecycle/create", createPageLifecycleHandler);
+router.post("/:id/pages/lifecycle/move", movePageLifecycleHandler);
+router.post("/:id/pages/lifecycle/retire", retirePageLifecycleHandler);
+router.post("/:id/pages/lifecycle/restore", restorePageLifecycleHandler);
+
+// Section 5: Reference Project Benchmark Suite
+router.post("/benchmark/reference-suite", runReferenceBenchmarkHandler);
+router.post("/:id/benchmark/reference-suite", runReferenceBenchmarkHandler);
+
+// Blueprint Point 37: Dynamic Source Generation & Safe Cleanup
+router.post("/:id/generator/plan-symbols", planSymbolsHandler);
+router.post("/:id/generator/evaluate-regeneration", evaluateRegenerationHandler);
+router.post("/:id/generator/cleanup-plan", createCleanupPlanHandler);
+router.post("/:id/generator/apply-cleanup", applyCleanupPlanHandler);
+
+// Full-stack application generation (blueprint §38): durable runs, AI provider or approved template
+router.get("/:id/app-generation-templates", listAppGenerationTemplatesHandler);
+router.get("/:id/app-generations", listAppGenerationsHandler);
+router.post("/:id/app-generations", createAppGenerationHandler);
+router.get("/:id/app-generations/:runId", getAppGenerationHandler);
+router.post("/:id/app-generations/:runId/retry", retryAppGenerationHandler);
+
+// Blueprint Point 39: General-Purpose Application Data-Model & Introspection
+router.post("/:id/data-model/build-spec", buildDomainModelSpecHandler);
+router.post("/:id/data-model/validate-mutation", validateDataMutationHandler);
+router.post("/:id/database/introspect", introspectExternalDatabaseHandler);
+
+// Blueprint Point 40: Contract-First APIs, Auth & Unified Authorization
+router.post("/:id/api/contract-first/generate", generateContractFirstApiHandler);
+router.post("/:id/auth/application/bootstrap", bootstrapApplicationAuthHandler);
+router.post("/:id/auth/unified/authorize", evaluateUnifiedAuthorizationHandler);
+
+// Blueprint Point 41: One Consistent Database Schema Studio Views
+router.get("/:id/database/studio/views/:viewName", getDatabaseStudioViewHandler);
+router.post("/:id/database/studio/views/:viewName", getDatabaseStudioViewHandler);
+
+// Blueprint Point 42: Environment Bindings, Secrets and Isolation
+router.get("/:id/environment/bindings", resolveEnvironmentBindingHandler);
+router.post("/:id/environment/pools/resolve", resolveTargetPoolHandler);
+
+// Blueprint Point 43: One Migration Authority & Safe Upgrade Lifecycle
+router.post("/:id/database/migrations/unified-execute", executeUnifiedMigrationHandler);
+
+// Blueprint Point 44: End-to-End Application/Database Release Qualification
+router.post("/:id/qualification/release/run", runReleaseQualificationHandler);
+router.get("/:id/qualification/release/:runId", getReleaseQualificationRecordHandler);
+
+// Blueprint Point 45: Team Project Tracker Vertical Acceptance Slice
+router.post("/:id/showcase/team-project-tracker", teamProjectTrackerOperationsHandler);
+
+// Blueprint Point 46: Reconcile Architecture and API Contracts
+router.post("/:id/architecture/package/validate", validateGeneratedPackageHandler);
+router.get("/:id/architecture/control-plane/diagnostics", verifyControlPlaneDiagnosticsHandler);
+
+
 
 // Visual pages (registry, routes and their source files) & preview of the persisted source
 router.get("/:id/pages", listPagesHandler);
@@ -739,4 +840,5 @@ router.get("/templates", DesignSystemPlatformController.listTemplates);
 router.post("/:id/templates/:templateId/scaffold", DesignSystemPlatformController.scaffoldTemplate);
 
 export default router;
+
 

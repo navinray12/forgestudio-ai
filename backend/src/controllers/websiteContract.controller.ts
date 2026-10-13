@@ -157,31 +157,27 @@ export async function provisionBaselineHandler(req: Request, res: Response, next
     });
 
     // Persist new baseline editor data to website
-    await updateWebsite(websiteId, userId, {
-      editorData: baselineResult.editorData,
-    });
+    await updateWebsite(websiteId, { editorData: baselineResult.editorData }, userId);
 
     // Create an explicit baseline snapshot revision
     try {
-      await createRevision(
-        websiteId,
-        userId,
-        baselineResult.editorData,
-        "Baseline provisioned under Point 04 Operating Contract",
-        "MANUAL"
-      );
+      await createRevision(websiteId, userId, {
+        snapshot: baselineResult.editorData,
+        description: "Baseline provisioned under Point 04 Operating Contract",
+        revisionType: "MANUAL",
+      });
     } catch (revErr) {
       // Non-blocking revision recording
     }
 
     return res.status(200).json({
       success: true,
-      contract: baselineResult.contract,
-      provisionedPages: baselineResult.contract.pages.map((p) => ({
+      contract: baselineResult.operatingContract,
+      provisionedPages: baselineResult.operatingContract.pages.map((p) => ({
         id: p.id,
         route: p.route,
         purpose: p.purpose,
-        title: p.title,
+        title: p.name,
       })),
       hiddenCollections: ["LMS", "COMMERCE_BOOKING", "EXTERNAL_CRM_SIMULATION"],
       message: "Normal-site baseline provisioned successfully without fake content.",
@@ -217,7 +213,10 @@ export async function auditActionsHandler(req: Request, res: Response, next: Nex
       ownerId: website.userId,
     });
 
-    const allActions = contract.pages.flatMap((p) => p.actions);
+    const allActions = contract.pages.flatMap((p) => [
+      ...(p.primaryAction ? [p.primaryAction] : []),
+      ...p.secondaryActions,
+    ]);
     const availableRoutes = contract.pages.map((p) => p.route);
 
     const audit = auditWebsiteActions(allActions, availableRoutes);

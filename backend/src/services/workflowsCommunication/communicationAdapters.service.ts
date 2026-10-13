@@ -12,7 +12,7 @@
 
 import crypto from "node:crypto";
 import { AppError } from "../../utils/app-error.js";
-import { PreActionPolicyValidator } from "./preActionPolicyValidator.service.ts";
+import { PreActionPolicyValidator } from "./preActionPolicyValidator.service.js";
 
 export type MessageChannel = "EMAIL" | "SMS" | "WHATSAPP" | "TELEGRAM" | "VOICE";
 export type MessageIntent = "TRANSACTIONAL" | "MARKETING";

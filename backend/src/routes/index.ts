@@ -41,10 +41,7 @@ import tenantWorkspaceRoutes from "./tenant-workspace.routes.js";
 import benchmarkRoutes from "./benchmark.routes.js";
 import websiteContractRoutes from "./websiteContract.routes.js";
 import capabilityRoutes from "./capability.routes.js";
-import authoritativeRoutes from "./authoritative.routes.js";
-import generationRoutes from "./generation.routes.js";
 import componentRoutes from "./component.routes.js";
-import cmsProvisioningRoutes from "./cmsProvisioning.routes.js";
 import ownerExperienceRoutes from "./ownerExperience.routes.js";
 import formsLeadsRoutes from "./formsLeads.routes.js";
 import marketingAnalyticsRoutes from "./marketingAnalytics.routes.js";
@@ -55,6 +52,7 @@ import releaseIntegrityRoutes from "./releaseIntegrity.routes.js";
 import securityAuditRoutes from "./securityAudit.routes.js";
 import adaptiveInfrastructureRoutes from "./adaptiveInfrastructure.routes.js";
 import serviceObjectivesRoutes from "./serviceObjectives.routes.js";
+import deliveryAndCommercialRoutes from "./deliveryAndCommercial.routes.js";
 
 const apiRouter = Router();
 
@@ -96,10 +94,7 @@ apiRouter.use("/plugins-integration", pluginIntegrationRoutes);
 apiRouter.use("/multisite", multisiteRoutes);
 apiRouter.use("/benchmark", benchmarkRoutes);
 apiRouter.use("/capabilities", capabilityRoutes);
-apiRouter.use("/authoritative", authoritativeRoutes);
-apiRouter.use("/generation", generationRoutes);
 apiRouter.use("/components", componentRoutes);
-apiRouter.use("/cms", cmsProvisioningRoutes);
 apiRouter.use("/owner-experience", ownerExperienceRoutes);
 apiRouter.use("/forms-leads", formsLeadsRoutes);
 apiRouter.use("/marketing-analytics", marketingAnalyticsRoutes);
@@ -110,6 +105,7 @@ apiRouter.use("/release-integrity", releaseIntegrityRoutes);
 apiRouter.use("/security-audit", securityAuditRoutes);
 apiRouter.use("/adaptive-infrastructure", adaptiveInfrastructureRoutes);
 apiRouter.use("/service-objectives", serviceObjectivesRoutes);
+apiRouter.use("/delivery-governance", deliveryAndCommercialRoutes);
 
 // Custom Types, Code, and Components
 apiRouter.use("/", customPostTypeRoutes);
@@ -174,3 +170,4 @@ export { default as releaseIntegrityRoutes } from "./releaseIntegrity.routes.js"
 export { default as securityAuditRoutes } from "./securityAudit.routes.js";
 export { default as adaptiveInfrastructureRoutes } from "./adaptiveInfrastructure.routes.js";
 export { default as serviceObjectivesRoutes } from "./serviceObjectives.routes.js";
+export { default as deliveryAndCommercialRoutes } from "./deliveryAndCommercial.routes.js";

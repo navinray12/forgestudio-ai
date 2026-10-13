@@ -4,15 +4,25 @@
  */
 
 import { Request, Response } from "express";
-import { DurableReleaseController } from "../services/releaseIntegrity/durableReleaseController.service.ts";
-import { MandatoryReleaseGatesService } from "../services/releaseIntegrity/mandatoryReleaseGates.service.ts";
-import { ReleasePassportService } from "../services/releaseIntegrity/releasePassportService.service.ts";
+import { tenantScopeOf } from "../middlewares/tenantScope.middleware.js";
+import { AppError } from "../utils/app-error.js";
+import { DurableReleaseController } from "../services/releaseIntegrity/durableReleaseController.service.js";
+import { MandatoryReleaseGatesService } from "../services/releaseIntegrity/mandatoryReleaseGates.service.js";
+import { ReleasePassportService } from "../services/releaseIntegrity/releasePassportService.service.js";
+
+/** A release ID only counts within the website the request was scoped to; others look absent. */
+function assertReleaseInScope(releaseId: string, res: Response) {
+  const candidate = DurableReleaseController.getCandidate(releaseId);
+  if (candidate.websiteId !== tenantScopeOf(res).websiteId) {
+    throw new AppError(`Release ${releaseId} not found`, 404, "NOT_FOUND");
+  }
+}
 
 export class ReleaseIntegrityController {
   public static async requestRelease(req: Request, res: Response) {
     try {
       const { tenantId, websiteId, version, immutableArtifactDigest, pinnedInputDigests } = req.body;
-      const requestedBy = (req as any).user?.id || "admin_user";
+      const requestedBy = res.locals.user.id;
       const candidate = DurableReleaseController.requestRelease(
         tenantId,
         websiteId,
@@ -29,8 +39,9 @@ export class ReleaseIntegrityController {
 
   public static async transitionReleaseState(req: Request, res: Response) {
     try {
-      const { releaseId } = req.params;
+      const { releaseId } = req.params as Record<string, string>;
       const { nextState, workerFencingToken } = req.body;
+      assertReleaseInScope(releaseId, res);
       const candidate = DurableReleaseController.transitionState(releaseId, nextState, workerFencingToken || 1);
       return res.status(200).json({ success: true, candidate });
     } catch (err: any) {
@@ -66,8 +77,9 @@ export class ReleaseIntegrityController {
 
   public static async promoteRelease(req: Request, res: Response) {
     try {
-      const { releaseId } = req.params;
+      const { releaseId } = req.params as Record<string, string>;
       const { expectedCurrentReleaseId, verifiedArtifactDigest } = req.body;
+      assertReleaseInScope(releaseId, res);
       const promoted = DurableReleaseController.promoteToActive(releaseId, expectedCurrentReleaseId, verifiedArtifactDigest);
       return res.status(200).json({ success: true, promoted });
     } catch (err: any) {

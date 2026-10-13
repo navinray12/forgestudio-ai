@@ -1,5 +1,5 @@
 import { AppError } from "../../utils/app-error.js";
-import type { AiGenerationRequest, AiGenerationResult, AiProvider } from "./ai-provider.js";
+import { reportedUsage, type AiGenerationRequest, type AiGenerationResult, type AiProvider } from "./ai-provider.js";
 import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-blueprint.js";
 
 /** Minimal Responses API adapter. Credentials remain server-only in OPENAI_API_KEY. */
@@ -26,16 +26,26 @@ export class OpenAiProvider implements AiProvider {
         headers: { "Authorization": `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: this.model, store: false, max_output_tokens: 8192,
-          instructions: SITE_BLUEPRINT_INSTRUCTIONS,
-          input: [{ role: "user", content: JSON.stringify({ brief: request.prompt, websiteName: request.context.websiteName }) }],
-          text: { format: { type: "json_schema", name: "site_blueprint", strict: true, schema: SITE_BLUEPRINT_JSON_SCHEMA } },
+          instructions,
+          input: [{ role: "user", content: inputContent }],
+          text: {
+            format: {
+              type: "json_schema",
+              name: request.operation === "SITE_GENERATION" ? "site_blueprint" : request.operation.toLowerCase(),
+              strict: true,
+              schema: schema || SITE_BLUEPRINT_JSON_SCHEMA,
+            },
+          },
         }),
       });
       if (!response.ok) throw new AppError("AI provider is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");
-      const body = await response.json().catch(() => null) as { status?: unknown; output?: Array<{ type?: unknown; content?: Array<{ type?: unknown; text?: unknown }> }>; id?: unknown } | null;
+      const body = await response.json().catch(() => null) as { status?: unknown; output?: Array<{ type?: unknown; content?: Array<{ type?: unknown; text?: unknown }> }>; id?: unknown; usage?: { input_tokens?: unknown; output_tokens?: unknown } } | null;
       const texts = body?.output?.filter(item => item.type === "message").flatMap(item => item.content ?? []).filter(item => item.type === "output_text" && typeof item.text === "string").map(item => item.text as string) ?? [];
       if (body?.status !== "completed" || texts.length !== 1 || !texts[0]?.trim()) throw new AppError("AI provider returned an invalid website draft", 502, "AI_INVALID_OUTPUT");
-      return { text: texts[0], model: this.model, provider: this.name, requestId: typeof body.id === "string" ? body.id : undefined };
+      return {
+        text: texts[0], model: this.model, provider: this.name, requestId: typeof body.id === "string" ? body.id : undefined,
+        usage: reportedUsage(body.usage?.input_tokens, body.usage?.output_tokens),
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError("AI provider request timed out or failed", 503, "AI_PROVIDER_UNAVAILABLE");

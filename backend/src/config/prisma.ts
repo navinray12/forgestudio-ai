@@ -25,6 +25,10 @@ const globalForPrisma = globalThis as unknown as {
 
 export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
   connectionString,
+  // The Prisma pg adapter sends DateTime values without a UTC offset, which PostgreSQL interprets in
+  // the session time zone. Pinning sessions to UTC keeps timestamptz writes and now() comparisons
+  // correct on servers whose default time zone is not UTC.
+  options: "-c TimeZone=UTC",
   max: positiveInteger("DATABASE_POOL_MAX", 10, 100),
   connectionTimeoutMillis: positiveInteger("DATABASE_ACQUIRE_TIMEOUT_MS", 10000, 30000),
   idleTimeoutMillis: positiveInteger("DATABASE_IDLE_TIMEOUT_MS", 30000, 300000),

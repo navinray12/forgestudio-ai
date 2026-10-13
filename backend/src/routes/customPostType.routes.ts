@@ -9,6 +9,12 @@ import {
     getCustomEntriesHandler,
     createCustomEntryHandler,
     updateCustomEntryHandler,
+    restoreCustomEntryHandler,
+    getTrashedEntriesHandler,
+    createPurgeRequestHandler,
+    listPurgeRequestsHandler,
+    approvePurgeRequestHandler,
+    executePurgeRequestHandler,
     deleteCustomEntryHandler
 } from "../controllers/customPostType.controller.js";
 
@@ -29,5 +35,13 @@ router.get("/types/:cptId/entries", requireAuth, getCustomEntriesHandler);
 router.post("/types/:cptId/entries", requireAuth, createCustomEntryHandler);
 router.patch("/entries/:entryId", requireAuth, updateCustomEntryHandler);
 router.delete("/entries/:entryId", requireAuth, deleteCustomEntryHandler);
+router.post("/entries/:entryId/restore", requireAuth, restoreCustomEntryHandler);
+router.get("/types/:cptId/trash", requireAuth, getTrashedEntriesHandler);
+
+// Permanent deletion of trashed content: exact manifest, independent approval, expiring (blueprint §10)
+router.get("/websites/:websiteId/purge-requests", requireAuth, listPurgeRequestsHandler);
+router.post("/websites/:websiteId/purge-requests", requireAuth, createPurgeRequestHandler);
+router.post("/purge-requests/:requestId/approve", requireAuth, approvePurgeRequestHandler);
+router.post("/purge-requests/:requestId/execute", requireAuth, executePurgeRequestHandler);
 
 export default router;

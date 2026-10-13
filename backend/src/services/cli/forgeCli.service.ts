@@ -827,7 +827,7 @@ Flags:
         } else {
           const graph = await monorepoDiscoveryService.discoverMonorepo(projId);
           resultData = { graph };
-          stdout = `Monorepo Workspaces (${graph.manager}):\n` +
+          stdout = `Monorepo Workspaces (${graph.packages.length} packages${graph.hasCircularDependencies ? ", circular dependencies detected" : ""}):\n` +
             graph.packages.map((p: any) => `* [${p.type}] ${p.name} -> ${p.path}`).join("\n");
         }
         break;
@@ -852,7 +852,8 @@ Flags:
             hostPort: 3000,
           });
           resultData = { run };
-          stdout = `Container started: ${run.id} [port: ${run.hostPort} -> ${run.containerPort}]`;
+          const ports = Object.entries(run.portBindings).map(([container, host]) => `${host} -> ${container}`).join(", ");
+          stdout = `Container started: ${run.id} [ports: ${ports || "none"}]`;
         } else if (subCommand === "list" || !subCommand) {
           const runs = await dockerfileGeneratorService.listContainers(projId);
           resultData = { runs };
@@ -876,7 +877,7 @@ Flags:
         if (subCommand === "validate") {
           const validation = await dockerfileGeneratorService.validateInfrastructure(projId);
           resultData = { validation };
-          stdout = `Infrastructure Validation:\n* Valid: ${validation.valid}\n* Errors (${validation.errors.length}): ${validation.errors.join(", ") || "None"}\n* Warnings (${validation.warnings.length}): ${validation.warnings.join(", ") || "None"}`;
+          stdout = `Infrastructure Validation:\n* Valid: ${validation.isValid}\n* Security score: ${validation.securityScore}\n* Syntax errors (${validation.syntaxErrors.length}): ${validation.syntaxErrors.join(", ") || "None"}\n* Detected secrets (${validation.detectedSecrets.length}): ${validation.detectedSecrets.join(", ") || "None"}\n* Dangerous configs (${validation.dangerousConfigs.length}): ${validation.dangerousConfigs.join(", ") || "None"}`;
         } else if (subCommand === "kubernetes") {
           const manifests = await dockerfileGeneratorService.generateKubernetesManifests(projId, {
             serviceName: "web",

@@ -201,7 +201,7 @@ export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
   // ==========================================
   // 1. HOME PAGE ("/")
   // ==========================================
-  const homeElements = [
+  const homeElements: JsonObject[] = [
     createHeader(websiteName, navLinks),
     // Hero Section
     {

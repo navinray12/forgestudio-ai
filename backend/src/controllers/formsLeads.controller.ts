@@ -33,7 +33,7 @@ export async function createSchemaHandler(req: Request, res: Response, next: Nex
 
 export async function getSchemaHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { websiteId, formId } = req.params;
+    const { websiteId, formId } = req.params as Record<string, string>;
     const version = req.query.version ? Number(req.query.version) : undefined;
     const schema = getFormSchema(websiteId, formId, version);
     if (!schema) {
@@ -70,7 +70,7 @@ export async function submitFormAtomicHandler(req: Request, res: Response, next:
 
 export async function getSubmissionHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { receiptId } = req.params;
+    const { receiptId } = req.params as Record<string, string>;
     const record = getStoredSubmission(receiptId);
     if (!record) {
       res.status(404).json({ success: false, message: "Submission not found" });
@@ -96,7 +96,7 @@ export async function listLeadsHandler(req: Request, res: Response, next: NextFu
 
 export async function transitionLeadStageHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { leadId } = req.params;
+    const { leadId } = req.params as Record<string, string>;
     const { tenantId, targetStage, qualificationEvidence } = req.body;
     const actorId = res.locals.user?.id || req.body.actorId || "user-1";
     const lead = await transitionLeadStage({

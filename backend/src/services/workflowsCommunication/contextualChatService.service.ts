@@ -13,7 +13,7 @@
 
 import crypto from "node:crypto";
 import { AppError } from "../../utils/app-error.js";
-import { AtomicSubmissionBoundary } from "../formsLeads/atomicSubmissionBoundary.service.ts";
+import { executeAtomicSubmission } from "../formsLeads/atomicSubmissionBoundary.service.js";
 
 export interface ChatSessionContext {
   sessionId: string;
@@ -120,17 +120,15 @@ export class ContextualChatService {
       message: req.confirmedContact.message || "Captured via confirmed chat",
     };
 
-    return await AtomicSubmissionBoundary.processSubmissionTransaction(
-      req.tenantId,
-      req.websiteId,
-      req.formId,
-      payload,
+    return await executeAtomicSubmission({
+      tenantId: req.tenantId,
+      websiteId: req.websiteId,
+      formId: req.formId,
+      fields: payload,
       idempotencyKey,
-      {
-        consentGranted: true,
-        sourceProvenance: "CHAT_CONVERSATION",
-      }
-    );
+      consentGiven: true,
+      consentPurpose: "CHAT_CONVERSATION_LEAD",
+    });
   }
 
   /**

@@ -94,6 +94,7 @@ model Website {
   customCodeSnippets CustomCodeSnippet[]
   formSubmissions    FormSubmission[]
   customPostTypes    CustomPostType[]
+  contentPurgeRequests ContentPurgeRequest[]
   themeLocationRules ThemeLocationRule[]
   sftpConnections    SftpConnection[]
   pluginIntegrations PluginIntegration[]
@@ -405,6 +406,9 @@ model CustomPostType {
   name        String
   slug        String
   description String?
+  singular    String?
+  plural      String?
+  hasArchive  Boolean  @default(false)
   supports    Json     @default("[\"title\", \"editor\", \"thumbnail\"]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -516,6 +520,9 @@ model CustomEntry {
   data       Json     @default("{}")
   status     String   @default("PUBLISHED")
   authorId   String?  @db.Uuid
+  deletedAt    DateTime?
+  deletedById  String?  @db.Uuid
+  deleteReason String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -1723,6 +1730,8 @@ enum DatabaseEnvironment {
   DEVELOPMENT
   PREVIEW
   PRODUCTION
+  /// Kept for databases whose enum was first created by the runtime setup with STAGING.
+  STAGING
 }
 
 enum DatabaseProvisioningStatus {
@@ -1865,4 +1874,25 @@ model StorageObject {
   @@map("storage_objects")
 }
 
+/// Approved, exact-manifest permanent deletion of trashed CMS content (blueprint §10).
+model ContentPurgeRequest {
+  id                   String    @id @default(uuid()) @db.Uuid
+  websiteId            String    @db.Uuid
+  manifest             Json
+  manifestHash         String
+  reason               String
+  requestedById        String    @db.Uuid
+  approvedById         String?   @db.Uuid
+  approvedAt           DateTime?
+  singleOwnerException Boolean   @default(false)
+  status               String    @default("PENDING_APPROVAL")
+  expiresAt            DateTime
+  executedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId, status])
+  @@map("content_purge_requests")
+}

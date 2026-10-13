@@ -114,7 +114,7 @@ export async function getCapabilityByIdHandler(req: Request, res: Response, next
     const capability = getCapabilityById(capId);
 
     if (!capability) {
-      throw new AppError(404, `Capability '${capId}' not found.`);
+      throw new AppError(`Capability '${capId}' not found.`, 404);
     }
 
     const evidence = getEvidenceForCapability(capability.id).map((e) => ({
@@ -234,7 +234,7 @@ export async function recordEvidenceHandler(req: Request, res: Response, next: N
     const { type, artifactReference, verificationScope, environment, result, limitations, freshnessDaysLimit } = req.body || {};
 
     if (!type || !artifactReference || !verificationScope || !result) {
-      throw new AppError(400, "Missing required evidence fields (type, artifactReference, verificationScope, result).");
+      throw new AppError("Missing required evidence fields (type, artifactReference, verificationScope, result).", 400);
     }
 
     const evidence = recordEvidence({
@@ -267,7 +267,7 @@ export async function evaluateReleaseGateHandler(req: Request, res: Response, ne
     const { websiteId, profileId, activeCapabilities } = req.body || {};
 
     if (!websiteId || !profileId) {
-      throw new AppError(400, "websiteId and profileId are required.");
+      throw new AppError("websiteId and profileId are required.", 400);
     }
 
     const assessment = evaluateProfileReleaseGate(websiteId, profileId, activeCapabilities || []);

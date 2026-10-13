@@ -9,6 +9,8 @@ node_modules/
 # Build output
 dist/
 build/
+# Source directories named "build" are not build output
+!backend/src/services/build/
 
 # Logs
 *.log

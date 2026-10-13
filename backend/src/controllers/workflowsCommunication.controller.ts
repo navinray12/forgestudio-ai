@@ -4,12 +4,13 @@
  */
 
 import { Request, Response } from "express";
-import { VersionedWorkflowEngine } from "../services/workflowsCommunication/workflowEngine.service.ts";
-import { PreActionPolicyValidator } from "../services/workflowsCommunication/preActionPolicyValidator.service.ts";
-import { CommunicationAdaptersService } from "../services/workflowsCommunication/communicationAdapters.service.ts";
-import { ExplainableScoringSegmentation } from "../services/workflowsCommunication/explainableScoringSegmentation.service.ts";
-import { ExperimentationEngine } from "../services/workflowsCommunication/experimentationEngine.service.ts";
-import { ContextualChatService } from "../services/workflowsCommunication/contextualChatService.service.ts";
+import { tenantScopeOf } from "../middlewares/tenantScope.middleware.js";
+import { VersionedWorkflowEngine } from "../services/workflowsCommunication/workflowEngine.service.js";
+import { PreActionPolicyValidator } from "../services/workflowsCommunication/preActionPolicyValidator.service.js";
+import { CommunicationAdaptersService } from "../services/workflowsCommunication/communicationAdapters.service.js";
+import { ExplainableScoringSegmentation } from "../services/workflowsCommunication/explainableScoringSegmentation.service.js";
+import { ExperimentationEngine } from "../services/workflowsCommunication/experimentationEngine.service.js";
+import { ContextualChatService } from "../services/workflowsCommunication/contextualChatService.service.js";
 
 export class WorkflowsCommunicationController {
   public static async createWorkflowDraft(req: Request, res: Response) {
@@ -24,7 +25,10 @@ export class WorkflowsCommunicationController {
 
   public static async publishWorkflow(req: Request, res: Response) {
     try {
-      const { workflowId, version } = req.params;
+      const { workflowId, version } = req.params as Record<string, string>;
+      if (VersionedWorkflowEngine.getWorkflowTenant(workflowId) !== tenantScopeOf(res).tenantId) {
+        return res.status(404).json({ success: false, error: `Workflow ${workflowId} not found`, code: "WORKFLOW_NOT_FOUND" });
+      }
       const publishedBy = (req as any).user?.id || "admin_user";
       const published = VersionedWorkflowEngine.publishWorkflowVersion(workflowId, parseInt(version, 10), publishedBy);
       return res.status(200).json({ success: true, workflow: published });
@@ -35,7 +39,10 @@ export class WorkflowsCommunicationController {
 
   public static async simulateWorkflow(req: Request, res: Response) {
     try {
-      const { workflowId, version } = req.params;
+      const { workflowId, version } = req.params as Record<string, string>;
+      if (VersionedWorkflowEngine.getWorkflowTenant(workflowId) !== tenantScopeOf(res).tenantId) {
+        return res.status(404).json({ success: false, error: `Workflow ${workflowId} not found`, code: "WORKFLOW_NOT_FOUND" });
+      }
       const { initialContext } = req.body;
       const result = VersionedWorkflowEngine.runSimulation(workflowId, parseInt(version, 10), initialContext);
       return res.status(200).json({ success: true, simulation: result });

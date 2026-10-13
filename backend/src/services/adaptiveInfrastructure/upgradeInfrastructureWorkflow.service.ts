@@ -14,7 +14,7 @@ import {
   InfrastructureProfilesService,
   InfrastructureProfileType,
   ProfileMigrationPlan,
-} from "./infrastructureProfiles.service.ts";
+} from "./infrastructureProfiles.service.js";
 
 export interface UpgradeExecutionReceipt {
   executionId: string;

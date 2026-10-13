@@ -74,7 +74,7 @@ export interface TableEdge {
  */
 export async function getDatabaseTables(
   projectId: string,
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<TableSummary[]> {
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const client = await pool.connect();
@@ -134,7 +134,7 @@ export async function getDatabaseTables(
 export async function getTableDetails(
   projectId: string,
   tableName: string,
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<TableDetails> {
   const safeTable = validateIdentifier(tableName);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -220,7 +220,7 @@ export async function getTableDetails(
  */
 export async function getSchemaDiagram(
   projectId: string,
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<{ tables: TableNode[]; relationships: TableEdge[] }> {
   const tables = await getDatabaseTables(projectId, environment);
   const nodes: TableNode[] = [];
@@ -258,7 +258,7 @@ export async function getSchemaDiagram(
 export async function createTable(
   projectId: string,
   payload: { name: string; columns: ColumnDefinition[] },
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(payload.name);
   if (!payload.columns || payload.columns.length === 0) {
@@ -342,7 +342,7 @@ export async function createTable(
 export async function dropTable(
   projectId: string,
   tableName: string,
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(tableName);
   const ddl = `DROP TABLE IF EXISTS "public"."${safeName}" CASCADE;`;
@@ -387,7 +387,7 @@ export async function getTableRows(
     sortBy?: string;
     sortOrder?: "ASC" | "DESC";
   },
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<{ rows: any[]; total: number }> {
   const safeTable = validateIdentifier(tableName);
   const page = Math.max(1, params.page || 1);
@@ -442,7 +442,7 @@ export async function mutateTableRow(
     primaryKeyValue?: any;
     data?: Record<string, any>;
   },
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment
 ): Promise<any> {
   const safeTable = validateIdentifier(tableName);
   const safePk = validateIdentifier(payload.primaryKeyColumn);

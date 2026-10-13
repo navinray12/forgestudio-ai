@@ -88,15 +88,15 @@ export function registerReleaseException(input: {
 }): RestrictedReleaseException {
   const cap = getCapabilityById(input.capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${input.capId}' not found.`);
+    throw new AppError(`Capability '${input.capId}' not found.`, 404);
   }
 
   // Non-waivable safety gates: Tenant isolation, authentication, data consent, durable leads
   const nonWaivable = new Set(["CAP-006", "CAP-007", "CAP-043", "CAP-072"]);
   if (nonWaivable.has(cap.id)) {
     throw new AppError(
-      403,
-      `Capability '${cap.id}' (${cap.name}) is a non-waivable security/consent gate. Exceptions are strictly prohibited.`
+      `Capability '${cap.id}' (${cap.name}) is a non-waivable security/consent gate. Exceptions are strictly prohibited.`,
+      403
     );
   }
 

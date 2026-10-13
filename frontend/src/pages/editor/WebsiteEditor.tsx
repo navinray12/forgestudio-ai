@@ -2144,7 +2144,7 @@ export default function WebsiteEditor() {
       const serverVer = loadedSite.documentVersion ?? 1;
       if (!forced && serverVer <= websiteDocVerRef.current) return;
 
-      if (hasUnsavedRef.current && !forced) {
+      if (hasUnsavedRef.current() && !forced) {
         setSaveMessage(`Code Workspace updated (v${serverVer}). Save or switch pages to merge.`);
         setTimeout(() => setSaveMessage(""), 5000);
         return;

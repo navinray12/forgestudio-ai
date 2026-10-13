@@ -25,7 +25,7 @@ import { moveOrRenameFile, readFile, sanitizeAndNormalizePath } from "./forgeFil
 
 const db = prisma as any;
 
-export interface ProjectPageInfo extends RegisteredPage {
+export interface ProjectPageInfo extends Omit<RegisteredPage, "ownership"> {
   fileExists: boolean;
   /** "generated": follows the visual document; "code": hand-written code held back from regeneration */
   ownership: "generated" | "code" | "missing";

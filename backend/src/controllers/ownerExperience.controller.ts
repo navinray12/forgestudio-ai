@@ -28,27 +28,25 @@ import {
 } from "../services/ownerExperience/privacySafeDraftRecovery.service.js";
 import { executeAcceptanceJourney } from "../services/ownerExperience/ownerAcceptanceJourneys.service.js";
 
+/**
+ * Builds the authorization context from the verified session only. There is no anonymous fallback
+ * user, an unknown role gets the least privilege, and MFA and approvals cannot be asserted by
+ * request headers. Workspace membership is not verified here, so this router stays unmounted.
+ */
 function getAuthContext(req: Request, res: Response): AuthorizationContext {
-  const user = res.locals.user || { id: "test-user-id", role: "OWNER", status: "ACTIVE" };
-  const workspaceId =
-    (req.query.workspaceId as string) ||
-    req.body?.workspaceId ||
-    req.params?.workspaceId ||
-    "default-workspace-id";
-  const websiteId =
-    (req.query.websiteId as string) ||
-    req.body?.websiteId ||
-    req.params?.websiteId ||
-    undefined;
+  const user = res.locals.user;
+  if (!user?.id) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
+  const workspaceId = (req.query.workspaceId as string) || req.body?.workspaceId || req.params?.workspaceId || "";
+  const websiteId = (req.query.websiteId as string) || req.body?.websiteId || req.params?.websiteId || undefined;
 
   return {
     userId: user.id,
-    userRole: user.role || "OWNER",
-    userStatus: user.status || "ACTIVE",
+    userRole: user.role || "VIEWER",
+    userStatus: user.status === "SUSPENDED" || user.status === "DELETED" ? user.status : "ACTIVE",
     workspaceId,
     websiteId,
-    mfaVerified: Boolean(req.headers["x-mfa-verified"] === "true"),
-    independentApproverId: (req.headers["x-independent-approver-id"] as string) || undefined,
+    mfaVerified: Boolean(res.locals.session?.mfaVerifiedAt),
+    independentApproverId: undefined,
   };
 }
 
@@ -113,7 +111,7 @@ export async function createCustomRoleHandler(req: Request, res: Response, next:
 
 export async function getEditorState(req: Request, res: Response, next: NextFunction) {
   try {
-    const { websiteId } = req.params;
+    const { websiteId } = req.params as Record<string, string>;
     const session = getOrCreateEditorSession(websiteId);
     res.json({ success: true, session });
   } catch (error) {
@@ -123,7 +121,7 @@ export async function getEditorState(req: Request, res: Response, next: NextFunc
 
 export async function transitionEditorStateHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { websiteId } = req.params;
+    const { websiteId } = req.params as Record<string, string>;
     const { targetState, reason, failureReason, scheduledUtc } = req.body;
     const context = getAuthContext(req, res);
 
@@ -144,7 +142,7 @@ export async function transitionEditorStateHandler(req: Request, res: Response, 
 
 export async function saveEditorAttemptHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { websiteId } = req.params;
+    const { websiteId } = req.params as Record<string, string>;
     const { expectedVersion, serverVersion, clientContent, serverContent } = req.body;
     const context = getAuthContext(req, res);
 
@@ -165,7 +163,7 @@ export async function saveEditorAttemptHandler(req: Request, res: Response, next
 
 export async function resolveConflictHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { websiteId } = req.params;
+    const { websiteId } = req.params as Record<string, string>;
     const { conflictId, strategy, resolvedContent } = req.body;
     const context = getAuthContext(req, res);
 
@@ -207,7 +205,7 @@ export async function storeLocalDraftHandler(req: Request, res: Response, next: 
 export async function evaluateLocalDraftHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const context = getAuthContext(req, res);
-    const { websiteId, draftId } = req.params;
+    const { websiteId, draftId } = req.params as Record<string, string>;
     const serverVersion = Number(req.query.serverVersion) || 1;
 
     const result = evaluateDraftRecovery({

@@ -5,7 +5,8 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
-import { AdaptiveInfrastructureController } from "../controllers/adaptiveInfrastructure.controller.ts";
+import { scopeToWebsite, requirePlatformAdmin } from "../middlewares/tenantScope.middleware.js";
+import { AdaptiveInfrastructureController } from "../controllers/adaptiveInfrastructure.controller.js";
 
 const router = Router();
 
@@ -13,10 +14,10 @@ const router = Router();
 router.get("/profiles", requireAuth, AdaptiveInfrastructureController.listProfiles);
 
 // 2. Migration Planning & Preflight
-router.post("/profiles/plan-migration", requireAuth, AdaptiveInfrastructureController.generateMigrationPlan);
+router.post("/profiles/plan-migration", requireAuth, scopeToWebsite(), AdaptiveInfrastructureController.generateMigrationPlan);
 
 // 3. Upgrade Infrastructure Action
-router.post("/upgrade/execute", requireAuth, AdaptiveInfrastructureController.executeUpgrade);
+router.post("/upgrade/execute", requireAuth, scopeToWebsite({ admin: true }), AdaptiveInfrastructureController.executeUpgrade);
 
 // 4. Autoscaling Evaluation
 router.post("/autoscaling/evaluate", requireAuth, AdaptiveInfrastructureController.evaluateAutoscaling);

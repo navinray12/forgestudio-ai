@@ -11,41 +11,15 @@ import {
   mutateTableRow,
 } from "./studio-schema.service.js";
 import { executeUserQuery } from "./studio-sql.service.js";
-import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
+import {
+  verifyProjectAccess,
+  resolveExplicitEnvironment as resolveEnvironment,
+  assertCanModify,
+} from "../common/project-access.js";
 
 function getParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] || "";
   return param || "";
-}
-
-async function verifyProjectAccess(websiteId: string, userId: string) {
-  const website = await prisma.website.findFirst({
-    where: {
-      id: websiteId,
-      OR: [
-        { userId },
-        { collaborators: { some: { userId } } },
-        { team: { members: { some: { userId } } } },
-        { workspace: { members: { some: { userId } } } },
-        { organization: { members: { some: { userId } } } },
-      ],
-    },
-  });
-
-  if (!website) {
-    throw new AppError("Project not found or access denied", 404, "NOT_FOUND");
-  }
-
-  return website;
-}
-
-function resolveEnvironment(req: Request): DatabaseEnvironment {
-  const raw = (req.query.environment as string) || (req.body?.environment as string) || "PRODUCTION";
-  const upper = raw.toUpperCase();
-  if (upper === "DEVELOPMENT" || upper === "PREVIEW" || upper === "PRODUCTION") {
-    return upper as DatabaseEnvironment;
-  }
-  return "PRODUCTION";
 }
 
 /**
@@ -104,8 +78,9 @@ export async function createTableHandler(req: Request, res: Response, next: Next
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
+    assertCanModify(env, access, "create tables");
 
     const { name, columns } = req.body;
     if (!name || !columns || !Array.isArray(columns)) {
@@ -133,8 +108,9 @@ export async function dropTableHandler(req: Request, res: Response, next: NextFu
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
+    assertCanModify(env, access, "drop tables");
 
     await dropTable(projectId, tableName, env);
 
@@ -192,8 +168,9 @@ export async function mutateTableRowHandler(req: Request, res: Response, next: N
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
+    assertCanModify(env, access, "modify rows");
 
     const { action, primaryKeyColumn, primaryKeyValue, data } = req.body;
     if (!action || !primaryKeyColumn) {
@@ -248,15 +225,20 @@ export async function executeQueryHandler(req: Request, res: Response, next: Nex
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
+    // PRODUCTION queries run in a database-enforced read-only transaction unless an
+    // owner/admin explicitly opts in to writes.
+    const allowWrite = req.body?.allowWrite === true;
+    if (allowWrite) assertCanModify(env, access, "run write queries");
+    const readOnly = env === "PRODUCTION" && !allowWrite;
 
     const { sql } = req.body;
     if (!sql || typeof sql !== "string") {
       throw new AppError("sql query string is required", 400, "INVALID_INPUT");
     }
 
-    const result = await executeUserQuery(projectId, sql, env);
+    const result = await executeUserQuery(projectId, sql, env, { readOnly });
 
     return res.status(200).json({
       success: true,

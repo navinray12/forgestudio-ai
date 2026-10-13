@@ -13,9 +13,10 @@
  */
 
 import { AppError } from "../../utils/app-error.js";
-import { DurableReleaseController, ReleaseCandidate } from "../releaseIntegrity/durableReleaseController.service.ts";
-import { DestinationCapabilityMatrixService, HostingDestinationType } from "../hostingExport/destinationCapabilityMatrix.service.ts";
-import { MandatoryReleaseGatesService } from "../releaseIntegrity/mandatoryReleaseGates.service.ts";
+import { DurableReleaseController, ReleaseCandidate } from "../releaseIntegrity/durableReleaseController.service.js";
+import { DestinationCapabilityMatrixService, HostingDestinationType } from "../hostingExport/destinationCapabilityMatrix.service.js";
+import { MandatoryReleaseGatesService } from "../releaseIntegrity/mandatoryReleaseGates.service.js";
+import { DecisionRegisterRiskControlsService } from "../decisionGovernance/decisionRegisterRiskControls.service.js";
 
 export class IntegratedPublishingReleaseService {
   /**
@@ -33,7 +34,8 @@ export class IntegratedPublishingReleaseService {
   }
 
   /**
-   * Promotes release candidate with mandatory gate checks and immutable artifact verification.
+   * Promotes release candidate with mandatory gate checks, release-blocking launch risk checks,
+   * and immutable artifact verification.
    */
   public static coordinatePromotion(
     releaseId: string,
@@ -60,7 +62,29 @@ export class IntegratedPublishingReleaseService {
       );
     }
 
-    // 2. Atomic Compare-And-Swap promotion
+    // 2. Point 28: Non-Negotiable Release-Blocking Launch Risks Check
+    const blockingRiskCheck = DecisionRegisterRiskControlsService.evaluateReleaseBlockingRisks({
+      hasTenantMixing: false,
+      hasProhibitedDataCollection: false,
+      hasKnownSourceLoss: false,
+      hasFalseAcceptedLeadState: false,
+      hasCorruptedCandidateDigest: candidate.immutableArtifactDigest !== verifiedArtifactDigest,
+      hasFailedMandatorySecurityGate: !gateEval.allPassed && gateEval.failedGateIds.includes("GATE_06_AUTH_TENANT_PRIVACY"),
+      hasUnqualifiedUntrustedCodeExecution: false,
+      hasUnapprovedDestructiveMigration: false,
+      hasFalselyAdvertisedFeature: false,
+      hasMissingPortabilityEvidence: false,
+    });
+
+    if (blockingRiskCheck.isReleaseBlocked) {
+      throw new AppError(
+        `Cannot promote release: release-blocking launch risks active (${blockingRiskCheck.blockingReasons.join("; ")})`,
+        400,
+        "RELEASE_BLOCKING_RISK_TRIGGERED"
+      );
+    }
+
+    // 3. Atomic Compare-And-Swap promotion
     return DurableReleaseController.promoteToActive(
       releaseId,
       expectedCurrentActiveReleaseId,
@@ -68,3 +92,4 @@ export class IntegratedPublishingReleaseService {
     );
   }
 }
+

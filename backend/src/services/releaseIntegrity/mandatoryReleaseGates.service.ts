@@ -11,7 +11,7 @@
  */
 
 import { AppError } from "../../utils/app-error.js";
-import { GateAttestation } from "./releasePassportService.service.ts";
+import { GateAttestation } from "./releasePassportService.service.js";
 
 export interface ReleaseEvaluationContext {
   releaseId: string;

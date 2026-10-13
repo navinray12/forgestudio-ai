@@ -1,10 +1,13 @@
 import { pgPool } from "./prisma.js";
 
+const failedSchemaSteps: string[] = [];
+
 async function execSafe(label: string, sql: string) {
   try {
     await pgPool.query(sql);
   } catch (err: any) {
     if (err?.code !== "42701" && err?.code !== "42P07") {
+      failedSchemaSteps.push(label);
       console.warn(`[DATABASE] Schema notice (${label}):`, err?.message || err);
     }
   }
@@ -2666,7 +2669,7 @@ export async function ensureDatabaseTables(): Promise<void> {
       "rootConfig" JSONB DEFAULT '{}'::jsonb,
       "packageCount" INTEGER DEFAULT 0,
       "serviceCount" INTEGER DEFAULT 0,
-      "hasCircularDependencies BOOLEAN DEFAULT false,
+      "hasCircularDependencies" BOOLEAN DEFAULT false,
       "lastScannedAt" TIMESTAMPTZ DEFAULT now(),
       "createdAt" TIMESTAMPTZ DEFAULT now(),
       "updatedAt" TIMESTAMPTZ DEFAULT now()
@@ -3171,7 +3174,113 @@ export async function ensureDatabaseTables(): Promise<void> {
     );
   `);
 
-  console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
+  // Databases created before Prisma's enum have STAGING but not PREVIEW (and vice versa); both
+  // labels are kept valid so neither API value fails at the database (additive, nothing renamed).
+  await execSafe("database environment enum labels", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'DatabaseEnvironment') THEN
+        ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'PREVIEW';
+        ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'STAGING';
+      END IF;
+    END $$;
+  `);
+
+  // Recoverable CMS entry trash and approved purge requests (blueprint §10).
+  await execSafe("content trash and purge requests", `
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deletedById" UUID;
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deleteReason" TEXT;
+
+CREATE TABLE IF NOT EXISTS "content_purge_requests" (
+  "id" UUID NOT NULL,
+  "websiteId" UUID NOT NULL,
+  "manifest" JSONB NOT NULL,
+  "manifestHash" TEXT NOT NULL,
+  "reason" TEXT NOT NULL,
+  "requestedById" UUID NOT NULL,
+  "approvedById" UUID,
+  "approvedAt" TIMESTAMP(3),
+  "singleOwnerException" BOOLEAN NOT NULL DEFAULT false,
+  "status" TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+  "expiresAt" TIMESTAMP(3) NOT NULL,
+  "executedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "content_purge_requests_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "content_purge_requests_websiteId_fkey" FOREIGN KEY ("websiteId") REFERENCES "websites"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "content_purge_requests_websiteId_status_idx" ON "content_purge_requests"("websiteId", "status");
+  `);
+
+  // Durable Visual Editor <-> Code Workspace checkpoints (blueprint §33.3, §34).
+  await execSafe("forge_workspace_checkpoints table", `
+    CREATE TABLE IF NOT EXISTS forge_workspace_checkpoints (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      sequence BIGINT NOT NULL,
+      origin VARCHAR(16) NOT NULL CHECK (origin IN ('CODE', 'VISUAL')),
+      kind VARCHAR(16) NOT NULL CHECK (kind IN ('SYNCHRONIZED', 'DRAFT', 'CONFLICT', 'SOURCE_ONLY')),
+      "filePath" TEXT,
+      message TEXT,
+      "documentVersion" INTEGER,
+      "documentHash" VARCHAR(64),
+      "sourceManifest" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "changeSetId" VARCHAR(128),
+      response JSONB,
+      "createdById" UUID,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_workspace_checkpoint_sequence UNIQUE ("projectId", sequence),
+      CONSTRAINT uq_workspace_checkpoint_change_set UNIQUE ("projectId", "changeSetId")
+    );
+  `);
+
+  // Full-stack application generation runs (blueprint §38): durable job state and evidence.
+  await execSafe("forge_app_generation_runs table", `
+    CREATE TABLE IF NOT EXISTS forge_app_generation_runs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "requestedById" UUID NOT NULL,
+      mode VARCHAR(32) NOT NULL CHECK (mode IN ('AI_PROVIDER', 'APPROVED_TEMPLATE')),
+      status VARCHAR(32) NOT NULL,
+      brief TEXT NOT NULL DEFAULT '',
+      "templateId" VARCHAR(64),
+      "idempotencyKey" VARCHAR(128) NOT NULL,
+      "retryOfRunId" UUID REFERENCES forge_app_generation_runs(id) ON DELETE SET NULL,
+      provider VARCHAR(32),
+      model VARCHAR(128),
+      "providerRequestIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "inputTokens" INTEGER,
+      "outputTokens" INTEGER,
+      "providerCalls" INTEGER NOT NULL DEFAULT 0,
+      "repairAttempts" INTEGER NOT NULL DEFAULT 0,
+      "appModel" JSONB,
+      spec JSONB,
+      files JSONB NOT NULL DEFAULT '[]'::jsonb,
+      diagnostics JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "errorCode" VARCHAR(64),
+      "errorMessage" TEXT,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "completedAt" TIMESTAMPTZ,
+      CONSTRAINT uq_app_generation_idempotency UNIQUE ("projectId", "idempotencyKey")
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_generation_runs_project ON forge_app_generation_runs ("projectId", "createdAt" DESC);
+  `);
+
+  await execSafe("custom post type label columns", `
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "singular" TEXT;
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "plural" TEXT;
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "hasArchive" BOOLEAN NOT NULL DEFAULT false;
+  `);
+
+  if (failedSchemaSteps.length > 0) {
+    console.warn(
+      `⚠️ [DATABASE] Schema self-healing finished with ${failedSchemaSteps.length} failed step(s): ${failedSchemaSteps.join(", ")}`
+    );
+  } else {
+    console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
+  }
+  failedSchemaSteps.length = 0;
 }
 
 

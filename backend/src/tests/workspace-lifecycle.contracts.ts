@@ -16,7 +16,15 @@ export async function runWorkspaceLifecycleContracts(t:TestContext) {
  // Only the parent suite's explicitly guarded disposable database reaches here.
  // Replace the schema-only fixture additions with the actual migration and triggers.
  if (!await fixtureHasMigration("20260928122000_workspace_lifecycle")) {
-   await pgPool.query('DROP TABLE IF EXISTS workspace_invitations; ALTER TABLE workspaces DROP COLUMN "lifecycleStatus", DROP COLUMN version, DROP COLUMN "archivedAt"');
+   // Undo everything the migration creates (db push already made the unique index, and an earlier
+   // replay leaves its functions and triggers), so the replay can run on any fixture state.
+   await pgPool.query(`DROP TABLE IF EXISTS workspace_invitations;
+     DROP INDEX IF EXISTS workspaces_tenant_identity;
+     DROP FUNCTION IF EXISTS forge_workspace_version() CASCADE;
+     DROP FUNCTION IF EXISTS forge_workspace_write_admission() CASCADE;
+     DROP FUNCTION IF EXISTS forge_workspace_child_admission() CASCADE;
+     DROP FUNCTION IF EXISTS forge_workspace_owner_invariant() CASCADE;
+     ALTER TABLE workspaces DROP COLUMN IF EXISTS "lifecycleStatus", DROP COLUMN IF EXISTS version, DROP COLUMN IF EXISTS "archivedAt"`);
    await pgPool.query(readFileSync("prisma/migrations/20260928122000_workspace_lifecycle/migration.sql","utf8"));
  }
  const createUser=(name:string)=>prisma.user.create({data:{fullName:name,email:`${randomUUID()}@example.test`,emailVerified:true,status:"ACTIVE"}});

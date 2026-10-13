@@ -145,8 +145,8 @@ export function reviewClaim(
   if (decision === "APPROVE") {
     if (!claim.evidenceReference && claim.category !== "ORGANIZATION_IDENTITY") {
       throw new AppError(
-        400,
-        `Cannot approve claim '${claim.id}' in category '${claim.category}' without a valid evidence reference.`
+        `Cannot approve claim '${claim.id}' in category '${claim.category}' without a valid evidence reference.`,
+        400
       );
     }
     nextStatus = claim.evidenceReference ? "EVIDENCE_ATTACHED" : "APPROVED_FACT";

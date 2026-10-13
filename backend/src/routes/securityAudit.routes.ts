@@ -5,7 +5,8 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
-import { SecurityAuditController } from "../controllers/securityAudit.controller.ts";
+import { scopeToWebsite, requirePlatformAdmin } from "../middlewares/tenantScope.middleware.js";
+import { SecurityAuditController } from "../controllers/securityAudit.controller.js";
 
 const router = Router();
 
@@ -22,9 +23,9 @@ router.post("/ssrf/validate", requireAuth, SecurityAuditController.validateOutbo
 router.post("/redact", requireAuth, SecurityAuditController.redactPayload);
 
 // 5. Audit Chain Integrity Verification
-router.get("/audit/integrity", requireAuth, SecurityAuditController.verifyAuditIntegrity);
+router.get("/audit/integrity", requireAuth, requirePlatformAdmin, SecurityAuditController.verifyAuditIntegrity);
 
 // 6. Tenant Quotas & Abuse Pausing
-router.post("/quota/check", requireAuth, SecurityAuditController.checkQuota);
+router.post("/quota/check", requireAuth, scopeToWebsite(), SecurityAuditController.checkQuota);
 
 export default router;

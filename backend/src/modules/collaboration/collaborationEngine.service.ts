@@ -21,6 +21,12 @@ const db = prisma as any;
 // In-memory real-time presence registry for ultra-fast broadcasts
 const PROJECT_PRESENCE = new Map<string, Map<string, PeerPresence>>();
 
+/** Stable per-user presence color when the client does not supply one. */
+function presenceColorFor(userId: string): string {
+  const hash = crypto.createHash("sha256").update(userId).digest();
+  return `hsl(${hash.readUInt16BE(0) % 360}, 70%, 50%)`;
+}
+
 export class CollaborationEngineService {
   /**
    * Update or register user presence in a project
@@ -432,6 +438,8 @@ export class CollaborationEngineService {
     return this.updatePresence({
       projectId,
       userId,
+      name: typeof data?.name === "string" && data.name ? data.name : userId,
+      color: typeof data?.color === "string" && data.color ? data.color : presenceColorFor(userId),
       socketId: data?.socketId || userId,
       status: "ONLINE",
       activeFile: data?.activeFile,

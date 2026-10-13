@@ -4,9 +4,9 @@
  */
 
 import { Request, Response } from "express";
-import { ServiceLevelObjectivesRegisterService } from "../services/serviceObjectives/serviceLevelObjectivesRegister.service.ts";
-import { FailureIsolationContractsService, OutageType } from "../services/serviceObjectives/failureIsolationContracts.service.ts";
-import { IncidentAlertOperationsService } from "../services/serviceObjectives/incidentAlertOperations.service.ts";
+import { ServiceLevelObjectivesRegisterService } from "../services/serviceObjectives/serviceLevelObjectivesRegister.service.js";
+import { FailureIsolationContractsService, OutageType } from "../services/serviceObjectives/failureIsolationContracts.service.js";
+import { IncidentAlertOperationsService } from "../services/serviceObjectives/incidentAlertOperations.service.js";
 
 export class ServiceObjectivesController {
   public static async listSLOs(req: Request, res: Response) {

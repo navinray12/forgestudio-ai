@@ -36,6 +36,13 @@ import {
   executeGeneration,
   regenerateScope,
 } from "../services/generator/index.js";
+import {
+  recordCheckpoint,
+  findCommittedChangeSet,
+  getCheckpointState,
+  listCheckpointsAfter,
+  kindForSyncStatus,
+} from "../services/workspace/workspaceCheckpoints.service.js";
 import { prisma } from "../config/prisma.js";
 import { buildSyncBaseline, buildPageRegistry, parseEditorDocument, toProjectFramework } from "../services/compiler/pageRegistry.js";
 import {
@@ -46,6 +53,30 @@ import {
   PageImportError,
 } from "../services/project/projectPages.service.js";
 import { buildSourcePreview } from "../services/preview/sourcePreview.service.js";
+import { RoundTripContractService } from "../services/compiler/roundTripContract.service.js";
+import {
+  createPageLifecycle,
+  renameOrMovePage,
+  retirePageReversible,
+  restorePageDraft,
+} from "../services/compiler/pageRegistry.js";
+import { ReferenceProjectBenchmarkService } from "../services/benchmark/referenceProjectBenchmark.service.js";
+import { DynamicSourcePlannerService } from "../services/generator/dynamicSourcePlanner.service.js";
+import { SafeCleanupEngineService } from "../services/generator/safeCleanupEngine.service.js";
+import { DataModelGeneratorService } from "../services/generator/dataModelGenerator.service.js";
+import { ExternalDatabaseIntrospectionService } from "../services/generator/externalDatabaseIntrospection.service.js";
+import { contractFirstApiGenerator } from "../services/api/contractFirstApiGenerator.service.js";
+import { applicationAuth } from "../services/auth/applicationAuth.service.js";
+import { unifiedExecutionAuthorization } from "../services/auth/unifiedExecutionAuthorization.service.js";
+import { databaseStudioViews } from "../services/database/databaseStudioViews.service.js";
+import { environmentBindingService } from "../services/environment/environmentBinding.service.js";
+import { targetResolutionService } from "../services/environment/targetResolution.service.js";
+import { unifiedMigrationAuthority } from "../services/migration/unifiedMigrationAuthority.service.js";
+import { applicationReleaseQualificationService } from "../services/qualification/applicationReleaseQualification.service.js";
+import { teamProjectTrackerService } from "../services/showcase/teamProjectTracker.service.js";
+import { controlPlaneReconciliationService } from "../services/architecture/controlPlaneReconciliation.service.js";
+
+
 
 const db = prisma as any;
 
@@ -197,6 +228,16 @@ export async function writeFileHandler(req: Request, res: Response, next: NextFu
     const projectId = String(req.params.id);
     const project = await getForgeProjectById(projectId, user);
     const { path: filePath, content, encoding, expectedVersion, isProtected, reason } = req.body;
+    // A retried save (e.g. after a lost acknowledgement) with the same change-set id returns the
+    // committed result instead of writing again (blueprint §34.3, FS21-AT-SYN-07).
+    const changeSetId = (req.get("Idempotency-Key") || req.body?.changeSetId || "").toString().trim().slice(0, 128) || null;
+    if (changeSetId) {
+      const committed = await findCommittedChangeSet(projectId, changeSetId);
+      if (committed) {
+        const { id, sequence, kind } = committed.checkpoint;
+        return res.status(200).json({ ...(committed.response as object), checkpoint: { id, sequence, kind }, replayed: true });
+      }
+    }
     const previous = await db.forgeProjectFile.findFirst({ where: { projectId, path: String(filePath || ""), deletedAt: null } });
     let file = await writeFile(projectId, filePath, {
       content,
@@ -236,7 +277,22 @@ export async function writeFileHandler(req: Request, res: Response, next: NextFu
     }
 
     file = (await db.forgeProjectFile.findFirst({ where: { id: file.id } })) || file;
-    res.status(200).json({ success: true, file, sync });
+    const body: Record<string, unknown> = { success: true, file, sync };
+    if (changed || changeSetId) {
+      const checkpoint = await recordCheckpoint({
+        projectId,
+        websiteId: project.websiteId,
+        origin: "CODE",
+        kind: kindForSyncStatus(sync?.status),
+        filePath: file.path,
+        message: sync?.message ?? null,
+        changeSetId,
+        response: body,
+        actorId: user.id,
+      });
+      body.checkpoint = { id: checkpoint.id, sequence: checkpoint.sequence, kind: checkpoint.kind };
+    }
+    res.status(200).json(body);
   } catch (err) {
     next(err);
   }
@@ -401,13 +457,682 @@ export async function syncVisualToCodeHandler(req: Request, res: Response, next:
     const projectId = String(req.params.id);
     await getForgeProjectById(projectId, user);
 
-    const { filePath, element } = req.body;
-    const result = await syncVisualElementToSource(projectId, filePath, element, user.id);
+    const { filePath, element, expectedRevision } = req.body;
+    const result = await syncVisualElementToSource(projectId, filePath, element, {
+      authorId: user.id,
+      expectedRevision: expectedRevision !== undefined ? Number(expectedRevision) : undefined,
+    });
     res.status(200).json(result);
   } catch (err) {
     next(err);
   }
 }
+
+/** GET /:id/workspace/checkpoint — durable latest and last synchronized checkpoints. */
+export async function getWorkspaceCheckpointHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+    const state = await getCheckpointState(projectId);
+    res.status(200).json({ success: true, ...state });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /:id/workspace/checkpoints?after=N — checkpoints after a sequence, for reconnecting clients. */
+export async function listWorkspaceCheckpointsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+    const checkpoints = await listCheckpointsAfter(projectId, Number(req.query.after) || 0, Number(req.query.limit) || 100);
+    res.status(200).json({ success: true, checkpoints });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRoundTripCompatibilityHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+
+    const framework = (req.query.framework as any) || (project.framework === "nextjs" ? "nextjs" : "react");
+    const matrix = RoundTripContractService.publishCompatibilityMatrix(framework);
+
+    res.status(200).json({ success: true, matrix });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function classifyConstructHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { codeFragment, filePath } = req.body;
+    const classification = RoundTripContractService.classifyConstruct(
+      codeFragment || "",
+      filePath || ""
+    );
+
+    res.status(200).json({ success: true, classification });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createPageLifecycleHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+
+    const { pageName, routePath, framework, existingPages } = req.body;
+    const fw = framework || (project.framework === "nextjs" ? "nextjs" : "react");
+
+    const result = createPageLifecycle({
+      projectId,
+      pageName: pageName || "New Page",
+      routePath: routePath || "/new-page",
+      framework: fw,
+      existingPages: Array.isArray(existingPages) ? existingPages : [],
+    });
+
+    res.status(201).json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function movePageLifecycleHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { pages, pageKey, newRoutePath, newFilePath, newName } = req.body;
+    const result = renameOrMovePage({
+      pages: Array.isArray(pages) ? pages : [],
+      pageKey,
+      newRoutePath,
+      newFilePath,
+      newName,
+    });
+
+    res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function retirePageLifecycleHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { pages, pageKey, reason } = req.body;
+    const result = retirePageReversible(
+      Array.isArray(pages) ? pages : [],
+      pageKey,
+      reason
+    );
+
+    res.status(200).json({ success: true, pages: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function restorePageLifecycleHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { pages, pageKey } = req.body;
+    const result = restorePageDraft(
+      Array.isArray(pages) ? pages : [],
+      pageKey
+    );
+
+    res.status(200).json({ success: true, pages: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function runReferenceBenchmarkHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    getAuthUser(res, req);
+    const iterations = Number(req.body.iterations || 10);
+    const report = await ReferenceProjectBenchmarkService.runBenchmark(iterations);
+
+    res.status(200).json({ success: true, report });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 37: Dynamic Source Generation & Safe Cleanup
+// ---------------------------------------------------------------------------
+
+export async function planSymbolsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { items } = req.body;
+    const plansMap = DynamicSourcePlannerService.planSymbols(Array.isArray(items) ? items : []);
+    const plans = Object.fromEntries(plansMap.entries());
+
+    res.status(200).json({ success: true, plans });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function evaluateRegenerationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { plannedModule, existingRecord } = req.body;
+    const decision = DynamicSourcePlannerService.evaluateRegenerationSafety(
+      plannedModule,
+      existingRecord
+    );
+
+    res.status(200).json({ success: true, decision });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createCleanupPlanHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { previousManifestFiles, newPlannedPaths, checkpointId } = req.body;
+    const plan = SafeCleanupEngineService.createRemovalPlan(
+      projectId,
+      checkpointId || "cp_current",
+      Array.isArray(previousManifestFiles) ? previousManifestFiles : [],
+      new Set(Array.isArray(newPlannedPaths) ? newPlannedPaths : [])
+    );
+
+    res.status(200).json({ success: true, removalManifest: plan });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function applyCleanupPlanHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { manifestId, currentFiles } = req.body;
+    const currentFilesMap = new Map<string, { contentHash: string; isModifiedSince: boolean }>(
+      Object.entries(currentFiles || {})
+    );
+
+    const result = SafeCleanupEngineService.applyRemovalPlan(manifestId, currentFilesMap);
+    res.status(result.success ? 200 : 409).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 39: General-Purpose Application Data-Model & Introspection
+// ---------------------------------------------------------------------------
+
+export async function buildDomainModelSpecHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { entityName, description, moneyFields, relationships } = req.body;
+    const spec = DataModelGeneratorService.buildDomainModelSpec({
+      entityName: entityName || "Item",
+      description: description || "Application domain item",
+      moneyFields,
+      relationships,
+    });
+
+    res.status(200).json({ success: true, spec });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function validateDataMutationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { payload, dtoContract, operationType } = req.body;
+    const result = DataModelGeneratorService.validateIncomingMutation(
+      payload || {},
+      dtoContract,
+      operationType || "CREATE"
+    );
+
+    res.status(result.isValid ? 200 : 400).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function introspectExternalDatabaseHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { connectionString, existingManagedTableNames } = req.body;
+    const report = await ExternalDatabaseIntrospectionService.introspectSchema(
+      connectionString,
+      Array.isArray(existingManagedTableNames) ? existingManagedTableNames : []
+    );
+
+    res.status(200).json({ success: true, report });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 40: Contract-First APIs, Auth & Unified Authorization
+// ---------------------------------------------------------------------------
+
+export async function generateContractFirstApiHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { applicationSpec } = req.body;
+    const artifacts = contractFirstApiGenerator.generateContractFirstArtifacts(applicationSpec);
+    res.status(200).json({ success: true, artifacts });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bootstrapApplicationAuthHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { email, password, role, apiBaseUrl } = req.body;
+    const registered = applicationAuth.registerUser(
+      `app_${projectId}`,
+      user.tenantId || `tenant_${projectId}`,
+      email || "testuser@example.com",
+      password || "SuperSecretPassword123!",
+      role || "USER"
+    );
+
+    const loginResult = applicationAuth.loginUser(
+      `app_${projectId}`,
+      email || "testuser@example.com",
+      password || "SuperSecretPassword123!"
+    );
+
+    const sessionCheck = applicationAuth.verifySession(loginResult.token);
+    const publicConfig = applicationAuth.buildSanitizedPublicConfig(
+      `app_${projectId}`,
+      apiBaseUrl || "https://api.app.example.com",
+      ["auth", "orders"]
+    );
+
+    res.status(200).json({
+      success: true,
+      user: registered.user,
+      token: loginResult.token,
+      sessionValid: sessionCheck.valid,
+      publicConfig,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function evaluateUnifiedAuthorizationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { transport, subject, targetTenantId, requestedFields, resourceOwnerTenantId } = req.body;
+    const decision = unifiedExecutionAuthorization.evaluateAuthorization({
+      transport: transport || "HTTP_ENDPOINT",
+      subject: subject || {
+        userId: user.id,
+        tenantId: user.tenantId || `tenant_${projectId}`,
+        applicationId: `app_${projectId}`,
+        roles: ["USER"],
+        scopes: ["read:data"],
+      },
+      targetTenantId: targetTenantId || user.tenantId || `tenant_${projectId}`,
+      requestedFields: Array.isArray(requestedFields) ? requestedFields : ["id", "name", "passwordHash"],
+      resourceOwnerTenantId,
+    });
+
+    res.status(decision.allowed ? 200 : 403).json({ success: decision.allowed, decision });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 41: One Consistent Database Schema Studio Views
+// ---------------------------------------------------------------------------
+
+export async function getDatabaseStudioViewHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const viewName = String(req.params.viewName || req.query.view || "overview").toLowerCase();
+    const environment = String(req.query.environment || req.body.environment || "");
+
+    let viewData: any;
+    switch (viewName) {
+      case "overview":
+        viewData = databaseStudioViews.getOverviewView(projectId, environment);
+        break;
+      case "model-designer":
+        viewData = databaseStudioViews.getModelDesignerView(projectId, environment);
+        break;
+      case "relationships":
+        viewData = databaseStudioViews.getRelationshipView(projectId, environment);
+        break;
+      case "schema-inspector":
+        viewData = databaseStudioViews.getSchemaInspectorView(projectId, environment);
+        break;
+      case "change-planner":
+        viewData = databaseStudioViews.getChangePlannerView(projectId, environment, req.body.proposedChanges || []);
+        break;
+      case "migration-history":
+        viewData = databaseStudioViews.getMigrationHistoryView(projectId, environment);
+        break;
+      case "data-browser":
+        viewData = databaseStudioViews.getDataBrowserView(
+          projectId,
+          environment,
+          String(req.query.table || "app_users"),
+          Number(req.query.page || 1),
+          Number(req.query.limit || 20)
+        );
+        break;
+      case "api-binding":
+        viewData = databaseStudioViews.getApiBindingExplorerView(projectId, environment);
+        break;
+      case "environments":
+        viewData = databaseStudioViews.getEnvironmentsView(projectId);
+        break;
+      case "recovery":
+        viewData = databaseStudioViews.getRecoveryView(projectId, environment);
+        break;
+      default:
+        return res.status(400).json({ success: false, error: `Unknown Database Studio view: ${viewName}` });
+    }
+
+    res.status(200).json({ success: true, view: viewData });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 42: Environment Bindings, Secrets and Isolation
+// ---------------------------------------------------------------------------
+
+export async function resolveEnvironmentBindingHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const environment = req.query.environment || req.body.environment;
+    const binding = environmentBindingService.getBinding(projectId, environment);
+
+    res.status(200).json({ success: true, binding });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resolveTargetPoolHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { environment, roleType } = req.body;
+    const pool = targetResolutionService.resolveTargetPool(
+      projectId,
+      environment || "DEVELOPMENT",
+      roleType || "runtime"
+    );
+
+    res.status(200).json({ success: true, pool });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 43: One Migration Authority & Safe Upgrade Lifecycle
+// ---------------------------------------------------------------------------
+
+export async function executeUnifiedMigrationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { targetBindingId, namespace, authority, statements } = req.body;
+    const plan = unifiedMigrationAuthority.createMigrationPlan(
+      projectId,
+      targetBindingId || `bind_${projectId}_dev`,
+      namespace || `schema_${projectId}`,
+      authority || "FORGE_MANAGED",
+      Array.isArray(statements) ? statements : ["CREATE TABLE app_items (id uuid primary key);"]
+    );
+
+    // Rehearse & Approve
+    const rehearsal = unifiedMigrationAuthority.rehearseMigrationPlan(plan.planId);
+    unifiedMigrationAuthority.approveMigrationPlan(plan.planId, user.id);
+    const result = unifiedMigrationAuthority.executeMigrationPlan(plan.planId);
+
+    res.status(200).json({ success: true, plan, rehearsal, result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 44: End-to-End Application/Database Release Qualification
+// ---------------------------------------------------------------------------
+
+export async function runReleaseQualificationHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const {
+      applicationSpecRevision = 1,
+      applicationSpecDigest = "spec_digest_default",
+      sourceCheckpointId = "chk_default",
+      sourceTreeHash = "src_hash_default",
+      apiContractDigest = "contract_digest_default",
+      schemaVersionDigest = "schema_digest_default",
+      migrationSetHash = "mig_hash_default",
+      environmentBindingId = `bind_${projectId}_dev`,
+      credentialReferenceVersion = 1,
+      environmentClass = "DEVELOPMENT",
+      syntheticMarker = "SYNTH_QUAL_TEST",
+    } = req.body;
+
+    const qualification = applicationReleaseQualificationService.runQualification({
+      applicationId: `app_${projectId}`,
+      projectId,
+      applicationSpecRevision: Number(applicationSpecRevision),
+      applicationSpecDigest,
+      sourceCheckpointId,
+      sourceTreeHash,
+      apiContractDigest,
+      schemaVersionDigest,
+      migrationSetHash,
+      environmentBindingId,
+      credentialReferenceVersion: Number(credentialReferenceVersion),
+      verifierIdentity: user.id,
+      environmentClass,
+      syntheticMarker,
+    });
+
+    res.status(200).json({ success: true, qualification });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getReleaseQualificationRecordHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const runId = String(req.params.runId);
+    const record = applicationReleaseQualificationService.getQualificationRecord(runId);
+    if (!record) {
+      return res.status(404).json({ success: false, error: "Qualification run record not found" });
+    }
+
+    res.status(200).json({ success: true, qualification: record });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 45: Team Project Tracker Vertical Acceptance Slice
+// ---------------------------------------------------------------------------
+
+export async function teamProjectTrackerOperationsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { operation, payload = {} } = req.body;
+
+    if (operation === "run-demonstration") {
+      const demoResult = teamProjectTrackerService.run15StepDemonstration(
+        payload.syntheticMarker || `RUN_${Date.now()}`
+      );
+      return res.status(200).json({ success: true, demonstration: demoResult });
+    }
+
+    if (operation === "create-org") {
+      const org = teamProjectTrackerService.createOrganization(payload.name || "Default Org", payload.slug || "default-org");
+      return res.status(201).json({ success: true, org });
+    }
+
+    if (operation === "add-member") {
+      const mem = teamProjectTrackerService.addMember(payload.organizationId, payload.userId || user.id, payload.role || "MEMBER");
+      return res.status(201).json({ success: true, membership: mem });
+    }
+
+    if (operation === "create-task") {
+      const task = teamProjectTrackerService.createTask(payload.projectId || projectId, payload.callerMembershipId, {
+        title: payload.title || "New Task",
+        description: payload.description,
+        priority: payload.priority,
+        dueDate: payload.dueDate,
+        assigneeMembershipId: payload.assigneeMembershipId,
+      });
+      return res.status(201).json({ success: true, task });
+    }
+
+    if (operation === "complete-task") {
+      const result = teamProjectTrackerService.completeTask(payload.taskId, payload.callerMembershipId, {
+        expectedRevision: Number(payload.expectedRevision || 1),
+        idempotencyKey: payload.idempotencyKey || `idem_${Date.now()}`,
+      });
+      return res.status(200).json({ success: true, ...result });
+    }
+
+    if (operation === "add-comment") {
+      const comment = teamProjectTrackerService.addComment(payload.taskId, payload.callerMembershipId, payload.content || "");
+      return res.status(201).json({ success: true, comment });
+    }
+
+    if (operation === "list-tasks") {
+      const tasks = teamProjectTrackerService.listProjectTasks(payload.projectId || projectId, payload.callerMembershipId);
+      return res.status(200).json({ success: true, tasks });
+    }
+
+    res.status(400).json({ success: false, error: `Unknown Team Project Tracker operation: ${operation}` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Blueprint Point 46: Reconcile Architecture and API Contracts
+// ---------------------------------------------------------------------------
+
+export async function validateGeneratedPackageHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const { files = [] } = req.body;
+    const manifest = controlPlaneReconciliationService.validateGeneratedPackage(files);
+    res.status(200).json({ success: true, manifest });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyControlPlaneDiagnosticsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
+    const environment = String(req.query.environment || "DEVELOPMENT");
+    const diagnostics = controlPlaneReconciliationService.verifyControlPlaneConnection(projectId, environment);
+    res.status(200).json({ success: true, diagnostics });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
 
 export async function syncCodeToVisualHandler(req: Request, res: Response, next: NextFunction) {
   try {
@@ -430,7 +1155,16 @@ export async function syncCodeToVisualHandler(req: Request, res: Response, next:
       return res.status(400).json({ success: false, message: "resolve must be 'code' or 'visual'" });
     }
     const result = await syncSourceToVisualWebsite(projectId, project.websiteId, filePath, user.id, { resolve });
-    res.status(200).json(result);
+    const checkpoint = await recordCheckpoint({
+      projectId,
+      websiteId: project.websiteId,
+      origin: "CODE",
+      kind: kindForSyncStatus(result.status),
+      filePath,
+      message: result.message ?? null,
+      actorId: user.id,
+    });
+    res.status(200).json({ ...result, checkpointId: checkpoint.id, checkpoint: { id: checkpoint.id, sequence: checkpoint.sequence, kind: checkpoint.kind } });
   } catch (err) {
     next(err);
   }

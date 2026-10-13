@@ -4,11 +4,11 @@
  */
 
 import { Request, Response } from "express";
-import { ThreatModelMatrixService } from "../services/securityAudit/threatModelMatrix.service.ts";
-import { SecurityPlanesAuthorizationService } from "../services/securityAudit/securityPlanesAuthorization.service.ts";
-import { SsrfNetworkQuarantineService } from "../services/securityAudit/ssrfNetworkQuarantine.service.ts";
-import { DataPolicyRetentionRedactionService } from "../services/securityAudit/dataPolicyRetentionRedaction.service.ts";
-import { DurableAuditDenialLedgerService } from "../services/securityAudit/durableAuditDenialLedger.service.ts";
+import { ThreatModelMatrixService } from "../services/securityAudit/threatModelMatrix.service.js";
+import { SecurityPlanesAuthorizationService } from "../services/securityAudit/securityPlanesAuthorization.service.js";
+import { SsrfNetworkQuarantineService } from "../services/securityAudit/ssrfNetworkQuarantine.service.js";
+import { DataPolicyRetentionRedactionService } from "../services/securityAudit/dataPolicyRetentionRedaction.service.js";
+import { DurableAuditDenialLedgerService } from "../services/securityAudit/durableAuditDenialLedger.service.js";
 
 export class SecurityAuditController {
   public static async getThreatModel(req: Request, res: Response) {
@@ -22,7 +22,7 @@ export class SecurityAuditController {
 
   public static async resolveContext(req: Request, res: Response) {
     try {
-      const user = (req as any).user || {};
+      const user = res.locals.user || {};
       const untrustedHeader = req.headers["x-tenant-id"] as string | undefined;
       const context = SecurityPlanesAuthorizationService.resolveSecurityContext(user, untrustedHeader);
       return res.status(200).json({ success: true, context });

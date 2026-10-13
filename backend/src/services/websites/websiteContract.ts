@@ -372,7 +372,7 @@ export function extractContractFromEditorData(
           // Default truthful claim baseline
           {
             id: `claim-${index}-org`,
-            statement: `Official page representation for ${websiteMetadata.websiteName}`,
+            statement: `Official page representation for ${websiteName}`,
             status: "APPROVED_FACT",
           },
         ];
@@ -389,8 +389,8 @@ export function extractContractFromEditorData(
       claims,
       reviewState: (p.reviewState || "APPROVED") as ContentReviewState,
       seoPolicy: {
-        title: p.pageSettings?.title || `${pageName} | ${websiteMetadata.websiteName}`,
-        metaDescription: p.pageSettings?.metaDescription || `${pageName} for ${websiteMetadata.websiteName}`,
+        title: p.pageSettings?.title || `${pageName} | ${websiteName}`,
+        metaDescription: p.pageSettings?.metaDescription || `${pageName} for ${websiteName}`,
         noIndex: Boolean(p.pageSettings?.noIndex),
         canonicalUrl: p.pageSettings?.canonicalUrl || route,
       },

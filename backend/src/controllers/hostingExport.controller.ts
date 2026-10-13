@@ -4,10 +4,10 @@
  */
 
 import { Request, Response } from "express";
-import { DestinationCapabilityMatrixService, HostingDestinationType } from "../services/hostingExport/destinationCapabilityMatrix.service.ts";
-import { HostingProfilesEngine } from "../services/hostingExport/hostingProfilesEngine.service.ts";
-import { PortableExportPackageService } from "../services/hostingExport/portableExportPackage.service.ts";
-import { WordPressCompatibilityAdapterService } from "../services/hostingExport/wordPressCompatibilityAdapter.service.ts";
+import { DestinationCapabilityMatrixService, HostingDestinationType } from "../services/hostingExport/destinationCapabilityMatrix.service.js";
+import { HostingProfilesEngine } from "../services/hostingExport/hostingProfilesEngine.service.js";
+import { PortableExportPackageService } from "../services/hostingExport/portableExportPackage.service.js";
+import { WordPressCompatibilityAdapterService } from "../services/hostingExport/wordPressCompatibilityAdapter.service.js";
 
 export class HostingExportController {
   public static async getDestinationCapabilities(req: Request, res: Response) {

@@ -97,7 +97,7 @@ export function evaluateActivationPrerequisites(
 ): ActivationPrerequisiteReport {
   const cap = getCapabilityById(capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${capId}' not found.`);
+    throw new AppError(`Capability '${capId}' not found.`, 404);
   }
 
   const prerequisites: PrerequisiteItem[] = [];
@@ -230,7 +230,7 @@ export function previewDisableImpact(
 ): DisableImpactPreview {
   const cap = getCapabilityById(capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${capId}' not found.`);
+    throw new AppError(`Capability '${capId}' not found.`, 404);
   }
 
   // Check downstream dependencies
@@ -291,7 +291,7 @@ export function executeGovernedActivation(
 ): GovernedTransitionResult {
   const cap = getCapabilityById(capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${capId}' not found.`);
+    throw new AppError(`Capability '${capId}' not found.`, 404);
   }
 
   const prereqReport = evaluateActivationPrerequisites(capId, context);
@@ -301,8 +301,8 @@ export function executeGovernedActivation(
       .map((p) => p.name)
       .join("; ");
     throw new AppError(
-      400,
-      `Cannot activate capability '${cap.id}': ${prereqReport.blockerCount} hard blocker(s) present (${blockerNames}).`
+      `Cannot activate capability '${cap.id}': ${prereqReport.blockerCount} hard blocker(s) present (${blockerNames}).`,
+      400
     );
   }
 
@@ -341,13 +341,13 @@ export function executeGovernedDisable(
 ): GovernedTransitionResult {
   const cap = getCapabilityById(capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${capId}' not found.`);
+    throw new AppError(`Capability '${capId}' not found.`, 404);
   }
 
   if (cap.disableExitBehavior === "LOCKED_CANNOT_DISABLE" && !options.force) {
     throw new AppError(
-      403,
-      `Capability '${cap.id}' (${cap.name}) is locked and cannot be disabled through ordinary controls.`
+      `Capability '${cap.id}' (${cap.name}) is locked and cannot be disabled through ordinary controls.`,
+      403
     );
   }
 

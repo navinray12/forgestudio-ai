@@ -12,13 +12,14 @@ import {
   Database,
   Filter,
 } from "lucide-react";
-import type { TableDetails } from "../types/studio.types";
+import type { StudioEnvironment, TableDetails } from "../types/studio.types";
 
 interface DataGridProps {
   projectId: string;
   tableName: string;
   tableDetails: TableDetails | null;
   apiBase: string;
+  environment: StudioEnvironment;
 }
 
 export const DataGrid: React.FC<DataGridProps> = ({
@@ -26,6 +27,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   tableName,
   tableDetails,
   apiBase,
+  environment,
 }) => {
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [total, setTotal] = useState(0);
@@ -59,6 +61,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       const query = new URLSearchParams({
         page: String(page),
         limit: String(limit),
+        environment,
       });
       if (sortBy) {
         query.set("sortBy", sortBy);
@@ -80,7 +83,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [projectId, tableName, page, limit, sortBy, sortOrder, apiBase]);
+  }, [projectId, tableName, page, limit, sortBy, sortOrder, apiBase, environment]);
 
   useEffect(() => {
     setPage(1);
@@ -113,7 +116,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       }
 
       const res = await fetch(
-        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows`,
+        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows?environment=${environment}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -162,7 +165,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
     setMutating(true);
     try {
       const res = await fetch(
-        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows`,
+        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows?environment=${environment}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -200,7 +203,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       }
 
       const res = await fetch(
-        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows`,
+        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}/rows?environment=${environment}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -20,7 +20,19 @@ import { MonacoSqlEditor } from "../components/MonacoSqlEditor";
 import { VisualTableDesigner } from "../components/VisualTableDesigner";
 import { SchemaVisualizer } from "../components/SchemaVisualizer";
 import { MigrationsManager } from "../components/MigrationsManager";
-import type { TableSummary, TableDetails, DatabaseStatus } from "../types/studio.types";
+import type { TableSummary, TableDetails, DatabaseStatus, StudioEnvironment } from "../types/studio.types";
+
+const STUDIO_ENVIRONMENTS: StudioEnvironment[] = ["DEVELOPMENT", "PREVIEW", "PRODUCTION"];
+
+function readStoredEnvironment(projectId: string): StudioEnvironment {
+  try {
+    const stored = localStorage.getItem(`forge.studio.environment.${projectId}`);
+    if (stored && (STUDIO_ENVIRONMENTS as string[]).includes(stored)) return stored as StudioEnvironment;
+  } catch {
+    // Storage may be unavailable; fall back to development.
+  }
+  return "DEVELOPMENT";
+}
 
 export const DatabaseStudioPage: React.FC = () => {
   const params = useParams<{ projectId?: string; websiteId?: string }>();
@@ -36,11 +48,27 @@ export const DatabaseStudioPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
+  // Every Studio request names its target database explicitly; the server rejects requests
+  // without one instead of defaulting to PRODUCTION.
+  const [environment, setEnvironment] = useState<StudioEnvironment>(() => readStoredEnvironment(projectId));
+  const isProduction = environment === "PRODUCTION";
+
+  const changeEnvironment = (next: StudioEnvironment) => {
+    setEnvironment(next);
+    setSelectedTable("");
+    setTables([]);
+    setDbStatus(null);
+    try {
+      localStorage.setItem(`forge.studio.environment.${projectId}`, next);
+    } catch {
+      // Non-critical convenience only.
+    }
+  };
 
   const fetchDatabaseStatus = useCallback(async () => {
     if (!projectId) return;
     try {
-      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/database`, {
+      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/database?environment=${environment}`, {
         credentials: "include",
       });
       const json = await res.json();
@@ -50,13 +78,13 @@ export const DatabaseStudioPage: React.FC = () => {
     } catch (err) {
       console.error("Failed to load database status", err);
     }
-  }, [projectId, apiBase]);
+  }, [projectId, apiBase, environment]);
 
   const fetchTables = useCallback(async () => {
     if (!projectId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/studio/tables`, {
+      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/studio/tables?environment=${environment}`, {
         credentials: "include",
       });
       const json = await res.json();
@@ -72,13 +100,13 @@ export const DatabaseStudioPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, apiBase, selectedTable]);
+  }, [projectId, apiBase, selectedTable, environment]);
 
   const fetchTableDetails = useCallback(async (tableName: string) => {
     if (!projectId || !tableName) return;
     try {
       const res = await fetch(
-        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}`,
+        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}?environment=${environment}`,
         { credentials: "include" }
       );
       const json = await res.json();
@@ -88,7 +116,7 @@ export const DatabaseStudioPage: React.FC = () => {
     } catch (err) {
       console.error("Failed to load table details", err);
     }
-  }, [projectId, apiBase]);
+  }, [projectId, apiBase, environment]);
 
   useEffect(() => {
     fetchDatabaseStatus();
@@ -110,7 +138,7 @@ export const DatabaseStudioPage: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ environment: "PRODUCTION" }),
+        body: JSON.stringify({ environment }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Provisioning failed");
@@ -124,12 +152,19 @@ export const DatabaseStudioPage: React.FC = () => {
   };
 
   const handleDropTable = async (tableName: string) => {
-    if (!confirm(`Are you sure you want to drop table "${tableName}"? This action is irreversible.`)) {
+    if (isProduction) {
+      const typed = prompt(
+        `You are about to drop "${tableName}" from the PRODUCTION database. This cannot be undone.
+
+Type the table name to confirm:`
+      );
+      if (typed !== tableName) return;
+    } else if (!confirm(`Drop table "${tableName}" from ${environment}? This action is irreversible.`)) {
       return;
     }
     try {
       const res = await fetch(
-        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}`,
+        `${apiBase}/api/v1/projects/${projectId}/studio/tables/${tableName}?environment=${environment}`,
         {
           method: "DELETE",
           credentials: "include",
@@ -180,6 +215,28 @@ export const DatabaseStudioPage: React.FC = () => {
 
         {/* Database Telemetry Status Bar */}
         <div className="flex items-center gap-4 text-xs font-mono">
+          <label
+            className={`flex items-center gap-2 px-2 py-1 rounded-lg border ${
+              isProduction
+                ? "bg-rose-950/60 border-rose-500/60 text-rose-200"
+                : "bg-slate-950 border-slate-800 text-slate-400"
+            }`}
+          >
+            <span className="uppercase tracking-wider text-[10px]">Environment</span>
+            <select
+              value={environment}
+              onChange={(e) => changeEnvironment(e.target.value as StudioEnvironment)}
+              className="bg-transparent font-bold focus:outline-none"
+              aria-label="Target database environment"
+            >
+              {STUDIO_ENVIRONMENTS.map((env) => (
+                <option key={env} value={env} className="bg-slate-900 text-white">
+                  {env}
+                </option>
+              ))}
+            </select>
+            {isProduction && <span className="text-[10px] font-bold">LIVE DATA</span>}
+          </label>
           {dbStatus?.provisioned ? (
             <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400">
               <span className="flex items-center gap-1.5 text-emerald-400">
@@ -201,7 +258,7 @@ export const DatabaseStudioPage: React.FC = () => {
                 disabled={provisioning}
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold shadow transition disabled:opacity-50"
               >
-                {provisioning ? "Provisioning..." : "Provision Database"}
+                {provisioning ? "Provisioning..." : `Provision ${environment} Database`}
               </button>
             </div>
           )}
@@ -336,6 +393,7 @@ export const DatabaseStudioPage: React.FC = () => {
                 tableName={selectedTable}
                 tableDetails={selectedTableDetails}
                 apiBase={apiBase}
+                environment={environment}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-3">
@@ -352,11 +410,11 @@ export const DatabaseStudioPage: React.FC = () => {
           )}
 
           {activeTab === "sql" && (
-            <MonacoSqlEditor projectId={projectId} apiBase={apiBase} />
+            <MonacoSqlEditor projectId={projectId} apiBase={apiBase} environment={environment} />
           )}
 
           {activeTab === "erd" && (
-            <SchemaVisualizer projectId={projectId} apiBase={apiBase} />
+            <SchemaVisualizer projectId={projectId} apiBase={apiBase} environment={environment} />
           )}
 
           {activeTab === "migrations" && (
@@ -369,6 +427,7 @@ export const DatabaseStudioPage: React.FC = () => {
       <VisualTableDesigner
         projectId={projectId}
         apiBase={apiBase}
+        environment={environment}
         isOpen={showDesigner}
         onClose={() => setShowDesigner(false)}
         onTableCreated={(newTable) => {

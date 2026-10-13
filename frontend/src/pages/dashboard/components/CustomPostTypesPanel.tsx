@@ -135,14 +135,23 @@ export default function CustomPostTypesPanel() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ fields: fields.map((f, i) => ({ ...f, order: i })) }),
             });
-            if (r.ok) { alert("Fields saved!"); loadCpts(); } // refresh counts
-            else alert("Save failed.");
+            const d = await r.json().catch(() => ({}));
+            if (r.ok) {
+                if (Array.isArray(d.data)) setFields(d.data);
+                const retained: string[] = d.migrationPlan?.retained ?? [];
+                alert(retained.length > 0
+                    ? `Fields saved. Removing fields is not applied automatically, so these were kept: ${retained.join(", ")}.`
+                    : "Fields saved!");
+                loadCpts(); // refresh counts
+            } else {
+                alert(d.error?.message || "Save failed.");
+            }
         } catch { alert("Network error."); }
         finally { setSavingFields(false); }
     };
 
     const handleDelete = async (cpt: CPT) => {
-        if (!confirm(`Delete "${cpt.name}" and all its fields/entries? This cannot be undone.`)) return;
+        if (!confirm(`Delete "${cpt.name}" and its field definitions? Post types that still have entries cannot be deleted. This cannot be undone.`)) return;
         try {
             // Route: DELETE /api/cpt/types/:cptId
             const r = await fetch(`${apiUrl}/api/cpt/types/${cpt.id}`, { method: "DELETE", credentials: "include" });

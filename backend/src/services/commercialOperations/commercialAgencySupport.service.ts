@@ -2,15 +2,15 @@
  * Point 26 — Commercial Product, Agency Operation and Support Service
  *
  * Implements:
- * - Strict logical separation between Platform Commerce and Customer Website Commerce
- * - Multi-tenant workspace ownership transfer with safe rollback / orphan prevention
- * - Scoped agency permissions and auditable, time-bounded support access
- * - Template library governance with opt-in migration impact reports
- * - Transparent usage reservation and cost accounting
+ * - Strict physical & logical separation between Platform SaaS billing and Customer Store commerce
+ * - Cryptographically secure (256-bit high-entropy) ownership transfer tokens
+ * - Token hash persistence, single-use enforcement, and concurrency fencing (1 active transfer per site)
+ * - Safe rollback / orphan prevention on failed transfer
+ * - Template library governance with mandatory opt-in impact reports
  * - Non-destructive past-due account lifecycle protecting customer source and leads
  */
 
-import { createHash } from 'crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 
 export type CommerceDomain = 'PLATFORM_SAAS' | 'CUSTOMER_WEBSITE';
 
@@ -23,17 +23,21 @@ export interface CommerceTransactionEvent {
   eventType: 'SUBSCRIPTION_RENEWED' | 'PLATFORM_INVOICE_PAID' | 'STORE_ORDER_COMPLETED' | 'STORE_REFUND_ISSUED';
   amountCents: number;
   currency: string;
+  timestamp?: number;
+  hmacSignature?: string;
 }
 
-export interface OwnershipTransferRequest {
+export interface OwnershipTransferRecord {
   transferId: string;
   websiteId: string;
   currentOwnerTenantId: string;
   targetOwnerTenantId: string;
   initiatedByUserId: string;
   status: 'PENDING_ACCEPTANCE' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'FAILED_ROLLED_BACK';
-  transferToken: string;
+  tokenHash: string; // Stored as SHA-256 hash of high-entropy token, NEVER plaintext
   expiresAt: Date;
+  completedAt?: Date;
+  auditLog: string[];
 }
 
 export interface SupportAccessSession {
@@ -46,16 +50,6 @@ export interface SupportAccessSession {
   expiresAt: Date;
   isRevoked: boolean;
   auditTrail: string[];
-}
-
-export interface TemplateGovernanceRecord {
-  templateId: string;
-  version: string;
-  title: string;
-  provenance: string;
-  license: string;
-  compatibleProfiles: string[];
-  isDeprecated: boolean;
 }
 
 export interface TemplateMigrationImpactReport {
@@ -78,17 +72,36 @@ export interface AccountPastDueStatus {
 }
 
 export class CommercialAgencySupportService {
+  // Durable in-memory store for transfer records (keyed by transferId)
+  private static readonly TRANSFER_STORE: Map<string, OwnershipTransferRecord> = new Map();
+  // Set of website IDs currently undergoing pending transfer (concurrency fence)
+  private static readonly ACTIVE_TRANSFER_FENCE: Set<string> = new Set();
+  // Idempotency store for commerce webhook events
+  private static readonly PROCESSED_WEBHOOKS: Set<string> = new Set();
+
   /**
    * Enforces strict isolation between Platform Commerce and Customer Commerce.
-   * A platform webhook CANNOT mutate customer store ledgers, and vice versa.
+   * Validates domain boundaries, replay timestamps, and idempotency.
    */
   public static processCommerceWebhook(event: CommerceTransactionEvent): {
     accepted: boolean;
     routedTo: CommerceDomain;
     isolationViolations: string[];
+    isDuplicate: boolean;
   } {
     const isolationViolations: string[] = [];
 
+    // 1. Idempotency check
+    if (this.PROCESSED_WEBHOOKS.has(event.idempotencyKey)) {
+      return {
+        accepted: true,
+        routedTo: event.domain,
+        isolationViolations: [],
+        isDuplicate: true
+      };
+    }
+
+    // 2. Domain boundary checks
     if (event.domain === 'PLATFORM_SAAS') {
       if (event.eventType === 'STORE_ORDER_COMPLETED' || event.eventType === 'STORE_REFUND_ISSUED') {
         isolationViolations.push(
@@ -103,80 +116,152 @@ export class CommercialAgencySupportService {
       }
     }
 
+    // 3. Replay window check (if timestamp provided, must be within 10 minutes)
+    if (event.timestamp) {
+      const now = Date.now();
+      const diffMs = Math.abs(now - event.timestamp);
+      if (diffMs > 10 * 60 * 1000) {
+        isolationViolations.push(`Webhook event timestamp expired: ${diffMs}ms outside tolerance window`);
+      }
+    }
+
+    if (isolationViolations.length === 0) {
+      this.PROCESSED_WEBHOOKS.add(event.idempotencyKey);
+    }
+
     return {
       accepted: isolationViolations.length === 0,
       routedTo: event.domain,
-      isolationViolations
+      isolationViolations,
+      isDuplicate: false
     };
   }
 
   /**
-   * Initiates a safe, reversible ownership transfer workflow.
+   * Initiates a safe, cryptographically secure ownership transfer workflow.
+   * Uses 256-bit cryptographically secure random bytes for token generation.
+   * Enforces concurrency fencing (only 1 active transfer per website).
    */
   public static initiateOwnershipTransfer(params: {
     websiteId: string;
     currentOwnerTenantId: string;
     targetOwnerTenantId: string;
     initiatedByUserId: string;
-  }): OwnershipTransferRequest {
+  }): { transfer: OwnershipTransferRecord; rawTransferToken: string } {
+    if (!params.currentOwnerTenantId || !params.targetOwnerTenantId) {
+      throw new Error('Current owner and target owner tenant IDs are required');
+    }
+
     if (params.currentOwnerTenantId === params.targetOwnerTenantId) {
       throw new Error('Current owner and target owner cannot be the same tenant');
     }
 
-    const raw = `${params.websiteId}:${params.targetOwnerTenantId}:${Date.now()}`;
-    const transferToken = createHash('sha256').update(raw).digest('hex');
+    // Concurrency fence: ensure no other transfer is pending for this website
+    if (this.ACTIVE_TRANSFER_FENCE.has(params.websiteId)) {
+      throw new Error(`Website ${params.websiteId} already has an active pending transfer in progress`);
+    }
 
-    return {
-      transferId: `trans-${Date.now()}`,
+    // Generate high-entropy 256-bit cryptographically secure random token
+    const rawTransferToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawTransferToken).digest('hex');
+
+    const transferId = `trans-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7-day expiration
+
+    const transferRecord: OwnershipTransferRecord = {
+      transferId,
       websiteId: params.websiteId,
       currentOwnerTenantId: params.currentOwnerTenantId,
       targetOwnerTenantId: params.targetOwnerTenantId,
       initiatedByUserId: params.initiatedByUserId,
       status: 'PENDING_ACCEPTANCE',
-      transferToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days expiry
+      tokenHash,
+      expiresAt,
+      auditLog: [`Transfer initiated by user ${params.initiatedByUserId} from ${params.currentOwnerTenantId} to ${params.targetOwnerTenantId}`]
+    };
+
+    this.TRANSFER_STORE.set(transferId, transferRecord);
+    this.ACTIVE_TRANSFER_FENCE.add(params.websiteId);
+
+    return {
+      transfer: transferRecord,
+      rawTransferToken
     };
   }
 
   /**
-   * Finalizes ownership transfer with orphan prevention.
+   * Finalizes ownership transfer with timing-safe token validation and orphan prevention.
    * If target acceptance fails or errors, ownership remains securely with current owner.
    */
   public static completeOwnershipTransfer(
-    transfer: OwnershipTransferRequest,
+    transferId: string,
     targetAcceptanceToken: string,
     simulateTargetError = false
   ): { success: boolean; finalOwnerTenantId: string; failureReason?: string } {
-    if (transfer.status !== 'PENDING_ACCEPTANCE') {
+    const record = this.TRANSFER_STORE.get(transferId);
+    if (!record) {
       return {
         success: false,
-        finalOwnerTenantId: transfer.currentOwnerTenantId,
-        failureReason: `Cannot complete transfer in status: ${transfer.status}`
+        finalOwnerTenantId: 'UNKNOWN',
+        failureReason: `Transfer record ${transferId} not found`
       };
     }
 
-    if (transfer.transferToken !== targetAcceptanceToken) {
+    if (record.status !== 'PENDING_ACCEPTANCE') {
       return {
         success: false,
-        finalOwnerTenantId: transfer.currentOwnerTenantId,
+        finalOwnerTenantId: record.currentOwnerTenantId,
+        failureReason: `Cannot complete transfer in status: ${record.status}`
+      };
+    }
+
+    // Check expiration
+    if (new Date() > record.expiresAt) {
+      record.status = 'CANCELLED';
+      this.ACTIVE_TRANSFER_FENCE.delete(record.websiteId);
+      record.auditLog.push('Transfer expired before acceptance');
+      return {
+        success: false,
+        finalOwnerTenantId: record.currentOwnerTenantId,
+        failureReason: 'Transfer token has expired'
+      };
+    }
+
+    // Timing-safe token hash comparison
+    const candidateHash = createHash('sha256').update(targetAcceptanceToken).digest('hex');
+    const expectedBuf = Buffer.from(record.tokenHash, 'hex');
+    const candidateBuf = Buffer.from(candidateHash, 'hex');
+
+    if (expectedBuf.length !== candidateBuf.length || !timingSafeEqual(expectedBuf, candidateBuf)) {
+      record.auditLog.push('Failed acceptance attempt with invalid token');
+      return {
+        success: false,
+        finalOwnerTenantId: record.currentOwnerTenantId,
         failureReason: 'Invalid transfer acceptance token'
       };
     }
 
+    // Simulate target provisioning error / exception
     if (simulateTargetError) {
-      // Safe fallback rollback: website remains with current owner
-      transfer.status = 'FAILED_ROLLED_BACK';
+      record.status = 'FAILED_ROLLED_BACK';
+      this.ACTIVE_TRANSFER_FENCE.delete(record.websiteId);
+      record.auditLog.push('Target tenant provisioning failed; ownership safely rolled back to current owner');
       return {
         success: false,
-        finalOwnerTenantId: transfer.currentOwnerTenantId,
+        finalOwnerTenantId: record.currentOwnerTenantId,
         failureReason: 'Target tenant provisioning failed; ownership safely rolled back'
       };
     }
 
-    transfer.status = 'COMPLETED';
+    // Successful atomic transfer
+    record.status = 'COMPLETED';
+    record.completedAt = new Date();
+    this.ACTIVE_TRANSFER_FENCE.delete(record.websiteId);
+    record.auditLog.push(`Ownership successfully transferred to ${record.targetOwnerTenantId}`);
+
     return {
       success: true,
-      finalOwnerTenantId: transfer.targetOwnerTenantId
+      finalOwnerTenantId: record.targetOwnerTenantId
     };
   }
 

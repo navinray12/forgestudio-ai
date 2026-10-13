@@ -7,6 +7,7 @@ import { pgPool, prisma } from "./config/prisma.js";
 
 import { validateIdentityConfiguration } from "./modules/identity/composition.js";
 import { ensureDatabaseTables } from "./config/ensure-schema.js";
+import { reconcileInterruptedRuns } from "./services/appGeneration/appGeneration.service.js";
 validateIdentityConfiguration();
 
 const PORT = process.env.PORT || 5000;
@@ -45,7 +46,12 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-void ensureDatabaseTables().then(() => {
+void ensureDatabaseTables().then(async () => {
+  const interrupted = await reconcileInterruptedRuns().catch((err) => {
+    console.error("[app-generation] could not reconcile interrupted runs:", err?.message || err);
+    return 0;
+  });
+  if (interrupted > 0) console.warn(`[app-generation] marked ${interrupted} interrupted generation run(s) as failed`);
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     startScheduler();

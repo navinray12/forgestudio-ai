@@ -3,6 +3,7 @@ import { ts } from "./tsCompiler.js";
 import { AppError } from "../../utils/app-error.js";
 import { readFile, writeFile, listFiles, sanitizeAndNormalizePath } from "../project/forgeFilesystem.service.js";
 import { prisma } from "../../config/prisma.js";
+import { updateProjectMetadataAtomic } from "../workspace/workspaceCheckpoints.service.js";
 import { extractProtectedRegions, injectProtectedRegions } from "../generator/sourcePreservation.service.js";
 import { escapeJsxText } from "../generator/jsxRenderer.js";
 import { compileAndSyncProject } from "./unifiedCompiler.service.js";
@@ -33,6 +34,19 @@ export { extractProtectedRegions, injectProtectedRegions };
 
 export type SyncMode = "VISUAL_TO_CODE" | "CODE_TO_VISUAL" | "BIDIRECTIONAL" | "MANUAL";
 
+export type CodeOwnershipBoundary =
+  | "VISUAL_COMPOSITION"
+  | "SOURCE_OWNED"
+  | "CMS_CONTENT"
+  | "APPLICATION_SPEC_OWNED";
+
+export interface WorkspaceCheckpointReference {
+  checkpointId: string;
+  revision: number;
+  hash: string;
+  timestamp: string;
+}
+
 export interface SyncConflict {
   elementId?: string;
   filePath: string;
@@ -50,8 +64,9 @@ export interface SyncConflict {
  * - conflict: the visual page changed since this code was generated; nothing was overwritten
  * - reverted: the code edit was discarded in favour of the visual document
  * - error: the document was updated but its source could not be regenerated
+ * - draft_saved: invalid draft saved safely without destroying last valid semantic checkpoint
  */
-export type CodeSyncStatus = PageSyncStatus | "conflict" | "reverted" | "error";
+export type CodeSyncStatus = PageSyncStatus | "conflict" | "reverted" | "error" | "draft_saved";
 
 export interface VisualCodeSyncResult {
   success: boolean;
@@ -66,6 +81,7 @@ export interface VisualCodeSyncResult {
   updatedFiles: string[];
   documentVersion?: number;
   reconciledEditorData?: any;
+  checkpointId?: string;
 }
 
 export interface CodeSyncOptions {
@@ -272,19 +288,130 @@ export function parseSourceCodeToElements(
 }
 
 /**
- * Target Visual -> Code targeted reconciliation for an updated element
+ * Surgically update a JSX element's text or props using the TypeScript AST
+ * rather than fragile regex replacements.
+ */
+export function updateJsxElementViaAst(
+  sourceCode: string,
+  elementId: string,
+  newText?: string,
+  fileName = "component.tsx"
+): { updated: boolean; content: string; diagnostic?: string } {
+  if (!ts) {
+    return { updated: false, content: sourceCode, diagnostic: "TypeScript compiler unavailable" };
+  }
+
+  try {
+    const sourceFile = ts.createSourceFile(
+      fileName,
+      sourceCode,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX
+    );
+
+    let targetElementNode: any = null;
+
+    function findElement(node: any) {
+      if (ts.isJsxElement(node)) {
+        const opening = node.openingElement;
+        for (const attr of opening.attributes.properties) {
+          if (ts.isJsxAttribute(attr)) {
+            const attrName = attr.name.getText(sourceFile);
+            if (attrName === "data-forge-id" || attrName === "id") {
+              const attrVal = attr.initializer?.getText(sourceFile)?.replace(/['"]/g, "");
+              if (attrVal === elementId) {
+                targetElementNode = node;
+                return;
+              }
+            }
+          }
+        }
+      } else if (ts.isJsxSelfClosingElement(node)) {
+        for (const attr of node.attributes.properties) {
+          if (ts.isJsxAttribute(attr)) {
+            const attrName = attr.name.getText(sourceFile);
+            if (attrName === "data-forge-id" || attrName === "id") {
+              const attrVal = attr.initializer?.getText(sourceFile)?.replace(/['"]/g, "");
+              if (attrVal === elementId) {
+                targetElementNode = node;
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      ts.forEachChild(node, findElement);
+    }
+
+    findElement(sourceFile);
+
+    if (!targetElementNode) {
+      return { updated: false, content: sourceCode, diagnostic: `Element with id '${elementId}' not found in AST` };
+    }
+
+    // If node has children and newText is provided, replace children range
+    if (ts.isJsxElement(targetElementNode) && typeof newText === "string") {
+      // PRESERVE SOURCE-OWNED EXPRESSION: Do not overwrite code-owned dynamic expressions!
+      const hasDynamicExpression = targetElementNode.children.some((child: any) => ts.isJsxExpression(child));
+      if (hasDynamicExpression) {
+        return {
+          updated: false,
+          content: sourceCode,
+          diagnostic: `Element '${elementId}' contains source-owned dynamic expressions; preserved without overwrite.`,
+        };
+      }
+
+      const start = targetElementNode.openingElement.end;
+      const end = targetElementNode.closingElement.pos;
+      const escapedText = escapeJsxText(newText);
+      const updated = sourceCode.slice(0, start) + escapedText + sourceCode.slice(end);
+      return { updated: true, content: updated };
+    }
+
+    return { updated: false, content: sourceCode };
+  } catch (err: any) {
+    return { updated: false, content: sourceCode, diagnostic: err?.message || "AST parse error" };
+  }
+}
+
+export interface SyncVisualElementOptions {
+  authorId?: string;
+  expectedRevision?: number;
+}
+
+/**
+ * Target Visual -> Code targeted reconciliation for an updated element.
+ * Uses AST-based surgical range edits first, with expected revision validation.
  */
 export async function syncVisualElementToSource(
   projectId: string,
   filePath: string,
   element: any,
-  authorId?: string
+  authorIdOrOptions?: string | SyncVisualElementOptions
 ): Promise<{ success: boolean; diagnostics: SyncDiagnostic[]; content: string }> {
+  const options: SyncVisualElementOptions =
+    typeof authorIdOrOptions === "string"
+      ? { authorId: authorIdOrOptions }
+      : authorIdOrOptions || {};
+
   const diagnostics: SyncDiagnostic[] = [];
   const file = await readFile(projectId, filePath);
 
   if (!file.content) {
     throw new AppError(`Target source file '${filePath}' is empty`, 400, "EMPTY_SOURCE_FILE");
+  }
+
+  // Revision-bound validation
+  if (options.expectedRevision !== undefined && file.version !== undefined) {
+    if (file.version !== options.expectedRevision) {
+      throw new AppError(
+        `Revision conflict: expected file version ${options.expectedRevision}, but found ${file.version}`,
+        409,
+        "REVISION_CONFLICT"
+      );
+    }
   }
 
   if (file.isProtected) {
@@ -308,15 +435,28 @@ export async function syncVisualElementToSource(
   let updatedContent = file.content;
   const newText = element.textContent || element.content || element.buttonText;
 
-  // Search by data-forge-id
-  const safeId = String(elementId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(
-    `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${safeId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
-  );
+  // 1. Attempt AST-based surgical range replacement first
+  const astResult = updateJsxElementViaAst(updatedContent, String(elementId), newText, filePath);
+  if (astResult.updated) {
+    updatedContent = astResult.content;
+  } else if (astResult.diagnostic && astResult.diagnostic.includes("source-owned")) {
+    diagnostics.push({
+      severity: "warning",
+      code: "SOURCE_OWNED_PROTECTED",
+      message: astResult.diagnostic,
+      filePath,
+    });
+  } else {
+    // 2. Fallback to data-forge-id pattern matching if AST did not resolve node
+    const safeId = String(elementId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(
+      `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${safeId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
+    );
 
-  if (typeof newText === "string" && pattern.test(updatedContent)) {
-    const text = escapeJsxText(newText);
-    updatedContent = updatedContent.replace(pattern, (_m, open: string, _old: string, close: string) => `${open}${text}${close}`);
+    if (typeof newText === "string" && pattern.test(updatedContent)) {
+      const text = escapeJsxText(newText);
+      updatedContent = updatedContent.replace(pattern, (_m, open: string, _old: string, close: string) => `${open}${text}${close}`);
+    }
   }
 
   // Re-inject protected regions
@@ -326,7 +466,7 @@ export async function syncVisualElementToSource(
   await writeFile(projectId, filePath, {
     content: updatedContent,
     expectedVersion: file.version,
-    authorId,
+    authorId: options.authorId,
     reason: `Visual sync for element: ${elementId}`,
   });
 
@@ -355,12 +495,9 @@ function projectMetadata(project: any): Record<string, any> {
   return project?.metadata && typeof project.metadata === "object" ? project.metadata : {};
 }
 
+/** Row-locked so concurrent syncs of different pages cannot overwrite each other's state. */
 async function updateProjectMetadata(projectId: string, mutate: (metadata: Record<string, any>) => void) {
-  const project = await db.forgeProject.findUnique({ where: { id: projectId } });
-  if (!project) return;
-  const metadata = { ...projectMetadata(project) };
-  mutate(metadata);
-  await db.forgeProject.update({ where: { id: projectId }, data: { metadata } });
+  await updateProjectMetadataAtomic(projectId, mutate);
 }
 
 /** Ownership decides whether regeneration may rewrite the file */
@@ -545,8 +682,12 @@ export async function syncSourceToVisualWebsite(
 
   const baseline = metadata.visualSync || {};
   const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
-  const basePageHash: string | undefined = baseline.pages?.[page.key]?.hash ?? previousEntry?.basePageHash;
-  const baseSharedHash: string | undefined = baseline.sharedHash ?? previousEntry?.baseSharedHash;
+  // A held file was not regenerated by later visual saves, so the code it contains is still based
+  // on the page as it was when the hold started; the latest visual baseline is not its base.
+  const basePageHash: string | undefined = previousEntry
+    ? previousEntry.basePageHash
+    : baseline.pages?.[page.key]?.hash;
+  const baseSharedHash: string | undefined = previousEntry ? previousEntry.baseSharedHash : baseline.sharedHash;
 
   /** Keep the saved code as hand-written source until the two sides agree again */
   const holdAsCode = async (status: CodeSyncStatus, message: string, diagnostics: SyncDiagnostic[]) => {

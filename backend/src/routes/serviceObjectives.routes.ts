@@ -5,7 +5,7 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
-import { ServiceObjectivesController } from "../controllers/serviceObjectives.controller.ts";
+import { ServiceObjectivesController } from "../controllers/serviceObjectives.controller.js";
 
 const router = Router();
 

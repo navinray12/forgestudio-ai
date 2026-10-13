@@ -3,3 +3,7 @@ export * from "./sourcePreservation.service.js";
 export * from "./reactGenerator.service.js";
 export * from "./nextjsGenerator.service.js";
 export * from "./projectGenerator.service.js";
+export * from "./dynamicSourcePlanner.service.js";
+export * from "./safeCleanupEngine.service.js";
+export * from "./dataModelGenerator.service.js";
+export * from "./externalDatabaseIntrospection.service.js";

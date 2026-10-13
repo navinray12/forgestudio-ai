@@ -40,6 +40,10 @@ function normalizePostgreSqlError(err: any): { message: string; code: string; po
     case "23503":
       message = `Foreign key violation: ${err.detail || err.message}`;
       break;
+    case "25006":
+      message =
+        "PRODUCTION queries run read-only. An owner or admin must explicitly allow writes to modify data.";
+      break;
     case "28P01":
       message = "Authentication failed connecting to tenant database.";
       break;
@@ -60,7 +64,8 @@ function normalizePostgreSqlError(err: any): { message: string; code: string; po
 export async function executeUserQuery(
   projectId: string,
   sql: string,
-  environment: DatabaseEnvironment = "PRODUCTION"
+  environment: DatabaseEnvironment,
+  options: { readOnly?: boolean } = {}
 ): Promise<QueryExecutionResult> {
   const trimmedSql = (sql || "").trim();
   if (!trimmedSql) {
@@ -74,11 +79,20 @@ export async function executeUserQuery(
 
   try {
     // 1. Enter transaction to enforce local statement timeout
-    await client.query("BEGIN;");
+    // Read-only mode is enforced by PostgreSQL, not by inspecting the SQL text. The extended
+    // query protocol rejects multiple statements, so "COMMIT; DROP ..." cannot leave the
+    // read-only transaction.
+    await client.query(options.readOnly ? "BEGIN TRANSACTION READ ONLY;" : "BEGIN;");
     await client.query("SET LOCAL statement_timeout = '8000ms';");
+    if (options.readOnly) {
+      // Taking a snapshot makes PostgreSQL refuse any later switch back to read-write.
+      await client.query("SELECT 1;");
+    }
 
     // 2. Execute user query
-    const res = await client.query(trimmedSql);
+    const res = options.readOnly
+      ? await client.query({ text: trimmedSql, queryMode: "extended" } as any)
+      : await client.query(trimmedSql);
 
     // If query returns multiple statements, pick the last statement result
     const actualResult = Array.isArray(res) ? res[res.length - 1] : res;

@@ -31,7 +31,7 @@ export class ComponentController {
    */
   public getContract(req: Request, res: Response): void {
     try {
-      const { componentId } = req.params;
+      const { componentId } = req.params as Record<string, string>;
       const version = req.query.version as string;
       const contract = componentContractRegistry.getContract(componentId, version);
 
@@ -118,7 +118,7 @@ export class ComponentController {
    */
   public getConflicts(req: Request, res: Response): void {
     try {
-      const { websiteId } = req.params;
+      const { websiteId } = req.params as Record<string, string>;
       const conflicts = threeWaySourceReconciliationService.getActiveConflictsForWebsite(websiteId);
       res.json({ success: true, count: conflicts.length, data: conflicts });
     } catch (err: any) {
@@ -132,7 +132,7 @@ export class ComponentController {
    */
   public resolveConflict(req: Request, res: Response): void {
     try {
-      const { conflictId } = req.params;
+      const { conflictId } = req.params as Record<string, string>;
       const { choice, customContent } = req.body;
       const resolvedBy = (req as any).user?.id || "admin";
 

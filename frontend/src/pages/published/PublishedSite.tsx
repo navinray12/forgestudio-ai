@@ -840,6 +840,8 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
         ));
 
     const [loading, setLoading] = useState(true);
+    // Incremented by the editor preview's "reload" message to re-run the site fetch effect.
+    const [reloadToken, setReloadToken] = useState(0);
     const [errorMessage, setErrorMessage] = useState("");
     const [elements, setElements] = useState<EditorElement[]>([]);
     const [pages, setPages] = useState<PageConfig[]>([]);
@@ -1023,7 +1025,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             }
         };
         fetchWebsite();
-    }, [websiteId, apiUrl, pageSlug]);
+    }, [websiteId, apiUrl, pageSlug, reloadToken]);
 
     // Phase 3 Subsystem 2: A/B Split Testing & Impression Telemetry
     useEffect(() => {
@@ -1117,7 +1119,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     setElements(matched.elements || []);
                 }
             } else if (e.data?.type === "forge:preview:reload") {
-                fetchWebsite();
+                setReloadToken((token) => token + 1);
             }
         };
 

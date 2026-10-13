@@ -86,7 +86,7 @@ export class WorkPackagesRegisterService {
       prerequisites: ['WP-02', 'WP-03', 'WP-04'],
       exitEvidenceRequired: 'Blank site to working CMS, article schemas, review, scheduled release, non-destructive saves.',
       currentStatus: 'IMPLEMENTED_PARTIALLY_UNVERIFIED',
-      statusJustification: 'ScopedCustomPostTypeService remediates P0 deleteMany defect; schema migration planner verified.'
+      statusJustification: 'customPostType.controller saves fields non-destructively with stable IDs and checks project access; trash/restore and purge workflows are not implemented.'
     },
     {
       id: 'WP-06',

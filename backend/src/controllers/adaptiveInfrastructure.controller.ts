@@ -4,13 +4,14 @@
  */
 
 import { Request, Response } from "express";
+import { tenantScopeOf } from "../middlewares/tenantScope.middleware.js";
 import {
   InfrastructureProfilesService,
   InfrastructureProfileType,
-} from "../services/adaptiveInfrastructure/infrastructureProfiles.service.ts";
-import { OptionalInfrastructureCapabilitiesService } from "../services/adaptiveInfrastructure/optionalInfrastructureCapabilities.service.ts";
-import { UpgradeInfrastructureWorkflowService } from "../services/adaptiveInfrastructure/upgradeInfrastructureWorkflow.service.ts";
-import { AutoscalingCostEconomicsService } from "../services/adaptiveInfrastructure/autoscalingCostEconomics.service.ts";
+} from "../services/adaptiveInfrastructure/infrastructureProfiles.service.js";
+import { OptionalInfrastructureCapabilitiesService } from "../services/adaptiveInfrastructure/optionalInfrastructureCapabilities.service.js";
+import { UpgradeInfrastructureWorkflowService } from "../services/adaptiveInfrastructure/upgradeInfrastructureWorkflow.service.js";
+import { AutoscalingCostEconomicsService } from "../services/adaptiveInfrastructure/autoscalingCostEconomics.service.js";
 
 export class AdaptiveInfrastructureController {
   public static async listProfiles(req: Request, res: Response) {
@@ -38,8 +39,17 @@ export class AdaptiveInfrastructureController {
 
   public static async executeUpgrade(req: Request, res: Response) {
     try {
-      const { plan, approvals } = req.body;
-      const receipt = UpgradeInfrastructureWorkflowService.executeUpgradePlan(plan, approvals || []);
+      // The plan is regenerated on the server (a client-supplied plan could drop its required
+      // approvals) and the only approval the server can attest is the authenticated caller's.
+      const { plan } = req.body;
+      const scope = tenantScopeOf(res);
+      const serverPlan = InfrastructureProfilesService.generateProfileMigrationPlan(
+        scope.tenantId,
+        plan?.currentProfile as InfrastructureProfileType,
+        plan?.targetProfile as InfrastructureProfileType
+      );
+      const approvals = scope.canAdminister ? [{ role: "INFRASTRUCTURE_OWNER", approverId: res.locals.user.id }] : [];
+      const receipt = UpgradeInfrastructureWorkflowService.executeUpgradePlan(serverPlan, approvals);
       return res.status(200).json({ success: true, receipt });
     } catch (err: any) {
       return res.status(err.statusCode || 500).json({ success: false, error: err.message });

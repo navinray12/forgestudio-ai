@@ -195,7 +195,7 @@ export function recordEvidence(input: {
 }): EvidenceRecord {
   const cap = getCapabilityById(input.capId);
   if (!cap) {
-    throw new AppError(404, `Capability '${input.capId}' not found in authoritative registry.`);
+    throw new AppError(`Capability '${input.capId}' not found in authoritative registry.`, 404);
   }
 
   const id = `ev-${randomUUID()}`;

@@ -48,7 +48,7 @@ export class ModuleResponsibilityMatrixService {
       activeCallers: ['CmsDashboard', 'CmsEntryEditor'],
       extractionNecessity: 'INCREMENTAL_ADAPTER',
       migrationStatus: 'ALIGNED',
-      riskAndRollbackStrategy: 'Preserve API compatibility with ScopedCustomPostTypeService.'
+      riskAndRollbackStrategy: 'Preserve the /api/cpt field and entry API contract (key/required/options, values).'
     },
     {
       targetPath: 'frontend/src/features/forms-leads/',

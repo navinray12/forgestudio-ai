@@ -153,6 +153,11 @@ export class VersionedWorkflowEngine {
   /**
    * Publishes a workflow version. Immutable once published.
    */
+  /** Tenant that owns a workflow, or null when it does not exist. */
+  public static getWorkflowTenant(workflowId: string): string | null {
+    return this.definitions.get(workflowId)?.[0]?.tenantId ?? null;
+  }
+
   public static publishWorkflowVersion(workflowId: string, version: number, publishedBy: string): WorkflowDefinition {
     const versions = this.definitions.get(workflowId);
     if (!versions) {
