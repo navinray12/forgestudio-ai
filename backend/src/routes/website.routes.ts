@@ -10,6 +10,10 @@ import {
   getTrashedWebsitesHandler,
   restoreWebsiteHandler,
   purgeWebsiteHandler,
+  createWebsitePurgeRequestHandler,
+  listWebsitePurgeRequestsHandler,
+  approveWebsitePurgeRequestHandler,
+  executeWebsitePurgeRequestHandler,
   getWebsiteRolesHandler,
   updateWebsiteRoleHandler,
   inviteWebsiteMemberHandler,
@@ -221,6 +225,12 @@ router.put("/:id", authorizeCapability("EDIT"), updateWebsiteHandler);
 router.delete("/:id", authorizeCapability("DELETE"), deleteWebsiteHandler);
 router.post("/:id/restore", authorizeCapability("DELETE"), restoreWebsiteHandler);
 router.delete("/:id/purge", authorizeCapability("DELETE"), purgeWebsiteHandler);
+// Approved purge (blueprint §10). Authorization is in the service: the owner requests and executes,
+// a different owner/admin approves, non-members get 404.
+router.get("/:id/purge-requests", listWebsitePurgeRequestsHandler);
+router.post("/:id/purge-requests", createWebsitePurgeRequestHandler);
+router.post("/:id/purge-requests/:requestId/approve", approveWebsitePurgeRequestHandler);
+router.post("/:id/purge-requests/:requestId/execute", executeWebsitePurgeRequestHandler);
 
 // Cookie Consent (F-438)
 router.get("/:id/cookie-consent", authorizeCapability("VIEW"), getCookieConsentHandler);

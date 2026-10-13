@@ -24,6 +24,8 @@ export async function ensureDatabaseTables(): Promise<void> {
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "organizationId" UUID;
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "workspaceId" UUID;
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "approvalWorkflowEnabled" BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE websites ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ(6);
+    ALTER TABLE websites ADD COLUMN IF NOT EXISTS "teamId" UUID;
   `);
 
   // 2. Organizations
@@ -3326,6 +3328,132 @@ CREATE INDEX IF NOT EXISTS "content_purge_requests_websiteId_status_idx" ON "con
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_forge_lead_events_lead ON forge_lead_events ("leadId", "createdAt");
+  `);
+
+  // Same SQL as prisma/migrations/20261013120000_durable_workflow_definitions.
+  await execSafe("durable workflow definitions", `
+    -- Durable, immutable workflow definitions (blueprint §15). Additive only.
+    CREATE TABLE IF NOT EXISTS forge_workflow_definitions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "workflowKey" VARCHAR(100) NOT NULL,
+      version INTEGER NOT NULL CHECK (version >= 1),
+      status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PUBLISHED', 'DEPRECATED')),
+      name VARCHAR(200) NOT NULL,
+      definition JSONB NOT NULL,
+      "definitionHash" CHAR(64) NOT NULL,
+      "createdById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "publishedById" UUID,
+      "publishedAt" TIMESTAMPTZ,
+      CONSTRAINT uq_forge_workflow_version UNIQUE ("websiteId", "workflowKey", version)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_forge_workflow_published
+      ON forge_workflow_definitions ("websiteId", "workflowKey") WHERE status = 'PUBLISHED';
+
+    CREATE OR REPLACE FUNCTION forge_workflow_definitions_guard() RETURNS trigger AS $fn$
+    BEGIN
+      IF NEW."websiteId" IS DISTINCT FROM OLD."websiteId" OR NEW."workflowKey" IS DISTINCT FROM OLD."workflowKey"
+         OR NEW.version IS DISTINCT FROM OLD.version OR NEW.name IS DISTINCT FROM OLD.name
+         OR NEW.definition IS DISTINCT FROM OLD.definition OR NEW."definitionHash" IS DISTINCT FROM OLD."definitionHash"
+         OR NEW."createdById" IS DISTINCT FROM OLD."createdById" OR NEW."createdAt" IS DISTINCT FROM OLD."createdAt" THEN
+        RAISE EXCEPTION 'workflow definitions are immutable' USING ERRCODE = 'check_violation';
+      END IF;
+      IF NEW.status IS DISTINCT FROM OLD.status
+         AND NOT ((OLD.status = 'DRAFT' AND NEW.status = 'PUBLISHED') OR (OLD.status = 'PUBLISHED' AND NEW.status = 'DEPRECATED')) THEN
+        RAISE EXCEPTION 'illegal workflow status transition % -> %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS trg_forge_workflow_definitions_guard ON forge_workflow_definitions;
+    CREATE TRIGGER trg_forge_workflow_definitions_guard BEFORE UPDATE ON forge_workflow_definitions
+      FOR EACH ROW EXECUTE FUNCTION forge_workflow_definitions_guard();
+  `);
+
+  // Same SQL as prisma/migrations/20261013130000_website_purge_requests.
+  await execSafe("website purge requests", `
+    -- Approved website purge (blueprint §10). Additive only.
+    -- Deliberately no foreign key to websites: the request must outlive the website it purges.
+    CREATE TABLE IF NOT EXISTS website_purge_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL,
+      manifest JSONB NOT NULL,
+      "manifestHash" CHAR(64) NOT NULL,
+      reason VARCHAR(500) NOT NULL,
+      "requestedById" UUID NOT NULL,
+      "approvedById" UUID,
+      "approvedAt" TIMESTAMPTZ,
+      "executedById" UUID,
+      "executedAt" TIMESTAMPTZ,
+      "singleOwnerException" BOOLEAN NOT NULL DEFAULT false,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING_APPROVAL'
+        CHECK (status IN ('PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'EXECUTED', 'EXPIRED')),
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_website_purge_requests_website ON website_purge_requests ("websiteId", status);
+  `);
+
+  // Same SQL as prisma/migrations/20261013140000_environment_bindings.
+  await execSafe("environment bindings", `
+    -- Persistent environment bindings (blueprint §42.1, WP-17). Additive only.
+    -- One row per project and environment class; "secretRef" holds a vault key reference, never a credential.
+    CREATE TABLE IF NOT EXISTS forge_environment_bindings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "environmentClass" VARCHAR(20) NOT NULL CHECK ("environmentClass" IN ('DEVELOPMENT', 'STAGING', 'PRODUCTION')),
+      "bindingId" VARCHAR(120) NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+      "applicationId" VARCHAR(120) NOT NULL,
+      "databaseProvider" VARCHAR(30) NOT NULL DEFAULT 'postgresql',
+      "targetFingerprint" CHAR(64) NOT NULL,
+      "safeDisplayLabel" VARCHAR(120) NOT NULL,
+      "secretRef" VARCHAR(300) NOT NULL CHECK ("secretRef" !~ '://[^/]*:[^/]*@' AND position('password=' in "secretRef") = 0),
+      roles JSONB NOT NULL,
+      "poolLimits" JSONB NOT NULL,
+      "protectionLevel" VARCHAR(30) NOT NULL,
+      "verificationHistory" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RETIRED')),
+      "createdById" UUID,
+      "updatedById" UUID,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_environment_binding UNIQUE ("projectId", "environmentClass")
+    );
+  `);
+
+  // Same SQL as prisma/migrations/20261013150000_website_records_benchmark_runs.
+  await execSafe("website records and benchmark runs", `
+    -- Durable state for the blueprint v2 feature routers (WP-01, WP-16). Additive only.
+    -- One row per website, kind and key. "tenantId" is derived from verified membership, never from the
+    -- client. "requestHash" makes a repeated identical write a replay instead of a new revision.
+    CREATE TABLE IF NOT EXISTS forge_website_records (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "tenantId" VARCHAR(64) NOT NULL,
+      kind VARCHAR(40) NOT NULL,
+      "recordKey" VARCHAR(200) NOT NULL,
+      data JSONB NOT NULL,
+      "requestHash" CHAR(64) NOT NULL,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      "createdById" UUID NOT NULL,
+      "updatedById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_website_records UNIQUE ("websiteId", kind, "recordKey")
+    );
+
+    -- Operator-submitted benchmark runs (blueprint §03). Platform-wide, so there is no website scope.
+    CREATE TABLE IF NOT EXISTS forge_benchmark_runs (
+      "runId" VARCHAR(64) PRIMARY KEY,
+      "requestHash" CHAR(64) NOT NULL,
+      report JSONB NOT NULL,
+      "recordedById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_benchmark_runs_request UNIQUE ("requestHash")
+    );
   `);
 
   if (failedSchemaSteps.length > 0) {

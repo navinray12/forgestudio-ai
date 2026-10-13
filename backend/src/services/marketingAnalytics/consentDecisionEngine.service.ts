@@ -35,7 +35,7 @@ const consentDecisionStore = new Map<string, VisitorConsentDecision>();
 // Queue of pending analytics events awaiting dispatch
 const queuedAnalyticsEvents = new Map<string, Array<{ eventId: string; timestamp: string }>>();
 
-export function recordConsentChoice(params: {
+export interface ConsentChoiceInput {
   subjectId: string;
   websiteId: string;
   status: "GRANTED" | "REFUSED";
@@ -43,10 +43,12 @@ export function recordConsentChoice(params: {
   policyVersion?: string;
   ipMasked?: string;
   userAgent?: string;
-}): VisitorConsentDecision {
+}
+
+/** Builds the consent decision without storing it; the durable route persists the result. */
+export function buildConsentDecision(params: ConsentChoiceInput): VisitorConsentDecision {
   const { subjectId, websiteId, status, purposes, policyVersion = "2026.1", ipMasked, userAgent } = params;
 
-  const key = `${websiteId}:${subjectId}`;
   const now = new Date();
   const expires = new Date(now.getTime() + 180 * 24 * 3600 * 1000); // 180-day consent TTL
 
@@ -69,7 +71,12 @@ export function recordConsentChoice(params: {
     },
   };
 
-  consentDecisionStore.set(key, decision);
+  return decision;
+}
+
+export function recordConsentChoice(params: ConsentChoiceInput): VisitorConsentDecision {
+  const decision = buildConsentDecision(params);
+  consentDecisionStore.set(`${params.websiteId}:${params.subjectId}`, decision);
   return decision;
 }
 

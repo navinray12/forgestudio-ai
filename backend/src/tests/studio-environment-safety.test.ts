@@ -95,9 +95,15 @@ describe("explicit environment resolution", () => {
   });
 
   it("rejects unknown environments instead of mapping them to PRODUCTION", () => {
-    for (const value of ["staging", "dev", "prod", " "]) {
+    for (const value of ["stage", "dev", "prod", "test", " "]) {
       expect(() => resolveExplicitEnvironment({ query: { environment: value }, body: {} } as any)).toThrow();
     }
+  });
+
+  it("accepts the blueprint's staging class and keeps the legacy PREVIEW label addressable", () => {
+    expect(resolveExplicitEnvironment({ query: { environment: "staging" }, body: {} } as any)).toBe("STAGING");
+    expect(resolveExplicitEnvironment({ query: { env: "STAGING" }, body: {} } as any)).toBe("STAGING");
+    expect(resolveExplicitEnvironment({ query: { environment: "preview" }, body: {} } as any)).toBe("PREVIEW");
   });
 
   it("accepts explicit environments from query or body, case-insensitively", () => {

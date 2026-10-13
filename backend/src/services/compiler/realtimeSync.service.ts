@@ -21,6 +21,7 @@ import { AppError } from "../../utils/app-error.js";
 import { prisma } from "../../config/prisma.js";
 import { WorkspaceCoordinatorService, WorkspaceCheckpoint } from "../workspace/workspaceCoordinator.service.js";
 import { updateJsxElementViaAst, validateSourceSyntax } from "./visualCodeSync.service.js";
+import type { JsxMutation, JsxMutationCode } from "./jsxAstMutation.js";
 
 const db = prisma as any;
 
@@ -64,6 +65,10 @@ export interface VisualOperationPayload {
 export interface CommittedOperationResult {
   operationId: string;
   success: boolean;
+  /** True only when the operation changed the source and the change was committed. */
+  sourceChanged: boolean;
+  /** Why the edit was not applied (see JsxMutationCode); absent when it was. */
+  rejectionCode?: JsxMutationCode;
   sequenceNumber: number;
   committedFileHashes: Record<string, string>;
   committedRevision: number;
@@ -193,6 +198,46 @@ export class RealtimeSyncService {
   }
 
   /**
+   * Maps a semantic editor operation to a source mutation, or null when the payload does not
+   * describe one (for example a free-position drag with no target parent or index).
+   */
+  private static toJsxMutation(payload: VisualOperationPayload): JsxMutation | null {
+    const { operationType, propertyKey, newValue, reorderIndex, parentNodeId } = payload;
+    switch (operationType) {
+      case "TEXT_EDIT":
+        return { type: "SET_TEXT", text: String(newValue ?? "") };
+      case "PROPERTY_UPDATE": {
+        if (!propertyKey) return null;
+        if (["content", "textContent", "text", "buttonText"].includes(propertyKey)) {
+          return { type: "SET_TEXT", text: String(newValue ?? "") };
+        }
+        if (propertyKey === "className" || propertyKey === "classes") {
+          const classes = Array.isArray(newValue) ? newValue : String(newValue ?? "").split(/\s+/).filter(Boolean);
+          return { type: "SET_CLASSES", classes };
+        }
+        if (propertyKey === "style" || propertyKey === "styles") {
+          return newValue && typeof newValue === "object" ? { type: "SET_STYLE", style: newValue } : null;
+        }
+        if (propertyKey.startsWith("style.") || propertyKey.startsWith("styles.")) {
+          return { type: "SET_STYLE", style: { [propertyKey.slice(propertyKey.indexOf(".") + 1)]: newValue ?? null } };
+        }
+        return { type: "SET_PROP", name: propertyKey, value: newValue ?? null };
+      }
+      case "INSERT":
+        if (!parentNodeId || !newValue || typeof newValue !== "object") return null;
+        return { type: "INSERT", parentId: parentNodeId, index: reorderIndex, element: newValue };
+      case "REMOVE":
+        return { type: "REMOVE" };
+      case "REORDER":
+      case "DRAG":
+        if (parentNodeId) return { type: "MOVE", parentId: parentNodeId, index: reorderIndex };
+        return reorderIndex === undefined ? null : { type: "REORDER", index: reorderIndex };
+      default:
+        return null;
+    }
+  }
+
+  /**
    * 2.1 Process Visual-to-Code Semantic Operation
    */
   public static async processVisualOperation(
@@ -258,44 +303,42 @@ export class RealtimeSyncService {
       );
     }
 
-    // 4. Transform AST depending on semantic operation type
-    let modifiedCode = existingSourceCode;
-    let changedRanges: Array<{ filePath: string; startLine: number; endLine: number }> = [];
+    // 4. Apply the semantic operation to the source through the AST. Nothing is committed unless
+    //    the source actually changed: a rejected or no-op edit is reported as such.
+    const mutation = this.toJsxMutation(payload);
+    const astResult = mutation
+      ? updateJsxElementViaAst(existingSourceCode, String(nodeId), mutation, filePath)
+      : {
+          updated: false as const,
+          content: existingSourceCode,
+          code: "UNSUPPORTED" as const,
+          diagnostic: `Operation ${operationType} does not describe a supported source edit.`,
+        };
 
-    // Synthesize target element representation for AST updater
-    let targetElement: any = { id: nodeId };
-    if (operationType === "PROPERTY_UPDATE" && propertyKey) {
-      targetElement = { id: nodeId, [propertyKey]: newValue };
-    } else if (operationType === "TEXT_EDIT") {
-      targetElement = { id: nodeId, content: String(newValue ?? "") };
-    } else if (operationType === "DRAG" || operationType === "REORDER") {
-      targetElement = {
-        id: nodeId,
-        reorderIndex: reorderIndex !== undefined ? reorderIndex : undefined,
-        position: newValue,
+    if (!astResult.updated) {
+      const noChange = astResult.code === "NO_CHANGE";
+      const result: CommittedOperationResult = {
+        operationId,
+        success: noChange,
+        sourceChanged: false,
+        rejectionCode: astResult.code,
+        sequenceNumber: this.projectSequences.get(projectId) || 0,
+        committedFileHashes: {},
+        committedRevision: currentRevision,
+        changedRanges: [],
+        pageRegistryRevision: 1,
+        checkpointId: WorkspaceCoordinatorService.getLatestCheckpoint(projectId)?.checkpointId || baseCheckpointId,
+        echoSuppressedForViews: [viewId],
+        syncStatus: noChange ? "SYNCHRONIZED" : astResult.code === "INVALID_SOURCE" ? "INVALID_SOURCE" : "LOCAL_CHANGES",
+        diagnostics: [{ severity: noChange ? "info" : "error", message: astResult.diagnostic || "The edit was not applied." }],
       };
-    } else if (operationType === "REMOVE") {
-      targetElement = { id: nodeId, _deleted: true };
-    } else if (operationType === "INSERT") {
-      targetElement = { id: nodeId, ...(typeof newValue === "object" ? newValue : {}) };
+      this.committedOperations.set(operationId, result);
+      this.transitionSaveState(projectId, result.syncStatus);
+      return result;
     }
 
-    const newText = operationType === "TEXT_EDIT" ? String(newValue ?? "") : undefined;
-    try {
-      const astResult = updateJsxElementViaAst(existingSourceCode, String(nodeId), newText, filePath);
-      if (astResult.updated) {
-        modifiedCode = astResult.content;
-        changedRanges.push({ filePath, startLine: 1, endLine: modifiedCode.split("\n").length });
-      } else {
-        // If element is not found in JSX, it could be a code-owned or template element
-        // Preserve source untouched
-        modifiedCode = existingSourceCode;
-      }
-    } catch (_astErr) {
-      // Syntax or AST parsing limitation: do not destroy untouched code
-      modifiedCode = existingSourceCode;
-    }
-
+    const modifiedCode = astResult.content;
+    const changedRanges = [{ filePath, startLine: astResult.changedRange!.startLine, endLine: astResult.changedRange!.endLine }];
 
     // 5. Commit through authoritative WorkspaceCoordinatorService
     const commitResult = await WorkspaceCoordinatorService.commitChange({
@@ -324,6 +367,7 @@ export class RealtimeSyncService {
     const result: CommittedOperationResult = {
       operationId,
       success: commitResult.success,
+      sourceChanged: commitResult.success,
       sequenceNumber: seq,
       committedFileHashes: { [filePath]: fileHash },
       committedRevision: commitResult.revision,
@@ -402,7 +446,8 @@ export class RealtimeSyncService {
     );
 
     return {
-      success: true,
+      // The inverse may be rejected like any other edit; it is not reported as undone unless it was accepted.
+      success: committed.success,
       undoneOperation: inverse,
       committedResult: committed,
     };

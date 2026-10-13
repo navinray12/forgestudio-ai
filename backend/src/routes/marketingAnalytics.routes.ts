@@ -1,18 +1,22 @@
 import { Router } from "express";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { scopeToWebsite } from "../middlewares/tenantScope.middleware.js";
+import { userRateLimit } from "../middlewares/userRateLimit.middleware.js";
 import {
   recordConsentHandler,
   withdrawConsentHandler,
   validateEventHandler,
   buildUtmLinkHandler,
   calculateMetricsHandler,
-  dispatchConversionHandler,
 } from "../controllers/marketingAnalytics.controller.js";
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
+const writes = userRateLimit(30);
 
-// Consent management
-router.post("/consent", recordConsentHandler);
-router.post("/consent/withdraw", withdrawConsentHandler);
+// Consent management (durable, website-scoped)
+router.post("/consent", writes, scopeToWebsite(), recordConsentHandler);
+router.post("/consent/withdraw", writes, scopeToWebsite(), withdrawConsentHandler);
 
 // Measurement event validation
 router.post("/events/validate", validateEventHandler);
@@ -23,7 +27,6 @@ router.post("/utm/build", buildUtmLinkHandler);
 // Truthful Growth Metrics
 router.post("/metrics/calculate", calculateMetricsHandler);
 
-// Provider conversion dispatch
-router.post("/conversions/dispatch", dispatchConversionHandler);
+// Not exposed (see controller): /conversions/dispatch.
 
 export default router;

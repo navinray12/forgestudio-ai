@@ -8,8 +8,9 @@ import { contractFirstApiGenerator } from "../services/api/contractFirstApiGener
 import { applicationAuth } from "../services/auth/applicationAuth.service.js";
 import { unifiedExecutionAuthorization } from "../services/auth/unifiedExecutionAuthorization.service.js";
 import { databaseStudioViews } from "../services/database/databaseStudioViews.service.js";
-import { environmentBindingService } from "../services/environment/environmentBinding.service.js";
-import { targetResolutionService } from "../services/environment/targetResolution.service.js";
+import { EnvironmentBindingService } from "../services/environment/environmentBinding.service.js";
+import { TargetResolutionService } from "../services/environment/targetResolution.service.js";
+import { MemoryEnvironmentBindingStore } from "./helpers/memoryBindingStore.js";
 import { unifiedMigrationAuthority } from "../services/migration/unifiedMigrationAuthority.service.js";
 import { ApplicationSpec } from "../services/authoritative/applicationSpec.service.js";
 
@@ -106,7 +107,11 @@ describe("Points 40–43 Master Regression Gate", () => {
     updatedAt: new Date().toISOString(),
   };
 
-  it("executes unified end-to-end lifecycle across Points 40, 41, 42, and 43", () => {
+  // Binding persistence is verified separately on PostgreSQL (environment-bindings.integration.test.ts).
+  const environmentBindingService = new EnvironmentBindingService(new MemoryEnvironmentBindingStore());
+  const targetResolutionService = new TargetResolutionService(environmentBindingService);
+
+  it("executes unified end-to-end lifecycle across Points 40, 41, 42, and 43", async () => {
     // -------------------------------------------------------------------------
     // Phase 1 (Point 40): Contract-First API & Identity Verification
     // -------------------------------------------------------------------------
@@ -158,26 +163,26 @@ describe("Points 40–43 Master Regression Gate", () => {
     // -------------------------------------------------------------------------
     // Phase 2 (Point 42): Environment Bindings, Secrets & Isolation
     // -------------------------------------------------------------------------
-    const devBinding = environmentBindingService.registerBinding(projectId, applicationId, "DEVELOPMENT", {
+    const devBinding = await environmentBindingService.registerBinding(projectId, applicationId, "DEVELOPMENT", {
       secretRef: `vault:keys:${projectId}:dev_db`,
     });
     expect(devBinding.protectionLevel).toBe("SANDBOX");
 
-    const prodBinding = environmentBindingService.registerBinding(projectId, applicationId, "PRODUCTION", {
+    const prodBinding = await environmentBindingService.registerBinding(projectId, applicationId, "PRODUCTION", {
       secretRef: `vault:keys:${projectId}:prod_db`,
       stepUpVerified: true,
     });
     expect(prodBinding.protectionLevel).toBe("RESTRICTED_PRODUCTION");
 
     // Target pool resolution
-    const devPool = targetResolutionService.resolveTargetPool(projectId, "DEVELOPMENT", "runtime");
+    const devPool = await targetResolutionService.resolveTargetPool(projectId, "DEVELOPMENT", "runtime");
     expect(devPool.status).toBe("ACTIVE");
 
     // Credential rotation with obsolete pool draining
-    const rotatedDevBinding = environmentBindingService.registerBinding(projectId, applicationId, "DEVELOPMENT", {
+    const rotatedDevBinding = await environmentBindingService.registerBinding(projectId, applicationId, "DEVELOPMENT", {
       secretRef: `vault:keys:${projectId}:dev_db_v2`,
     });
-    const drainedResult = targetResolutionService.rotateCredentialsAndDrain(rotatedDevBinding);
+    const drainedResult = await targetResolutionService.rotateCredentialsAndDrain(rotatedDevBinding);
     expect(drainedResult.drainedPoolKeys.length).toBeGreaterThan(0);
 
     // Scratch database verification

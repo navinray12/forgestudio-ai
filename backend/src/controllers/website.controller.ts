@@ -1,3 +1,9 @@
+import {
+  createWebsitePurgeRequest,
+  listWebsitePurgeRequests,
+  approveWebsitePurgeRequest,
+  executeWebsitePurgeRequest,
+} from "../services/websitePurge.service.js";
 import { syncBridgedProjectForWebsite } from "../services/project/forgeProject.service.js";
 import { documentWriteContext } from "../services/websites/document-request.js";
 import { documentETag } from "../services/websites/document-policy.js";
@@ -277,6 +283,43 @@ export async function purgeWebsiteHandler(
     });
 
     return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+const sessionAuthTime = (res: Response) => (res.locals.session?.authTime ? new Date(res.locals.session.authTime) : null);
+
+export async function createWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await createWebsitePurgeRequest(req.params.id as string, res.locals.user.id, sessionAuthTime(res), req.body || {});
+    return res.status(201).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listWebsitePurgeRequestsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    return res.json({ success: true, data: await listWebsitePurgeRequests(req.params.id as string, res.locals.user.id) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await approveWebsitePurgeRequest(req.params.id as string, req.params.requestId as string, res.locals.user.id);
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function executeWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await executeWebsitePurgeRequest(req.params.id as string, req.params.requestId as string, res.locals.user.id, sessionAuthTime(res));
+    return res.json(result);
   } catch (error) {
     next(error);
   }

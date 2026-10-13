@@ -994,6 +994,15 @@ export const DeveloperWorkspace: React.FC = () => {
       addLog("Starting compilation (Unified IR & Source AST)...", "info");
       const res = await forgeProjectService.compileProject(project.id);
       addLog(`Compilation succeeded: ${res.result?.filesCount || 0} source files generated`, "success");
+      // Whole-project generation never rewrites hand-written pages. Canvas edits reach those pages
+      // as element-level AST edits when the canvas is saved, not through this action.
+      const held: string[] = res.result?.heldBackPaths || [];
+      if (held.length > 0) {
+        addLog(
+          `Not regenerated (hand-written code): ${held.join(", ")}. Canvas edits to these pages are applied element by element when the design is saved; resolve remaining differences with "Sync Code to Visual".`,
+          "warn"
+        );
+      }
       setDiagnostics(res.result?.diagnostics || []);
       setSyncStatus("synced");
       await handleRefreshTree();

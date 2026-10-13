@@ -338,6 +338,59 @@ describe.skipIf(!optedIn)("Generated application acceptance (separate process, d
     expect(await q(`SELECT revision FROM "${schema}".projects WHERE id = $1`, [projectA.id])).toEqual([{ revision: 2 }]);
   }, 60_000);
 
+  it("DAT-02/03/05: the migrated schema carries the approved types, defaults and constraints", async () => {
+    const columns = await q(
+      `SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'tasks'`, [schema]);
+    const column = (name: string) => columns.find((c) => c.column_name === name);
+    expect(column("title")).toMatchObject({ data_type: "character varying", is_nullable: "NO" });
+    expect(column("projectId")).toMatchObject({ data_type: "uuid", is_nullable: "NO" });
+    expect(column("dueAt")).toMatchObject({ data_type: "timestamp with time zone", is_nullable: "YES" });
+    expect(column("completionNote")).toMatchObject({ data_type: "text", is_nullable: "YES" });
+    expect(column("tenantId")).toMatchObject({ data_type: "text", is_nullable: "NO" });
+    expect(column("status")).toMatchObject({ is_nullable: "NO" });
+    expect(column("status")!.column_default).toContain("'OPEN'");
+    expect(column("revision")!.column_default).toBe("1");
+    expect(column("id")!.column_default).toContain("gen_random_uuid()");
+
+    // Server validation rejects wrongly typed and dangling input without reporting success.
+    const alice = token("alice", tenantA);
+    expect((await api("POST", "/api/tasks", { token: alice, body: { title: 42, projectId: projectA.id } })).status).toBe(422);
+    expect((await api("POST", "/api/tasks", { token: alice, body: { title: "x", projectId: randomUUID() } })).body.code).toBe("INVALID_REFERENCE");
+    // The physical constraints hold even when the API is bypassed.
+    await expect(pgPool.query(`UPDATE "${schema}".tasks SET status = 'BOGUS' WHERE id = $1`, [task.id])).rejects.toMatchObject({ code: "23514" });
+    await expect(pgPool.query(`INSERT INTO "${schema}".tasks ("tenantId", "projectId") VALUES ($1, $2)`, [tenantA, projectA.id])).rejects.toMatchObject({ code: "23502" });
+    await expect(pgPool.query(`DELETE FROM "${schema}".projects WHERE id = $1`, [projectA.id])).rejects.toMatchObject({ code: "23001" }); // restrict_violation
+  }, 60_000);
+
+  it("DAT-09/14: lists are bounded with a total order, and a record with live dependents cannot be archived", async () => {
+    const alice = token("alice", tenantA);
+    const project = (await api("POST", "/api/projects", { token: alice, body: { name: `Paging ${marker}` } })).body.data;
+    const created: string[] = [];
+    for (const title of ["one", "two", "three"]) {
+      created.push((await api("POST", "/api/tasks", { token: alice, body: { title, projectId: project.id } })).body.data.id);
+    }
+    const page1 = await api("GET", `/api/tasks?projectId=${project.id}&limit=2`, { token: alice });
+    const page2 = await api("GET", `/api/tasks?projectId=${project.id}&limit=2&offset=2`, { token: alice });
+    expect(page1.body.page).toEqual({ limit: 2, offset: 0, returned: 2 });
+    expect(page2.body.page).toEqual({ limit: 2, offset: 2, returned: 1 });
+    expect([...page1.body.data, ...page2.body.data].map((r: any) => r.id).sort()).toEqual([...created].sort());
+
+    for (const query of ["limit=101", "limit=0", "limit=abc", "offset=-1", "orderBy=title", `tenantId=${tenantB}`, "projectId=not-a-uuid", "status=DONE"]) {
+      expect((await api("GET", `/api/tasks?${query}`, { token: alice })).status, query).toBe(400);
+    }
+
+    const blocked = await api("DELETE", `/api/projects/${project.id}`, { token: alice, revision: 1 });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body).toMatchObject({ code: "HAS_DEPENDENTS", dependent: "Task" });
+    for (const id of created) expect((await api("DELETE", `/api/tasks/${id}`, { token: alice, revision: 1 })).status).toBe(204);
+    expect((await api("DELETE", `/api/projects/${project.id}`, { token: alice, revision: 1 })).status).toBe(204);
+    expect((await api("GET", `/api/projects/${project.id}`, { token: alice })).status).toBe(404);
+    expect((await api("POST", "/api/tasks", { token: alice, body: { title: "late", projectId: project.id } })).status).toBe(422);
+    // Archived, never hard-deleted.
+    expect(await q(`SELECT count(*)::int AS n FROM "${schema}".tasks WHERE "projectId" = $1 AND "deletedAt" IS NOT NULL`, [project.id])).toEqual([{ n: 3 }]);
+    expect(await q(`SELECT count(*)::int AS n FROM "${schema}".projects WHERE id = $1 AND "deletedAt" IS NOT NULL`, [project.id])).toEqual([{ n: 1 }]);
+  }, 60_000);
+
   it("GEN-05: the task survives a full API restart and is read back in a new session", async () => {
     await stopServer();
     await startServer(appDatabaseUrl());

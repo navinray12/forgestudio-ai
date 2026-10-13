@@ -1,39 +1,25 @@
 /**
  * ForgeStudio Execution Blueprint v2.1 — Point 05: Executable Capability Contract
- * Capability & Evidence Routes
+ * Capability registry routes (read-only)
  */
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
+import { userRateLimit } from "../middlewares/userRateLimit.middleware.js";
 import {
   listCapabilitiesHandler,
   getManifestHandler,
-  getAdminNavigationHandler,
   getCapabilityByIdHandler,
-  getPrerequisitesHandler,
-  activateCapabilityHandler,
-  previewDisableHandler,
-  disableCapabilityHandler,
-  recordEvidenceHandler,
-  evaluateReleaseGateHandler,
 } from "../controllers/capability.controller.js";
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
 
-// Public / Authenticated discovery endpoints
 router.get("/", listCapabilitiesHandler);
 router.get("/manifest", getManifestHandler);
-router.get("/navigation", getAdminNavigationHandler);
-router.post("/release-gate/evaluate", evaluateReleaseGateHandler);
-
-// Single capability inspection
 router.get("/:id", getCapabilityByIdHandler);
-router.get("/:id/prerequisites", getPrerequisitesHandler);
-router.get("/:id/disable-preview", previewDisableHandler);
 
-// Governed mutations require authentication
-router.post("/:id/activate", requireAuth, activateCapabilityHandler);
-router.post("/:id/disable", requireAuth, disableCapabilityHandler);
-router.post("/:id/evidence", requireAuth, recordEvidenceHandler);
+// Not exposed (see controller): /navigation, /release-gate/evaluate, /:id/prerequisites,
+// /:id/disable-preview, /:id/activate, /:id/disable, /:id/evidence.
 
 export default router;

@@ -5,30 +5,23 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
-import { scopeToWebsite, requirePlatformAdmin } from "../middlewares/tenantScope.middleware.js";
+import { scopeToWebsite } from "../middlewares/tenantScope.middleware.js";
 import { WorkflowsCommunicationController } from "../controllers/workflowsCommunication.controller.js";
 
 const router = Router();
 
-// 1. Workflow Automation & Simulation
+// 1. Durable workflow definitions & simulation
+router.get("/workflows", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.listWorkflows);
 router.post("/workflows/draft", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.createWorkflowDraft);
 router.post("/workflows/:workflowId/publish/:version", requireAuth, scopeToWebsite({ admin: true }), WorkflowsCommunicationController.publishWorkflow);
 router.post("/workflows/:workflowId/simulate/:version", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.simulateWorkflow);
 
-// 2. Pre-Action Policy Revalidation
-router.post("/policy/revalidate", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.revalidatePreAction);
-
-// 3. Multi-Channel Communication
-router.post("/messages/dispatch", requireAuth, scopeToWebsite({ admin: true }), WorkflowsCommunicationController.dispatchMessage);
-
-// 4. Scoring & Segmentation
+// 2. Scoring (pure calculation)
 router.post("/scoring/calculate", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.calculateLeadScore);
 
-// 5. Experiments
-router.post("/experiments/create", requireAuth, scopeToWebsite({ admin: true }), WorkflowsCommunicationController.createExperiment);
-
-// 6. Contextual Chat & Confirmed Lead Capture
-router.post("/chat/init", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.initChat);
+// 3. Confirmed chat lead capture, committed through the durable lead service
 router.post("/chat/convert-lead", requireAuth, scopeToWebsite(), WorkflowsCommunicationController.convertChatLead);
+
+// Not exposed (see controller): /policy/revalidate, /messages/dispatch, /experiments/create, /chat/init.
 
 export default router;

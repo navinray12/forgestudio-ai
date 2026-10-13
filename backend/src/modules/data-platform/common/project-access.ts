@@ -3,7 +3,13 @@ import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
-const DATABASE_ENVIRONMENTS = new Set<DatabaseEnvironment>(["DEVELOPMENT", "PREVIEW", "PRODUCTION"]);
+/**
+ * Blueprint §42.2 names the environment classes development, staging and production, so STAGING is
+ * the canonical value. PREVIEW is the legacy label of the same class: it stays addressable so that
+ * databases already registered under it keep working, and no stored value is renamed.
+ */
+export const CANONICAL_DATABASE_ENVIRONMENTS: DatabaseEnvironment[] = ["DEVELOPMENT", "STAGING", "PRODUCTION"];
+const DATABASE_ENVIRONMENTS = new Set<DatabaseEnvironment>([...CANONICAL_DATABASE_ENVIRONMENTS, "PREVIEW"]);
 const ADMIN_ROLES = new Set(["OWNER", "ADMIN"]);
 
 export interface ProjectAccess {
@@ -66,10 +72,11 @@ export async function verifyProjectAccess(websiteId: string, userId: string): Pr
  * request can never fall through to PRODUCTION by omission.
  */
 export function resolveExplicitEnvironment(req: Request): DatabaseEnvironment {
-  const raw = (req.query.environment as string | undefined) ?? (req.body?.environment as string | undefined);
+  const raw = (req.query.environment as string | undefined) ?? (req.query.env as string | undefined) ??
+    (req.body?.environment as string | undefined);
   if (typeof raw !== "string" || raw.trim() === "") {
     throw new AppError(
-      "An explicit environment is required (DEVELOPMENT, PREVIEW or PRODUCTION)",
+      "An explicit environment is required (DEVELOPMENT, STAGING or PRODUCTION)",
       400,
       "ENVIRONMENT_REQUIRED"
     );

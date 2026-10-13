@@ -1,33 +1,16 @@
 import { Router } from "express";
-import {
-  createSchemaHandler,
-  getSchemaHandler,
-  uploadFileInitHandler,
-  submitFormAtomicHandler,
-  getSubmissionHandler,
-  listLeadsHandler,
-  transitionLeadStageHandler,
-  getDisasterRecoveryProfileHandler,
-} from "../controllers/formsLeads.controller.js";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { scopeToWebsite } from "../middlewares/tenantScope.middleware.js";
+import { userRateLimit } from "../middlewares/userRateLimit.middleware.js";
+import { listLeadsHandler, transitionLeadStageHandler } from "../controllers/formsLeads.controller.js";
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
 
-// Schema endpoints
-router.post("/schemas", createSchemaHandler);
-router.get("/schemas/:websiteId/:formId", getSchemaHandler);
+// Lead lifecycle, backed by the durable lead service
+router.get("/leads", scopeToWebsite(), listLeadsHandler);
+router.post("/leads/:leadId/transition", userRateLimit(30), transitionLeadStageHandler);
 
-// Upload endpoint
-router.post("/uploads/init", uploadFileInitHandler);
-
-// Atomic submission endpoint
-router.post("/submissions", submitFormAtomicHandler);
-router.get("/submissions/:receiptId", getSubmissionHandler);
-
-// Lead lifecycle endpoints
-router.get("/leads", listLeadsHandler);
-router.post("/leads/:leadId/transition", transitionLeadStageHandler);
-
-// Disaster recovery disclosures
-router.get("/disaster-recovery", getDisasterRecoveryProfileHandler);
+// Not exposed (see controller): /schemas, /uploads/init, /submissions, /disaster-recovery.
 
 export default router;

@@ -103,7 +103,7 @@ describe.skipIf(!optedIn)("Tenant-scoped v2 APIs (real app, disposable PostgreSQ
       expect((await api("GET", path, null)).status).toBe(401);
     }
     expect((await api("POST", "/api/v1/workflows-communication/workflows/draft", null, { websiteId: ownerSite })).status).toBe(401);
-    expect((await api("POST", "/api/v1/release-integrity/releases/request", null, { websiteId: ownerSite })).status).toBe(401);
+    expect((await api("GET", `/api/v1/workflows-communication/workflows?websiteId=${ownerSite}`, null)).status).toBe(401);
   });
 
   it("lets any authenticated user use the tenant-free calculators", async () => {
@@ -125,7 +125,7 @@ describe.skipIf(!optedIn)("Tenant-scoped v2 APIs (real app, disposable PostgreSQ
       ...GRAPH,
     });
     expect(draft.status).toBe(201);
-    expect(draft.json.draft.tenantId).toBe(ids.owner);
+    expect(draft.json.draft).toMatchObject({ websiteId: ownerSite, workflowKey: `wf-${marker}`, version: 1, status: "DRAFT", createdById: ids.editor });
     expect(JSON.stringify(draft.json)).not.toContain("attacker-tenant");
     const quota = await api("POST", "/api/v1/security-audit/quota/check", "editor", {
       websiteId: ownerSite, tenantId: "attacker-tenant", category: "FORMS", currentCount: 1, limit: 10,
@@ -150,31 +150,69 @@ describe.skipIf(!optedIn)("Tenant-scoped v2 APIs (real app, disposable PostgreSQ
     expect(publishAsOwner.status).toBe(200);
   });
 
-  it("restricts release operations to owners/admins of the release's website", async () => {
-    const asEditor = await api("POST", "/api/v1/release-integrity/releases/request", "editor", {
-      websiteId: ownerSite, version: 1, immutableArtifactDigest: "a".repeat(64),
-      pinnedInputDigests: { sourceDigest: "s", contentDigest: "c", policyDigest: "p", schemaDigest: "d" },
-    });
-    expect(asEditor.status).toBe(403);
+  it("keeps workflow definitions durable, immutable and isolated per website", async () => {
+    const workflowId = `wf3-${marker}`;
+    const draft = (extra: Record<string, unknown> = {}, who: "owner" | "outsider" = "owner", site = ownerSite) =>
+      api("POST", "/api/v1/workflows-communication/workflows/draft", who, { websiteId: site, workflowId, name: "Durable", ...GRAPH, ...extra });
 
-    const requested = await api("POST", "/api/v1/release-integrity/releases/request", "owner", {
-      websiteId: ownerSite, tenantId: "attacker-tenant", version: 1, immutableArtifactDigest: "a".repeat(64),
-      pinnedInputDigests: { sourceDigest: "s", contentDigest: "c", policyDigest: "p", schemaDigest: "d" },
-    });
-    expect(requested.status).toBe(201);
-    const releaseId = requested.json.candidate.releaseId;
-    expect(requested.json.candidate.tenantId).toBe(ids.owner);
-    expect(requested.json.candidate.requestedBy).toBe(ids.owner);
+    // Concurrent drafts receive distinct, gap-free versions.
+    const created = await Promise.all([draft(), draft(), draft()]);
+    expect(created.map((r) => r.status)).toEqual([201, 201, 201]);
+    expect(created.map((r) => r.json.draft.version).sort()).toEqual([1, 2, 3]);
 
-    const crossTenant = await api("POST", `/api/v1/release-integrity/releases/${releaseId}/transition`, "outsider", {
-      websiteId: outsiderSite, nextState: "PLANNED", workerFencingToken: 1,
-    });
-    expect(crossTenant.status).toBe(404);
+    // The same workflowId on another tenant's website is a separate workflow, not a new version here.
+    const foreign = await draft({}, "outsider", outsiderSite);
+    expect(foreign.json.draft).toMatchObject({ websiteId: outsiderSite, version: 1 });
+    expect((await pgPool.query(`SELECT count(*)::int AS n FROM forge_workflow_definitions WHERE "websiteId" = $1 AND "workflowKey" = $2`, [ownerSite, workflowId])).rows[0].n).toBe(3);
+
+    // State is read from PostgreSQL, not process memory.
+    const publish = (version: number) => api("POST", `/api/v1/workflows-communication/workflows/${workflowId}/publish/${version}`, "owner", { websiteId: ownerSite });
+    expect((await publish(1)).json.workflow).toMatchObject({ status: "PUBLISHED", publishedById: ids.owner });
+    expect((await publish(1)).status).toBe(200);
+    expect((await publish(2)).json.workflow.status).toBe("PUBLISHED");
+    const statuses = (await pgPool.query(`SELECT version, status FROM forge_workflow_definitions WHERE "websiteId" = $1 AND "workflowKey" = $2 ORDER BY version`, [ownerSite, workflowId])).rows;
+    expect(statuses).toEqual([{ version: 1, status: "DEPRECATED" }, { version: 2, status: "PUBLISHED" }, { version: 3, status: "DRAFT" }]);
+    expect((await publish(1)).status).toBe(409);
+    expect((await publish(9)).status).toBe(404);
+
+    // The database itself refuses edits to a definition and illegal status changes.
+    await expect(pgPool.query(`UPDATE forge_workflow_definitions SET definition = '{}'::jsonb WHERE "websiteId" = $1 AND "workflowKey" = $2 AND version = 2`, [ownerSite, workflowId]))
+      .rejects.toThrow(/immutable/);
+    await expect(pgPool.query(`UPDATE forge_workflow_definitions SET status = 'DRAFT' WHERE "websiteId" = $1 AND "workflowKey" = $2 AND version = 2`, [ownerSite, workflowId]))
+      .rejects.toThrow(/illegal workflow status transition/);
+
+    const simulation = await api("POST", `/api/v1/workflows-communication/workflows/${workflowId}/simulate/2`, "editor", { websiteId: ownerSite, initialContext: {} });
+    expect(simulation.json.simulation).toMatchObject({ isSimulation: true, workflowVersion: 2, totalSteps: 2 });
+    const listed = await api("GET", `/api/v1/workflows-communication/workflows?websiteId=${ownerSite}&workflowId=${workflowId}`, "editor");
+    expect(listed.json.versions.map((v: any) => v.version)).toEqual([3, 2, 1]);
+    expect((await api("GET", `/api/v1/workflows-communication/workflows?websiteId=${ownerSite}`, "outsider")).status).toBe(404);
+
+    const invalid = await draft({ nodes: [{ id: "only", type: "ACTION", name: "x", config: {} }], edges: [] });
+    expect(invalid.status).toBe(400);
   });
 
-  it("does not expose self-attested release passports", async () => {
-    const res = await api("POST", "/api/v1/release-integrity/releases/passport/issue", "owner", { websiteId: ownerSite });
-    expect(res.status).toBe(404);
+  it("commits a confirmed chat lead through the durable lead service", async () => {
+    const body = { websiteId: ownerSite, tenantId: "attacker-tenant", formId: "chat", confirmedContact: { name: "Chat Lead", email: "chat@example.test" } };
+    expect((await api("POST", "/api/v1/workflows-communication/chat/convert-lead", "editor", body)).status).toBe(400);
+    expect((await api("POST", "/api/v1/workflows-communication/chat/convert-lead", "outsider", { ...body, consentConfirmed: true })).status).toBe(404);
+    const converted = await api("POST", "/api/v1/workflows-communication/chat/convert-lead", "editor", { ...body, consentConfirmed: true });
+    expect(converted.status).toBe(201);
+    const lead = (await pgPool.query(`SELECT "websiteId", provenance, email, stage FROM forge_leads WHERE id = $1`, [converted.json.receipt.leadId])).rows[0];
+    expect(lead).toEqual({ websiteId: ownerSite, provenance: "CHAT_AGENT", email: "chat@example.test", stage: "NEW" });
+  });
+
+  it("does not serve in-memory release state, self-attested gates or fabricated delivery", async () => {
+    for (const [method, path] of [
+      ["POST", "/api/v1/release-integrity/releases/request"],
+      ["POST", "/api/v1/release-integrity/releases/gates/evaluate"],
+      ["POST", "/api/v1/release-integrity/releases/passport/issue"],
+      ["POST", "/api/v1/workflows-communication/messages/dispatch"],
+      ["POST", "/api/v1/workflows-communication/policy/revalidate"],
+      ["POST", "/api/v1/workflows-communication/experiments/create"],
+      ["POST", "/api/v1/workflows-communication/chat/init"],
+    ] as const) {
+      expect((await api(method, path, "owner", { websiteId: ownerSite })).status, path).toBe(404);
+    }
   });
 
   it("regenerates infrastructure upgrade plans and attests only the caller's approval", async () => {

@@ -1,0 +1,80 @@
+{
+  "runId": "run-1791886540770-7e4a38b3",
+  "createdAt": "2026-10-13T10:15:40.771Z",
+  "config": {
+    "protocolVersion": "2.1.0",
+    "productName": "ForgeStudio",
+    "productVersion": "2.1.0",
+    "purchasedPlanOrEntitlement": "Team Pro",
+    "briefId": "BRIEF-01-SOLARIS-CONSULTING",
+    "operatorExperienceLevel": "BUSINESS_USER",
+    "enabledIntegrations": [
+      "WordPress Gutenberg Bridge"
+    ],
+    "startingConditions": "Clean workspace with Brief 01 fixtures",
+    "preparedAssetsDescription": "Solaris assets",
+    "costAssumptionsDescription": "Standard license",
+    "actualCostUsd": 49
+  },
+  "taskResults": [
+    {
+      "taskId": "TASK-08-REJECT-DANGEROUS-RELEASE",
+      "taskName": "Reject a Dangerous Release",
+      "status": "PASSED",
+      "activeElapsedSeconds": 0,
+      "totalElapsedSeconds": 0,
+      "assistanceInterventionsCount": 0,
+      "defects": [],
+      "isCriticalFailure": false,
+      "notes": "Automated qualification: validateWebsiteForPublish successfully intercepted and rejected malformed release candidate.",
+      "rawMetrics": {
+        "validationErrorsIntercepted": 1,
+        "liveDowntimeSeconds": 0
+      },
+      "evidenceArtifactUrls": [
+        "qa/evidence/TASK-08-validation-rejection.json"
+      ]
+    },
+    {
+      "taskId": "TASK-06-CRM-OUTAGE-LEAD",
+      "taskName": "Collect a Synthetic Lead During CRM Failure",
+      "status": "PASSED",
+      "activeElapsedSeconds": 0,
+      "totalElapsedSeconds": 0,
+      "assistanceInterventionsCount": 0,
+      "defects": [],
+      "isCriticalFailure": false,
+      "notes": "Automated qualification: synthetic lead preserved durably in database during simulated destination 503 outage.",
+      "rawMetrics": {
+        "leadStoredLocally": true,
+        "destinationStatusMocked": 503,
+        "retryQueueState": "RETRY_PENDING"
+      },
+      "evidenceArtifactUrls": [
+        "qa/evidence/TASK-06-lead-resilience.json"
+      ]
+    }
+  ],
+  "summary": {
+    "totalTasks": 2,
+    "tasksPassed": 2,
+    "tasksFailed": 0,
+    "tasksBlocked": 0,
+    "tasksNotMeasured": 0,
+    "totalActiveElapsedSeconds": 0,
+    "totalAssistanceInterventions": 0,
+    "defectsBySeverity": {
+      "CRITICAL": 0,
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0
+    },
+    "hasCriticalFailure": false,
+    "overallOutcome": "PASS",
+    "provisionalCompositeScore": 100,
+    "scoreInterpretation": "All measured tasks passed cleanly with zero high or critical defects. Score: 100/100."
+  },
+  "knownLimitationsAndUncertainty": [
+    "Human operator study not yet executed for this run"
+  ]
+}

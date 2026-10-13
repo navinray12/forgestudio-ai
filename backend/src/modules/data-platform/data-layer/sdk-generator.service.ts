@@ -184,7 +184,8 @@ export class TableQueryBuilder<TRecord, TInsert, TUpdate> {
     private tableName: string,
     apikey: string
   ) {
-    this.endpoint = \`\${baseUrl.replace(/\\/+$/, "")}/api/v1/data/\${projectId}/\${tableName}\`;
+    // The API has no default environment; this SDK is pinned to the one it was generated for.
+    this.endpoint = \`\${baseUrl.replace(/\\/+$/, "")}/api/v1/data/\${projectId}/\${tableName}?environment=${environment}\`;
     this.apikey = apikey;
   }
 

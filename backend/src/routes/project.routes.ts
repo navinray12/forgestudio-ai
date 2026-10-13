@@ -32,6 +32,7 @@ import {
   deletePageHandler,
   getSourcePreviewHandler,
   syncVisualToCodeHandler,
+  planVisualToCodeHandler,
   syncCodeToVisualHandler,
   getWorkspaceCheckpointHandler,
   listWorkspaceCheckpointsHandler,
@@ -54,10 +55,11 @@ import {
   evaluateUnifiedAuthorizationHandler,
   getDatabaseStudioViewHandler,
   resolveEnvironmentBindingHandler,
+  listEnvironmentBindingsHandler,
+  registerEnvironmentBindingHandler,
+  retireEnvironmentBindingHandler,
   resolveTargetPoolHandler,
   executeUnifiedMigrationHandler,
-  runReleaseQualificationHandler,
-  getReleaseQualificationRecordHandler,
   validateGeneratedPackageHandler,
   verifyControlPlaneDiagnosticsHandler,
 
@@ -293,6 +295,7 @@ router.put("/:id/manifest", updateManifestHandler);
 // Unified Compiler / IR & Visual ↔ Code Sync (Modules 06 & 07)
 router.post("/:id/compile", compileProjectHandler);
 router.post("/:id/sync/visual-to-code", syncVisualToCodeHandler);
+router.post("/:id/sync/visual-to-code/plan", planVisualToCodeHandler);
 router.post("/:id/sync/code-to-visual", syncCodeToVisualHandler);
 // Durable Visual Editor <-> Code Workspace checkpoints (blueprint §33.3, §34)
 router.get("/:id/workspace/checkpoint", getWorkspaceCheckpointHandler);
@@ -341,14 +344,18 @@ router.post("/:id/database/studio/views/:viewName", getDatabaseStudioViewHandler
 
 // Blueprint Point 42: Environment Bindings, Secrets and Isolation
 router.get("/:id/environment/bindings", resolveEnvironmentBindingHandler);
+router.get("/:id/environment/bindings/list", listEnvironmentBindingsHandler);
+router.put("/:id/environment/bindings/:environment", registerEnvironmentBindingHandler);
+router.delete("/:id/environment/bindings/:environment", retireEnvironmentBindingHandler);
 router.post("/:id/environment/pools/resolve", resolveTargetPoolHandler);
 
 // Blueprint Point 43: One Migration Authority & Safe Upgrade Lifecycle
 router.post("/:id/database/migrations/unified-execute", executeUnifiedMigrationHandler);
 
-// Blueprint Point 44: End-to-End Application/Database Release Qualification
-router.post("/:id/qualification/release/run", runReleaseQualificationHandler);
-router.get("/:id/qualification/release/:runId", getReleaseQualificationRecordHandler);
+// Blueprint Point 44: release qualification is not exposed. The former handlers returned a
+// "PASSED" evidence chain whose nine layers were hard-coded, without inspecting any schema, API or
+// database. Real qualification evidence comes from executed acceptance runs
+// (tests/generated-app.acceptance.test.ts), not from a self-reporting endpoint.
 
 // Blueprint Point 45: the Team Project Tracker is an acceptance application that
 // must be generated and run (blueprint 45.1), not an operations API hardcoded

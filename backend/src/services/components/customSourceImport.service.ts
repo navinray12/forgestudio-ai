@@ -101,7 +101,7 @@ export class CustomSourceImportService {
     fileName: string;
     sourceContent: string; // Decoded file content
     declaredLicense?: string;
-  }): ImportInspectionResult {
+  }, options: { retainInMemory?: boolean } = {}): ImportInspectionResult {
     const findings: SecurityInspectionFinding[] = [];
     const originalSizeBytes = Buffer.byteLength(params.sourceContent, "utf8");
     const originalSha256 = createHash("sha256").update(params.sourceContent).digest("hex");
@@ -206,7 +206,8 @@ export class CustomSourceImportService {
       exportedComponents
     };
 
-    this.quarantinedImports.set(params.importId, result);
+    // The durable import route persists the result itself and opts out of the process-local copy.
+    if (options.retainInMemory !== false) this.quarantinedImports.set(params.importId, result);
     return result;
   }
 

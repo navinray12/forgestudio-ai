@@ -1,27 +1,25 @@
 /**
  * Point 08: Component Routes
- * Exposes endpoints for component contracts, quarantine source imports, 3-way reconciliation, and behavior gates.
+ * Exposes endpoints for component contracts and quarantine source imports.
  */
 
 import { Router } from "express";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { scopeToWebsite } from "../middlewares/tenantScope.middleware.js";
+import { userRateLimit } from "../middlewares/userRateLimit.middleware.js";
 import { componentController } from "../controllers/component.controller.js";
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
 
 // Component Contract endpoints
-router.get("/contracts", (req, res) => componentController.listContracts(req, res));
-router.get("/contracts/:componentId", (req, res) => componentController.getContract(req, res));
-router.post("/validate", (req, res) => componentController.validateInstance(req, res));
+router.get("/contracts", (req, res, next) => componentController.listContracts(req, res, next));
+router.get("/contracts/:componentId", (req, res, next) => componentController.getContract(req, res, next));
+router.post("/validate", (req, res, next) => componentController.validateInstance(req, res, next));
 
-// Custom source import into quarantine
-router.post("/source/import", (req, res) => componentController.importSource(req, res));
+// Custom source import into quarantine (durable, website-scoped)
+router.post("/source/import", userRateLimit(10), scopeToWebsite(), (req, res, next) => componentController.importSource(req, res, next));
 
-// Three-way source reconciliation & conflict management
-router.post("/source/reconcile", (req, res) => componentController.reconcileSource(req, res));
-router.get("/source/conflicts/:websiteId", (req, res) => componentController.getConflicts(req, res));
-router.post("/source/conflicts/:conflictId/resolve", (req, res) => componentController.resolveConflict(req, res));
-
-// Behavioral review gate for business logic changes
-router.post("/behavior/review", (req, res) => componentController.reviewBehavior(req, res));
+// Not exposed (see controller): /source/reconcile, /source/conflicts/*, /behavior/review.
 
 export default router;

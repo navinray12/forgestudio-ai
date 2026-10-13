@@ -972,7 +972,8 @@ function indexNodes(root: JsxNode, into: Map<string, JsxNode>) {
   root.children.forEach((child) => indexNodes(child, into));
 }
 
-async function generatePageFile(
+/** The page file the generator produces for `filePath` from a visual document, and its root element ID. */
+export async function generatePageFile(
   editorData: any,
   framework: ProjectFramework,
   project: ProjectIdentity,

@@ -5,7 +5,6 @@ import { readFile, writeFile, listFiles, sanitizeAndNormalizePath } from "../pro
 import { prisma } from "../../config/prisma.js";
 import { updateProjectMetadataAtomic } from "../workspace/workspaceCheckpoints.service.js";
 import { extractProtectedRegions, injectProtectedRegions } from "../generator/sourcePreservation.service.js";
-import { escapeJsxText } from "../generator/jsxRenderer.js";
 import { compileAndSyncProject } from "./unifiedCompiler.service.js";
 import {
   buildPageRegistry,
@@ -26,6 +25,9 @@ import {
   reconcilePageSource,
 } from "./pageSourceSync.js";
 import { saveDocumentFromCode } from "../websites/documentGateway.js";
+import { applyJsxMutation, type JsxMutation, type JsxMutationCode, type JsxMutationResult } from "./jsxAstMutation.js";
+
+export type { JsxMutation, JsxMutationCode, JsxMutationResult };
 
 const db = prisma as any;
 
@@ -288,120 +290,65 @@ export function parseSourceCodeToElements(
 }
 
 /**
- * Surgically update a JSX element's text or props using the TypeScript AST
- * rather than fragile regex replacements.
+ * Applies one visual edit to a JSX element through the TypeScript AST (see jsxAstMutation.ts for
+ * the supported mutations and the reasons an edit is rejected). A string is shorthand for SET_TEXT.
+ * `updated` is true only when the returned content differs from the source.
  */
 export function updateJsxElementViaAst(
   sourceCode: string,
   elementId: string,
-  newText?: string,
+  change?: string | JsxMutation,
   fileName = "component.tsx"
-): { updated: boolean; content: string; diagnostic?: string } {
-  if (!ts) {
-    return { updated: false, content: sourceCode, diagnostic: "TypeScript compiler unavailable" };
+): JsxMutationResult {
+  if (change === undefined || change === null) {
+    return { updated: false, content: sourceCode, code: "INVALID_MUTATION", diagnostic: "No mutation supplied." };
   }
-
-  try {
-    const sourceFile = ts.createSourceFile(
-      fileName,
-      sourceCode,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX
-    );
-
-    let targetElementNode: any = null;
-
-    function findElement(node: any) {
-      if (ts.isJsxElement(node)) {
-        const opening = node.openingElement;
-        for (const attr of opening.attributes.properties) {
-          if (ts.isJsxAttribute(attr)) {
-            const attrName = attr.name.getText(sourceFile);
-            if (attrName === "data-forge-id" || attrName === "id") {
-              const attrVal = attr.initializer?.getText(sourceFile)?.replace(/['"]/g, "");
-              if (attrVal === elementId) {
-                targetElementNode = node;
-                return;
-              }
-            }
-          }
-        }
-      } else if (ts.isJsxSelfClosingElement(node)) {
-        for (const attr of node.attributes.properties) {
-          if (ts.isJsxAttribute(attr)) {
-            const attrName = attr.name.getText(sourceFile);
-            if (attrName === "data-forge-id" || attrName === "id") {
-              const attrVal = attr.initializer?.getText(sourceFile)?.replace(/['"]/g, "");
-              if (attrVal === elementId) {
-                targetElementNode = node;
-                return;
-              }
-            }
-          }
-        }
-      }
-
-      ts.forEachChild(node, findElement);
-    }
-
-    findElement(sourceFile);
-
-    if (!targetElementNode) {
-      return { updated: false, content: sourceCode, diagnostic: `Element with id '${elementId}' not found in AST` };
-    }
-
-    // If node has children and newText is provided, replace children range
-    if (ts.isJsxElement(targetElementNode) && typeof newText === "string") {
-      // PRESERVE SOURCE-OWNED EXPRESSION: Do not overwrite code-owned dynamic expressions!
-      const hasDynamicExpression = targetElementNode.children.some((child: any) => ts.isJsxExpression(child));
-      if (hasDynamicExpression) {
-        return {
-          updated: false,
-          content: sourceCode,
-          diagnostic: `Element '${elementId}' contains source-owned dynamic expressions; preserved without overwrite.`,
-        };
-      }
-
-      const start = targetElementNode.openingElement.end;
-      const end = targetElementNode.closingElement.pos;
-      const escapedText = escapeJsxText(newText);
-      const updated = sourceCode.slice(0, start) + escapedText + sourceCode.slice(end);
-      return { updated: true, content: updated };
-    }
-
-    return { updated: false, content: sourceCode };
-  } catch (err: any) {
-    return { updated: false, content: sourceCode, diagnostic: err?.message || "AST parse error" };
-  }
+  const mutation: JsxMutation = typeof change === "string" ? { type: "SET_TEXT", text: change } : change;
+  return applyJsxMutation(sourceCode, String(elementId), mutation, fileName);
 }
 
 export interface SyncVisualElementOptions {
   authorId?: string;
   expectedRevision?: number;
+  /** The edit to apply. Without it, the element's text (textContent/content/buttonText) is synced. */
+  mutation?: JsxMutation;
+}
+
+export interface VisualElementSyncResult {
+  /** False when the edit was rejected. A request that matches the source already is a success. */
+  success: boolean;
+  /** True only when the source file was changed and written. */
+  updated: boolean;
+  code?: JsxMutationCode;
+  diagnostics: SyncDiagnostic[];
+  content: string;
+  /** The file version after the request. */
+  version?: number;
+  changedRange?: { startLine: number; endLine: number };
 }
 
 /**
- * Target Visual -> Code targeted reconciliation for an updated element.
- * Uses AST-based surgical range edits first, with expected revision validation.
+ * Visual -> code edit of one element in a persisted source file, bound to the expected file
+ * revision. The file is written only when the AST mutation changed it and the result parses;
+ * a rejected or no-op edit leaves the file and its version untouched.
  */
 export async function syncVisualElementToSource(
   projectId: string,
   filePath: string,
   element: any,
   authorIdOrOptions?: string | SyncVisualElementOptions
-): Promise<{ success: boolean; diagnostics: SyncDiagnostic[]; content: string }> {
+): Promise<VisualElementSyncResult> {
   const options: SyncVisualElementOptions =
     typeof authorIdOrOptions === "string"
       ? { authorId: authorIdOrOptions }
       : authorIdOrOptions || {};
 
-  const diagnostics: SyncDiagnostic[] = [];
   const file = await readFile(projectId, filePath);
 
   if (!file.content) {
     throw new AppError(`Target source file '${filePath}' is empty`, 400, "EMPTY_SOURCE_FILE");
   }
+  const source: string = file.content;
 
   // Revision-bound validation
   if (options.expectedRevision !== undefined && file.version !== undefined) {
@@ -414,66 +361,59 @@ export async function syncVisualElementToSource(
     }
   }
 
+  const rejected = (code: JsxMutationCode | undefined, diagnosticCode: string, message: string): VisualElementSyncResult => ({
+    success: false,
+    updated: false,
+    code,
+    diagnostics: [{ severity: "error", code: diagnosticCode, message, filePath }],
+    content: source,
+    version: file.version,
+  });
+
   if (file.isProtected) {
-    diagnostics.push({
-      severity: "warning",
-      code: "FILE_PROTECTED",
-      message: `File '${filePath}' is protected. Sync skipped.`,
-      filePath,
-    });
-    return { success: false, diagnostics, content: file.content };
+    return rejected("SOURCE_OWNED", "FILE_PROTECTED", `File '${filePath}' is protected. Sync skipped.`);
   }
 
-  // Preserve protected manual code regions
-  const protectedRegions = extractProtectedRegions(file.content);
-
-  const elementId = element.id;
+  const elementId = element?.id;
   if (!elementId) {
     throw new AppError("Visual element must possess a stable ID for sync", 400, "MISSING_ELEMENT_ID");
   }
 
-  let updatedContent = file.content;
-  const newText = element.textContent || element.content || element.buttonText;
-
-  // 1. Attempt AST-based surgical range replacement first
-  const astResult = updateJsxElementViaAst(updatedContent, String(elementId), newText, filePath);
-  if (astResult.updated) {
-    updatedContent = astResult.content;
-  } else if (astResult.diagnostic && astResult.diagnostic.includes("source-owned")) {
-    diagnostics.push({
-      severity: "warning",
-      code: "SOURCE_OWNED_PROTECTED",
-      message: astResult.diagnostic,
-      filePath,
-    });
-  } else {
-    // 2. Fallback to data-forge-id pattern matching if AST did not resolve node
-    const safeId = String(elementId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(
-      `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${safeId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
-    );
-
-    if (typeof newText === "string" && pattern.test(updatedContent)) {
-      const text = escapeJsxText(newText);
-      updatedContent = updatedContent.replace(pattern, (_m, open: string, _old: string, close: string) => `${open}${text}${close}`);
-    }
+  const text = element.textContent ?? element.content ?? element.buttonText;
+  const mutation: JsxMutation | undefined = options.mutation ?? (typeof text === "string" ? { type: "SET_TEXT", text } : undefined);
+  if (!mutation) {
+    throw new AppError("A mutation or the element's text is required for visual sync", 400, "MISSING_MUTATION");
   }
 
-  // Re-inject protected regions
-  updatedContent = injectProtectedRegions(updatedContent, protectedRegions);
+  const result = updateJsxElementViaAst(source, String(elementId), mutation, filePath);
+  if (!result.updated) {
+    if (result.code === "NO_CHANGE") {
+      return {
+        success: true,
+        updated: false,
+        code: "NO_CHANGE",
+        diagnostics: [{ severity: "info", code: "NO_CHANGE", message: result.diagnostic || "No change", filePath }],
+        content: source,
+        version: file.version,
+      };
+    }
+    return rejected(result.code, `VISUAL_SYNC_${result.code ?? "REJECTED"}`, result.diagnostic || "The edit was not applied.");
+  }
 
-  // Persist updated source
-  await writeFile(projectId, filePath, {
-    content: updatedContent,
+  const written = await writeFile(projectId, filePath, {
+    content: result.content,
     expectedVersion: file.version,
     authorId: options.authorId,
-    reason: `Visual sync for element: ${elementId}`,
+    reason: `Visual ${mutation.type} for element: ${elementId}`,
   });
 
   return {
     success: true,
-    diagnostics,
-    content: updatedContent,
+    updated: true,
+    diagnostics: [],
+    content: result.content,
+    version: (written as any)?.version,
+    changedRange: result.changedRange,
   };
 }
 

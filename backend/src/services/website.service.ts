@@ -406,86 +406,24 @@ export interface PurgeWebsiteOptions {
 }
 
 /**
- * Permanently purge a website and its associated records.
- * Guardrails:
- * - Must currently be in TRASH.
- * - Authorized OWNER only.
- * - Explicit confirmation: confirmNameOrSlug must match website.name or website.slug.
- * - Configurable retention policy via FORGE_TRASH_RETENTION_DAYS.
- * - Complete pre-purge audit logging with metrics.
+ * Direct purge is no longer available: permanent deletion requires an approved purge request
+ * (services/websitePurge.service.ts, blueprint §10). The owner check is kept so that non-owners
+ * learn nothing about the website.
  */
 export async function purgeWebsite(
   websiteId: string,
   userId: string,
-  options: PurgeWebsiteOptions
-) {
+  _options: PurgeWebsiteOptions
+): Promise<never> {
   const website = await getScopedWebsiteInTransaction(db, websiteId, userId, { allowTrash: true });
-
   if (website.userPermission !== "OWNER") {
     throw new AppError("Only the project owner can permanently purge a website.", 403, "FORBIDDEN");
   }
-
-  if (website.status !== "TRASH") {
-    throw new AppError("Only websites currently in the trash can be permanently purged.", 400, "WEBSITE_NOT_IN_TRASH");
-  }
-
-  const { confirmNameOrSlug, forceImmediatePurge = false } = options || {};
-  if (!confirmNameOrSlug || (confirmNameOrSlug !== website.name && confirmNameOrSlug !== website.slug)) {
-    throw new AppError(
-      `Confirmation mismatch: please provide the exact website name ("${website.name}") or slug ("${website.slug}") to confirm permanent purge.`,
-      400,
-      "CONFIRMATION_MISMATCH"
-    );
-  }
-
-  // Retention check
-  const retentionDays = process.env.FORGE_TRASH_RETENTION_DAYS ? parseInt(process.env.FORGE_TRASH_RETENTION_DAYS, 10) : 0;
-  if (retentionDays > 0 && !forceImmediatePurge) {
-    const deletedTime = website.deletedAt ? new Date(website.deletedAt).getTime() : 0;
-    const elapsedDays = (Date.now() - deletedTime) / (1000 * 60 * 60 * 24);
-    if (elapsedDays < retentionDays) {
-      const remainingDays = Math.ceil(retentionDays - elapsedDays);
-      throw new AppError(
-        `Website retention policy active: website must remain in trash for ${retentionDays} days before purge (${remainingDays} days remaining).`,
-        409,
-        "RETENTION_PERIOD_ACTIVE"
-      );
-    }
-  }
-
-  // Count child records for auditability before executing destructive purge
-  const [revisionsCount, deploymentsCount, formSubmissionsCount] = await Promise.all([
-    db.websiteRevision?.count?.({ where: { websiteId } }).catch(() => 0) || 0,
-    db.deployment?.count?.({ where: { websiteId } }).catch(() => 0) || 0,
-    db.formSubmission?.count?.({ where: { websiteId } }).catch(() => 0) || 0,
-  ]);
-
-  await recordAuditLog({
-    userId,
-    action: "WEBSITE_PERMANENTLY_PURGED",
-    targetResource: `website:${websiteId}`,
-    details: {
-      websiteName: website.name,
-      websiteSlug: website.slug,
-      deletedAt: website.deletedAt,
-      purgedAt: new Date().toISOString(),
-      purgedRecords: {
-        revisions: revisionsCount,
-        deployments: deploymentsCount,
-        formSubmissions: formSubmissionsCount,
-      },
-    },
-  });
-
-  await db.website.delete({
-    where: { id: websiteId },
-  });
-
-  return {
-    success: true,
-    message: "Website and all associated records permanently purged.",
-    purgedWebsiteId: websiteId,
-  };
+  throw new AppError(
+    "Permanent deletion requires an approved purge request: POST /api/websites/:id/purge-requests, approval by another owner or admin, then execute.",
+    409,
+    "PURGE_APPROVAL_REQUIRED"
+  );
 }
 
 export async function getWebsiteRoles(websiteId: string, userId: string) {

@@ -44,6 +44,7 @@ import {
   kindForSyncStatus,
 } from "../services/workspace/workspaceCheckpoints.service.js";
 import { prisma } from "../config/prisma.js";
+import { AppError } from "../utils/app-error.js";
 import { buildSyncBaseline, buildPageRegistry, parseEditorDocument, toProjectFramework } from "../services/compiler/pageRegistry.js";
 import {
   listProjectPages,
@@ -69,7 +70,13 @@ import { contractFirstApiGenerator } from "../services/api/contractFirstApiGener
 import { applicationAuth } from "../services/auth/applicationAuth.service.js";
 import { unifiedExecutionAuthorization } from "../services/auth/unifiedExecutionAuthorization.service.js";
 import { databaseStudioViews } from "../services/database/databaseStudioViews.service.js";
-import { environmentBindingService } from "../services/environment/environmentBinding.service.js";
+import {
+  environmentBindingService,
+  requireEnvironmentClass,
+  toPublicBinding,
+} from "../services/environment/environmentBinding.service.js";
+import { recordAuditLog } from "../services/audit.service.js";
+import { FRESH_AUTH_WINDOW_MS } from "../services/cms/contentLifecycle.service.js";
 import { targetResolutionService } from "../services/environment/targetResolution.service.js";
 import { unifiedMigrationAuthority } from "../services/migration/unifiedMigrationAuthority.service.js";
 import { applicationReleaseQualificationService } from "../services/qualification/applicationReleaseQualification.service.js";
@@ -456,12 +463,40 @@ export async function syncVisualToCodeHandler(req: Request, res: Response, next:
     const projectId = String(req.params.id);
     await getForgeProjectById(projectId, user);
 
-    const { filePath, element, expectedRevision } = req.body;
+    const { filePath, element, expectedRevision, mutation } = req.body ?? {};
+    if (typeof filePath !== "string" || !filePath.trim()) {
+      throw new AppError("filePath is required", 400, "MISSING_FILE_PATH");
+    }
+    if (mutation !== undefined && (mutation === null || typeof mutation !== "object" || Array.isArray(mutation))) {
+      throw new AppError("mutation must be an object", 400, "INVALID_MUTATION");
+    }
     const result = await syncVisualElementToSource(projectId, filePath, element, {
       authorId: user.id,
       expectedRevision: expectedRevision !== undefined ? Number(expectedRevision) : undefined,
+      mutation,
     });
-    res.status(200).json(result);
+    // A rejected edit is reported as such (422) with its diagnostics; the file is untouched.
+    res.status(result.success ? 200 : 422).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /:id/sync/visual-to-code/plan — the element edits that carry a canvas change (the visual
+ * document before and after it) into the project's hand-written page files. Read-only: the edits
+ * are applied one by one through POST /:id/sync/visual-to-code.
+ */
+export async function planVisualToCodeHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const project = await getForgeProjectById(String(req.params.id), user);
+    const { before, after, paths } = req.body ?? {};
+    if (paths !== undefined && (!Array.isArray(paths) || paths.some((p) => typeof p !== "string"))) {
+      throw new AppError("paths must be an array of file paths", 400, "INVALID_PATHS");
+    }
+    const { planCanvasEdits } = await import("../services/compiler/canvasEditPlanner.js");
+    res.status(200).json({ success: true, ...(await planCanvasEdits(project as any, before, after, paths)) });
   } catch (err) {
     next(err);
   }
@@ -906,16 +941,107 @@ export async function getDatabaseStudioViewHandler(req: Request, res: Response, 
 // Blueprint Point 42: Environment Bindings, Secrets and Isolation
 // ---------------------------------------------------------------------------
 
+/** Same window the identity module and purge approvals use for a "fresh" sign-in. */
+const BINDING_STEP_UP_WINDOW_MS = FRESH_AUTH_WINDOW_MS;
+
+/**
+ * Binding changes are limited to the project owner, platform administrators and OWNER/ADMIN members
+ * of the project's workspace. Membership is always read from the database for the session user.
+ */
+async function assertCanAdministerBindings(project: { ownerId: string; workspaceId?: string | null }, user: { id: string; role?: string }) {
+  if (["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role || "") || project.ownerId === user.id) return;
+  if (project.workspaceId) {
+    const member = await (prisma as any).workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId: user.id } },
+    });
+    if (member && ["OWNER", "ADMIN"].includes(String(member.role).toUpperCase())) return;
+  }
+  throw new AppError("Only project owners and workspace admins can change environment bindings", 403, "FORBIDDEN");
+}
+
+/** Step-up is derived from the session's sign-in time; a client can never assert it. */
+function hasRecentSignIn(res: Response): boolean {
+  const authTime = res.locals.session?.authTime ? new Date(res.locals.session.authTime).getTime() : NaN;
+  return Number.isFinite(authTime) && Date.now() - authTime <= BINDING_STEP_UP_WINDOW_MS;
+}
+
 export async function resolveEnvironmentBindingHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const user = getAuthUser(res, req);
     const projectId = String(req.params.id);
     await getForgeProjectById(projectId, user);
 
-    const environment = req.query.environment || req.body.environment;
-    const binding = environmentBindingService.getBinding(projectId, environment);
+    const environment = req.query.environment || req.body?.environment;
+    const binding = await environmentBindingService.getBinding(projectId, environment);
 
-    res.status(200).json({ success: true, binding });
+    res.status(200).json({ success: true, binding: toPublicBinding(binding) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listEnvironmentBindingsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+    const bindings = await environmentBindingService.listBindings(projectId);
+    res.status(200).json({ success: true, bindings: bindings.map(toPublicBinding) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function registerEnvironmentBindingHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+    await assertCanAdministerBindings(project, user);
+
+    const environment = requireEnvironmentClass(req.params.environment);
+    const { secretRef, provider, roles, applicationId, expectedVersion } = req.body ?? {};
+    if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 0)) {
+      throw new AppError("expectedVersion must be a non-negative integer", 400, "INVALID_VERSION");
+    }
+    const binding = await environmentBindingService.registerBinding(
+      projectId,
+      typeof applicationId === "string" && applicationId ? applicationId : `app_${projectId}`,
+      environment,
+      { secretRef, provider, roles, expectedVersion, stepUpVerified: hasRecentSignIn(res), actorId: user.id }
+    );
+    await recordAuditLog({
+      userId: user.id,
+      action: "ENVIRONMENT_BINDING_REGISTERED",
+      targetResource: `forge_project:${projectId}`,
+      // The secret reference is deliberately not recorded; the fingerprint identifies the version.
+      details: { environment, bindingId: binding.bindingId, version: binding.version, targetFingerprint: binding.targetFingerprint },
+    });
+    res.status(binding.version === 1 ? 201 : 200).json({ success: true, binding: toPublicBinding(binding) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function retireEnvironmentBindingHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(res, req);
+    const projectId = String(req.params.id);
+    const project = await getForgeProjectById(projectId, user);
+    await assertCanAdministerBindings(project, user);
+
+    const environment = requireEnvironmentClass(req.params.environment);
+    const binding = await environmentBindingService.retireBinding(projectId, environment, {
+      stepUpVerified: hasRecentSignIn(res),
+      actorId: user.id,
+    });
+    await recordAuditLog({
+      userId: user.id,
+      action: "ENVIRONMENT_BINDING_RETIRED",
+      targetResource: `forge_project:${projectId}`,
+      details: { environment, bindingId: binding.bindingId, version: binding.version },
+    });
+    res.status(200).json({ success: true, binding: toPublicBinding(binding) });
   } catch (err) {
     next(err);
   }
@@ -927,10 +1053,11 @@ export async function resolveTargetPoolHandler(req: Request, res: Response, next
     const projectId = String(req.params.id);
     await getForgeProjectById(projectId, user);
 
-    const { environment, roleType } = req.body;
-    const pool = targetResolutionService.resolveTargetPool(
+    // The environment must be named explicitly; there is no default destination.
+    const { environment, roleType } = req.body ?? {};
+    const pool = await targetResolutionService.resolveTargetPool(
       projectId,
-      environment || "DEVELOPMENT",
+      requireEnvironmentClass(environment),
       roleType || "runtime"
     );
 

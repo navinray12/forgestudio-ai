@@ -12,7 +12,7 @@
  */
 
 import { AppError } from "../../utils/app-error.js";
-import { EnvironmentBinding, environmentBindingService, EnvironmentClass } from "./environmentBinding.service.js";
+import { EnvironmentBinding, EnvironmentBindingService, environmentBindingService, EnvironmentClass } from "./environmentBinding.service.js";
 
 export interface ResolvedTargetPool {
   poolKey: string;
@@ -34,18 +34,24 @@ export interface ShadowDatabaseDescriptor {
 }
 
 export class TargetResolutionService {
+  // Pool handles are per-process runtime state; the bindings they are keyed by are persistent.
   private activePools = new Map<string, ResolvedTargetPool>();
   private quarantinedConnectionsCount = 0;
+
+  constructor(private readonly bindings: Pick<EnvironmentBindingService, "getBinding"> = environmentBindingService) {}
 
   /**
    * Resolve authoritative connection pool key for binding and requested role
    */
-  public resolveTargetPool(
+  public async resolveTargetPool(
     projectId: string,
     environmentClass: EnvironmentClass,
     roleType: "runtime" | "inspection" | "migrator" = "runtime"
-  ): ResolvedTargetPool {
-    const binding = environmentBindingService.getBinding(projectId, environmentClass);
+  ): Promise<ResolvedTargetPool> {
+    if (!["runtime", "inspection", "migrator"].includes(roleType)) {
+      throw new AppError("roleType must be runtime, inspection or migrator", 400, "INVALID_ROLE_TYPE");
+    }
+    const binding = await this.bindings.getBinding(projectId, environmentClass);
     const roleName =
       roleType === "runtime"
         ? binding.roles.runtimeRole
@@ -76,10 +82,10 @@ export class TargetResolutionService {
   /**
    * Handle credential rotation: Gracefully drain obsolete pools for previous binding versions
    */
-  public rotateCredentialsAndDrain(binding: EnvironmentBinding): {
+  public async rotateCredentialsAndDrain(binding: EnvironmentBinding): Promise<{
     drainedPoolKeys: string[];
     newActivePoolKeys: string[];
-  } {
+  }> {
     const prefix = `${binding.bindingId}:`;
     const drainedPoolKeys: string[] = [];
 
@@ -91,7 +97,7 @@ export class TargetResolutionService {
     }
 
     // Provision new active pools for new version
-    const newPool = this.resolveTargetPool(binding.projectId, binding.environmentClass, "runtime");
+    const newPool = await this.resolveTargetPool(binding.projectId, binding.environmentClass, "runtime");
 
     return {
       drainedPoolKeys,

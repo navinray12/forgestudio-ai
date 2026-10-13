@@ -1,28 +1,22 @@
 import { Router } from 'express';
+import { requireAuth } from '../middlewares/auth.middleware.js';
+import { userRateLimit } from '../middlewares/userRateLimit.middleware.js';
 import { DeliveryAndCommercialController } from '../controllers/deliveryAndCommercial.controller.js';
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
 
 // Point 24: Delivery Stages & Planning
 router.get('/stages', DeliveryAndCommercialController.getDeliveryStages);
-router.post('/validate-scope', DeliveryAndCommercialController.validateReleaseScope);
 
 // Point 25: Test Program & Evidence
 router.get('/source-registers', DeliveryAndCommercialController.getSourceRegisters);
 
-// Point 26: Commercial Operations & Past-Due
-router.post('/commerce-webhook', DeliveryAndCommercialController.processCommerceWebhook);
-router.post('/initiate-transfer', DeliveryAndCommercialController.initiateOwnershipTransfer);
-router.post('/complete-transfer', DeliveryAndCommercialController.completeOwnershipTransfer);
-router.get('/past-due-status', DeliveryAndCommercialController.getPastDueLifecycle);
-
-// Point 27: Migration & Existing-Customer Protection
-router.post('/capture-snapshot', DeliveryAndCommercialController.captureSourceSnapshot);
-router.post('/verify-snapshot', DeliveryAndCommercialController.verifySnapshotRestore);
-router.post('/legacy-retirement-check', DeliveryAndCommercialController.evaluateLegacyRetirement);
-
-// Point 28: Decision Register & Launch Risks
+// Point 28: Decision Register
 router.get('/decisions', DeliveryAndCommercialController.getDecisions);
-router.post('/check-launch-risks', DeliveryAndCommercialController.evaluateReleaseBlockingRisks);
+
+// Not exposed (see controller): /validate-scope, /commerce-webhook, /initiate-transfer,
+// /complete-transfer, /past-due-status, /capture-snapshot, /verify-snapshot,
+// /legacy-retirement-check, /check-launch-risks.
 
 export default router;

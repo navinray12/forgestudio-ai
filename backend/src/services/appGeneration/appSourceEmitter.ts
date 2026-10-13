@@ -633,11 +633,14 @@ export function parse${e.name}Evidence(command: CommandRule, input: unknown): Pa
 `;
 }
 
-function routesModule(e: AppModelEntity, runId: string): string {
+function routesModule(e: AppModelEntity, model: AppModel, runId: string): string {
   const accessor = lowerFirst(e.name);
   const base = fileBase(e.name);
   const table = tableName(e.name);
   const refs = e.fields.filter((f) => f.type === "reference").map((f) => `{ field: "${f.name}", table: "${tableName(f.references)}" }`);
+  const dependents = model.entities.flatMap((other) =>
+    other.fields.filter((f) => f.type === "reference" && f.references === e.name)
+      .map((f) => `{ entity: "${other.name}", table: "${tableName(other.name)}", field: "${f.name}" }`));
   const lc = e.lifecycle;
   const commandsConst = `${constName(e.name)}_COMMANDS`;
   const commandRoute = lc ? `
@@ -692,6 +695,21 @@ const ENTITY = "${e.name}";
 const TABLE = "${table}";
 /** Reference fields; each must point at a live record of the caller's own tenant. */
 const REFERENCES: Array<{ field: string; table: string }> = [${refs.join(", ")}];
+/** Records that reference this entity; it cannot be archived while any of them is live. */
+const DEPENDENTS: Array<{ entity: string; table: string; field: string }> = [${dependents.join(", ")}];
+/** Query parameters a list request may carry; anything else is rejected rather than ignored. */
+const LIST_PARAMS = new Set(["limit", "offset", ...REFERENCES.map((ref) => ref.field)]);
+const MAX_PAGE_SIZE = 100;
+const MAX_OFFSET = 10000;
+
+function boundedInt(raw: unknown, name: string, fallback: number, min: number, max: number): number {
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (typeof raw !== "string" || !Number.isInteger(value) || value < min || value > max) {
+    throw new HttpError(400, "INVALID_PAGE", \`\${name} must be an integer between \${min} and \${max}\`);
+  }
+  return value;
+}
 ${lc ? `const INITIAL_STATE = { field: "${lc.field}", value: "${lc.initial}" };\n` : ""}
 export const ${accessor}Router = Router();
 
@@ -718,6 +736,11 @@ ${accessor}Router.get("/", async (req, res, next) => {
   try {
     const tenantId = tenantOf(req, res);
     if (!tenantId) return;
+    for (const key of Object.keys(req.query)) {
+      if (!LIST_PARAMS.has(key)) throw new HttpError(400, "INVALID_FILTER", \`Unsupported query parameter: \${key}\`);
+    }
+    const limit = boundedInt(req.query.limit, "limit", 50, 1, MAX_PAGE_SIZE);
+    const offset = boundedInt(req.query.offset, "offset", 0, 0, MAX_OFFSET);
     const where = ['"tenantId" = $1', '"deletedAt" IS NULL'];
     const params: unknown[] = [tenantId];
     for (const ref of REFERENCES) {
@@ -727,10 +750,11 @@ ${accessor}Router.get("/", async (req, res, next) => {
       params.push(filter);
       where.push(\`"\${ref.field}" = $\${params.length}\`);
     }
-    params.push(Math.min(Math.max(Number(req.query.limit) || 50, 1), 100));
+    params.push(limit, offset);
+    // The order is total ("id" breaks ties), so successive pages never repeat or skip a record.
     const { rows } = await pool.query(
-      \`SELECT * FROM "\${TABLE}" WHERE \${where.join(" AND ")} ORDER BY "createdAt" DESC LIMIT $\${params.length}\`, params);
-    res.json({ data: rows.map(publicRow) });
+      \`SELECT * FROM "\${TABLE}" WHERE \${where.join(" AND ")} ORDER BY "createdAt" DESC, "id" DESC LIMIT $\${params.length - 1} OFFSET $\${params.length}\`, params);
+    res.json({ data: rows.map(publicRow), page: { limit, offset, returned: rows.length } });
   } catch (err) { next(err); }
 });
 
@@ -795,7 +819,7 @@ ${accessor}Router.patch("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** Archives (soft-deletes) a record; nothing is permanently deleted by this API. */
+/** Archives (soft-deletes) a record, unless live records still reference it. Nothing is hard-deleted. */
 ${accessor}Router.delete("/:id", async (req, res, next) => {
   try {
     const tenantId = tenantOf(req, res);
@@ -805,6 +829,15 @@ ${accessor}Router.delete("/:id", async (req, res, next) => {
     const id = req.params.id;
     const actor = actorOf(req);
     await withTransaction(async (client) => {
+      // Lock the record first: a concurrent create that references it waits, then sees it archived.
+      await client.query(\`SELECT 1 FROM "\${TABLE}" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE\`, [id, tenantId]);
+      for (const dep of DEPENDENTS) {
+        const live = await client.query(
+          \`SELECT 1 FROM "\${dep.table}" WHERE "\${dep.field}" = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL LIMIT 1\`, [id, tenantId]);
+        if (live.rowCount) {
+          throw new HttpError(409, "HAS_DEPENDENTS", \`Archive its \${dep.entity} records first\`, [], { dependent: dep.entity });
+        }
+      }
       const { rows } = await client.query(
         \`UPDATE "\${TABLE}" SET "deletedAt" = now(), "revision" = "revision" + 1, "updatedAt" = now() WHERE "id" = $1 AND "tenantId" = $2 AND "deletedAt" IS NULL AND "revision" = $3 RETURNING "id"\`,
         [id, tenantId, revision]);
@@ -904,6 +937,7 @@ export function createClient(options: ClientOptions) {
   const enc = encodeURIComponent;
   function resource<T, TInput, TCommand extends string>(path: string) {
     return {
+      /** Supports limit (1-100), offset and reference-field filters; anything else is rejected by the API. */
       list: (query: Record<string, string> = {}) => {
         const qs = new URLSearchParams(query).toString();
         return request<T[]>("GET", qs ? \`\${path}?\${qs}\` : path);
@@ -1361,7 +1395,7 @@ export function emitApplicationSource(model: AppModel, spec: unknown, runId: str
   ];
   for (const e of model.entities) {
     files.push({ path: `server/${fileBase(e.name)}.validation.ts`, content: validationModule(e, runId), role: "VALIDATION" });
-    files.push({ path: `server/${fileBase(e.name)}.routes.ts`, content: routesModule(e, runId), role: "SERVER" });
+    files.push({ path: `server/${fileBase(e.name)}.routes.ts`, content: routesModule(e, model, runId), role: "SERVER" });
     files.push({ path: `tests/${fileBase(e.name)}.validation.test.ts`, content: testModule(e, runId), role: "TEST" });
   }
   return files.map((f) => ({ ...f, path: `${GENERATED_ROOT}/${f.path}` }));

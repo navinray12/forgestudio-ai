@@ -1,4 +1,4 @@
-import "dotenv/config"; // tsx reload trigger 5
+import "dotenv/config"; // tsx reload trigger 8
 import http from "http";
 import app from "./app.js";
 import { startScheduler } from "./services/scheduleWorker.js";

@@ -1,39 +1,23 @@
 import { Router } from "express";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import { scopeToWebsite } from "../middlewares/tenantScope.middleware.js";
+import { userRateLimit } from "../middlewares/userRateLimit.middleware.js";
 import {
-  getWorkspaceView,
-  getEffectivePermissions,
   getPermissionCatalog,
-  createCustomRoleHandler,
-  getEditorState,
-  transitionEditorStateHandler,
-  saveEditorAttemptHandler,
-  resolveConflictHandler,
   storeLocalDraftHandler,
   evaluateLocalDraftHandler,
-  runJourneyHandler,
 } from "../controllers/ownerExperience.controller.js";
 
 const router = Router();
+router.use(requireAuth, userRateLimit(120));
 
-// Progressive Disclosure & Navigation
-router.get("/view", getWorkspaceView);
-
-// Versioned Dynamic Permissions
-router.get("/permissions", getEffectivePermissions);
+// Versioned permission catalog (static)
 router.get("/permissions/catalog", getPermissionCatalog);
-router.post("/roles/custom", createCustomRoleHandler);
 
-// Truthful Editor & Publishing State Machine
-router.get("/editor-state/:websiteId", getEditorState);
-router.post("/editor-state/:websiteId/transition", transitionEditorStateHandler);
-router.post("/editor-state/:websiteId/save", saveEditorAttemptHandler);
-router.post("/editor-state/:websiteId/resolve-conflict", resolveConflictHandler);
+// Privacy-safe draft recovery (durable; websiteId comes from the body or query string)
+router.post("/drafts/local", userRateLimit(30), scopeToWebsite(), storeLocalDraftHandler);
+router.get("/drafts/local/:draftId", scopeToWebsite(), evaluateLocalDraftHandler);
 
-// Privacy-Safe Local Draft Recovery
-router.post("/drafts/local", storeLocalDraftHandler);
-router.get("/drafts/local/:websiteId/:draftId", evaluateLocalDraftHandler);
-
-// Acceptance Journeys
-router.post("/journeys/execute", runJourneyHandler);
+// Not exposed (see controller): /view, /permissions, /roles/custom, /editor-state/*, /journeys/execute.
 
 export default router;
