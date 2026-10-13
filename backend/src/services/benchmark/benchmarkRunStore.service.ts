@@ -5,7 +5,7 @@
  * protocol and stored once: resubmitting the same configuration and results returns the stored run.
  */
 import { randomBytes } from "node:crypto";
-import { pgPool } from "../../config/prisma.js";
+import { withPlatformAdminRls } from "../../platform/tenancy/rls.js";
 import { AppError } from "../../utils/app-error.js";
 import { recordAuditLog } from "../audit.service.js";
 import { requestHashOf } from "../websiteRecords.service.js";
@@ -17,8 +17,14 @@ import {
   type TaskMeasurementResult,
 } from "./benchmarkProtocol.js";
 
+/** A platform administrator, as resolved from the session. */
+export interface PlatformActor {
+  id: string;
+  role?: string;
+}
+
 export async function recordBenchmarkRun(
-  userId: string,
+  actor: PlatformActor,
   input: { config: BenchmarkRunConfig; taskResults: TaskMeasurementResult[]; knownLimitations?: string[] }
 ): Promise<{ report: BenchmarkRunReport; replayed: boolean }> {
   const { config, taskResults, knownLimitations = [] } = input;
@@ -31,15 +37,18 @@ export async function recordBenchmarkRun(
   const runId = `run-${Date.now()}-${randomBytes(4).toString("hex")}`;
   const report = computeBenchmarkRunReport(runId, config, taskResults, knownLimitations);
 
-  const { rows } = await pgPool.query(
-    `INSERT INTO forge_benchmark_runs ("runId", "requestHash", report, "recordedById")
-     VALUES ($1, $2, $3::jsonb, $4::uuid) ON CONFLICT ("requestHash") DO NOTHING RETURNING "runId"`,
-    [runId, requestHash, JSON.stringify(report), userId]
-  );
-  if (!rows[0]) {
-    const { rows: existing } = await pgPool.query(`SELECT report FROM forge_benchmark_runs WHERE "requestHash" = $1`, [requestHash]);
-    return { report: existing[0].report as BenchmarkRunReport, replayed: true };
-  }
+  const userId = actor.id;
+  const replayedReport = await withPlatformAdminRls(actor, "benchmark_runs:record", async (db) => {
+    const { rows } = await db.query(
+      `INSERT INTO forge_benchmark_runs ("runId", "requestHash", report, "recordedById")
+       VALUES ($1, $2, $3::jsonb, $4::uuid) ON CONFLICT ("requestHash") DO NOTHING RETURNING "runId"`,
+      [runId, requestHash, JSON.stringify(report), userId]
+    );
+    if (rows[0]) return null;
+    const { rows: existing } = await db.query(`SELECT report FROM forge_benchmark_runs WHERE "requestHash" = $1`, [requestHash]);
+    return existing[0].report as BenchmarkRunReport;
+  });
+  if (replayedReport) return { report: replayedReport, replayed: true };
 
   await recordAuditLog({
     userId,
@@ -56,8 +65,9 @@ export async function recordBenchmarkRun(
   return { report, replayed: false };
 }
 
-export async function listBenchmarkRuns() {
-  const { rows } = await pgPool.query(`SELECT report FROM forge_benchmark_runs ORDER BY "createdAt" DESC LIMIT 200`);
+export async function listBenchmarkRuns(actor: PlatformActor) {
+  const { rows } = await withPlatformAdminRls(actor, "benchmark_runs:list", (db) =>
+    db.query(`SELECT report FROM forge_benchmark_runs ORDER BY "createdAt" DESC LIMIT 200`));
   return rows.map(({ report: r }: { report: BenchmarkRunReport }) => ({
     runId: r.runId,
     createdAt: r.createdAt,
@@ -72,8 +82,9 @@ export async function listBenchmarkRuns() {
   }));
 }
 
-export async function getBenchmarkRun(runId: string): Promise<BenchmarkRunReport> {
-  const { rows } = await pgPool.query(`SELECT report FROM forge_benchmark_runs WHERE "runId" = $1`, [runId]);
+export async function getBenchmarkRun(actor: PlatformActor, runId: string): Promise<BenchmarkRunReport> {
+  const { rows } = await withPlatformAdminRls(actor, "benchmark_runs:read", (db) =>
+    db.query(`SELECT report FROM forge_benchmark_runs WHERE "runId" = $1`, [runId]));
   if (!rows[0]) throw new AppError("Benchmark run not found.", 404, "NOT_FOUND");
   return rows[0].report as BenchmarkRunReport;
 }

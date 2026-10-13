@@ -110,7 +110,7 @@ export async function getSyntheticBriefByIdHandler(req: Request, res: Response, 
 
 export async function recordBenchmarkRunHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { report, replayed } = await recordBenchmarkRun(res.locals.user.id, runInput.parse(req.body));
+    const { report, replayed } = await recordBenchmarkRun(res.locals.user, runInput.parse(req.body));
     res.status(replayed ? 200 : 201).json({ success: true, report, idempotentReplay: replayed });
   } catch (error) {
     next(error);
@@ -119,7 +119,7 @@ export async function recordBenchmarkRunHandler(req: Request, res: Response, nex
 
 export async function listBenchmarkRunsHandler(_req: Request, res: Response, next: NextFunction) {
   try {
-    res.status(200).json({ success: true, runs: await listBenchmarkRuns() });
+    res.status(200).json({ success: true, runs: await listBenchmarkRuns(res.locals.user) });
   } catch (error) {
     next(error);
   }
@@ -127,7 +127,7 @@ export async function listBenchmarkRunsHandler(_req: Request, res: Response, nex
 
 export async function getBenchmarkRunByIdHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    res.status(200).json({ success: true, report: await getBenchmarkRun(String(req.params.runId)) });
+    res.status(200).json({ success: true, report: await getBenchmarkRun(res.locals.user, String(req.params.runId)) });
   } catch (error) {
     next(error);
   }

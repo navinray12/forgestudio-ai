@@ -12,6 +12,7 @@ validateIdentityConfiguration();
 const PORT = process.env.PORT || 5000;
 
 import { attachWebSocketGateways } from "./websocketGateways.js";
+import { unifiedMigrationAuthority } from "./services/migration/unifiedMigrationAuthority.service.js";
 
 const server = http.createServer(app);
 // Presence, workspace sync (/ws/workspace-sync), data realtime and terminal gateways.
@@ -23,6 +24,11 @@ void ensureDatabaseTables().then(async () => {
     return 0;
   });
   if (interrupted > 0) console.warn(`[app-generation] marked ${interrupted} interrupted generation run(s) as failed`);
+  // A migration left in flight by a process that died is resolved from what its target database
+  // holds (never re-run). Anything still held by a live session is left for the next start.
+  void unifiedMigrationAuthority.reconcileInterrupted().then((resolved) => {
+    if (resolved.length > 0) console.warn(`[migrations] reconciled ${resolved.length} interrupted migration(s): ${resolved.map((r) => `${r.id}=${r.status}`).join(", ")}`);
+  }).catch((err) => console.error("[migrations] could not reconcile interrupted migrations:", err?.message || err));
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     startScheduler();

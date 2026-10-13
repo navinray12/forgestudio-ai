@@ -14,7 +14,7 @@
  */
 import crypto from "node:crypto";
 import type { PoolClient } from "pg";
-import { pgPool } from "../../config/prisma.js";
+import { withTenantRls } from "../../platform/tenancy/rls.js";
 import { AppError } from "../../utils/app-error.js";
 import {
   VersionedWorkflowEngine,
@@ -97,20 +97,9 @@ function boundedNumber(value: unknown, fallback: number, max: number, label: str
   return value;
 }
 
-async function inTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pgPool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await fn(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw err;
-  } finally {
-    client.release();
-  }
-}
+/** Every statement of this module runs in a row-level-security transaction for the website's tenant. */
+const inTenant = <T>(scope: Scope, userId: string | null, fn: (client: PoolClient) => Promise<T>): Promise<T> =>
+  withTenantRls(scope.tenantId, userId, fn);
 
 /** Stores a validated graph as the next immutable version of this website's workflow. */
 export async function createWorkflowDraft(scope: Scope, userId: string, input: {
@@ -141,7 +130,7 @@ export async function createWorkflowDraft(scope: Scope, userId: string, input: {
     throw new AppError(`Workflow validation failed: ${report.errors.join("; ")}`, 400, "INVALID_WORKFLOW_GRAPH");
   }
 
-  return inTransaction(async (client) => {
+  return inTenant(scope, userId, async (client) => {
     // Serializes version allocation for this workflow so versions are gap-free and unique.
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`workflow:${scope.websiteId}:${input.workflowKey}`]);
     const { rows: [{ next }] } = await client.query(
@@ -160,22 +149,22 @@ export async function createWorkflowDraft(scope: Scope, userId: string, input: {
 export async function getWorkflowVersion(scope: Scope, workflowKey: string, version: number): Promise<StoredWorkflowVersion> {
   assertKey(workflowKey);
   if (!Number.isInteger(version) || version < 1) throw new AppError("version must be a positive integer", 400, "INVALID_VERSION");
-  const { rows } = await pgPool.query(
+  const { rows } = await inTenant(scope, null, (client) => client.query(
     `SELECT * FROM forge_workflow_definitions WHERE "websiteId" = $1::uuid AND "workflowKey" = $2 AND version = $3`,
     [scope.websiteId, workflowKey, version]
-  );
+  ));
   if (!rows[0]) throw new AppError(`Workflow ${workflowKey} version ${version} not found`, 404, "WORKFLOW_NOT_FOUND");
   return toStored(rows[0]);
 }
 
 export async function listWorkflowVersions(scope: Scope, workflowKey?: string): Promise<Array<Omit<StoredWorkflowVersion, "nodes" | "edges" | "limits">>> {
   if (workflowKey !== undefined) assertKey(workflowKey);
-  const { rows } = await pgPool.query(
+  const { rows } = await inTenant(scope, null, (client) => client.query(
     `SELECT id, "websiteId", "workflowKey", version, status, name, "definitionHash", "createdById", "createdAt", "publishedById", "publishedAt"
        FROM forge_workflow_definitions WHERE "websiteId" = $1::uuid ${workflowKey ? `AND "workflowKey" = $2` : ""}
       ORDER BY "workflowKey", version DESC LIMIT 500`,
     workflowKey ? [scope.websiteId, workflowKey] : [scope.websiteId]
-  );
+  ));
   return rows.map((row) => ({
     ...row,
     createdAt: new Date(row.createdAt).toISOString(),
@@ -190,7 +179,7 @@ export async function listWorkflowVersions(scope: Scope, workflowKey?: string): 
 export async function publishWorkflowVersion(scope: Scope, userId: string, workflowKey: string, version: number): Promise<StoredWorkflowVersion> {
   assertKey(workflowKey);
   if (!Number.isInteger(version) || version < 1) throw new AppError("version must be a positive integer", 400, "INVALID_VERSION");
-  return inTransaction(async (client) => {
+  return inTenant(scope, userId, async (client) => {
     const { rows } = await client.query(
       `SELECT * FROM forge_workflow_definitions WHERE "websiteId" = $1::uuid AND "workflowKey" = $2 ORDER BY version FOR UPDATE`,
       [scope.websiteId, workflowKey]

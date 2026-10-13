@@ -2,12 +2,13 @@
  * Durable, website-scoped records for the blueprint v2 feature routers (WP-01, WP-16).
  *
  * Replaces the process-local Maps those routers used. The scope always comes from verified
- * membership (tenantScope.middleware), so a record can only be read or written inside the website
- * it belongs to. A write that repeats the previous request is a replay: it returns the stored
+ * membership (tenantScope.middleware), and every statement runs in a row-level-security
+ * transaction for that tenant, so a record can only be read or written inside the website it
+ * belongs to even if a query here were wrong. A write that repeats the previous request is a replay: it returns the stored
  * record and does not create a new revision.
  */
 import { createHash } from "node:crypto";
-import { pgPool } from "../config/prisma.js";
+import { withTenantRls } from "../platform/tenancy/rls.js";
 import { AppError } from "../utils/app-error.js";
 
 export type WebsiteRecordKind = "FACT_OFFER" | "CONSENT_DECISION" | "LOCAL_DRAFT" | "SOURCE_IMPORT";
@@ -69,10 +70,10 @@ function toRecord<T>(row: any): WebsiteRecord<T> {
 
 export async function getWebsiteRecord<T>(scope: WebsiteRecordScope, kind: WebsiteRecordKind, key: string): Promise<WebsiteRecord<T> | null> {
   assertKey(key);
-  const { rows } = await pgPool.query(
+  const { rows } = await withTenantRls(scope.tenantId, null, (db) => db.query(
     `SELECT ${COLUMNS} FROM forge_website_records WHERE "websiteId" = $1::uuid AND kind = $2 AND "recordKey" = $3`,
     [scope.websiteId, kind, key]
-  );
+  ));
   return rows[0] ? toRecord<T>(rows[0]) : null;
 }
 
@@ -99,7 +100,9 @@ export async function putWebsiteRecord<T>(params: {
   const requestHash = requestHashOf(params.request);
   const expected = params.expectedRevision ?? null;
 
-  const { rows } = await pgPool.query(
+  // One tenant transaction: row security confines every statement to the website's tenant.
+  return withTenantRls(scope.tenantId, userId, async (db): Promise<WebsiteRecordWrite<T>> => {
+  const { rows } = await db.query(
     `INSERT INTO forge_website_records AS r ("websiteId", "tenantId", kind, "recordKey", data, "requestHash", "createdById", "updatedById")
      SELECT $1::uuid, $2, $3, $4, $5::jsonb, $6, $7::uuid, $7::uuid WHERE $8::int IS NULL
      ON CONFLICT ("websiteId", kind, "recordKey") DO UPDATE
@@ -112,7 +115,7 @@ export async function putWebsiteRecord<T>(params: {
   if (rows[0]) return { record: toRecord<T>(rows[0]), outcome: rows[0].inserted ? "CREATED" : "UPDATED" };
 
   if (expected !== null) {
-    const { rows: updated } = await pgPool.query(
+    const { rows: updated } = await db.query(
       `UPDATE forge_website_records SET data = $4::jsonb, "requestHash" = $5, revision = revision + 1, "updatedById" = $6::uuid, "updatedAt" = now()
        WHERE "websiteId" = $1::uuid AND kind = $2 AND "recordKey" = $3 AND revision = $7 AND "requestHash" <> $5
        RETURNING ${COLUMNS}`,
@@ -121,11 +124,12 @@ export async function putWebsiteRecord<T>(params: {
     if (updated[0]) return { record: toRecord<T>(updated[0]), outcome: "UPDATED" };
   }
 
-  const { rows: existing } = await pgPool.query(
+  const { rows: existing } = await db.query(
     `SELECT ${COLUMNS} FROM forge_website_records WHERE "websiteId" = $1::uuid AND kind = $2 AND "recordKey" = $3`,
     [scope.websiteId, kind, key]
   );
   if (!existing[0]) throw new AppError("Record not found", 404, "RECORD_NOT_FOUND");
   if (existing[0].requestHash === requestHash) return { record: toRecord<T>(existing[0]), outcome: "REPLAYED" };
   throw new AppError("The record changed since it was read", 409, "REVISION_CONFLICT");
+  });
 }

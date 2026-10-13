@@ -30,6 +30,7 @@
 import crypto from "node:crypto";
 import type { PoolClient } from "pg";
 import { pgPool } from "../../config/prisma.js";
+import { withProjectRls } from "../../platform/tenancy/rls.js";
 import { AppError } from "../../utils/app-error.js";
 
 export type EnvironmentClass = "DEVELOPMENT" | "STAGING" | "PRODUCTION";
@@ -149,13 +150,18 @@ function storeError(err: any): never {
 export class PostgresEnvironmentBindingStore implements EnvironmentBindingStore {
   constructor(private readonly pool: { query: (...args: any[]) => Promise<any>; connect: () => Promise<PoolClient> } = pgPool) {}
 
+  /** A row-level-security transaction for the tenant that owns the project. */
+  private inProject<T>(projectId: string, actorId: string | null | undefined, work: (db: PoolClient) => Promise<T>): Promise<T> {
+    return withProjectRls(projectId, actorId, work, this.pool);
+  }
+
   async find(projectId: string, envClass: EnvironmentClass): Promise<EnvironmentBinding | null> {
     if (!UUID.test(projectId)) return null;
     try {
-      const { rows } = await this.pool.query(
+      const { rows } = await this.inProject(projectId, null, (db) => db.query(
         `SELECT * FROM forge_environment_bindings WHERE "projectId" = $1::uuid AND "environmentClass" = $2`,
         [projectId, envClass]
-      );
+      ));
       return rows[0] ? fromRow(rows[0]) : null;
     } catch (err) {
       return storeError(err);
@@ -165,10 +171,10 @@ export class PostgresEnvironmentBindingStore implements EnvironmentBindingStore 
   async list(projectId: string): Promise<EnvironmentBinding[]> {
     if (!UUID.test(projectId)) return [];
     try {
-      const { rows } = await this.pool.query(
+      const { rows } = await this.inProject(projectId, null, (db) => db.query(
         `SELECT * FROM forge_environment_bindings WHERE "projectId" = $1::uuid ORDER BY "environmentClass"`,
         [projectId]
-      );
+      ));
       return rows.map(fromRow);
     } catch (err) {
       return storeError(err);
@@ -183,10 +189,8 @@ export class PostgresEnvironmentBindingStore implements EnvironmentBindingStore 
     build: (existing: EnvironmentBinding | null) => EnvironmentBinding
   ): Promise<EnvironmentBinding> {
     if (!UUID.test(projectId)) throw new AppError("Project not found", 404, "PROJECT_NOT_FOUND");
-    let client: PoolClient | null = null;
     try {
-      client = await this.pool.connect();
-      await client.query("BEGIN");
+      return await this.inProject(projectId, actorId, async (client) => {
       // Serializes writers for this project/environment, including the first insert.
       await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`environment-binding:${projectId}:${envClass}`]);
       const current = await client.query(
@@ -222,24 +226,21 @@ export class PostgresEnvironmentBindingStore implements EnvironmentBindingStore 
              VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13::jsonb, $14::uuid, $14::uuid) RETURNING *`,
             params
           );
-      await client.query("COMMIT");
       return fromRow(rows[0]);
+      });
     } catch (err) {
-      if (client) await client.query("ROLLBACK").catch(() => undefined);
       return storeError(err);
-    } finally {
-      client?.release();
     }
   }
 
   async retire(projectId: string, envClass: EnvironmentClass, actorId: string | undefined): Promise<EnvironmentBinding | null> {
     if (!UUID.test(projectId)) return null;
     try {
-      const { rows } = await this.pool.query(
+      const { rows } = await this.inProject(projectId, actorId, (db) => db.query(
         `UPDATE forge_environment_bindings SET status = 'RETIRED', version = version + 1, "updatedById" = $3::uuid, "updatedAt" = now()
           WHERE "projectId" = $1::uuid AND "environmentClass" = $2 AND status = 'ACTIVE' RETURNING *`,
         [projectId, envClass, actorId && UUID.test(actorId) ? actorId : null]
-      );
+      ));
       return rows[0] ? fromRow(rows[0]) : null;
     } catch (err) {
       return storeError(err);

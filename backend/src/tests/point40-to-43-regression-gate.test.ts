@@ -11,7 +11,7 @@ import { databaseStudioViews } from "../services/database/databaseStudioViews.se
 import { EnvironmentBindingService } from "../services/environment/environmentBinding.service.js";
 import { TargetResolutionService } from "../services/environment/targetResolution.service.js";
 import { MemoryEnvironmentBindingStore } from "./helpers/memoryBindingStore.js";
-import { unifiedMigrationAuthority } from "../services/migration/unifiedMigrationAuthority.service.js";
+import { analyzeStatement } from "../services/migration/unifiedMigrationAuthority.service.js";
 import { ApplicationSpec } from "../services/authoritative/applicationSpec.service.js";
 
 describe("Points 40–43 Master Regression Gate", () => {
@@ -236,32 +236,17 @@ describe("Points 40–43 Master Regression Gate", () => {
     // -------------------------------------------------------------------------
     // Phase 4 (Point 43): Unified Migration Authority & Upgrade Lifecycle
     // -------------------------------------------------------------------------
-    const namespace = `ns_${projectId}`;
-    unifiedMigrationAuthority.claimNamespaceAuthority(namespace, "FORGE_MANAGED");
-
-    const migPlan = unifiedMigrationAuthority.createMigrationPlan(
-      projectId,
-      devBinding.bindingId,
-      namespace,
-      "FORGE_MANAGED",
-      [
-        "CREATE TABLE app_accounts (id uuid primary key, balance_cents int NOT NULL);",
-        "CREATE INDEX CONCURRENTLY idx_acc_balance ON app_accounts (balance_cents);",
-      ]
-    );
-    expect(migPlan.state).toBe("planned");
-
-    const rehearsals = unifiedMigrationAuthority.rehearseMigrationPlan(migPlan.planId);
-    expect(rehearsals.state).toBe("rehearsed");
-
-    unifiedMigrationAuthority.approveMigrationPlan(migPlan.planId, user.id);
-    const migExec = unifiedMigrationAuthority.executeMigrationPlan(migPlan.planId);
-    expect(migExec.state).toBe("applied");
-
-    // Uncertain outcome reconciliation
-    const reconciliation = unifiedMigrationAuthority.reconcileUncertainOutcome(migPlan.planId, [
-      migPlan.targetSchemaHash,
-    ]);
-    expect(reconciliation.reconciledState).toBe("applied");
+    // The plan is analysed here; preflight, rehearsal, approval, execution and reconciliation run
+    // real DDL and are covered against PostgreSQL in migration-authority.integration.test.ts.
+    // (This gate used to assert that an in-memory authority reported "applied" without a database.)
+    const schemaName = "forge_cust_gate_development";
+    const planned = [
+      "CREATE TABLE app_accounts (id uuid primary key, balance_cents int NOT NULL);",
+      "CREATE INDEX CONCURRENTLY idx_acc_balance ON app_accounts (balance_cents);",
+    ].map((sql, index) => analyzeStatement(sql, index + 1, schemaName));
+    expect(planned.map((statement) => statement.transactional)).toEqual([true, false]);
+    expect(planned.every((statement) => /^[0-9a-f]{64}$/.test(statement.checksum) && !statement.destructive)).toBe(true);
+    expect(() => analyzeStatement("DROP TABLE public.users", 1, schemaName)).toThrowError(/outside this database's namespace/);
+    expect(devBinding.bindingId).toBeTruthy();
   });
 });
