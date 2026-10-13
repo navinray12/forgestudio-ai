@@ -262,7 +262,7 @@ export class AppGenerationService {
     if (!sourceCheck.ok) {
       return fail("SOURCE_VALIDATION_FAILED", `Generated source failed validation: ${sourceCheck.errors.slice(0, 10).join("; ")}`);
     }
-    diagnostics.push({ severity: "info", message: `Syntax-checked ${sourceCheck.checkedFiles} files and resolved their relative imports.` });
+    diagnostics.push({ severity: "info", message: `Syntax-checked ${sourceCheck.checkedFiles} files; relative imports resolve and every package import is a declared dependency.` });
 
     // 4. Refuse to overwrite source that ForgeStudio did not generate.
     const expectedVersions = new Map<string, number>();
@@ -313,7 +313,7 @@ export class AppGenerationService {
 
     diagnostics.push({
       severity: "warn",
-      message: "Not built, migrated, executed or deployed: install, build, schema review and tests must still be run.",
+      message: "Generation did not install, build, migrate, execute or deploy the package; those steps run separately (see forge-app/README.md).",
     });
     return updateRun(run.id, { status: "SOURCE_WRITTEN", files: manifest, diagnostics, completedAt: new Date().toISOString() });
   }

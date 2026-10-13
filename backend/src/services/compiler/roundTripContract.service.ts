@@ -176,8 +176,9 @@ export class RoundTripContractService {
       };
     }
 
-    // 5. Styles: style={{ ... }} or CSS modules / className
-    if (/style\s*=\s*\{\{/.test(trimmed) || /className\s*=/.test(trimmed)) {
+    // 5. Styles: inline style objects or CSS-module/token class references.
+    // A literal className="..." is a static attribute of native JSX (blueprint 35.1).
+    if (/style\s*=\s*\{\{/.test(trimmed) || /className\s*=\s*\{\s*(styles|classes|tokens)/.test(trimmed)) {
       return {
         category: "STYLES",
         isVisuallyEditable: true,

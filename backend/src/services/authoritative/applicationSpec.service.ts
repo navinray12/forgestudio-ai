@@ -235,19 +235,26 @@ export class ApplicationSpecService {
       errors.push("revision must be a positive integer");
     }
 
-    // Invariant 1: Must NOT contain raw credentials or customer row storage
-    const rawJson = JSON.stringify(spec).toLowerCase();
+    // Invariant 1: Must NOT contain raw credentials or customer row storage.
+    // Each string value is scanned as-is: scanning JSON.stringify output would
+    // see escaped quotes (\") and never match a quoted assignment.
     const forbiddenCredentialPatterns = [
-      /password\s*[:=]\s*["'][^"']+["']/,
-      /client_secret\s*[:=]\s*["'][^"']+["']/,
-      /private_key\s*[:=]\s*["'][^"']+["']/,
-      /api_key\s*[:=]\s*["'][a-zA-Z0-9_\-]{16,}["']/,
+      /password\s*[:=]\s*["'][^"']+["']/i,
+      /client_secret\s*[:=]\s*["'][^"']+["']/i,
+      /private_key\s*[:=]\s*["'][^"']+["']/i,
+      /api_key\s*[:=]\s*["'][a-zA-Z0-9_\-]{16,}["']/i,
+      /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
     ];
-    for (const pattern of forbiddenCredentialPatterns) {
-      if (pattern.test(rawJson)) {
-        errors.push("ApplicationSpec must never contain raw credentials or private secrets.");
-        break;
-      }
+    const stringValues: string[] = [];
+    const collectStrings = (value: unknown, depth: number): void => {
+      if (depth > 32 || value == null) return;
+      if (typeof value === "string") stringValues.push(value);
+      else if (Array.isArray(value)) value.forEach((item) => collectStrings(item, depth + 1));
+      else if (typeof value === "object") Object.values(value as Record<string, unknown>).forEach((item) => collectStrings(item, depth + 1));
+    };
+    collectStrings(spec, 0);
+    if (stringValues.some((text) => forbiddenCredentialPatterns.some((pattern) => pattern.test(text)))) {
+      errors.push("ApplicationSpec must never contain raw credentials or private secrets.");
     }
 
     // Invariant 2: Entity & Field Identifiers must be stable and prefixed

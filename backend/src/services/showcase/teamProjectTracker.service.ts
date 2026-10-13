@@ -108,6 +108,8 @@ export interface OutboxEventRecord {
   createdAt: string;
 }
 
+export type DemonstrationStepStatus = "PASS" | "FAIL" | "NOT_EXECUTED";
+
 export class TeamProjectTrackerService {
   // Durable isolated in-memory stores for Team Project Tracker domain entities
   private organizations = new Map<string, OrganizationRecord>();
@@ -118,7 +120,16 @@ export class TeamProjectTrackerService {
   private tasks = new Map<string, TaskRecord>();
   private comments = new Map<string, CommentRecord>();
   private outbox = new Map<string, OutboxEventRecord>();
-  private commandReceipts = new Set<string>(); // idempotency keys
+  // organizationId:idempotencyKey -> taskId the command was accepted for
+  private commandReceipts = new Map<string, string>();
+
+  /**
+   * Callers receive copies: handing out the stored record would let a caller
+   * mutate authoritative state (including its revision) without any checks.
+   */
+  private snapshot<T>(record: T): T {
+    return structuredClone(record);
+  }
 
   /**
    * Create an Organization
@@ -281,7 +292,7 @@ export class TeamProjectTrackerService {
     const projectTasks: TaskRecord[] = [];
     for (const task of this.tasks.values()) {
       if (task.projectId === projectId) {
-        projectTasks.push(task);
+        projectTasks.push(this.snapshot(task));
       }
     }
     return projectTasks.sort((a, b) => a.taskNumber - b.taskNumber);
@@ -374,7 +385,7 @@ export class TeamProjectTrackerService {
       createdAt: now,
     });
 
-    return task;
+    return this.snapshot(task);
   }
 
   /**
@@ -431,7 +442,7 @@ export class TeamProjectTrackerService {
 
     task.revision += 1;
     task.updatedAt = new Date().toISOString();
-    return task;
+    return this.snapshot(task);
   }
 
   /**
@@ -460,7 +471,7 @@ export class TeamProjectTrackerService {
     task.assigneeMembershipId = assigneeMembershipId;
     task.revision += 1;
     task.updatedAt = new Date().toISOString();
-    return task;
+    return this.snapshot(task);
   }
 
   /**
@@ -493,9 +504,16 @@ export class TeamProjectTrackerService {
       throw new AppError("UNAUTHORIZED_CROSS_TENANT_ACCESS: Cannot complete tasks across organizations", 403, "UNAUTHORIZED_CROSS_TENANT_ACCESS");
     }
 
-    // Idempotency check
-    if (this.commandReceipts.has(idempKey)) {
-      return Object.assign(task, { task, outboxEventId: "ev_idempotent", wasIdempotentReplay: true });
+    // Idempotency check, scoped to the organization. A key already accepted for
+    // a different task is a conflict, never a replay of that other command.
+    const receiptKey = `${task.organizationId}:${idempKey}`;
+    const receiptTaskId = this.commandReceipts.get(receiptKey);
+    if (receiptTaskId !== undefined) {
+      if (receiptTaskId !== taskId) {
+        throw new AppError("Idempotency key was already used for a different task", 409, "IDEMPOTENCY_CONFLICT");
+      }
+      const current = this.snapshot(task);
+      return { ...current, task: current, outboxEventId: "ev_idempotent", wasIdempotentReplay: true };
     }
 
     if (task.revision !== expRev) {
@@ -537,9 +555,10 @@ export class TeamProjectTrackerService {
     };
 
     this.outbox.set(outboxEventId, outboxEvent);
-    this.commandReceipts.add(idempKey);
+    this.commandReceipts.set(receiptKey, taskId);
 
-    return Object.assign(task, { task, outboxEventId, wasIdempotentReplay: false });
+    const completed = this.snapshot(task);
+    return { ...completed, task: completed, outboxEventId, wasIdempotentReplay: false };
   }
 
   /**
@@ -580,7 +599,7 @@ export class TeamProjectTrackerService {
     };
 
     this.comments.set(commentId, comment);
-    return comment;
+    return this.snapshot(comment);
   }
 
   /**
@@ -598,103 +617,116 @@ export class TeamProjectTrackerService {
     const taskComments: CommentRecord[] = [];
     for (const comment of this.comments.values()) {
       if (comment.taskId === taskId) {
-        taskComments.push(comment);
+        taskComments.push(this.snapshot(comment));
       }
     }
     return taskComments.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
   }
 
   /**
-   * Authoritative 15-Step Acceptance Demonstration Protocol
+   * Blueprint 45.1 demonstration, run against this in-process domain model.
+   *
+   * Only steps this model can actually execute are run and reported PASS/FAIL
+   * with observed evidence. Every other step (provider-backed generation,
+   * database provisioning, restart, code workspace, migration, export, ...)
+   * needs the generated application and real infrastructure, so it is
+   * reported NOT_EXECUTED. The protocol passes only when all 15 steps pass.
    */
   public async executeFifteenStepAcceptanceProtocol(projectId: string): Promise<{
     protocolPassed: boolean;
-    steps: Array<{ stepNumber: number; action: string; passed: boolean; evidence: string }>;
+    steps: Array<{ stepNumber: number; action: string; passed: boolean; status: DemonstrationStepStatus; evidence: string }>;
   }> {
-    const demo = this.run15StepDemonstration(`PROTOCOL_${Date.now()}`);
-    return {
-      protocolPassed: true,
-      steps: demo.stepLog.map((s) => ({
-        stepNumber: s.stepNumber,
-        action: s.title,
-        passed: s.status === "PASS",
-        evidence: s.evidence,
-      })),
-    };
+    const demo = this.run15StepDemonstration(`PROTOCOL_${projectId}_${Date.now()}`);
+    const steps = demo.stepLog.map((s) => ({
+      stepNumber: s.stepNumber,
+      action: s.title,
+      passed: s.status === "PASS",
+      status: s.status,
+      evidence: s.evidence,
+    }));
+    return { protocolPassed: steps.every((s) => s.passed), steps };
   }
 
-  /**
-   * Run the full 15-step demonstration protocol
-   */
   public run15StepDemonstration(uniqueSyntheticMarker: string): {
     demonstrationRunId: string;
     passedSteps: number;
     stepsCount: 15;
-    stepLog: Array<{ stepNumber: number; title: string; status: "PASS"; evidence: string }>;
+    protocolPassed: boolean;
+    stepLog: Array<{ stepNumber: number; title: string; status: DemonstrationStepStatus; evidence: string }>;
   } {
-    const stepLog: Array<{ stepNumber: number; title: string; status: "PASS"; evidence: string }> = [];
+    const notExecuted = (reason: string) => ({ status: "NOT_EXECUTED" as const, evidence: `Not executed: ${reason}` });
+    const outcome: Record<number, { status: DemonstrationStepStatus; evidence: string }> = {
+      1: notExecuted("requires a provider-backed generation job for the approved brief"),
+      2: notExecuted("requires review of a generated ApplicationSpec, policies, API and schema plan"),
+      3: notExecuted("requires provisioning an isolated development database and running migrations"),
+      6: notExecuted("requires restarting the generated API and frontend"),
+      8: notExecuted("requires creating the route file in the Code Workspace"),
+      9: notExecuted("requires code/canvas round trips in the editor"),
+      10: notExecuted("requires a two-editor conflict in the workspace"),
+      11: notExecuted("requires a route rename through the framework adapter"),
+      12: notExecuted("requires retiring and restoring a page against a real database"),
+      13: notExecuted("requires a Schema Studio change with migration rehearsal and promotion"),
+      14: notExecuted("requires publishing and trashing/restoring a CMS article"),
+      15: notExecuted("requires exporting the app and a second operator installing it"),
+    };
 
-    // Step 1: Generate application specification
-    stepLog.push({ stepNumber: 1, title: "Step 1: Provider-Backed Generation", status: "PASS", evidence: "ApplicationSpec v1.0.0 validated with Team Project Tracker entities" });
-
-    // Step 2: Review models, policies, API contracts, schema plan
-    stepLog.push({ stepNumber: 2, title: "Step 2: Specification & Policy Review", status: "PASS", evidence: "Models Organization, Membership, Project, Task, Comment reviewed; cross-org barriers confirmed" });
-
-    // Step 3: Provision isolated development database & run approved migrations
-    stepLog.push({ stepNumber: 3, title: "Step 3: Isolated Database Provisioning", status: "PASS", evidence: "Dual-rehearsed migrations applied cleanly to isolated database" });
-
-    // Step 4: Create unique task title
+    // Step 4: create a task with a unique title.
     const org = this.createOrganization("Acme Corp", "acme");
     const mem = this.addMember(org.id, "usr_alice", "ADMIN");
     const prj = this.createProject(org.id, mem.id, "Platform Revamp", "PLT");
-    const task = this.createTask(prj.id, mem.id, { title: `Audit Security Gate - ${uniqueSyntheticMarker}` });
-    stepLog.push({ stepNumber: 4, title: "Step 4: UI Task Creation", status: "PASS", evidence: `Task ${task.id} created with title: ${task.title}` });
+    const title = `Audit Security Gate - ${uniqueSyntheticMarker}`;
+    const task = this.createTask(prj.id, mem.id, { title });
+    outcome[4] = task.title === title
+      ? { status: "PASS", evidence: `Task ${task.id} created with title "${task.title}" (in-process model, not the UI)` }
+      : { status: "FAIL", evidence: `Created task title was "${task.title}"` };
 
-    // Step 5: Independently verify task row, tenant scope, expected outbox event
-    stepLog.push({ stepNumber: 5, title: "Step 5: Independent Row Observation & Outbox", status: "PASS", evidence: `Task belongs strictly to org ${org.id}` });
+    // Step 5: independently read the stored row, its scope and its event.
+    const stored = this.tasks.get(task.id);
+    const event = [...this.outbox.values()].find((e) => e.eventType === "TASK_CREATED" && e.aggregateId === task.id);
+    outcome[5] = stored && stored.organizationId === org.id && stored.projectId === prj.id && event?.organizationId === org.id
+      ? { status: "PASS", evidence: `Stored task scoped to ${org.id}/${prj.id}; outbox event ${event.id}` }
+      : { status: "FAIL", evidence: "Stored task, scope or TASK_CREATED event did not match" };
 
-    // Step 6: Restart application and verify task persists
-    stepLog.push({ stepNumber: 6, title: "Step 6: Persistence & Session Restart", status: "PASS", evidence: `Task ${task.id} retrieved successfully after simulated reload` });
-
-    // Step 7: Attempt cross-org read and protected status update -> both denied
+    // Step 7: a cross-organization read and a protected status patch must both fail.
     const otherOrg = this.createOrganization("Beta Inc", "beta");
     const intruder = this.addMember(otherOrg.id, "usr_bob", "MEMBER");
     let crossOrgDenied = false;
     try {
       this.listProjectTasks(prj.id, intruder.id);
-    } catch {
-      crossOrgDenied = true;
+    } catch (err: any) {
+      crossOrgDenied = err?.code === "UNAUTHORIZED_CROSS_TENANT_ACCESS";
     }
-    stepLog.push({ stepNumber: 7, title: "Step 7: Cross-Tenant Isolation Enforcement", status: "PASS", evidence: `Cross-tenant read threw 403 UNAUTHORIZED_CROSS_TENANT_ACCESS (verified: ${crossOrgDenied})` });
+    const patched = this.editTaskDetails(task.id, mem.id, task.revision, { status: "COMPLETED" } as any);
+    const statusProtected = patched.status === task.status;
+    outcome[7] = crossOrgDenied && statusProtected
+      ? { status: "PASS", evidence: "Cross-organization read denied with UNAUTHORIZED_CROSS_TENANT_ACCESS; generic patch left status unchanged" }
+      : { status: "FAIL", evidence: `crossOrgDenied=${crossOrgDenied}, statusProtected=${statusProtected}` };
 
-    // Step 8: Dynamic route registration
-    stepLog.push({ stepNumber: 8, title: "Step 8: Dynamic Route Registration", status: "PASS", evidence: "App Router /projects/[id]/tasks registered with layout ancestry" });
-
-    // Step 9: Edit heading in code & visual sync
-    stepLog.push({ stepNumber: 9, title: "Step 9: Bidirectional Visual/Code Convergence", status: "PASS", evidence: "AST surgical replacement applied to JSX without touching unrelated code" });
-
-    // Step 10: Concurrent edits & three-way merge resolution
-    stepLog.push({ stepNumber: 10, title: "Step 10: Concurrent Edit Conflict Resolution", status: "PASS", evidence: "Three-way reconciliation resolved non-overlapping edits without proposal loss" });
-
-    // Step 11: Route rename preservation
-    stepLog.push({ stepNumber: 11, title: "Step 11: Route Rename Safety", status: "PASS", evidence: "Stable pageId preserved across rename, Windows MAX_PATH validated" });
-
-    // Step 12: Retire and restore draft page, confirming task records remain intact
-    stepLog.push({ stepNumber: 12, title: "Step 12: Page Retirement Data Preservation", status: "PASS", evidence: `Task ${task.id} remained completely intact after page retirement/restoration` });
-
-    // Step 13: Schema Studio optional field addition & rehearsal
-    stepLog.push({ stepNumber: 13, title: "Step 13: Schema Studio Extension & Migration", status: "PASS", evidence: "Added optional field 'estimatedHours', rehearsed migration, promoted safely" });
-
-    // Step 14: Publish & trash/restore CMS article
-    stepLog.push({ stepNumber: 14, title: "Step 14: CMS Lifecycle Separation", status: "PASS", evidence: "CMS article published, trashed, and restored; private comments completely segregated" });
-
-    // Step 15: Portable clean export & second operator install
-    stepLog.push({ stepNumber: 15, title: "Step 15: Fresh-Host Portability Verification", status: "PASS", evidence: "Export package installed on fresh host with new credentials, genuine task created" });
+    const titles: Record<number, string> = {
+      1: "Step 1: Provider-Backed Generation",
+      2: "Step 2: Specification & Policy Review",
+      3: "Step 3: Isolated Database Provisioning",
+      4: "Step 4: Task Creation",
+      5: "Step 5: Independent Row Observation & Outbox",
+      6: "Step 6: Persistence & Session Restart",
+      7: "Step 7: Cross-Tenant Isolation Enforcement",
+      8: "Step 8: Dynamic Route Registration",
+      9: "Step 9: Bidirectional Visual/Code Convergence",
+      10: "Step 10: Concurrent Edit Conflict Resolution",
+      11: "Step 11: Route Rename Safety",
+      12: "Step 12: Page Retirement Data Preservation",
+      13: "Step 13: Schema Studio Extension & Migration",
+      14: "Step 14: CMS Lifecycle Separation",
+      15: "Step 15: Fresh-Host Portability Verification",
+    };
+    const stepLog = Object.keys(titles).map(Number).map((n) => ({ stepNumber: n, title: titles[n], ...outcome[n] }));
+    const passedSteps = stepLog.filter((s) => s.status === "PASS").length;
 
     return {
       demonstrationRunId: "demo_" + crypto.randomUUID(),
-      passedSteps: 15,
+      passedSteps,
       stepsCount: 15,
+      protocolPassed: passedSteps === 15,
       stepLog,
     };
   }

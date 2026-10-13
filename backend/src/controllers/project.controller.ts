@@ -73,7 +73,6 @@ import { environmentBindingService } from "../services/environment/environmentBi
 import { targetResolutionService } from "../services/environment/targetResolution.service.js";
 import { unifiedMigrationAuthority } from "../services/migration/unifiedMigrationAuthority.service.js";
 import { applicationReleaseQualificationService } from "../services/qualification/applicationReleaseQualification.service.js";
-import { teamProjectTrackerService } from "../services/showcase/teamProjectTracker.service.js";
 import { controlPlaneReconciliationService } from "../services/architecture/controlPlaneReconciliation.service.js";
 
 
@@ -1031,70 +1030,6 @@ export async function getReleaseQualificationRecordHandler(req: Request, res: Re
     }
 
     res.status(200).json({ success: true, qualification: record });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Blueprint Point 45: Team Project Tracker Vertical Acceptance Slice
-// ---------------------------------------------------------------------------
-
-export async function teamProjectTrackerOperationsHandler(req: Request, res: Response, next: NextFunction) {
-  try {
-    const user = getAuthUser(res, req);
-    const projectId = String(req.params.id);
-    await getForgeProjectById(projectId, user);
-
-    const { operation, payload = {} } = req.body;
-
-    if (operation === "run-demonstration") {
-      const demoResult = teamProjectTrackerService.run15StepDemonstration(
-        payload.syntheticMarker || `RUN_${Date.now()}`
-      );
-      return res.status(200).json({ success: true, demonstration: demoResult });
-    }
-
-    if (operation === "create-org") {
-      const org = teamProjectTrackerService.createOrganization(payload.name || "Default Org", payload.slug || "default-org");
-      return res.status(201).json({ success: true, org });
-    }
-
-    if (operation === "add-member") {
-      const mem = teamProjectTrackerService.addMember(payload.organizationId, payload.userId || user.id, payload.role || "MEMBER");
-      return res.status(201).json({ success: true, membership: mem });
-    }
-
-    if (operation === "create-task") {
-      const task = teamProjectTrackerService.createTask(payload.projectId || projectId, payload.callerMembershipId, {
-        title: payload.title || "New Task",
-        description: payload.description,
-        priority: payload.priority,
-        dueDate: payload.dueDate,
-        assigneeMembershipId: payload.assigneeMembershipId,
-      });
-      return res.status(201).json({ success: true, task });
-    }
-
-    if (operation === "complete-task") {
-      const result = teamProjectTrackerService.completeTask(payload.taskId, payload.callerMembershipId, {
-        expectedRevision: Number(payload.expectedRevision || 1),
-        idempotencyKey: payload.idempotencyKey || `idem_${Date.now()}`,
-      });
-      return res.status(200).json({ success: true, ...result });
-    }
-
-    if (operation === "add-comment") {
-      const comment = teamProjectTrackerService.addComment(payload.taskId, payload.callerMembershipId, payload.content || "");
-      return res.status(201).json({ success: true, comment });
-    }
-
-    if (operation === "list-tasks") {
-      const tasks = teamProjectTrackerService.listProjectTasks(payload.projectId || projectId, payload.callerMembershipId);
-      return res.status(200).json({ success: true, tasks });
-    }
-
-    res.status(400).json({ success: false, error: `Unknown Team Project Tracker operation: ${operation}` });
   } catch (err) {
     next(err);
   }

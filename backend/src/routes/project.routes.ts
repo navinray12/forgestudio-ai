@@ -58,7 +58,6 @@ import {
   executeUnifiedMigrationHandler,
   runReleaseQualificationHandler,
   getReleaseQualificationRecordHandler,
-  teamProjectTrackerOperationsHandler,
   validateGeneratedPackageHandler,
   verifyControlPlaneDiagnosticsHandler,
 
@@ -351,8 +350,10 @@ router.post("/:id/database/migrations/unified-execute", executeUnifiedMigrationH
 router.post("/:id/qualification/release/run", runReleaseQualificationHandler);
 router.get("/:id/qualification/release/:runId", getReleaseQualificationRecordHandler);
 
-// Blueprint Point 45: Team Project Tracker Vertical Acceptance Slice
-router.post("/:id/showcase/team-project-tracker", teamProjectTrackerOperationsHandler);
+// Blueprint Point 45: the Team Project Tracker is an acceptance application that
+// must be generated and run (blueprint 45.1), not an operations API hardcoded
+// into the product. The former showcase route trusted client-supplied
+// membership IDs and roles and returned a fabricated 15-step report.
 
 // Blueprint Point 46: Reconcile Architecture and API Contracts
 router.post("/:id/architecture/package/validate", validateGeneratedPackageHandler);

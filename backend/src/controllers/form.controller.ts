@@ -45,9 +45,12 @@ export async function submitFormHandler(
       conditionalLogic,
       fieldConfigs,
       metadata,
+      idempotencyKey: req.get("Idempotency-Key") || undefined,
     });
 
-    return res.status(200).json(result);
+    // 201 only for a newly committed submission; a replayed key returns the original receipt.
+    const created = "receipt" in result && result.receipt && !result.receipt.replayed;
+    return res.status(created ? 201 : 200).json(result);
   } catch (error) {
     next(error);
   }

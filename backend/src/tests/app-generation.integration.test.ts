@@ -134,7 +134,26 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(run).toMatchObject({ provider: "scripted", model: "scripted-model-v1", inputTokens: 310, outputTokens: 220, providerCalls: 1, repairAttempts: 0 });
     expect(run.providerRequestIds).toEqual(["req_1"]);
     expect((run.spec as any).entities[0].name).toBe("Appointment");
-    expect((await fs.readFile(project.id, "forge-app/prisma/schema.prisma")).content).toContain("model Appointment");
+    expect((await fs.readFile(project.id, "forge-app/migrations/0001_initial.sql")).content).toContain('CREATE TABLE "appointments"');
+  });
+
+  it("GEN-09: sends the provider only the brief, the model contract and the instructions", async () => {
+    const project = await newProject();
+    const { provider, calls } = scriptedProvider([{ text: JSON.stringify(VALID_MODEL) }]);
+    const service = new AppGenerationService({ providerFactory: () => provider, filesystem: fs });
+    const brief = "A clinic books patient appointments.";
+    await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id, mode: "AI_PROVIDER", brief,
+    });
+    expect(calls).toHaveLength(1);
+    expect(Object.keys(calls[0]).sort()).toEqual(["context", "operation", "prompt", "schema", "systemPrompt"]);
+    expect(calls[0].context).toEqual({});
+    expect(calls[0].prompt).toBe(brief);
+    const sent = JSON.stringify(calls[0]);
+    const forbidden = [project.id, users.owner.id, `gen-owner-${marker}@example.test`, process.env.DATABASE_URL,
+      process.env.ANTHROPIC_API_KEY, process.env.GEMINI_API_KEY, process.env.OPENAI_API_KEY, process.env.JWT_SECRET]
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    for (const value of forbidden) expect(sent.includes(value)).toBe(false);
   });
 
   it("repairs invalid output at most twice, then fails without writing files", async () => {

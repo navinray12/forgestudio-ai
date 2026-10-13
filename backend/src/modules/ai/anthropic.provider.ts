@@ -7,20 +7,22 @@ import { resolveAnthropicWorkspaceId } from "./anthropic-workspace.js";
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
-    readonly model = process.env.AI_MODEL_PLANNER || "claude-3-7-sonnet-20250219",
+    readonly model: string = process.env.AI_MODEL_PLANNER ?? "",
     private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {
     if (!this.apiKey) {
       throw new AppError("AI generation is not configured", 503, "AI_NOT_CONFIGURED");
     }
+    if (!this.model) {
+      // The configured model is used as-is; it is never silently replaced.
+      throw new AppError("AI generation is not configured: set AI_MODEL_PLANNER", 503, "AI_NOT_CONFIGURED");
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
     const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
     try {
-      const activeModel = this.model && this.model !== "claude-opus-5-5" && this.model.startsWith("claude-")
-        ? this.model
-        : "claude-3-7-sonnet-20250219";
+      const activeModel = this.model;
       const workspaceId = await resolveAnthropicWorkspaceId(this.apiKey);
       const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
       const defaultInstruction = request.operation === "SITE_GENERATION"

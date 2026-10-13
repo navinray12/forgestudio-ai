@@ -752,6 +752,12 @@ export function reconcilePersistedCheckpoint(pages: RegisteredPage[], existingFi
       missingFiles.push(page.filePath);
       return { ...page, syncStatus: "PENDING_SYNC" as const };
     }
+    // The file is present: a page that was only pending because its file was
+    // missing (or has no recorded status) is synchronized again. Conflicts and
+    // retirements are never cleared by reconciliation.
+    if (!page.isRetired && (page.syncStatus === undefined || page.syncStatus === "PENDING_SYNC")) {
+      return { ...page, syncStatus: "SYNCHRONIZED" as const };
+    }
     return page;
   });
 

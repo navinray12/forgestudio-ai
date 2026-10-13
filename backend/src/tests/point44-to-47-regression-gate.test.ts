@@ -48,10 +48,11 @@ describe("Points 44–47 Master Regression Gate", () => {
     teamProjectTrackerService.addProjectMember(projectId, memberLeadId, "LEAD");
     teamProjectTrackerService.addProjectMember(projectId, memberDevId, "CONTRIBUTOR");
 
-    // 2. Execute authoritative 15-step vertical slice protocol
+    // 2. The in-process protocol runs the steps it can and never claims the rest.
     const protocolResult = await teamProjectTrackerService.executeFifteenStepAcceptanceProtocol(projectId);
-    expect(protocolResult.protocolPassed).toBe(true);
     expect(protocolResult.steps.length).toBe(15);
+    expect(protocolResult.steps.filter((s) => s.status === "PASS").map((s) => s.stepNumber)).toEqual([4, 5, 7]);
+    expect(protocolResult.protocolPassed).toBe(false);
 
     // 3. Verify transactional completion with outbox dispatch
     const task = teamProjectTrackerService.createTask(

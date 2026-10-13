@@ -169,7 +169,8 @@ export default function HomePage() {
         newValue: "New Description",
         oldValue: "Original Description",
         baseCheckpointId: "cp_base",
-        expectedRevision: 1,
+        // Earlier tests in this file advance the shared project's revision.
+        expectedRevision: WorkspaceCoordinatorService.getCurrentRevision(projectId),
         actorId,
         tenantId: "tenant_1",
         operationId: "op_for_undo_1",

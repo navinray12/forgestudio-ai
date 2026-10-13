@@ -3,7 +3,7 @@
  * Regression Test Suite: Database Studio Environment Security & Migration Integrity
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   DatabaseStudioService,
 } from "../modules/data-platform/studio/databaseStudio.service.js";
@@ -46,11 +46,31 @@ describe("Point 33 — Database Studio & Migration Integrity Engine", () => {
 
   it("detects drift across applied migrations via verifyMigrationIntegrity", async () => {
     const engine = new MigrationEngine();
-    const report = await engine.verifyMigrationIntegrity("non-existent-db-for-unit-test");
+    const databaseId = "4f1c2d3e-0000-4000-8000-000000000033";
+    const intactSql = "CREATE TABLE a (id UUID PRIMARY KEY);";
+    const recordedSql = "CREATE TABLE b (id UUID PRIMARY KEY);";
+    const base = { databaseId, projectId: "p", downSql: null, createdAt: new Date() };
+    vi.spyOn(engine, "listMigrations").mockResolvedValue([
+      { ...base, id: "m1", name: "001_intact", upSql: intactSql, checksum: engine.computeChecksum(intactSql), status: "APPLIED" },
+      // Applied SQL edited after the checksum was recorded.
+      { ...base, id: "m2", name: "002_tampered", upSql: recordedSql + " -- edited", checksum: engine.computeChecksum(recordedSql), status: "APPLIED" },
+      { ...base, id: "m3", name: "003_interrupted", upSql: "SELECT 1;", checksum: engine.computeChecksum("SELECT 1;"), status: "RECONCILIATION_REQUIRED" },
+    ] as any);
 
-    expect(report.isConsistent).toBe(true);
-    expect(Array.isArray(report.driftsDetected)).toBe(true);
-    expect(Array.isArray(report.unreconciledMigrations)).toBe(true);
+    const report = await engine.verifyMigrationIntegrity(databaseId);
+
+    expect(report.isConsistent).toBe(false);
+    expect(report.appliedCount).toBe(2);
+    expect(report.driftsDetected.map((d) => d.migrationName)).toEqual(["002_tampered"]);
+    expect(report.unreconciledMigrations).toEqual(["003_interrupted"]);
+  });
+
+  it("fails closed on a malformed database identifier instead of reporting it consistent", async () => {
+    const engine = new MigrationEngine();
+    await expect(engine.verifyMigrationIntegrity("non-existent-db-for-unit-test")).rejects.toMatchObject({
+      statusCode: 400,
+      code: "INVALID_DATABASE_ID",
+    });
   });
 
   it("handles non-transactional migrations (CREATE INDEX CONCURRENTLY) outside atomic transaction blocks", () => {

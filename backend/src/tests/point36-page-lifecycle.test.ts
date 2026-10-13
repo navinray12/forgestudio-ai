@@ -209,5 +209,20 @@ describe("Point 36: Canonical Page Registry and File Lifecycle", () => {
       expect(reconciliation.missingFiles.length).toBe(0);
       expect(reconciliation.reconciledPages[0].syncStatus).toBe("SYNCHRONIZED");
     });
+
+    it("marks a page pending while its file is missing, recovers it when the file returns, and never clears a conflict", () => {
+      const missing = reconcilePersistedCheckpoint(existingPages, ["src/pages/HomePage.tsx.tmp"]);
+      expect(missing.missingFiles).toEqual(["src/pages/HomePage.tsx"]);
+      expect(missing.reconciledPages[0].syncStatus).toBe("PENDING_SYNC");
+
+      const recovered = reconcilePersistedCheckpoint(missing.reconciledPages, ["src/pages/HomePage.tsx"]);
+      expect(recovered.reconciledPages[0].syncStatus).toBe("SYNCHRONIZED");
+
+      const conflicted = reconcilePersistedCheckpoint(
+        [{ ...existingPages[0], syncStatus: "CONFLICT" }],
+        ["src/pages/HomePage.tsx"]
+      );
+      expect(conflicted.reconciledPages[0].syncStatus).toBe("CONFLICT");
+    });
   });
 });

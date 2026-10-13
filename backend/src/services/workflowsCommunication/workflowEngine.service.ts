@@ -343,7 +343,15 @@ export class VersionedWorkflowEngine {
     if (!def) {
       throw new AppError(`Workflow ${workflowId} version ${version} not found for simulation`, 404, "WORKFLOW_NOT_FOUND");
     }
+    return this.simulateDefinition(def, initialContext);
+  }
 
+  /**
+   * Simulates a definition with a synthetic recipient and a virtual clock. Pure: no network,
+   * no persistence and no production effects (blueprint §15).
+   */
+  public static simulateDefinition(def: WorkflowDefinition, initialContext: Record<string, any> = {}): WorkflowSimulationResult {
+    const { workflowId, version } = def;
     const simulationId = `sim_${crypto.randomUUID()}`;
     const syntheticRecipient = {
       id: "synthetic_lead_001",

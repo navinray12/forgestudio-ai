@@ -146,6 +146,24 @@ describe("Point 45 — Team Project Tracker Vertical Acceptance Slice", () => {
     );
     expect(replayed.id).toBe(task.id);
     expect(replayed.status).toBe("COMPLETED");
+    expect(replayed.wasIdempotentReplay).toBe(true);
+
+    // The same key may not be reused to "replay" a command against another task.
+    const other = teamProjectTrackerService.createTask(projectId, memberContributorA, "Another Task");
+    expect(() =>
+      teamProjectTrackerService.completeTask(other.id, memberContributorA, other.revision, idempotencyKey)
+    ).toThrow("Idempotency key was already used for a different task");
+    const untouched = teamProjectTrackerService.listProjectTasks(projectId, memberContributorA).find((t) => t.id === other.id);
+    expect(untouched?.status).toBe("TODO");
+  });
+
+  it("45.6b Returned records are copies: mutating them cannot change stored state", () => {
+    const task = teamProjectTrackerService.createTask(projectId, memberContributorA, "Copy Semantics");
+    (task as any).revision = 99;
+    (task as any).organizationId = orgBId;
+    const stored = teamProjectTrackerService.listProjectTasks(projectId, memberContributorA).find((t) => t.id === task.id);
+    expect(stored?.revision).toBe(1);
+    expect(stored?.organizationId).toBe(orgAId);
   });
 
   it("45.7 Private task comments are segregated and never leak into CMS or search", () => {
@@ -167,25 +185,27 @@ describe("Point 45 — Team Project Tracker Vertical Acceptance Slice", () => {
     expect(cmsLeakDetected).toBe(false);
   });
 
-  it("45.8 Executes the complete authoritative 15-step demonstration protocol", async () => {
+  it("45.8 Reports only demonstration steps it actually executed", async () => {
     const result = await teamProjectTrackerService.executeFifteenStepAcceptanceProtocol(projectId);
 
-    expect(result).toBeDefined();
-    expect(result.protocolPassed).toBe(true);
     expect(result.steps.length).toBe(15);
-
+    const executed = result.steps.filter((s) => s.status !== "NOT_EXECUTED").map((s) => s.stepNumber);
+    expect(executed).toEqual([4, 5, 7]);
     for (const step of result.steps) {
-      expect(step.passed).toBe(true);
-      expect(step.evidence).toBeDefined();
+      expect(step.passed).toBe(step.status === "PASS");
+      expect(step.evidence).toBeTruthy();
     }
 
-    // Explicit check on step 7 (cross tenant denial) and step 14 (CMS separation)
+    // Steps executed in-process pass with observed evidence.
     const step7 = result.steps.find((s) => s.stepNumber === 7);
     expect(step7?.action).toContain("Cross-Tenant Isolation");
-    expect(step7?.passed).toBe(true);
+    expect(step7?.status).toBe("PASS");
+    expect(step7?.evidence).toContain("UNAUTHORIZED_CROSS_TENANT_ACCESS");
 
+    // Steps that need the generated app and real infrastructure are never claimed.
     const step14 = result.steps.find((s) => s.stepNumber === 14);
     expect(step14?.action).toContain("CMS Lifecycle Separation");
-    expect(step14?.passed).toBe(true);
+    expect(step14?.status).toBe("NOT_EXECUTED");
+    expect(result.protocolPassed).toBe(false);
   });
 });

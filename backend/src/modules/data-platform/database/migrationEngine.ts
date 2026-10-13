@@ -77,6 +77,11 @@ export class MigrationEngine {
    * List all migrations for a customer database
    */
   public async listMigrations(databaseId: string): Promise<MigrationRecord[]> {
+    // Fail closed on malformed identifiers instead of surfacing a raw driver error
+    // (or, worse, reporting an unknown database as consistent).
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(databaseId)) {
+      throw new AppError("Invalid database identifier", 400, "INVALID_DATABASE_ID");
+    }
     return await db.forgeDatabaseMigration.findMany({
       where: { databaseId },
       orderBy: { createdAt: "asc" },

@@ -95,6 +95,7 @@ model Website {
   formSubmissions    FormSubmission[]
   customPostTypes    CustomPostType[]
   contentPurgeRequests ContentPurgeRequest[]
+  leads              Lead[]
   themeLocationRules ThemeLocationRule[]
   sftpConnections    SftpConnection[]
   pluginIntegrations PluginIntegration[]
@@ -385,15 +386,19 @@ model CustomCodeRevision {
 }
 
 model FormSubmission {
-  id        String   @id @default(uuid()) @db.Uuid
-  websiteId String   @db.Uuid
-  formId    String
-  data      Json
-  ipAddress String?
-  status    String   @default("NEW")
-  createdAt DateTime @default(now())
+  id             String   @id @default(uuid()) @db.Uuid
+  websiteId      String   @db.Uuid
+  formId         String
+  data           Json
+  ipAddress      String?
+  status         String   @default("NEW")
+  createdAt      DateTime @default(now())
+  idempotencyKey String?  @db.VarChar(200)
+  requestHash    String?  @db.Char(64)
+  leadId         String?  @db.Uuid
 
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  leads   Lead[]
 
   @@index([websiteId])
   @@index([formId])
@@ -1895,4 +1900,50 @@ model ContentPurgeRequest {
 
   @@index([websiteId, status])
   @@map("content_purge_requests")
+}
+
+/// Durable lead created atomically with its form submission (blueprint §12).
+model Lead {
+  id                    String   @id @default(uuid()) @db.Uuid
+  websiteId             String   @db.Uuid
+  submissionId          String?  @db.Uuid
+  provenance            String   @default("WEBSITE_FORM") @db.VarChar(30)
+  formId                String?  @db.VarChar(255)
+  displayName           String?  @db.VarChar(255)
+  email                 String?  @db.VarChar(320)
+  phone                 String?  @db.VarChar(64)
+  stage                 String   @default("NEW") @db.VarChar(20)
+  assignedToId          String?  @db.Uuid
+  qualificationEvidence String?
+  revision              Int      @default(1)
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime @default(now()) @db.Timestamptz(6)
+  stageChangedAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  website    Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  submission FormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  events     LeadEvent[]
+
+  @@index([websiteId, createdAt(sort: Desc)], map: "idx_forge_leads_website")
+  @@index([websiteId, stage], map: "idx_forge_leads_website_stage")
+  @@map("forge_leads")
+}
+
+/// Immutable audit/notes trail for a lead.
+model LeadEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  leadId    String   @db.Uuid
+  websiteId String   @db.Uuid
+  actorId   String?  @db.Uuid
+  type      String   @db.VarChar(30)
+  fromStage String?  @db.VarChar(20)
+  toStage   String?  @db.VarChar(20)
+  note      String?
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt], map: "idx_forge_lead_events_lead")
+  @@map("forge_lead_events")
 }
