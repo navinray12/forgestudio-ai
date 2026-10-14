@@ -9,7 +9,6 @@ import { useForumTopics } from "../hooks/useForumTopics";
 import { useForumCategories } from "../hooks/useForumCategories";
 import { useForumTopicDetail } from "../hooks/useForumTopicDetail";
 import { forumService } from "../services/forumService";
-import type { ForumTopic } from "../types/forum.types";
 
 export const ForumPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("feed");
@@ -28,7 +27,13 @@ export const ForumPage: React.FC = () => {
     toggleReaction,
   } = useForumTopicDetail(selectedTopicId || "");
 
-  const handleCreateTopic = async (payload: any) => {
+  const handleCreateTopic = async (payload: {
+    title: string;
+    content: string;
+    categoryId: string;
+    tags: string[];
+    visibility: string;
+  }) => {
     await forumService.createTopic(payload);
     await refetchTopics();
   };

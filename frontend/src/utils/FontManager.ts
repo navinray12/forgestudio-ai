@@ -11,13 +11,15 @@ import type { EditorElement } from '../pages/editor/WebsiteEditor';
 
 // Default font configurations (Standard system fallbacks prevent invisible text)
 
+export interface GlobalFontFamilies { heading?: string; body?: string; }
+
 export interface FontUsageInfo {
     family: string;
     weights: Set<number>;
     isCritical: boolean; // e.g. appears in first element / heading
 }
 
-function analyzeFontUsage(elements: EditorElement[], globalFonts: any): Map<string, FontUsageInfo> {
+function analyzeFontUsage(elements: EditorElement[], globalFonts: GlobalFontFamilies | null | undefined): Map<string, FontUsageInfo> {
     const usage = new Map<string, FontUsageInfo>();
 
     const safeAdd = (family: string, weight: number, isCritical: boolean) => {
@@ -92,7 +94,7 @@ export function generateGoogleFontsUrl(usage: Map<string, FontUsageInfo>): strin
     return `https://fonts.googleapis.com/css2?${familyStrings.join('&')}&display=swap`;
 }
 
-export function useDynamicFonts(elements: EditorElement[], globalFonts: any) {
+export function useDynamicFonts(elements: EditorElement[], globalFonts: GlobalFontFamilies | null | undefined) {
     const fontUrl = useMemo(() => {
         const usage = analyzeFontUsage(elements, globalFonts);
         return generateGoogleFontsUrl(usage);

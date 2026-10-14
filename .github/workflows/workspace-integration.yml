@@ -45,7 +45,7 @@ jobs:
           npx --no-install prisma db push
           npm run build
       - name: Exercise actual workspace SQL migration and contracts
-        run: node --test dist/tests/workspace-integration.test.js 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
+        run: node --import tsx --test src/tests/workspace-integration.test.ts 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
       - name: Retain evidence including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -567,6 +567,14 @@ function isContainerType(element: any): boolean {
 
 function setText(element: any, text: string) {
   element.content = text;
+  // A code edit establishes one canonical text value. Keep historic editor
+  // documents that explicitly use textContent/text compatible, but do not
+  // leave duplicate aliases that can mask a later canvas edit to content.
+  if (["heading", "text", "paragraph", "blockquote"].includes(String(element.type).toLowerCase())) {
+    delete element.textContent;
+    delete element.text;
+    return;
+  }
   element.textContent = text;
   element.text = text;
   if (String(element.type).toLowerCase() === "button") {
@@ -1180,7 +1188,7 @@ export async function reconcilePageSource(input: PageReconcileInput): Promise<Pa
         if (at >= 0 || saved.length !== canonical.length) {
           const token = at >= 0 ? saved[at] : canonical[saved.length];
           diagnostics.push({
-            severity: "warning",
+            severity: "error",
             code: "CUSTOM_CODE_OUTSIDE_PROTECTED_REGION",
             message: `Code outside the page's JSX and its protected regions differs from the generated page (near "${String(token).slice(0, 40)}"). Move custom logic into a // [forge-protect-start: ...] region.`,
             filePath,

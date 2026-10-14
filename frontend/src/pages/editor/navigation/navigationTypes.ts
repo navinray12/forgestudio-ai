@@ -31,7 +31,7 @@ export interface NavMenuItem {
   linkType?: string;
   destinationType?: string;
   productId?: string;
-  submenu?: any[];
+  submenu?: NavMenuItem[];
   position?: { x: number; y: number };
   children?: Array<{
     id: string;

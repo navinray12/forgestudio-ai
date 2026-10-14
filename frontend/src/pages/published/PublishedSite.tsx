@@ -297,11 +297,11 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
     const stickyStyles = resolveStickyStyles(el);
 
     // Defer Background Image safely via F-355
-    let finalMergedStyles: any = {
+    const finalMergedStyles: any = {
         ...(optClass ? {} : resolvedStyles),
         ...stickyStyles
     };
-    let finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
+    const finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
 
     // Keep backgroundImage strictly inline safely
     if (resolvedStyles.backgroundImage) {
@@ -936,8 +936,8 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                 if (typeof rawEditorData === "string") {
                     try {
                         rawEditorData = JSON.parse(rawEditorData);
-                    } catch (_e) {
-                        throw new Error("The saved website document is invalid.");
+                    } catch (parseError) {
+                        throw new Error("The saved website document is invalid.", { cause: parseError });
                     }
                 }
                 const editorData = isPreview 

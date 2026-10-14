@@ -30,6 +30,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (classToEdit) {
       setName(classToEdit.name);
       setDescription(classToEdit.description || "");
@@ -47,6 +49,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
       });
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [classToEdit, defaultIsGlobal, isOpen]);
 
   if (!isOpen) return null;
@@ -58,8 +62,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
     try {
       await onSubmit({ name, styles, description, isGlobal });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Unable to save class.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Unable to save class.");
     } finally {
       setIsSubmitting(false);
     }
@@ -67,7 +71,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
 
   const previewClassKey = name.trim() ? `.${formatClassName(name)}` : ".class-name";
 
-  const updateStyleProp = (key: keyof ElementStyles, value: any) => {
+  const updateStyleProp = <K extends keyof ElementStyles,>(key: K, value: ElementStyles[K]) => {
     setStyles((prev) => ({
       ...prev,
       [key]: value !== "" ? value : undefined,

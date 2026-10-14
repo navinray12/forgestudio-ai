@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { ReusableComponentDefinition } from "../types/reusableComponents.types";
+import type { ReusableComponentDefinition, CreateReusableComponentPayload } from "../types/reusableComponents.types";
 import { useReusableComponents } from "../hooks/useReusableComponents";
 import { ReusableComponentFormModal } from "./ReusableComponentFormModal";
 import { DeleteComponentConfirmModal } from "./DeleteComponentConfirmModal";
@@ -41,7 +41,7 @@ export const ReusableComponentsPanel: React.FC<ReusableComponentsPanelProps> = (
     updateLockSettings,
   } = useControlledComponent(activeInstanceComponent);
 
-  const handleFormSubmit = async (payload: any) => {
+  const handleFormSubmit = async (payload: CreateReusableComponentPayload) => {
     if (editingComponent) {
       await updateComponent(editingComponent.id, payload);
     } else {

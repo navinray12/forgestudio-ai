@@ -12,7 +12,7 @@ export interface WcCartItem {
   product: SiteProduct;
   quantity: number;
   selectedVariant?: string;
-  selectedAddOns?: Record<string, any>;
+  selectedAddOns?: Record<string, unknown>;
   customPrice?: number;
 }
 
@@ -31,6 +31,23 @@ export interface WcOrderReceipt {
   status: string;
 }
 
+// Backend commerce catalog fields consumed by the storefront adapter.
+interface CommerceCatalogProduct {
+  id: string;
+  name: string;
+  price: string | number;
+  salePrice?: string | number | null;
+  images?: string[];
+  image?: string;
+  description?: string;
+  rating?: number;
+  ratingCount?: number;
+  badge?: string;
+  categories?: string[];
+  category?: string;
+  stock?: number | "unlimited" | string;
+}
+
 interface WooCommerceContextType {
   products: SiteProduct[];
   setProducts: React.Dispatch<React.SetStateAction<SiteProduct[]>>;
@@ -38,7 +55,7 @@ interface WooCommerceContextType {
   addToCart: (
     product: SiteProduct,
     quantity?: number,
-    selectedAddOns?: Record<string, any>,
+    selectedAddOns?: Record<string, unknown>,
     customPrice?: number
   ) => void;
   removeFromCart: (productId: string) => void;
@@ -59,8 +76,8 @@ interface WooCommerceContextType {
   placeOrder: (checkoutData: {
     customerName: string;
     customerEmail: string;
-    billingAddress?: any;
-    shippingAddress?: any;
+    billingAddress?: unknown;
+    shippingAddress?: unknown;
     paymentMethod?: string;
     couponCode?: string;
   }) => Promise<WcOrderReceipt>;
@@ -134,15 +151,31 @@ export const WooCommerceProvider: React.FC<{
   const [cart, setCart] = useState<WcCartItem[]>(() => {
     try {
       const saved = localStorage.getItem("fs_wc_cart");
-      return saved ? JSON.parse(saved) : [
-        { product: DEFAULT_PRODUCTS[0], quantity: 1 }
-      ];
+      if (!saved) return [{ product: DEFAULT_PRODUCTS[0], quantity: 1 }];
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item): item is WcCartItem => {
+        if (!item || typeof item !== "object") return false;
+        const entry = item as Record<string, unknown>;
+        const product = entry.product;
+        if (!product || typeof product !== "object") return false;
+        const details = product as Record<string, unknown>;
+        return typeof details.id === "string" &&
+          typeof details.name === "string" &&
+          typeof details.price === "string" &&
+          typeof entry.quantity === "number" &&
+          Number.isSafeInteger(entry.quantity) &&
+          entry.quantity > 0 &&
+          (entry.customPrice === undefined ||
+            (typeof entry.customPrice === "number" &&
+              Number.isFinite(entry.customPrice) && entry.customPrice >= 0));
+      });
     } catch {
       return [{ product: DEFAULT_PRODUCTS[0], quantity: 1 }];
     }
   });
 
-  const [notices, setNotices] = useState<WcNotice[]>([
+  const [notices, setNotices] = useState<WcNotice[]>(() => [
     {
       id: "wc-init-notice",
       type: "info",
@@ -164,7 +197,7 @@ export const WooCommerceProvider: React.FC<{
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (isMounted && data && Array.isArray(data.products) && data.products.length > 0) {
-            setProducts(data.products.map((p: any) => ({
+            setProducts(data.products.map((p: CommerceCatalogProduct) => ({
               id: p.id,
               name: p.name,
               price: typeof p.price === "number" ? `$${p.price.toFixed(2)}` : String(p.price || "$0.00"),
@@ -211,9 +244,17 @@ export const WooCommerceProvider: React.FC<{
   const addToCart = (
     product: SiteProduct,
     quantity = 1,
-    selectedAddOns?: Record<string, any>,
+    selectedAddOns?: Record<string, unknown>,
     customPrice?: number
   ) => {
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+      addNotice("error", "Please select a valid positive whole-number quantity.");
+      return;
+    }
+    if (customPrice !== undefined && (!Number.isFinite(customPrice) || customPrice < 0)) {
+      addNotice("error", "Custom price must be a valid non-negative amount.");
+      return;
+    }
     setCart((prev) => {
       const addOnsKey = selectedAddOns ? JSON.stringify(selectedAddOns) : "";
       const existingIdx = prev.findIndex((item) => {
@@ -222,10 +263,15 @@ export const WooCommerceProvider: React.FC<{
       });
 
       if (existingIdx > -1) {
-        const copy = [...prev];
-        copy[existingIdx].quantity += quantity;
-        if (customPrice !== undefined) copy[existingIdx].customPrice = customPrice;
-        return copy;
+        return prev.map((item, index) =>
+          index === existingIdx
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+                ...(customPrice !== undefined ? { customPrice } : {}),
+              }
+            : item
+        );
       }
       return [...prev, { product, quantity, selectedAddOns, customPrice }];
     });
@@ -234,16 +280,18 @@ export const WooCommerceProvider: React.FC<{
   };
 
   const removeFromCart = (productId: string) => {
-    setCart((prev) => {
-      const item = prev.find((i) => i.product.id === productId);
-      if (item) {
-        addNotice("info", `🗑️ Removed "${item.product.name}" from cart.`);
-      }
-      return prev.filter((i) => i.product.id !== productId);
-    });
+    const removedItem = cart.find((item) => item.product.id === productId);
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    if (removedItem) {
+      addNotice("info", `🗑️ Removed "${removedItem.product.name}" from cart.`);
+    }
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
+    if (!Number.isSafeInteger(quantity)) {
+      addNotice("error", "Cart quantity must be a whole number.");
+      return;
+    }
     if (quantity <= 0) {
       removeFromCart(productId);
       return;
@@ -274,11 +322,14 @@ export const WooCommerceProvider: React.FC<{
   const placeOrder = async (checkoutData: {
     customerName: string;
     customerEmail: string;
-    billingAddress?: any;
-    shippingAddress?: any;
+    billingAddress?: unknown;
+    shippingAddress?: unknown;
     paymentMethod?: string;
     couponCode?: string;
   }): Promise<WcOrderReceipt> => {
+    if (cart.length === 0) {
+      throw new Error("Cannot place an order with an empty cart.");
+    }
     const orderItems = cart.map((i) => {
       const unitPrice = i.customPrice ?? parsePriceNum(i.product.price);
       const addOnSuffix = i.selectedAddOns && Object.keys(i.selectedAddOns).length > 0
@@ -300,7 +351,7 @@ export const WooCommerceProvider: React.FC<{
     // Dispatch POST to commerce orders endpoint
     if (websiteId) {
       try {
-        await fetch(`/api/websites/${websiteId}/commerce/orders`, {
+        const response = await fetch(`/api/websites/${websiteId}/commerce/orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -318,8 +369,20 @@ export const WooCommerceProvider: React.FC<{
             })),
           }),
         });
+        if (!response.ok) {
+          throw new Error(`Commerce order was not accepted (HTTP ${response.status}).`);
+        }
+        // Some integrations return HTTP 200 with an application-level failure.
+        // Never clear the buyer's cart if the backend explicitly rejected it.
+        const result: unknown = await response.json().catch(() => null);
+        if (result && typeof result === "object" && "success" in result && result.success === false) {
+          throw new Error("Commerce order was rejected by the backend.");
+        }
       } catch (err) {
-        console.warn("Could not dispatch order to commerce backend endpoint", err);
+        // Keep the cart intact; an unconfirmed server order must not be reported
+        // as successfully placed or cause the buyer to lose their selections.
+        console.error("Could not submit commerce order", err);
+        throw err instanceof Error ? err : new Error("Commerce order submission failed.");
       }
     }
 

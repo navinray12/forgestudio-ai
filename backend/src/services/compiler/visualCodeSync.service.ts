@@ -520,17 +520,28 @@ export async function syncSourceToVisualWebsite(
     };
     nextDoc.pages.push(newPageObj);
 
-    // The legacy emitter does not yet preserve every router's source layout.
-    // Check its plan BEFORE saving the document or changing file ownership.
+    // Confirm the generated page keeps exactly the recognized route. If the
+    // canonical filename differs, retain the user's original source instead
+    // of moving or deleting it.
     const plannedPage = buildPageRegistry(nextDoc, framework).find((p) => p.pageId === pageId);
-    if (!plannedPage || plannedPage.filePath !== cleanPath ||
-        pageRouteIdentity(plannedPage.routePath) !== pageRouteIdentity(pageEntry.routePath)) {
-      const message = "The current compiler would relocate this source or change its route. " +
-        "The file was preserved; register it only after a compatible source-layout adapter is available.";
+    if (!plannedPage || pageRouteIdentity(plannedPage.routePath) !== pageRouteIdentity(pageEntry.routePath)) {
+      const message = "The compiler would change the imported page route. The source was preserved and no page was registered.";
       return result("unsupported", {
         message,
         diagnostics: [{ severity: "error", code: "PAGE_SOURCE_LAYOUT_UNSUPPORTED", message, filePath: cleanPath }],
       });
+    }
+    const useCanonicalPath = plannedPage.filePath !== cleanPath;
+    if (useCanonicalPath) {
+      const canonicalExisting = (await listFiles(projectId)).find((entry: any) => entry.path === plannedPage.filePath);
+      if (canonicalExisting && (!canonicalExisting.isGenerated || canonicalExisting.isProtected)) {
+        const message = "The canonical page file already contains user-owned or protected source. The import was preserved without overwriting it.";
+        return result("conflict", {
+          message,
+          conflicts: [{ filePath: plannedPage.filePath, visualValue: "new page", sourceValue: "existing protected source", reason: message }],
+          diagnostics: [{ severity: "error", code: "PAGE_CANONICAL_SOURCE_CONFLICT", message, filePath: plannedPage.filePath }],
+        });
+      }
     }
 
     let documentVersion: number;
@@ -550,7 +561,9 @@ export async function syncSourceToVisualWebsite(
       });
     }
 
-    await setFileGenerated(file, true);
+    // A differently named source remains user-owned; generated output goes to
+    // its canonical path without deleting or taking ownership of the original.
+    await setFileGenerated(file, !useCanonicalPath);
     const freshSite = await db.website.findUnique({ where: { id: websiteId } });
     const persistedDoc = parseEditorDocument(freshSite?.editorData ?? nextDoc);
     const { compiled, updatedFiles } = await regenerate(persistedDoc);
@@ -583,8 +596,11 @@ export async function syncSourceToVisualWebsite(
   const page = target.page;
   const baseline = metadata.visualSync || {};
   const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
-  const basePageHash: string | undefined = baseline.pages?.[page.key]?.hash ?? previousEntry?.basePageHash;
-  const baseSharedHash: string | undefined = baseline.sharedHash ?? previousEntry?.baseSharedHash;
+  // A held code file is based on the snapshot recorded when it first became
+  // unsupported/conflicted. Subsequent visual saves must not silently rebase
+  // that file or hide a two-sided edit conflict.
+  const basePageHash: string | undefined = previousEntry?.basePageHash ?? baseline.pages?.[page.key]?.hash;
+  const baseSharedHash: string | undefined = previousEntry?.baseSharedHash ?? baseline.sharedHash;
 
   /** Keep the saved code as hand-written source until the two sides agree again */
   const holdAsCode = async (status: CodeSyncStatus, message: string, diagnostics: SyncDiagnostic[]) => {

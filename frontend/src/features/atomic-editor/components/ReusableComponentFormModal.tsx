@@ -23,6 +23,8 @@ export const ReusableComponentFormModal: React.FC<ReusableComponentFormModalProp
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (componentToEdit) {
       setName(componentToEdit.name);
       setCategory(componentToEdit.category || "Cards");
@@ -37,6 +39,8 @@ export const ReusableComponentFormModal: React.FC<ReusableComponentFormModalProp
       setRootContent("High performance modular UI component definition.");
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [componentToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -104,8 +108,8 @@ export const ReusableComponentFormModal: React.FC<ReusableComponentFormModalProp
         rootElement,
       });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save Reusable Component.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save Reusable Component.");
     } finally {
       setIsSubmitting(false);
     }

@@ -405,7 +405,7 @@ export async function promoteArtifact(params: {
   }
 
   const project = await forgeProjectService.getProjectById(projectId);
-  const targetUrl = computeDeploymentUrl(project.slug, targetEnvironment, `promo_${Date.now()}`);
+  const targetUrl = computeDeploymentUrl(projectId, project.slug, targetEnvironment, `promo_${Date.now()}`);
 
   const logs: DeploymentLogEntry[] = [
     {

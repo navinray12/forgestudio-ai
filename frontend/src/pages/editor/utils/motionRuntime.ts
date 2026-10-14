@@ -74,16 +74,24 @@ function safeQuerySelector<T extends Element = HTMLElement>(selector: string | n
   try {
     const found = document.querySelector<T>(trimmed);
     if (found) return found;
-  } catch {}
+  } catch {
+    // Invalid selectors may still identify an editor element; try the element ID fallback.
+  }
   try {
-    const escaped = CSS.escape ? CSS.escape(trimmed) : trimmed;
+    const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(trimmed)
+      : trimmed;
     const foundByElId = document.querySelector<T>(`[data-el-id="${escaped}"]`);
     if (foundByElId) return foundByElId;
-  } catch {}
+  } catch {
+    // An invalid attribute selector should not prevent direct ID lookup.
+  }
   try {
     const foundById = document.getElementById(trimmed);
     if (foundById) return foundById as unknown as T;
-  } catch {}
+  } catch {
+    // Unavailable DOM APIs should not interrupt an optional animation lookup.
+  }
   return null;
 }
 
@@ -413,7 +421,7 @@ export function initMotionRuntime(root: HTMLElement | Document = document): Moti
     const rawInteractions = el.getAttribute("data-interactions");
     if (!rawInteractions) return;
 
-    let rules: InteractionRule[] = [];
+    let rules: InteractionRule[];
     try {
       rules = JSON.parse(rawInteractions);
     } catch {
@@ -547,7 +555,9 @@ export function initMotionRuntime(root: HTMLElement | Document = document): Moti
       cleanupFns.forEach((fn) => {
         try {
           fn();
-        } catch {}
+        } catch {
+          // Continue the remaining cleanup callbacks even if one fails.
+        }
       });
       cleanupFns.length = 0;
 
@@ -573,7 +583,9 @@ export function initMotionRuntime(root: HTMLElement | Document = document): Moti
       cleanupFns.forEach((fn) => {
         try {
           fn();
-        } catch {}
+        } catch {
+          // Continue the remaining cleanup callbacks even if one fails.
+        }
       });
       cleanupFns.length = 0;
       childController = initMotionRuntime(root);

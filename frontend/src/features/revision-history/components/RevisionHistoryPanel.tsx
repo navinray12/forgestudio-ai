@@ -41,16 +41,15 @@ function formatRevisionTime(timestamp: number): { dateGroup: string; formattedTi
     date.getMonth() === yesterday.getMonth() &&
     date.getFullYear() === yesterday.getFullYear();
 
-  let dateGroup = "Earlier";
-  if (isToday) dateGroup = "Today";
-  else if (isYesterday) dateGroup = "Yesterday";
-  else {
-    dateGroup = date.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
+  const dateGroup = isToday
+    ? "Today"
+    : isYesterday
+      ? "Yesterday"
+      : date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
 
   const formattedTime = date.toLocaleTimeString(undefined, {
     hour: "2-digit",

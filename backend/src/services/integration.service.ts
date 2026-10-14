@@ -104,141 +104,96 @@ export class IntegrationService {
     quantity: number = 1,
     env: string = "sandbox"
   ) {
-    const clientId = process.env.PAYPAL_CLIENT_ID;
-    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-    const isLive = env === "live";
-    const baseUrl = isLive ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+    const money = validateMoney(amount, currency);
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000) {
+      throw new Error("PayPal quantity must be a positive integer at most 1000");
+    }
+    // PAYPAL_ENV and server credentials choose the authorized environment.
+    if (env !== "sandbox" && env !== "live") throw new Error("Invalid PayPal environment");
+    const unitMinor = Math.round(Number(money.amount) * 100);
+    const totalMinor = unitMinor * quantity;
+    if (!Number.isSafeInteger(totalMinor) || totalMinor <= 0) throw new Error("PayPal total is out of range");
+    const total = (totalMinor / 100).toFixed(2);
 
-    // If real server credentials exist, call official PayPal v2 Orders API
-    if (clientId && clientSecret) {
-      try {
-        const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-        const tokenRes = await fetch(`${baseUrl}/v1/oauth2/token`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${auth}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: "grant_type=client_credentials",
-        });
-
-        if (tokenRes.ok) {
-          const tokenData = await tokenRes.json();
-          const accessToken = tokenData.access_token;
-
-          const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              intent: "CAPTURE",
-              purchase_units: [
-                {
-                  amount: {
-                    currency_code: currency.toUpperCase(),
-                    value: parseFloat(amount).toFixed(2),
-                  },
-                  description: itemDescription || itemName,
-                  items: [
-                    {
-                      name: itemName,
-                      quantity: String(quantity),
-                      unit_amount: {
-                        currency_code: currency.toUpperCase(),
-                        value: parseFloat(amount).toFixed(2),
-                      },
-                    },
-                  ],
-                },
-              ],
-            }),
-          });
-
-          if (orderRes.ok) {
-            const orderData = await orderRes.json();
-            const approveLink = orderData.links?.find((l: any) => l.rel === "approve")?.href;
-            return {
-              success: true,
-              orderId: orderData.id,
-              amount,
-              currency,
-              itemName,
-              approveUrl: approveLink || `${isLive ? "https://www.paypal.com" : "https://www.sandbox.paypal.com"}/checkoutnow?token=${orderData.id}`,
-              mode: isLive ? "live" : "sandbox",
-            };
-          }
-        }
-      } catch (err) {
-        console.warn("[PayPal Integration] Native v2 OAuth failed, falling back to structured sandbox order:", err);
-      }
+    // The opt-in local demo is never an actual checkout or a completed payment.
+    if (process.env.NODE_ENV !== "production" && process.env.PAYPAL_DEMO_MODE === "1") {
+      return {
+        success: true, simulated: true,
+        orderId: "PAYPAL-DEMO-" + crypto.randomBytes(8).toString("hex").toUpperCase(),
+        amount: total, currency: money.currency, itemName, quantity,
+        approveUrl: null, mode: "demo", message: "Development simulation only. No payment was created.",
+      };
     }
 
-    // Structured Sandbox / Development Order Response
-    const orderId = "PAYPAL-ORD-" + crypto.randomBytes(8).toString("hex").toUpperCase();
+    const { token, baseUrl } = await paypalAccessToken();
+    // An editor must never silently send a sandbox request to live PayPal (or vice versa).
+    const authorizedEnv = baseUrl.includes(".sandbox.") ? "sandbox" : "live";
+    if (env !== authorizedEnv) throw new Error("Requested PayPal environment differs from the server configuration");
+    const response = await fetch(baseUrl + "/v2/checkout/orders", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [{
+          description: String(itemDescription || itemName).slice(0, 127),
+          amount: {
+            currency_code: money.currency, value: total,
+            breakdown: { item_total: { currency_code: money.currency, value: total } },
+          },
+          items: [{
+            name: String(itemName || "Digital Product").slice(0, 127),
+            quantity: String(quantity),
+            unit_amount: { currency_code: money.currency, value: (unitMinor / 100).toFixed(2) },
+          }],
+        }],
+      }),
+      signal: withTimeout(),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data?.message || "PayPal order creation failed (" + response.status + ")");
+    const orderId = data?.id;
+    const approval = Array.isArray(data?.links) ? data.links.find(
+      (link: { rel?: string; href?: string }) => link.rel === "approve" && typeof link.href === "string"
+    )?.href : undefined;
+    if (typeof orderId !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(orderId) ||
+        typeof approval !== "string" || !approval.startsWith("https://")) {
+      throw new Error("PayPal did not return a valid order and approval URL");
+    }
     return {
-      success: true,
-      orderId,
-      amount,
-      currency,
-      itemName,
-      quantity,
-      approveUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
-      mode: isLive ? "live_simulated" : "sandbox",
+      success: true, simulated: false, orderId, amount: total, currency: money.currency,
+      itemName, quantity, approveUrl: approval,
+      mode: baseUrl.includes(".sandbox.") ? "sandbox" : "live",
     };
   }
 
   public static async capturePayPalOrder(orderId: string) {
-    const clientId = process.env.PAYPAL_CLIENT_ID;
-    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-
-    if (clientId && clientSecret && !orderId.startsWith("PAYPAL-ORD-")) {
-      try {
-        const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-        const tokenRes = await fetch("https://api-m.sandbox.paypal.com/v1/oauth2/token", {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${auth}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: "grant_type=client_credentials",
-        });
-
-        if (tokenRes.ok) {
-          const tokenData = await tokenRes.json();
-          const accessToken = tokenData.access_token;
-
-          const captureRes = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-          });
-
-          if (captureRes.ok) {
-            const captureData = await captureRes.json();
-            return {
-              success: true,
-              orderId,
-              status: captureData.status || "COMPLETED",
-              transactionId: captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || "TXN-" + orderId,
-              capturedAt: new Date().toISOString(),
-            };
-          }
-        }
-      } catch (err) {
-        console.warn("[PayPal Integration] Native capture failed, returning verified fallback capture state:", err);
-      }
+    if (typeof orderId !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(orderId)) {
+      throw new Error("Invalid PayPal order ID");
     }
-
+    if (orderId.startsWith("PAYPAL-DEMO-") || orderId.startsWith("PAYPAL-ORD-")) {
+      throw new Error("Simulated PayPal orders cannot be captured");
+    }
+    const { token, baseUrl } = await paypalAccessToken();
+    const response = await fetch(baseUrl + "/v2/checkout/orders/" + encodeURIComponent(orderId) + "/capture", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      signal: withTimeout(),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data?.message || "PayPal capture failed (" + response.status + ")");
+    const captures = data?.purchase_units?.flatMap(
+      (unit: { payments?: { captures?: Array<{ id?: string; status?: string }> } }) =>
+        unit.payments?.captures ?? []
+    ) ?? [];
+    const completed = data?.status === "COMPLETED" &&
+      captures.length > 0 && captures.every(
+        (capture: { id?: string; status?: string }) => capture.status === "COMPLETED" && !!capture.id
+      );
+    if (!completed) throw new Error("PayPal did not confirm a completed capture");
     return {
-      success: true,
-      orderId,
-      status: "COMPLETED",
-      transactionId: "TXN-" + crypto.randomBytes(6).toString("hex").toUpperCase(),
-      capturedAt: new Date().toISOString(),
+      success: true, orderId, status: "COMPLETED",
+      transactionId: captures[0].id as string,
+      capturedAt: new Date().toISOString(), simulated: false,
     };
   }
 

@@ -10,9 +10,9 @@ interface AutosaveStatusProps {
 /**
  * Formats lastSavedAt timestamp into human relative string ("just now", "1m ago", etc.)
  */
-function formatTimeAgo(timestamp: number | null): string {
+function formatTimeAgo(timestamp: number | null, now: number): string {
   if (!timestamp) return "Saved";
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  const seconds = Math.floor((now - timestamp) / 1000);
   if (seconds < 10) return "Saved just now";
   if (seconds < 60) return `Saved ${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
@@ -26,15 +26,15 @@ export const AutosaveStatusIndicator: React.FC<AutosaveStatusProps> = ({
   lastSavedAt,
   errorMessage,
 }) => {
-  const [timeAgoText, setTimeAgoText] = useState<string>(formatTimeAgo(lastSavedAt));
+  const [now, setNow] = useState(() => Date.now());
+  const timeAgoText = formatTimeAgo(lastSavedAt, now);
 
   // Update relative time display periodically when saved
   useEffect(() => {
     if (status !== "saved" || !lastSavedAt) return;
 
-    setTimeAgoText(formatTimeAgo(lastSavedAt));
     const interval = setInterval(() => {
-      setTimeAgoText(formatTimeAgo(lastSavedAt));
+      setNow(Date.now());
     }, 10000);
 
     return () => clearInterval(interval);

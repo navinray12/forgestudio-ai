@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Internal agent snapshots and legacy one-off repair scripts are not shipped\n  // by the app; keep linting every real frontend TypeScript source file.\n  globalIgnores(['dist', '.agent/**', 'fix.js']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

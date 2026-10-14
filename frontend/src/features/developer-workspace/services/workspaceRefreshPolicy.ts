@@ -32,7 +32,12 @@ export function readPreviewCommand(
   if (data.type === "forge:preview:reload") return { type: "reload" };
   if (data.type !== "forge:preview:set-route" || typeof data.route !== "string") return null;
   const route = data.route;
+  // Reject backslashes, ASCII whitespace, controls and DEL without a control-character regexp.
+  const hasForbiddenPathCharacter = Array.from(route).some((character) => {
+    const code = character.charCodeAt(0);
+    return character === "\\" || code <= 0x20 || code === 0x7f;
+  });
   if (!route.startsWith("/") || route.startsWith("//") || route.length > 2048 ||
-      /[\\\u0000-\u0020\u007f]/.test(route)) return null;
+      hasForbiddenPathCharacter) return null;
   return { type: "route", route };
 }

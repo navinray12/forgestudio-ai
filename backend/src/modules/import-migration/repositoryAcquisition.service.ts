@@ -139,6 +139,13 @@ export class RepositoryAcquisitionService {
     };
   }
 
+  /** Lookup is scoped to the authenticated owner; an import job ID is not authorization. */
+  async getImportJob(jobId: string, ownerId: string) {
+    const job = await db.forgeImportJob.findUnique({ where: { id: jobId } });
+    if (!job || job.ownerId !== ownerId) throw new AppError("Import job not found", 404, "NOT_FOUND");
+    return job;
+  }
+
   /**
    * Finalize and commit the import into a real, isolated Forge Project
    */
@@ -151,7 +158,7 @@ export class RepositoryAcquisitionService {
     const { jobId, projectName, ownerId, files } = params;
 
     const job = await db.forgeImportJob.findUnique({ where: { id: jobId } });
-    if (!job) throw new AppError("Import job not found", 404, "NOT_FOUND");
+    if (!job || job.ownerId !== ownerId) throw new AppError("Import job not found", 404, "NOT_FOUND");
 
     await db.forgeImportJob.update({
       where: { id: jobId },

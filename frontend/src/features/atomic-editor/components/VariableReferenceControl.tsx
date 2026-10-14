@@ -39,7 +39,7 @@ export const VariableReferenceControl: React.FC<VariableReferenceControlProps> =
   const handleToggleSource = (useVar: boolean) => {
     if (useVar) {
       if (filteredVariables.length > 0) {
-        onChange(`var(--${filteredVariables[0].key})`);
+        onChange(`var(${filteredVariables[0].key.startsWith("--") ? filteredVariables[0].key : `--${filteredVariables[0].key}`})`);
       } else {
         onChange("var(--var-name)");
       }
@@ -49,7 +49,7 @@ export const VariableReferenceControl: React.FC<VariableReferenceControlProps> =
   };
 
   const handleSelectVariable = (varKey: string) => {
-    onChange(`var(--${varKey})`);
+    onChange(`var(${varKey.startsWith("--") ? varKey : `--${varKey}`})`);
   };
 
   return (
@@ -111,13 +111,13 @@ export const VariableReferenceControl: React.FC<VariableReferenceControlProps> =
         <div className="space-y-1.5">
           {filteredVariables.length > 0 ? (
             <select
-              value={cleanKey}
+              value={filteredVariables.find((v) => v.key.replace(/^--/, "") === cleanKey)?.key ?? ""}
               onChange={(e) => handleSelectVariable(e.target.value)}
               className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-mono font-semibold text-purple-600 dark:text-purple-400 outline-none focus:border-purple-500 cursor-pointer"
             >
               {filteredVariables.map((v) => (
                 <option key={v.id} value={v.key}>
-                  --{v.key} ({v.value})
+                  {v.key.startsWith("--") ? v.key : `--${v.key}`} ({v.value})
                 </option>
               ))}
             </select>

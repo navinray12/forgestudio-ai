@@ -51,7 +51,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-    } catch (_e) {
+    } catch {
       // Fallback
     }
 
@@ -159,16 +159,16 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const toggleTextToSpeech = useCallback(() => {
-    setPrefs((prev) => {
-      const next = !prev.textToSpeech;
-      if (next) {
-        speakText("Text to speech screen reader enabled");
-      } else if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-      return { ...prev, textToSpeech: next };
-    });
-  }, [speakText]);
+    const enabled = !prefs.textToSpeech;
+    // Keep speech playback outside React's state updater. React can replay
+    // updater functions, which must remain pure.
+    setPrefs((prev) => ({ ...prev, textToSpeech: !prev.textToSpeech }));
+    if (enabled) {
+      speakText("Text to speech screen reader enabled");
+    } else if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, [prefs.textToSpeech, speakText]);
 
   // F-378: Accessibility Reset
   const resetPreferences = useCallback(() => {
@@ -178,7 +178,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     try {
       localStorage.removeItem(STORAGE_KEY);
-    } catch (_e) {
+    } catch {
       // Fallback
     }
   }, []);

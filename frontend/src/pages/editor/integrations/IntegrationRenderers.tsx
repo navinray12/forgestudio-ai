@@ -20,11 +20,112 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
 }) => {
   const innerStyles = getInnerStyles(resolvedStyles);
 
+  // All integrations share this component. Hooks must run in the same order
+  // when an existing canvas element changes its integration type.
+  const [fetchedData, setFetchedData] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [crmError, setCrmError] = useState<string | null>(null);
+  const [triggered, setTriggered] = useState(false);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
+  const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
+  const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
+
   // Helper for safe style value getters with fallback defaults
   const getProp = (prop: string, fallback: string): string => {
     const val = getStyleVal(prop);
     return val !== undefined && val !== "" ? val : fallback;
   };
+
+
+  const dynamicApiEndpoint = getProp("dynamicApiUrl", "https://api.github.com/repos/facebook/react");
+  const dynamicJsonPath = getProp("dynamicJsonPath", "stargazers_count");
+  const dynamicFallback = getProp("dynamicFallbackText", "Loading dynamic stats...");
+  const acfFieldKey = getProp("acfFieldKey", "hero_banner_text");
+  const acfPostId = getProp("acfPostId", "1");
+  const toolsetFieldSlug = getProp("toolsetFieldSlug", "wpcf-custom-header");
+  const podsFieldKey = getProp("podsFieldKey", "pod_title");
+
+  useEffect(() => {
+  if (el.type !== "dynamic-data") return;
+    let isMounted = true;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Use backend dynamic data proxy for CORS safety
+        const proxyUrl = `${apiUrl}/api/integrations/dynamic-data/fetch?url=${encodeURIComponent(dynamicApiEndpoint)}&jsonPath=${encodeURIComponent(dynamicJsonPath)}`;
+        const res = await fetch(proxyUrl);
+        const json = await res.json();
+        if (isMounted && json?.value !== undefined) {
+          setFetchedData(String(json.value));
+        } else if (isMounted) {
+          setFetchedData(dynamicFallback);
+        }
+      } catch {
+        if (isMounted) setFetchedData(dynamicFallback);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [dynamicApiEndpoint, dynamicJsonPath, dynamicFallback, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "acf-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/acf-fields?postId=${acfPostId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[acfFieldKey]) {
+          setAcfVal(String(d.fields[acfFieldKey]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [acfFieldKey, acfPostId, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "toolset-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/toolset-fields`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[toolsetFieldSlug]) {
+          setToolsetVal(String(d.fields[toolsetFieldSlug]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [toolsetFieldSlug, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "pods-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/pods-fields`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[podsFieldKey]) {
+          setPodsVal(String(d.fields[podsFieldKey]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [podsFieldKey, apiUrl, el.type]);
 
   // ==========================================
   // F-411: Google Maps Renderer
@@ -256,23 +357,31 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           <span className="text-lg font-extrabold text-amber-400">${amount} <span className="text-xs font-semibold text-slate-400">{currency}</span></span>
         </div>
         <p className="text-xs text-slate-300 mb-4 font-medium">{itemName}</p>
+        {paymentError && <p role="alert" className="mb-3 text-xs text-red-300">{paymentError}</p>}
         <button
           onClick={async () => {
             if (!isPreview) return;
+            setPaymentError(null);
             try {
               const res = await fetch(`${apiUrl}/api/integrations/paypal/create-order`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount, currency, itemName }),
+                body: JSON.stringify({ amount, currency, itemName, env }),
               });
               const data = await res.json();
-              if (data?.approveUrl) {
-                window.open(data.approveUrl, "_blank");
-              } else {
-                alert(`PayPal Checkout Initialized for ${itemName} ($${amount} ${currency})! Order ID: ${data?.orderId || "demo-id"}`);
+              if (!res.ok || data?.success !== true) {
+                throw new Error(typeof data?.message === "string" ? data.message : "PayPal order could not be created.");
               }
-            } catch {
-              alert(`PayPal Payment Demo Mode: Checkout trigger for ${itemName} ($${amount} ${currency})`);
+              if (data.simulated) {
+                setPaymentError("Development demo only: no PayPal order or payment was created.");
+                return;
+              }
+              if (typeof data.approveUrl !== "string" || !data.approveUrl.startsWith("https://")) {
+                throw new Error("PayPal did not return an approval URL.");
+              }
+              window.location.href = data.approveUrl;
+            } catch (error) {
+              setPaymentError(error instanceof Error ? error.message : "PayPal checkout is unavailable.");
             }
           }}
           className={`w-full py-3 px-6 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${colorClasses[btnColor] || colorClasses.gold}`}
@@ -307,9 +416,11 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           <span className="text-lg font-bold text-indigo-200">${amount} <span className="text-xs font-normal text-slate-400">{currency}</span></span>
         </div>
         <p className="text-xs text-slate-300 mb-4 font-medium">{itemName}</p>
+        {paymentError && <p role="alert" className="mb-3 text-xs text-red-300">{paymentError}</p>}
         <button
           onClick={async () => {
             if (!isPreview) return;
+            setPaymentError(null);
             try {
               const res = await fetch(`${apiUrl}/api/integrations/stripe/create-checkout-session`, {
                 method: "POST",
@@ -317,13 +428,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
                 body: JSON.stringify({ amount, currency, itemName }),
               });
               const data = await res.json();
-              if (data?.sessionUrl) {
-                window.location.href = data.sessionUrl;
-              } else {
-                alert(`Stripe Checkout Triggered for ${itemName} ($${amount} ${currency})! Session ID: ${data?.sessionId || "demo-session"}`);
+              if (!res.ok || data?.success !== true || typeof data.sessionUrl !== "string") {
+                throw new Error(typeof data?.message === "string" ? data.message : "Stripe checkout could not be created.");
               }
-            } catch {
-              alert(`Stripe Payment Demo Mode: Triggered checkout for ${itemName} ($${amount} ${currency})`);
+              window.location.href = data.sessionUrl;
+            } catch (error) {
+              setPaymentError(error instanceof Error ? error.message : "Stripe checkout is unavailable.");
             }
           }}
           className="w-full py-3 px-6 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center justify-center gap-2"
@@ -386,35 +496,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
     const apiUrlEndpoint = getProp("dynamicApiUrl", "https://api.github.com/repos/facebook/react");
     const jsonPath = getProp("dynamicJsonPath", "stargazers_count");
     const fallback = getProp("dynamicFallbackText", "Loading dynamic stats...");
-    const [fetchedData, setFetchedData] = useState<string>(fallback);
-    const [loading, setLoading] = useState<boolean>(false);
 
-    useEffect(() => {
-      let isMounted = true;
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          // Use backend dynamic data proxy for CORS safety
-          const proxyUrl = `${apiUrl}/api/integrations/dynamic-data/fetch?url=${encodeURIComponent(apiUrlEndpoint)}&jsonPath=${encodeURIComponent(jsonPath)}`;
-          const res = await fetch(proxyUrl);
-          const json = await res.json();
-          if (isMounted && json?.value !== undefined) {
-            setFetchedData(String(json.value));
-          } else if (isMounted) {
-            setFetchedData(fallback);
-          }
-        } catch {
-          if (isMounted) setFetchedData(fallback);
-        } finally {
-          if (isMounted) setLoading(false);
-        }
-      };
 
-      fetchData();
-      return () => {
-        isMounted = false;
-      };
-    }, [apiUrlEndpoint, jsonPath, apiUrl]);
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 text-white shadow-md">
@@ -423,7 +506,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           {loading && <span className="text-[10px] text-sky-400 animate-pulse">Syncing live...</span>}
         </div>
         <div className="text-2xl font-bold text-sky-300">
-          {fetchedData}
+          {fetchedData || fallback}
         </div>
         <div className="text-[10px] text-slate-500 mt-2 truncate">
           Source: {apiUrlEndpoint} &rarr; Path: {jsonPath}
@@ -479,13 +562,11 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if (el.type === "crm-integration") {
     const provider = getProp("crmProvider", "hubspot");
     const title = getProp("crmFormTitle", "Subscribe for Enterprise Updates");
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [status, setStatus] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!isPreview) return;
+      setCrmError(null);
       try {
         const res = await fetch(`${apiUrl}/api/integrations/crm/submit-lead`, {
           method: "POST",
@@ -493,9 +574,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           body: JSON.stringify({ provider, name, email }),
         });
         const data = await res.json();
-        setStatus(data?.message || "Lead successfully synced with CRM!");
-      } catch {
-        setStatus("Synced lead data with CRM (Demo Mode).");
+        if (!res.ok || data?.success !== true) {
+          throw new Error(typeof data?.message === "string" ? data.message : "CRM rejected the lead.");
+        }
+        setStatus("Lead successfully synced with CRM.");
+      } catch (error) {
+        setCrmError(error instanceof Error ? error.message : "Unable to sync lead to CRM.");
       }
     };
 
@@ -508,11 +592,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           </span>
         </div>
         {status ? (
-          <div className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs font-medium">
+          <div role="status" className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs font-medium">
             {status}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            {crmError && <p role="alert" className="text-xs text-red-300">{crmError}</p>}
             <input
               type="text"
               placeholder="Full Name"
@@ -547,20 +632,30 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if (el.type === "webhook-integration") {
     const webhookUrl = getProp("webhookUrl", "https://hooks.zapier.com/hooks/catch/12345/abcde");
     const eventType = getProp("webhookTriggerEvent", "onButtonClick");
-    const [triggered, setTriggered] = useState(false);
 
     const handleWebhookTrigger = async () => {
-      setTriggered(true);
+      if (!isPreview || webhookLoading) return;
+      setWebhookLoading(true);
+      setWebhookError(null);
+      setTriggered(false);
       try {
-        await fetch(`${apiUrl}/api/integrations/webhook/dispatch`, {
+        const response = await fetch(`${apiUrl}/api/integrations/webhook/dispatch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ webhookUrl, eventType, timestamp: new Date().toISOString() }),
         });
-      } catch {
-        // Fallback for demo mode
+        const result = await response.json();
+        if (!response.ok || result?.success !== true) {
+          throw new Error(typeof result?.message === "string" ? result.message : "Webhook dispatch failed.");
+        }
+        setTriggered(true);
+        setTimeout(() => setTriggered(false), 3000);
+      } catch (error) {
+        setWebhookError(error instanceof Error ? error.message : "Unable to dispatch webhook.");
+      } finally {
+        setWebhookLoading(false);
       }
-      setTimeout(() => setTriggered(false), 3000);
     };
 
     return (
@@ -572,15 +667,17 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           </span>
         </div>
         <p className="text-[11px] text-slate-400 mb-4 font-mono truncate">{webhookUrl}</p>
+        {webhookError && <p role="alert" className="mb-3 text-xs text-red-300">{webhookError}</p>}
         <button
           onClick={handleWebhookTrigger}
+          disabled={webhookLoading || !isPreview}
           className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition-all shadow ${
             triggered
               ? "bg-emerald-500 text-slate-950"
               : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white"
           }`}
         >
-          {triggered ? "Webhook Triggered Successfully ✓" : "Fire Webhook Event"}
+          {webhookLoading ? "Sending webhook..." : triggered ? "Webhook Dispatched ✓" : "Fire Webhook Event"}
         </button>
       </div>
     );
@@ -592,22 +689,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if ((el.type as string) === "acf-integration") {
     const fieldKey = getProp("acfFieldKey", "hero_banner_text");
     const postId = getProp("acfPostId", "1");
-    const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/acf-fields?postId=${postId}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldKey]) {
-            setAcfVal(String(d.fields[fieldKey]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldKey, postId, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-amber-500/40 text-white shadow-md">
@@ -627,22 +710,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   // ==========================================
   if ((el.type as string) === "toolset-integration") {
     const fieldSlug = getProp("toolsetFieldSlug", "wpcf-custom-header");
-    const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/toolset-fields`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldSlug]) {
-            setToolsetVal(String(d.fields[fieldSlug]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldSlug, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-blue-500/40 text-white shadow-md">
@@ -662,22 +731,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   // ==========================================
   if ((el.type as string) === "pods-integration") {
     const fieldKey = getProp("podsFieldKey", "pod_title");
-    const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/pods-fields`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldKey]) {
-            setPodsVal(String(d.fields[fieldKey]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldKey, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-emerald-500/40 text-white shadow-md">

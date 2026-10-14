@@ -327,7 +327,7 @@ export class DeveloperPlatformController {
   static async getImportStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const jobId = paramStr(req.params.jobId);
-      const job = await repositoryAcquisitionService.getImportJob(jobId);
+      const job = await repositoryAcquisitionService.getImportJob(jobId, (req as any).user?.id);
       res.json({ success: true, job });
     } catch (err) {
       next(err);
@@ -338,7 +338,15 @@ export class DeveloperPlatformController {
     try {
       const jobId = paramStr(req.params.jobId);
       const projectId = paramStr(req.params.id);
-      const result = await repositoryAcquisitionService.commitImportToProject(jobId, projectId);
+      const userId = (req as any).user?.id;
+      // Commit the import through its existing canonical service, with the
+      // owner and uploaded files instead of calling a missing method.
+      const result = await repositoryAcquisitionService.commitImport({
+        jobId,
+        projectName: req.body?.projectName || projectId,
+        ownerId: userId,
+        files: req.body?.files,
+      });
       res.json({ success: true, result });
     } catch (err) {
       next(err);

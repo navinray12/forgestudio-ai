@@ -15,18 +15,18 @@ export function useAtomicForm() {
     try {
       const list = AtomicFormService.getForms();
       setForms(list);
-      if (list.length > 0 && !activeForm) {
-        setActiveForm(list[0]);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load Atomic Forms.");
+      setActiveForm((previous) => list.find((item) => item.id === previous?.id) ?? list[0] ?? null);
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load Atomic Forms.");
     } finally {
       setIsLoading(false);
     }
-  }, [activeForm]);
+  }, []);
 
   useEffect(() => {
-    fetchForms();
+    // Cancel stale initial loads on StrictMode remount or cleanup.
+    const timer = window.setTimeout(fetchForms, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchForms]);
 
   const filteredForms = useMemo(() => {
@@ -43,8 +43,8 @@ export function useAtomicForm() {
       setForms((prev) => [...prev, created]);
       setActiveForm(created);
       return created;
-    } catch (err: any) {
-      setError(err?.message || "Failed to create Form.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create Form.");
       throw err;
     }
   };
@@ -55,8 +55,8 @@ export function useAtomicForm() {
       const updated = AtomicFormService.updateForm(activeForm.id, payload);
       setForms((prev) => prev.map((f) => (f.id === activeForm.id ? updated : f)));
       setActiveForm(updated);
-    } catch (err: any) {
-      setError(err?.message || "Failed to update Form.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to update Form.");
     }
   };
 
@@ -68,8 +68,8 @@ export function useAtomicForm() {
       if (activeForm?.id === id) {
         setActiveForm(remaining[0] || null);
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete Form.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to delete Form.");
     }
   };
 

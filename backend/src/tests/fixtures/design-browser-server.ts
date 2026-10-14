@@ -24,7 +24,22 @@ await prisma.session.create({ data: { userId: user.id, authEpoch: 1, audience: "
 await writeFile(output, JSON.stringify({ token, websiteId }), { mode: 0o600 });
 const artifacts = new Map<string, string>();
 registerJobHandler("AI_DESIGN_EXECUTION", async (payload, job) => runDesignExecution(String(payload.executionId), job, {
-  planner: { async plan() { return { design: "A confident green editorial academy with spacious typography", pages: [{ name: "Home", slug: "/", brief: "Home page with navigation, hero and contact CTA" }], setupRequired: [] }; }, async repair(html) { return html; }, async edit(document) { const pages = document.pages as Array<{elements: Array<{children: Array<{children: Array<{id: string}>}>}>}>; return [{ type: "text", elementId: pages[0]!.elements[0]!.children[0]!.children[0]!.id, text: "AI edited heading" }]; } },
+  planner: { async plan() { return { design: "A confident green editorial academy with spacious typography", pages: [{ name: "Home", slug: "/", brief: "Home page with navigation, hero and contact CTA" }], setupRequired: [] }; }, async repair(html) { return html; }, async edit(document) {
+    // The importer may use an authored <main> root or an explicit <body> root.
+    // Select by element type, never by a brittle depth-dependent array index.
+    const findHeading = (nodes: any[]): string | undefined => {
+      for (const node of nodes) {
+        if (node?.type === "heading" && typeof node.id === "string") return node.id;
+        const nested = findHeading(Array.isArray(node?.children) ? node.children : []);
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+    const page = (document.pages as Array<{ elements: any[] }>)[0];
+    const headingId = findHeading(page?.elements ?? []);
+    if (!headingId) throw new Error("Browser fixture contains no editable heading");
+    return [{ type: "text", elementId: headingId, text: "AI edited heading" }];
+  } },
   designer: { async createProject() { return "fixture-project"; }, async generate() { return { screenId: "fixture-screen" }; }, async html() { return '<style>body{margin:0;color:#153e32;font-family:system-ui}main{padding:40px;background:#f8f5ee;display:grid;grid-template-columns:1fr 1fr;gap:24px}h1{font-size:48px}@media(max-width:767px){main{padding:20px;grid-template-columns:1fr}h1{font-size:28px}}</style><main><h1>Editorial academy</h1><p>Learn with confidence.</p><a href="/">Explore courses</a></main>'; }, async close() {} },
   artifacts: { async put(value) { const id = randomUUID(); artifacts.set(id, value); return id; }, async get(key) { return artifacts.get(key)!; } }, converter: new IsolatedDesignConverter(),
 }));
