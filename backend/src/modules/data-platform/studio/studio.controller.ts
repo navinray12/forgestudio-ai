@@ -259,11 +259,13 @@ export async function listMigrationsHandler(req: Request, res: Response, next: N
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
     await verifyProjectAccess(projectId, user.id);
+    const env = resolveEnvironment(req);
 
     const migrations = await prisma.databaseMigrationRecord.findMany({
       where: {
         database: {
           websiteId: projectId,
+          environment: env,
         },
       },
       orderBy: {
