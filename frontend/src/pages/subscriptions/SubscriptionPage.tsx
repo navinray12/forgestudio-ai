@@ -384,7 +384,7 @@ export default function SubscriptionPage() {
                   <div className="mt-8 pt-4 border-t border-slate-800/80">
                     <button
                       type="button"
-                      disabled={isCurrent || actionBusy === p.slug}
+                      disabled={isCurrent || actionBusy !== null}
                       onClick={() => handleSelectPlan(p)}
                       className={`w-full rounded-xl py-2.5 text-xs font-bold transition shadow-sm cursor-pointer ${
                         isCurrent
