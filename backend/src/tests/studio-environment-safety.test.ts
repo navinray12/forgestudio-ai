@@ -17,10 +17,11 @@ const state = vi.hoisted(() => ({
   dropTable: vi.fn(async () => undefined),
   mutateTableRow: vi.fn(async () => ({})),
   getDatabaseTables: vi.fn(async () => []),
+  findMigrations: vi.fn(async () => []),
 }));
 
 vi.mock("../config/prisma.js", () => ({
-  prisma: { website: { findFirst: async () => state.website } },
+  prisma: { website: { findFirst: async () => state.website }, databaseMigrationRecord: { findMany: state.findMigrations } },
   pgPool: { query: async () => ({ rows: [] }) },
 }));
 
@@ -41,7 +42,7 @@ vi.mock("../modules/data-platform/studio/studio-schema.service.js", () => ({
 const { resolveExplicitEnvironment, assertCanModify, verifyProjectAccess } = await import(
   "../modules/data-platform/common/project-access.js"
 );
-const { dropTableHandler, getTablesHandler, mutateTableRowHandler } = await import(
+const { dropTableHandler, getTablesHandler, mutateTableRowHandler, listMigrationsHandler } = await import(
   "../modules/data-platform/studio/studio.controller.js"
 );
 const { executeUserQuery } = await import("../modules/data-platform/studio/studio-sql.service.js");
@@ -139,6 +140,26 @@ describe("Studio handlers", () => {
     state.dropTable.mockClear();
     state.mutateTableRow.mockClear();
     state.getDatabaseTables.mockClear();
+    state.findMigrations.mockClear();
+  });
+
+  it("migration history requires explicit environment before querying the ledger", async () => {
+    state.website = websiteFor();
+    const { error } = await invoke(listMigrationsHandler, { userId: OWNER });
+    expect(error?.code).toBe("ENVIRONMENT_REQUIRED");
+    expect(state.findMigrations).not.toHaveBeenCalled();
+  });
+
+  it("migration history is scoped to the authorized project and selected environment", async () => {
+    state.website = websiteFor();
+    const { status } = await invoke(listMigrationsHandler, {
+      userId: OWNER,
+      query: { environment: "STAGING" },
+    });
+    expect(status).toBe(200);
+    expect(state.findMigrations).toHaveBeenCalledWith(expect.objectContaining({
+      where: { database: { websiteId: PROJECT, environment: "STAGING" } },
+    }));
   });
 
   it("drop table without an environment is rejected before touching any database", async () => {
