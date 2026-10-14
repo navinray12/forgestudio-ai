@@ -583,8 +583,11 @@ export async function syncSourceToVisualWebsite(
   const page = target.page;
   const baseline = metadata.visualSync || {};
   const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
-  const basePageHash: string | undefined = baseline.pages?.[page.key]?.hash ?? previousEntry?.basePageHash;
-  const baseSharedHash: string | undefined = baseline.sharedHash ?? previousEntry?.baseSharedHash;
+  // A held code file is based on the snapshot recorded when it first became
+  // unsupported/conflicted. Subsequent visual saves must not silently rebase
+  // that file or hide a two-sided edit conflict.
+  const basePageHash: string | undefined = previousEntry?.basePageHash ?? baseline.pages?.[page.key]?.hash;
+  const baseSharedHash: string | undefined = previousEntry?.baseSharedHash ?? baseline.sharedHash;
 
   /** Keep the saved code as hand-written source until the two sides agree again */
   const holdAsCode = async (status: CodeSyncStatus, message: string, diagnostics: SyncDiagnostic[]) => {
