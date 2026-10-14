@@ -90,12 +90,17 @@ jobs:
           api_pid=$!
           (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
           ui_pid=$!
-          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; sleep 2; kill -KILL "$api_pid" "$ui_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then break; fi
             sleep 1
           done
-          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/workspace-journey.py
+          if ! timeout --signal=TERM --kill-after=10s 240s "$RUNNER_TEMP/browser-venv/bin/python" -u tests/browser/workspace-journey.py; then
+            echo "::error::Workspace browser qualification failed or exceeded its four-minute limit."
+            tail -n 100 "$RUNNER_TEMP/workspace-browser-api.log" || true
+            tail -n 100 "$RUNNER_TEMP/browser-ui.log" || true
+            exit 1
+          fi
       - name: Real identity browser journey with test-only private delivery sink
         env:
           DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_identity_browser
@@ -108,12 +113,17 @@ jobs:
           api_pid=$!
           (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
           ui_pid=$!
-          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; wait "$api_pid" "$ui_pid" 2>/dev/null || true; rm -f "$FORGE_IDENTITY_MAIL_SINK"' EXIT
+          trap 'kill "$api_pid" "$ui_pid" 2>/dev/null || true; sleep 2; kill -KILL "$api_pid" "$ui_pid" 2>/dev/null || true; rm -f "$FORGE_IDENTITY_MAIL_SINK"' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent --max-time 2 http://localhost:5000/api/v1/health >/dev/null && curl --fail --silent --max-time 2 http://localhost:5173 >/dev/null; then break; fi
             sleep 1
           done
-          "$RUNNER_TEMP/browser-venv/bin/python" tests/browser/identity-journey.py
+          if ! timeout --signal=TERM --kill-after=10s 240s "$RUNNER_TEMP/browser-venv/bin/python" -u tests/browser/identity-journey.py; then
+            echo "::error::Identity browser qualification failed or exceeded its four-minute limit."
+            tail -n 100 "$RUNNER_TEMP/identity-browser-api.log" || true
+            tail -n 100 "$RUNNER_TEMP/browser-ui.log" || true
+            exit 1
+          fi
       - name: Retain evidence, never fixture credentials
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
