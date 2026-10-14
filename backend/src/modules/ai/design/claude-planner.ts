@@ -30,21 +30,15 @@ export class ClaudeDesignPlanner implements DesignPlanner {
     if (!process.env.ANTHROPIC_API_KEY || !this.model) throw new AppError("Claude planning is not configured", 503, "AI_NOT_CONFIGURED");
     try {
       let response = await this.callAnthropic(this.model, 4096, system, data, signal);
-      if (!response.ok && (response.status === 400 || response.status === 404) && this.model !== "claude-3-5-sonnet-20241022") {
+      if (!response.ok && response.status === 404 && this.model !== "claude-3-5-sonnet-20241022") {
         const errorText = await response.text().catch(() => "");
         console.warn(`[CLAUDE PLANNER] Model ${this.model} returned ${response.status} (${errorText.slice(0, 120)}). Retrying with claude-3-5-sonnet-20241022...`);
         response = await this.callAnthropic("claude-3-5-sonnet-20241022", 4096, system, data, signal);
       }
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        let sanitizedError = "Request failed";
-        try {
-          const parsed = JSON.parse(errorText);
-          sanitizedError = parsed?.error?.message || errorText.slice(0, 200);
-        } catch {
-          sanitizedError = errorText.slice(0, 200);
-        }
-        console.error(`[CLAUDE PLANNER ERROR ${response.status}]:`, sanitizedError);
+        // Provider bodies can include prompts, keys or confidential diagnostics.
+        // Never embed them in logs or public API errors.
+        console.error(`[CLAUDE PLANNER ERROR ${response.status}]`);
         if (response.status === 429) {
           throw new AppError("Claude rate limit reached", 429, "AI_RATE_LIMIT");
         }
@@ -52,7 +46,7 @@ export class ClaudeDesignPlanner implements DesignPlanner {
           throw new AppError("Claude authentication failed", 401, "AI_AUTH_ERROR");
         }
         if (response.status === 400) {
-          throw new AppError(`Claude request was invalid: ${sanitizedError}`, 400, "AI_BAD_REQUEST");
+          throw new AppError("Claude request was invalid", 400, "AI_BAD_REQUEST");
         }
         throw new AppError("Claude is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");
       }
