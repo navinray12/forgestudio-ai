@@ -1,4 +1,5 @@
 import React from "react";
+import type { CreateGlobalElementPayload } from "../types/globalElements.types";
 import { useGlobalElements } from "../hooks/useGlobalElements";
 import { GlobalElementFormModal } from "./GlobalElementFormModal";
 import { DeleteGlobalElementConfirmModal } from "./DeleteGlobalElementConfirmModal";
@@ -27,7 +28,7 @@ export const GlobalElementsPanel: React.FC<GlobalElementsPanelProps> = ({
     deleteGlobalElement,
   } = useGlobalElements();
 
-  const handleFormSubmit = async (payload: any) => {
+  const handleFormSubmit = async (payload: CreateGlobalElementPayload) => {
     if (editingGlobalElement) {
       await updateGlobalElement(editingGlobalElement.id, payload);
     } else {
