@@ -52,6 +52,9 @@ jobs:
       - name: Durable ApplicationSpec PostgreSQL contract
         working-directory: backend
         run: npx --no-install vitest run src/tests/application-spec-persistence.integration.test.ts
+      - name: Full-stack generation failure and retry regression (disposable PostgreSQL)
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/app-generation.integration.test.ts
       - name: ApplicationSpec full-contract digest and revision integrity
         working-directory: backend
         run: npx --no-install vitest run src/tests/point32-fullstack-application-spec.test.ts
