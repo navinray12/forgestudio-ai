@@ -11,7 +11,6 @@ import {
   Shield,
   Flag,
   Pin,
-  Lock,
   Eye,
 } from "lucide-react";
 import { AcceptedAnswerCard } from "./AcceptedAnswerCard";
@@ -22,7 +21,7 @@ import { forumService } from "../services/forumService";
 interface TopicDetailViewProps {
   topic: ForumTopic;
   onBack: () => void;
-  onAddReply: (content: string, parentPostId?: string) => Promise<any>;
+  onAddReply: (content: string, parentPostId?: string) => Promise<ForumPost | undefined>;
   onToggleBookmark: () => Promise<void>;
   onToggleFollow: () => Promise<void>;
   onToggleAcceptedAnswer: (postId: string) => Promise<void>;
