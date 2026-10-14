@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -70,4 +70,13 @@ test("Schema Studio blocks unregistered databases before migration DDL", () => {
   assert.throws(() => assertMigrationLedgerRegistered(null), /not registered for migration tracking/);
   assert.throws(() => assertMigrationLedgerRegistered({ id: "" }), /not registered for migration tracking/);
   assert.deepEqual(assertMigrationLedgerRegistered({ id: "db_valid" }), { id: "db_valid" });
+});
+
+test("Schema Studio pagination keeps SQL and response bounds consistent", () => {
+  assert.deepEqual(normalizeStudioPagination(undefined, undefined), { page: 1, limit: 50, offset: 0 });
+  assert.deepEqual(normalizeStudioPagination("3", "500"), { page: 3, limit: 500, offset: 1000 });
+  assert.deepEqual(normalizeStudioPagination(2, 20), { page: 2, limit: 20, offset: 20 });
+  for (const [page, limit] of [["-1", "20"], ["1.5", "10"], ["NaN", "10"], ["1", "501"], ["1", "0"], ["1000001", "1"], [["2"], "20"], [1, Infinity]]) {
+    assert.throws(() => normalizeStudioPagination(page, limit), /Invalid (page|limit)/);
+  }
 });

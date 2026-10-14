@@ -417,6 +417,28 @@ export async function dropTable(
   });
 }
 
+/** One pagination contract for both the API response and the SQL LIMIT/OFFSET. */
+export function normalizeStudioPagination(
+  pageInput: unknown,
+  limitInput: unknown
+): { page: number; limit: number; offset: number } {
+  function parse(value: unknown, fallback: number, field: string, max: number): number {
+    if (value === undefined || value === null || value === "") return fallback;
+    if ((typeof value !== "number" && typeof value !== "string") ||
+        (typeof value === "string" && !/^[0-9]+$/.test(value))) {
+      throw new AppError(`Invalid ${field}: expected a positive integer`, 400, "INVALID_PAGINATION");
+    }
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 1 || number > max) {
+      throw new AppError(`Invalid ${field}: expected a positive integer up to ${max}`, 400, "INVALID_PAGINATION");
+    }
+    return number;
+  }
+  const page = parse(pageInput, 1, "page", 1_000_000);
+  const limit = parse(limitInput, 50, "limit", 500);
+  return { page, limit, offset: (page - 1) * limit };
+}
+
 /**
  * Returns paginated table rows with sorting.
  */
@@ -432,9 +454,7 @@ export async function getTableRows(
   environment: DatabaseEnvironment
 ): Promise<{ rows: any[]; total: number }> {
   const safeTable = validateIdentifier(tableName);
-  const page = Math.max(1, params.page || 1);
-  const limit = Math.min(500, Math.max(1, params.limit || 50));
-  const offset = (page - 1) * limit;
+  const { limit, offset } = normalizeStudioPagination(params.page, params.limit);
 
   const details = await getTableDetails(projectId, safeTable, environment);
   const validColumns = new Set(details.columns.map((c) => c.name));
