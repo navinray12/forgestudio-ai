@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { type CustomCodeSnippet, getCustomCodeSnippets, createCustomCodeSnippet, updateCustomCodeSnippet, deleteCustomCodeSnippet } from '../services/customCode.service';
 
 interface CustomCodeModalProps {
@@ -14,18 +14,21 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
 
     const [editingSnippet, setEditingSnippet] = useState<Partial<CustomCodeSnippet> | null>(null);
 
+    const loadSnippets = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const data = await getCustomCodeSnippets(websiteId);
+            setSnippets(data);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [websiteId]);
+
     useEffect(() => {
         if (isOpen && websiteId) {
-            loadSnippets();
+            void loadSnippets();
         }
-    }, [isOpen, websiteId]);
-
-    const loadSnippets = async () => {
-        setIsLoading(true);
-        const data = await getCustomCodeSnippets(websiteId);
-        setSnippets(data);
-        setIsLoading(false);
-    };
+    }, [isOpen, websiteId, loadSnippets]);
 
     const handleSave = async () => {
         if (!editingSnippet?.title || !editingSnippet.language || !editingSnippet.placement) {
@@ -142,7 +145,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                                 <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Code Type *</label>
                                                 <select
                                                     value={editingSnippet.language || 'HTML'}
-                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, language: e.target.value as any }))}
+                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, language: e.target.value as CustomCodeSnippet['language'] }))}
                                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                                                 >
                                                     <option value="HTML">HTML (Meta tags, scripts)</option>
@@ -154,7 +157,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                                 <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Execution Location *</label>
                                                 <select
                                                     value={editingSnippet.placement || 'HEAD'}
-                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, placement: e.target.value as any }))}
+                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, placement: e.target.value as CustomCodeSnippet['placement'] }))}
                                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                                                 >
                                                     <option value="HEAD">Head (Metadata, CSS bindings)</option>
