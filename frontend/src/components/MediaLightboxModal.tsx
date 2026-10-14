@@ -28,8 +28,12 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
   const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
-    setIndex(currentIndex);
-    setZoom(1);
+    // Reset after the effect is established to avoid synchronous render cascades.
+    const resetId = window.setTimeout(() => {
+      setIndex(currentIndex);
+      setZoom(1);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [currentIndex, isOpen]);
 
   useEffect(() => {
