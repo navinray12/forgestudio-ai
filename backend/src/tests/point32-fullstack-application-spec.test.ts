@@ -10,6 +10,40 @@ import {
 } from "../services/authoritative/applicationSpec.service.js";
 
 describe("Point 32 — ApplicationSpec Domain Contract & Real Generator", () => {
+  it("rejects non-genesis first revisions and cross-tenant/project revision hijacks", async () => {
+    const spec: ApplicationSpec = {
+      schemaVersion: "1.0.0", applicationId: "app_ownership_v21", projectId: "project_original",
+      tenantId: "tenant_original", revision: 1, parentRevision: 0,
+      frameworkProfile: "react-vite", identityStrategy: "SINGLE_TENANT_DEDICATED",
+      requirementIds: [], entities: [], relationships: [], operations: [], actors: [],
+      policies: [], frontendBindings: [], jobs: [], retentionPolicies: [],
+      acceptanceContracts: [], createdAt: "2026-10-14T00:00:00Z",
+      updatedAt: "2026-10-14T00:00:00Z",
+    };
+    await expect(ApplicationSpecService.commitRevision({
+      ...spec, applicationId: "app_invalid_initial_v21", revision: 7, parentRevision: 6,
+    })).rejects.toThrow(/initial application revision/);
+    await expect(ApplicationSpecService.commitRevision({
+      ...spec, applicationId: "app_invalid_parent_v21", parentRevision: 9,
+    })).rejects.toThrow(/initial application revision/);
+    await ApplicationSpecService.commitRevision(spec);
+    await expect(ApplicationSpecService.commitRevision({
+      ...spec, revision: 2, parentRevision: 1, tenantId: "tenant_attacker",
+    })).rejects.toThrow(/cannot change its project or tenant/);
+    await expect(ApplicationSpecService.commitRevision({
+      ...spec, revision: 2, parentRevision: 1, projectId: "project_attacker",
+    })).rejects.toThrow(/cannot change its project or tenant/);
+    await expect(ApplicationSpecService.commitRevision({
+      ...spec, revision: 2, parentRevision: 0,
+    })).rejects.toThrow(/Revision conflict/);
+    const committed = await ApplicationSpecService.commitRevision({
+      ...spec, revision: 2, parentRevision: 1,
+    });
+    expect(committed.revision).toBe(2);
+    expect(ApplicationSpecService.getLatestSpec(spec.applicationId)?.tenantId).toBe("tenant_original");
+  });
+
+
   it("rejects unresolved policy, binding, model and tenant references", () => {
     const spec: ApplicationSpec = {
       schemaVersion: "1.0.0", applicationId: "app_references", projectId: "project_refs",
