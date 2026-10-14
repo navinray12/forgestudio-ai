@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -57,4 +57,11 @@ test("Schema Studio rejects duplicate column identities before issuing DDL", () 
   assert.throws(() => assertUniqueColumnNames([column("id"), column("id")]), /Duplicate table column/);
   assert.throws(() => assertUniqueColumnNames([column("id"), column("bad-name")]), /Invalid SQL identifier/);
   assert.throws(() => assertUniqueColumnNames([]), /Table must contain at least one column/);
+});
+
+
+test("Schema Studio never records a missing-table DROP as a successful no-op", () => {
+  assert.equal(buildDropTableStatement("customer_orders"), 'DROP TABLE "public"."customer_orders" RESTRICT;');
+  assert.doesNotMatch(buildDropTableStatement("customer_orders"), /IF EXISTS|CASCADE/i);
+  assert.throws(() => buildDropTableStatement("orders; DROP TABLE users"), /Invalid SQL identifier/);
 });
