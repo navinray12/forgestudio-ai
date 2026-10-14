@@ -379,6 +379,11 @@ export async function syncProjectFromWebsite(
   }
 
   const pagePaths = new Set(Object.values(baseline.pages).map((page) => page.filePath));
+  // Hand-written page files held after an unsupported edit or conflict must never
+  // be unheld by an unrelated visual save. Only code reconciliation may release
+  // that hold after the caller explicitly resolves the source/document conflict.
+  const heldPaths = new Set(Object.keys(metadata.codeSync || {}));
+  const unheldPaths = new Set([...pagePaths].filter((path) => !heldPaths.has(path)));
 
   const result = await compileAndSyncProject(
     project.id,
@@ -390,7 +395,7 @@ export async function syncProjectFromWebsite(
       framework,
     },
     user.id,
-    { unholdPaths: pagePaths }
+    { unholdPaths: unheldPaths }
   );
 
   if (!result.success) {
@@ -405,7 +410,7 @@ export async function syncProjectFromWebsite(
 
   let nextCodeSync = currentMetadata.codeSync ? { ...currentMetadata.codeSync } : undefined;
   if (nextCodeSync) {
-    for (const p of pagePaths) {
+    for (const p of unheldPaths) {
       delete nextCodeSync[p];
     }
     if (Object.keys(nextCodeSync).length === 0) {
