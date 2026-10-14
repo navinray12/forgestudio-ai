@@ -247,13 +247,11 @@ export const WooCommerceProvider: React.FC<{
   };
 
   const removeFromCart = (productId: string) => {
-    setCart((prev) => {
-      const item = prev.find((i) => i.product.id === productId);
-      if (item) {
-        addNotice("info", `🗑️ Removed "${item.product.name}" from cart.`);
-      }
-      return prev.filter((i) => i.product.id !== productId);
-    });
+    const removedItem = cart.find((item) => item.product.id === productId);
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    if (removedItem) {
+      addNotice("info", `🗑️ Removed "${removedItem.product.name}" from cart.`);
+    }
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
