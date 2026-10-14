@@ -540,7 +540,7 @@ export async function mutateTableRow(
         throw new AppError("UPDATE requires at least one non-primary-key column", 400, "MISSING_UPDATABLE_COLUMNS");
       }
       values.push(payload.primaryKeyValue);
-      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}"  = ${idx} RETURNING *;`;
+      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}"  = $${idx} RETURNING *;`;
       const res = await client.query(query, values);
       return res.rows[0] || null;
     }
