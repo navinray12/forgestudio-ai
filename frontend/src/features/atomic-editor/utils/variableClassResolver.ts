@@ -91,6 +91,7 @@ export function resolveClassStyles(
   variables: AtomicVariable[]
 ): ResolvedClassStyle {
   const resolvedStyles: Partial<ElementStyles> = {};
+  const styleEntries = resolvedStyles as Record<string, unknown>;
   const missingVariables: string[] = [];
   const circularVariables: string[] = [];
 
@@ -101,7 +102,7 @@ export function resolveClassStyles(
   Object.entries(styles).forEach(([propKey, propVal]) => {
     if (typeof propVal === "string") {
       const res = resolveVariableValue(propVal, variables);
-      (resolvedStyles as Record<string, any>)[propKey] = res.value;
+      styleEntries[propKey] = res.value;
       if (res.isMissing && res.variableKey) {
         missingVariables.push(res.variableKey);
       }
@@ -109,7 +110,7 @@ export function resolveClassStyles(
         circularVariables.push(res.variableKey);
       }
     } else {
-      (resolvedStyles as Record<string, any>)[propKey] = propVal;
+      styleEntries[propKey] = propVal;
     }
   });
 
