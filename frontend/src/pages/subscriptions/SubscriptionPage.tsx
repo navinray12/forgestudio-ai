@@ -46,10 +46,6 @@ export default function SubscriptionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem("token");
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -181,6 +177,10 @@ export default function SubscriptionPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleSelectPlan = async (plan: Plan) => {
     if (subscription?.plan?.slug === plan.slug) return;
