@@ -31,6 +31,23 @@ export interface WcOrderReceipt {
   status: string;
 }
 
+// Backend commerce catalog fields consumed by the storefront adapter.
+interface CommerceCatalogProduct {
+  id: string;
+  name: string;
+  price: string | number;
+  salePrice?: string | number | null;
+  images?: string[];
+  image?: string;
+  description?: string;
+  rating?: number;
+  ratingCount?: number;
+  badge?: string;
+  categories?: string[];
+  category?: string;
+  stock?: number | "unlimited" | string;
+}
+
 interface WooCommerceContextType {
   products: SiteProduct[];
   setProducts: React.Dispatch<React.SetStateAction<SiteProduct[]>>;
@@ -180,7 +197,7 @@ export const WooCommerceProvider: React.FC<{
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (isMounted && data && Array.isArray(data.products) && data.products.length > 0) {
-            setProducts(data.products.map((p: any) => ({
+            setProducts(data.products.map((p: CommerceCatalogProduct) => ({
               id: p.id,
               name: p.name,
               price: typeof p.price === "number" ? `$${p.price.toFixed(2)}` : String(p.price || "$0.00"),
