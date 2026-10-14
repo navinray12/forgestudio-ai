@@ -146,8 +146,8 @@ export function UnifiedAiAssistant({
       } else {
         setSuccessMessage(`Action completed: ${data.intent ? data.intent.replace(/_/g, " ") : "Request processed"}`);
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setBusy(false);
     }
@@ -178,8 +178,8 @@ export function UnifiedAiAssistant({
         setGeneratedImages((prev) => [...data.images, ...prev]);
         setSuccessMessage("Images generated successfully!");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to generate image");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate image");
     } finally {
       setBusy(false);
     }
@@ -208,8 +208,8 @@ export function UnifiedAiAssistant({
       setTimeout(() => {
         onApplied();
       }, 700);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "The request failed");
     } finally {
       setBusy(false);
     }
@@ -227,8 +227,8 @@ export function UnifiedAiAssistant({
       });
       setChangeset(null);
       setSuccessMessage("Changeset discarded.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "The request failed");
     } finally {
       setBusy(false);
     }
