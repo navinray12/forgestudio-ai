@@ -7,6 +7,7 @@ on:
       - .github/workflows/qualify-tailwind4-lockfile.yml
       - backend/src/modules/ai/design/converter.ts
       - backend/src/services/compiler/pageSourceSync.ts
+      - backend/src/services/compiler/unifiedCompiler.service.ts
       - backend/src/services/compiler/visualCodeSync.service.ts
       - backend/src/services/project/forgeProject.service.ts
       - backend/src/tests/fixtures/design-browser-server.ts
