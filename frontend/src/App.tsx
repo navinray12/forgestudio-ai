@@ -281,9 +281,6 @@ function App() {
             }
           />
 
-          {/* ================= PLATFORM CONTROL (separate auth audience/cookie) ================= */}
-          <Route path="/platform-control" element={<PlatformControlPage />} />
-
           {/* ================= ROOT ================= */}
 
           <Route
