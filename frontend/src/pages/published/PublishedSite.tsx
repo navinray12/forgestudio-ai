@@ -297,11 +297,11 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
     const stickyStyles = resolveStickyStyles(el);
 
     // Defer Background Image safely via F-355
-    let finalMergedStyles: any = {
+    const finalMergedStyles: any = {
         ...(optClass ? {} : resolvedStyles),
         ...stickyStyles
     };
-    let finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
+    const finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
 
     // Keep backgroundImage strictly inline safely
     if (resolvedStyles.backgroundImage) {
