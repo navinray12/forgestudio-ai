@@ -210,15 +210,10 @@ function resolveElementTag(element: any): string {
 }
 
 export function resolveElementText(element: any): string | undefined {
-  const type = String(element.type || "").toLowerCase();
-  // The visual editor edits `content`. A prior code-sync may also have stored
-  // textContent/text aliases; those must not mask a newer canvas text change.
-  if (["heading", "text", "paragraph", "blockquote"].includes(type) && typeof element.content === "string") {
-    return element.content;
-  }
   if (typeof element.textContent === "string") return element.textContent;
   if (typeof element.text === "string") return element.text;
 
+  const type = String(element.type || "").toLowerCase();
   if (type === "button") {
     if (typeof element.buttonText === "string" && element.buttonText) return element.buttonText;
     if (typeof element.props?.buttonText === "string" && element.props.buttonText) return element.props.buttonText;
