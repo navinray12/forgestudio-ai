@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ticketService } from "../services/ticketService";
 import type { SupportTicket } from "../types/support.types";
 
@@ -7,8 +7,10 @@ export function useTicket(ticketId: string | undefined) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const requestVersion = useRef(0);
 
   const fetchTicket = useCallback(async () => {
+    const version = ++requestVersion.current;
     if (!ticketId) {
       setTicket(null);
       setError(null);
@@ -20,12 +22,14 @@ export function useTicket(ticketId: string | undefined) {
     setTicket(null);
     try {
       const res = await ticketService.getTicket(ticketId);
-      setTicket(res.ticket);
+      if (requestVersion.current === version) setTicket(res.ticket);
     } catch (err: unknown) {
-      setTicket(null);
-      setError(err instanceof Error ? err.message : "Failed to load ticket details");
+      if (requestVersion.current === version) {
+        setTicket(null);
+        setError(err instanceof Error ? err.message : "Failed to load ticket details");
+      }
     } finally {
-      setLoading(false);
+      if (requestVersion.current === version) setLoading(false);
     }
   }, [ticketId]);
 
