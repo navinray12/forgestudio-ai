@@ -322,24 +322,12 @@ export async function runDesignExecution(executionId: string, job: { id: string;
       const pages: JsonObject[] = [];
       for (let index = 0; index < plan.pages.length; index++) {
         const page = plan.pages[index]!;
-        let html: string;
-        try {
-          const screen = await stage(`SCREEN_${index}`, () => ports.designer.generate(projectId,
-            `${DESIGN_CONTRACT}\nShared design: ${plan.design}\nSite routes: ${JSON.stringify(plan.pages.map(item => ({ name: item.name, slug: item.slug })))}\nPage: ${page.name}\n${page.brief}`), true);
-          html = await stage(`EXPORT_${index}`, () => ports.designer.html(projectId, screen.screenId));
-        } catch (genErr) {
-          console.warn(`[AI PIPELINE] External designer failed on page ${index}, using deterministic local synthesis fallback:`, (genErr as any)?.message);
-          html = synthesizeDesignHtml(`${prompt} ${page.name} ${page.brief}`);
-        }
-
-        const elements = await stage(`CONVERT_${index}`, async () => {
-          try { return await ports.converter.convert(html, `${executionId}:${index}`); }
-          catch (error) {
-            console.warn(`[AI PIPELINE] Conversion issue on page ${index}, using clean synthesis fallback:`, (error as any)?.message);
-            const fallbackHtml = synthesizeDesignHtml(`${prompt} ${page.name}`);
-            return await ports.converter.convert(fallbackHtml, `${executionId}:${index}`);
-          }
-        });
+        // A failed or uncertain provider operation must not be presented as a
+        // successful paid AI design. Existing completed checkpoints remain reusable.
+        const screen = await stage(`SCREEN_${index}`, () => ports.designer.generate(projectId,
+          `${DESIGN_CONTRACT}\nShared design: ${plan.design}\nSite routes: ${JSON.stringify(plan.pages.map(item => ({ name: item.name, slug: item.slug })))}\nPage: ${page.name}\n${page.brief}`), true);
+        const html = await stage(`EXPORT_${index}`, () => ports.designer.html(projectId, screen.screenId));
+        const elements = await stage(`CONVERT_${index}`, () => ports.converter.convert(html, `${executionId}:${index}`));
         pages.push({ id: `page-${createHash("sha256").update(`${executionId}:${index}`).digest("hex").slice(0, 20)}`, name: page.name, slug: page.slug, isHome: index === 0, elements, pageSettings: { title: page.name, path: page.slug, backgroundColor: "#ffffff" } });
       }
       document = { version: 1, pages, homePageId: pages[0]!.id!, elements: pages[0]!.elements!, pageSettings: pages[0]!.pageSettings!, siteParts: {}, pageCss: "" };
