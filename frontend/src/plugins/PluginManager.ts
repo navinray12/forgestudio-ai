@@ -25,7 +25,7 @@ export interface PluginExtensionContext {
         addFilter: <T>(hookName: string, callback: (value: T, ...args: any[]) => T, priority?: number) => void;
     };
     elements: {
-        registerElement: (config: any) => void;
+        registerElement: (config: { type: string; [key: string]: unknown }) => void;
     };
     logger: {
         info: (msg: string, ...args: any[]) => void;
@@ -161,8 +161,13 @@ export class PluginManagerCore {
                 }
             },
             elements: {
-                registerElement: (config: any) => {
+                registerElement: (config) => {
                     if (capabilities.includes("elements")) {
+                        // Reject malformed plugin input before checking its registered namespace.
+                        if (!config || typeof config.type !== "string" || !config.type) {
+                            console.warn(`[PluginManager] ${pluginId} rejected an invalid element configuration`);
+                            return;
+                        }
                         // Validate element config namespaces dynamically forcing standard plugin ID prefixes restricting collisions completely.
                         if (!config.type.startsWith(`${pluginId}.`)) {
                             console.warn(`[PluginManager] ${pluginId} element type must be prefixed with "${pluginId}."`);
