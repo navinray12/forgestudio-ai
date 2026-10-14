@@ -29,6 +29,21 @@ export class HtmlDesignConverter implements DesignConverter {
     if (Buffer.byteLength(html) > 1024 * 1024) throw new ConversionError(["HTML_SIZE_LIMIT"]);
     if (!/<(?:html|body|header|main|footer|section|article|div|h[1-6]|p|span|a)(?:\s|>)/i.test(html)) throw new ConversionError(["HTML_PAGE_REQUIRED"]);
     const $ = load(html);
+    // Unsafe provider exports must fail closed. Silently stripping active content
+    // can conceal an incomplete or unsafe conversion from the editor.
+    if ($("script,iframe,object,embed").length) throw new ConversionError(["ACTIVE_CONTENT_UNSUPPORTED"]);
+    if ($("link[href],style").toArray().some(element => {
+      const item = $(element);
+      return element.type === "tag" && element.name === "link"
+        ? Boolean(item.attr("href"))
+        : /url\\s*\\(|@import\\b|expression\\s*\\(/i.test(item.html() || "");
+    })) throw new ConversionError(["EXTERNAL_STYLES_UNSUPPORTED"]);
+    if ($("*").toArray().some(element => {
+      if (element.type !== "tag") return false;
+      return Object.entries(element.attribs).some(([name, value]) =>
+        /^on/i.test(name) || /url\\s*\\(|expression\\s*\\(|javascript\\s*:/i.test(value)
+      );
+    })) throw new ConversionError(["UNSAFE_ATTRIBUTE"]);
     if ($("*").length > 1800) throw new ConversionError(["ELEMENT_LIMIT"]);
 
     // Strip scripts, external links, and unsupported media elements cleanly
