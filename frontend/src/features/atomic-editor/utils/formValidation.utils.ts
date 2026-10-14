@@ -35,14 +35,17 @@ export function validateFormValues(
     // URL format check
     if (field.type === "url") {
       try {
-        new URL(strVal);
+        const parsedUrl = new URL(strVal);
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+          errors[field.name] = "Please enter an HTTP or HTTPS URL.";
+        }
       } catch {
         errors[field.name] = `Please enter a valid URL (e.g. https://example.com).`;
       }
     }
 
     // Number check
-    if (field.type === "number" && isNaN(Number(strVal))) {
+    if (field.type === "number" && !Number.isFinite(Number(strVal))) {
       errors[field.name] = `Please enter a valid numeric value.`;
     }
 
