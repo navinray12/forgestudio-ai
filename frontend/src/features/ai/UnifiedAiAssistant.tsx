@@ -660,7 +660,11 @@ export function UnifiedAiAssistant({
                     {(!Array.isArray(auditResult.findings) || auditResult.findings.length === 0) && (
                       <p className="text-xs text-slate-400">No detailed findings were returned by the audit service.</p>
                     )}
-                    {(Array.isArray(auditResult.findings) ? auditResult.findings : []).map((f: any, i: number) => (
+                    {(Array.isArray(auditResult.findings) ? auditResult.findings : [])
+                      .filter((finding: unknown): finding is Record<string, unknown> =>
+                        finding !== null && typeof finding === "object" && !Array.isArray(finding)
+                      )
+                      .map((f, i: number) => (
                       <div
                         key={i}
                         className={`rounded-xl border p-3.5 text-xs space-y-1 ${
@@ -672,11 +676,11 @@ export function UnifiedAiAssistant({
                         }`}
                       >
                         <div className="flex justify-between font-bold">
-                          <span>{f.finding}</span>
-                          <span className="uppercase text-[10px] font-mono">{f.severity}</span>
+                          <span>{typeof f.finding === "string" ? f.finding : "Finding details unavailable"}</span>
+                          <span className="uppercase text-[10px] font-mono">{typeof f.severity === "string" ? f.severity : "unknown"}</span>
                         </div>
-                        <p className="text-slate-400">{f.reason}</p>
-                        <p className="text-indigo-300 font-semibold">Recommendation: {f.recommendation}</p>
+                        <p className="text-slate-400">{typeof f.reason === "string" ? f.reason : "No reason was provided."}</p>
+                        <p className="text-indigo-300 font-semibold">Recommendation: {typeof f.recommendation === "string" ? f.recommendation : "No recommendation was provided."}</p>
                       </div>
                     ))}
                   </div>
