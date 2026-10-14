@@ -276,6 +276,8 @@ export class ApplicationSpecService {
       entityNames.add(entity.name.toLowerCase());
 
       const fieldIds = new Set<string>();
+      const fieldNames = new Set<string>();
+      const physicalColumns = new Set<string>();
       for (const field of entity.fields || []) {
         if (!field.id || !field.id.startsWith("fld_")) {
           errors.push(`Field '${field.name}' in entity '${entity.name}' must have stable ID starting with 'fld_'.`);
@@ -284,6 +286,16 @@ export class ApplicationSpecService {
           errors.push(`Duplicate field ID '${field.id}' in entity '${entity.name}'.`);
         }
         fieldIds.add(field.id);
+        const logicalName = field.name.toLowerCase();
+        const physicalName = field.physicalColumnName.toLowerCase();
+        if (fieldNames.has(logicalName)) {
+          errors.push(`Duplicate field name '${field.name}' in entity '${entity.name}'.`);
+        }
+        if (physicalColumns.has(physicalName)) {
+          errors.push(`Duplicate physical column '${field.physicalColumnName}' in entity '${entity.name}'.`);
+        }
+        fieldNames.add(logicalName);
+        physicalColumns.add(physicalName);
       }
     }
 
@@ -295,6 +307,10 @@ export class ApplicationSpecService {
       if (!entityIds.has(rel.targetEntityId)) {
         errors.push(`Relationship '${rel.name}' references non-existent targetEntityId '${rel.targetEntityId}'.`);
       }
+      const source = spec.entities.find((entity) => entity.id === rel.sourceEntityId);
+      if (source && !source.fields.some((field) => field.id === rel.foreignKeyField || field.name === rel.foreignKeyField || field.physicalColumnName === rel.foreignKeyField)) {
+        errors.push(`Relationship '${rel.name}' references unknown foreignKeyField '${rel.foreignKeyField}'.`);
+      }
     }
 
     // Invariant 4: Tenancy enforcement - All entities must support tenant scoping under MULTI_TENANT strategies
@@ -304,7 +320,7 @@ export class ApplicationSpecService {
           (f) => f.name.toLowerCase() === "tenantid" || f.physicalColumnName.toLowerCase() === "tenant_id"
         );
         if (!hasTenantField) {
-          warnings.push(`Entity '${entity.name}' lacks explicit tenantId field under MULTI_TENANT_ROW strategy.`);
+          errors.push(`Entity '${entity.name}' must declare a tenantId field under MULTI_TENANT_ROW strategy.`);
         }
       }
     }
@@ -322,6 +338,33 @@ export class ApplicationSpecService {
 
       if (!op.routePath.startsWith("/")) {
         errors.push(`Operation '${op.name}' routePath must start with '/'`);
+      }
+    }
+
+    // Prevent unresolved or misdirected authorization and UI bindings from
+    // becoming part of a supposedly valid application contract.
+    const actorIds = new Set((spec.actors || []).map((actor) => actor.id));
+    for (const policy of spec.policies || []) {
+      if (!actorIds.has(policy.actorId)) {
+        errors.push(`Policy '${policy.name}' references unknown actorId '${policy.actorId}'.`);
+      }
+      if (!entityIds.has(policy.resourceEntityId)) {
+        errors.push(`Policy '${policy.name}' references unknown resourceEntityId '${policy.resourceEntityId}'.`);
+      }
+    }
+    for (const binding of spec.frontendBindings || []) {
+      if (!opIds.has(binding.operationId)) {
+        errors.push(`Frontend binding '${binding.id}' references unknown operationId '${binding.operationId}'.`);
+      }
+    }
+    for (const op of spec.operations || []) {
+      if (op.targetEntityId && !entityIds.has(op.targetEntityId)) {
+        errors.push(`Operation '${op.name}' references unknown targetEntityId '${op.targetEntityId}'.`);
+      }
+    }
+    for (const retention of spec.retentionPolicies || []) {
+      if (!entityIds.has(retention.entityId)) {
+        errors.push(`Retention policy references unknown entityId '${retention.entityId}'.`);
       }
     }
 

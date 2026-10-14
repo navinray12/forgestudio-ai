@@ -10,6 +10,53 @@ import {
 } from "../services/authoritative/applicationSpec.service.js";
 
 describe("Point 32 — ApplicationSpec Domain Contract & Real Generator", () => {
+  it("rejects unresolved policy, binding, model and tenant references", () => {
+    const spec: ApplicationSpec = {
+      schemaVersion: "1.0.0", applicationId: "app_references", projectId: "project_refs",
+      tenantId: "tenant_refs", revision: 1, parentRevision: 0,
+      frameworkProfile: "react-vite", identityStrategy: "MULTI_TENANT_ROW",
+      requirementIds: [], entities: [{
+        id: "ent_tasks", name: "Tasks", physicalTableName: "tasks",
+        isSoftDeletable: true, isAudited: true,
+        fields: [
+          { id: "fld_title", name: "title", physicalColumnName: "title", type: "string",
+            isNullable: false, sensitivity: "PUBLIC", visibility: "READ_WRITE", lifecycleOwnership: "USER" },
+          { id: "fld_title2", name: "Title", physicalColumnName: "title", type: "string",
+            isNullable: true, sensitivity: "PUBLIC", visibility: "READ_WRITE", lifecycleOwnership: "USER" },
+        ],
+      }], relationships: [{
+        id: "rel_missing", name: "broken_relation", sourceEntityId: "ent_tasks",
+        targetEntityId: "ent_tasks", type: "ONE_TO_MANY",
+        foreignKeyField: "unknown_field", cascadeRule: "RESTRICT_NO_ACTION",
+      }],
+      operations: [{
+        id: "op_tasks", name: "tasks", type: "QUERY", method: "GET", routePath: "/tasks",
+        summary: "Get tasks", targetEntityId: "ent_missing", requiredScopes: [],
+        transactionBoundary: "NONE", requiresIdempotencyKey: false, declaredSideEffects: [],
+      }],
+      actors: [], policies: [{
+        id: "pol_tasks", name: "task_access", actorId: "actor_missing",
+        resourceEntityId: "ent_missing", effect: "ALLOW", actions: ["READ"],
+      }],
+      frontendBindings: [{ id: "binding_tasks", operationId: "op_missing",
+        hookName: "useTasks", targetRoutePath: "/tasks" }],
+      jobs: [], retentionPolicies: [{
+        entityId: "ent_missing", retentionDays: 30,
+        archiveStrategy: "ANONYMIZE", legalBasis: "test",
+      }],
+      acceptanceContracts: [], createdAt: "2026-10-14T00:00:00Z", updatedAt: "2026-10-14T00:00:00Z",
+    };
+    const result = ApplicationSpecService.validateApplicationSpec(spec);
+    expect(result.valid).toBe(false);
+    for (const fragment of [
+      "Duplicate field name", "Duplicate physical column", "foreignKeyField",
+      "must declare a tenantId", "unknown actorId", "unknown resourceEntityId",
+      "unknown operationId", "unknown targetEntityId", "unknown entityId",
+    ]) {
+      expect(result.errors.some((error) => error.includes(fragment)), fragment).toBe(true);
+    }
+  });
+
   it("binds the digest to security policy, field defaults and retention behavior", () => {
     const base = {
       schemaVersion: "1.0.0", applicationId: "app_digest", projectId: "project_digest",
