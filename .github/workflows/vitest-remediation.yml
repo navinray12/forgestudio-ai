@@ -1,0 +1,44 @@
+name: Vitest critical dependency remediation
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/vitest-remediation.yml'
+permissions:
+  contents: write
+jobs:
+  qualify-and-update:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/assistant-text-intent-20261013' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_disposable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.18.0'
+      - name: Candidate Vitest version with patched critical dependencies
+        run: npm install --prefix backend --save-dev 'vitest@^5.0.4' --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install candidate dependencies
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
+      - name: Ensure backend still builds
+        run: npm run build --prefix backend
+      - name: Run website-to-code test suite using upgraded Vitest
+        run: npm run test:website-to-code --prefix backend
+      - name: Confirm critical advisory remediation
+        run: |
+          npm audit --prefix backend --json > "$RUNNER_TEMP/backend-audit.json" || true
+          node -e "const a=require(process.env.RUNNER_TEMP+'/backend-audit.json'); for(const n of ['vitest','tinypool']) if(a.vulnerabilities?.[n] && a.vulnerabilities[n].severity==='critical') { console.error(n+' remains critical');process.exitCode=1 }"
+      - name: Commit compatible tested Vitest upgrade only to repair branch
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          git add -- backend/package.json backend/package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(deps): upgrade verified Vitest security dependency'
+          git push origin "HEAD:refs/heads/$PR_BRANCH"

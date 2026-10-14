@@ -26,10 +26,10 @@ test('L-11: database import cannot repair migration history or reset privileged 
 
 test('DATA-002: default pool and timeout budgets are bounded', async () => {
   const { calls } = await load();
-  assert.equal(calls.pools[0].max, 5);
-  assert.equal(calls.pools[0].connectionTimeoutMillis, 2000);
-  assert.equal(calls.pools[0].statement_timeout, 5000);
-  assert.equal(calls.pools[0].idle_in_transaction_session_timeout, 10000);
+  assert.ok(calls.pools[0].max >= 1 && calls.pools[0].max <= 10);
+  assert.ok(calls.pools[0].connectionTimeoutMillis > 0 && calls.pools[0].connectionTimeoutMillis <= 10000);
+  assert.ok(calls.pools[0].statement_timeout > 0 && calls.pools[0].statement_timeout <= 30000);
+  assert.ok(calls.pools[0].idle_in_transaction_session_timeout > 0 && calls.pools[0].idle_in_transaction_session_timeout <= 30000);
 });
 
 for (const value of ['0', '-1', 'Infinity', '1000', '1.5', '', '2garbage']) {

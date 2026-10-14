@@ -55,7 +55,7 @@ export class PrivateStitchClient extends StitchToolClient {
     try {
       await this.connection.connect(transport, { timeout: 30000 });
     } catch (connectErr: any) {
-      console.error("[STITCH CONNECT ERROR]:", audit.status, connectErr?.message || connectErr);
+      console.error("[STITCH CONNECT ERROR]:", audit.status ?? "unknown");
       this.connecting = undefined;
       if (audit.status === 401 || audit.status === 403) {
         throw new AppError("Stitch authentication failed", 401, "AI_AUTH_ERROR");
@@ -90,25 +90,25 @@ export class PrivateStitchClient extends StitchToolClient {
         const providerCode = parsedPayload?.error?.code || parsedPayload?.error?.status || parsedPayload?.code || audit.status;
 
         console.error(`[STITCH] tool=${name}`);
-        if (modelId) console.error(`[STITCH] modelId=${modelId}`);
+        if (modelId) console.error("[STITCH] model was specified");
         console.error(`[STITCH] provider rejected request`);
-        console.error(`[STITCH] errorCode=${providerCode || "unknown"}`);
-        console.error(`[STITCH] errorMessage=${providerMsg.slice(0, 300)}`);
+        console.error("[STITCH] provider error code received");
+        // Provider body must never be logged.
 
         const lowerMsg = providerMsg.toLowerCase();
         if (audit.status === 401 || audit.status === 403 || lowerMsg.includes("unauthorized") || lowerMsg.includes("api key") || lowerMsg.includes("permission") || lowerMsg.includes("auth")) {
-          throw new AppError(`Stitch authentication failed: ${providerMsg.slice(0, 150)}`, 401, "AI_AUTH_ERROR");
+          throw new AppError("Stitch authentication failed", 401, "AI_AUTH_ERROR");
         }
         if (audit.status === 429 || lowerMsg.includes("quota") || lowerMsg.includes("rate limit") || lowerMsg.includes("resource exhausted")) {
-          throw new AppError(`Stitch rate limit reached: ${providerMsg.slice(0, 150)}`, 429, "AI_RATE_LIMIT");
+          throw new AppError("Stitch rate limit reached", 429, "AI_RATE_LIMIT");
         }
         if (audit.status === 400 || lowerMsg.includes("invalid") || lowerMsg.includes("not found") || lowerMsg.includes("unsupported") || lowerMsg.includes("bad request") || lowerMsg.includes("model")) {
-          throw new AppError(`Stitch request was invalid: ${providerMsg.slice(0, 200)}`, 400, "AI_BAD_REQUEST");
+          throw new AppError("Stitch request was invalid", 400, "AI_BAD_REQUEST");
         }
         if (audit.status && audit.status >= 500) {
-          throw new AppError(`Stitch provider is temporarily unavailable: ${providerMsg.slice(0, 150)}`, 503, "AI_PROVIDER_UNAVAILABLE");
+          throw new AppError("Stitch provider is temporarily unavailable", 503, "AI_PROVIDER_UNAVAILABLE");
         }
-        throw new AppError(`Stitch operation rejected: ${providerMsg.slice(0, 200)}`, 503, "AI_PROVIDER_UNAVAILABLE");
+        throw new AppError("Stitch operation rejected", 503, "AI_PROVIDER_UNAVAILABLE");
       }
       if (result.structuredContent) return result.structuredContent as T;
       const content = result.content as Array<{ type: string; text?: string }>;
@@ -119,10 +119,10 @@ export class PrivateStitchClient extends StitchToolClient {
       return JSON.parse(text) as T;
     } catch (error: any) {
       if (error instanceof AppError) {
-        console.error(`[STITCH TOOL ERROR]:`, error.code, error.message);
+        console.error("[STITCH TOOL ERROR]:", error.code);
         throw error;
       }
-      console.error(`[STITCH TOOL EXCEPTION]: status=${audit.status}`, error?.message || error);
+      console.error(`[STITCH TOOL EXCEPTION]: status=${audit.status ?? "unknown"}`);
       if (audit.status === 401 || audit.status === 403) {
         throw new AppError("Stitch authentication failed", 401, "AI_AUTH_ERROR");
       }

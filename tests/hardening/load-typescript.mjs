@@ -42,6 +42,9 @@ export async function loadTypeScript(relativePath, mocks = {}, globals = {}) {
       return synthetic(specifier, await import(specifier));
     }
     if (specifier === 'zod') return synthetic(specifier, await import('../../backend/node_modules/zod/index.js'));
+    // dotenv/config is a side-effect-only environment loader. The harness uses
+    // a sealed test process.env and must never load external .env secrets.
+    if (specifier === 'dotenv/config') return synthetic(specifier, {});
     if (!specifier.startsWith('.')) throw new Error(`Unmocked package import: ${specifier}`);
     return source(resolve(dirname(parent.identifier), specifier));
   });
