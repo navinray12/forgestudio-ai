@@ -52,6 +52,9 @@ jobs:
       - name: ApplicationSpec full-contract digest and revision integrity
         working-directory: backend
         run: npx --no-install vitest run src/tests/point32-fullstack-application-spec.test.ts
+      - name: Page registry stable-identity and lifecycle contract tests
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point36-page-lifecycle.test.ts
       - name: Schema Studio SQL safety regression tests
         working-directory: backend
         run: node --import tsx --test src/tests/schema-studio-ddl-validation.test.ts

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { buildWebsiteFixture } from "./fixtures/website-to-code.fixture.js";
 import {
   isRecognizedPageEntry,
   buildPageRegistry,
@@ -12,6 +13,36 @@ import {
 } from "../services/compiler/pageRegistry.js";
 
 describe("Point 36: Canonical Page Registry and File Lifecycle", () => {
+
+  it("preserves persisted page and file identities across route renames", () => {
+    const original = buildWebsiteFixture();
+    const about = original.pages.find((page: any) => page.id === "page-about");
+    expect(about).toBeDefined();
+    about.stablePageId = "page_approved_stable";
+    about.fileId = "file_approved_stable";
+    const before = buildPageRegistry(original, "react").find((page) => page.pageId === "page-about");
+    expect(before?.stablePageId).toBe("page_approved_stable");
+    expect(before?.fileId).toBe("file_approved_stable");
+
+    const renamed = structuredClone(original);
+    const renamedAbout = renamed.pages.find((page: any) => page.id === "page-about");
+    renamedAbout.slug = "our-company";
+    renamedAbout.name = "Our Company";
+    const after = buildPageRegistry(renamed, "react").find((page) => page.pageId === "page-about");
+    expect(after?.stablePageId).toBe(before?.stablePageId);
+    expect(after?.fileId).toBe(before?.fileId);
+  });
+
+  it("retains deterministic legacy page identities if no stored IDs exist", () => {
+    const document = buildWebsiteFixture();
+    const first = buildPageRegistry(document, "react");
+    const second = buildPageRegistry(structuredClone(document), "react");
+    expect(second.map((page) => [page.stablePageId, page.fileId])).toEqual(
+      first.map((page) => [page.stablePageId, page.fileId])
+    );
+    expect(first.length).toBeGreaterThan(0);
+  });
+
   describe("4.2 Framework-Specific Route Recognition", () => {
     describe("Next.js App Router Recognition", () => {
       it("recognizes standard App router page", () => {
