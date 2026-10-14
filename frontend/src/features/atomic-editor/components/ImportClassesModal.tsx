@@ -84,8 +84,8 @@ export const ImportClassesModal: React.FC<ImportClassesModalProps> = ({
 
       await onConfirmImport(itemsToCreate, itemsToReplace);
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to import classes.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to import classes.");
     } finally {
       setIsSubmitting(false);
     }
