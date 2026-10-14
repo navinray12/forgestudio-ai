@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, Star, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { Search, X, Star, Sparkles, Check } from 'lucide-react';
 import { FontService } from '../features/fonts/FontService';
-import type { FontMetadata, FontCategory } from '../features/fonts/types';
+import type { FontCategory } from '../features/fonts/types';
 import { loadFontBatch, loadFontFamily } from '../features/fonts/FontLoader';
 
 interface FontPickerModalProps {
