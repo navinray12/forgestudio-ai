@@ -23,7 +23,9 @@ jobs:
       - name: Candidate Vitest version with patched critical dependencies
         run: npm install --prefix backend --save-dev 'vitest@^5.0.4' --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Install candidate dependencies
-        run: npm ci --prefix backend --no-audit --no-fund
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
       - name: Ensure backend still builds
         run: npm run build --prefix backend
       - name: Run website-to-code test suite using upgraded Vitest
