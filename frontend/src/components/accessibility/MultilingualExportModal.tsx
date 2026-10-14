@@ -9,7 +9,7 @@ import type { MultilingualExportOptions } from "../../types/accessibility.types"
 export interface MultilingualExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activePage: { elements?: unknown[]; slug?: string } | null;
+  activePage: { id?: string; name?: string; elements?: unknown[]; slug?: string; pageSettings?: Record<string, unknown> } | null;
   websiteData: { name?: string; domain?: string; siteSettings?: { siteName?: string } } | null;
 }
 
