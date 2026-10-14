@@ -647,20 +647,17 @@ export function UnifiedAiAssistant({
                 <div className="space-y-4">
                   <div className="flex items-center gap-5 rounded-2xl bg-slate-900/80 p-5 border border-slate-800">
                     <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white font-black text-2xl shadow-lg border border-emerald-400/30">
-                      {auditResult.score || 94}
+                      {typeof auditResult.score === "number" && Number.isFinite(auditResult.score) ? auditResult.score : "N/A"}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">Overall Audit Score: Excellent</h4>
-                      <p className="text-xs text-slate-300 mt-0.5">{auditResult.summary || "Tree structure meets high standards with zero critical accessibility failures."}</p>
+                      <h4 className="text-sm font-bold text-white">Overall Audit Score</h4>
+                      <p className="text-xs text-slate-300 mt-0.5">{typeof auditResult.summary === "string" && auditResult.summary.trim() ? auditResult.summary : "No audit summary was returned."}</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Detailed Findings:</h5>
-                    {(auditResult.findings || [
-                      { finding: "High-contrast color ratio validated", severity: "info", reason: "All body text meets minimum 4.5:1 ratio", recommendation: "No change needed" },
-                      { finding: "Image alt text verified", severity: "info", reason: "Standard images contain descriptive attributes", recommendation: "No change needed" },
-                    ]).map((f: any, i: number) => (
+                    {(Array.isArray(auditResult.findings) ? auditResult.findings : []).map((f: any, i: number) => (
                       <div
                         key={i}
                         className={`rounded-xl border p-3.5 text-xs space-y-1 ${
