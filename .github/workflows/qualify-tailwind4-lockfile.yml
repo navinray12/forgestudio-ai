@@ -1,0 +1,69 @@
+name: Qualify Tailwind 4 lockfile repair
+on:
+  push:
+    branches:
+      - fix/tailwind-theme-vars-20261014
+    paths:
+      - .github/workflows/qualify-tailwind4-lockfile.yml
+      - backend/src/modules/ai/design/converter.ts
+      - backend/src/services/compiler/pageSourceSync.ts
+      - backend/src/services/compiler/unifiedCompiler.service.ts
+      - backend/src/services/compiler/visualCodeSync.service.ts
+      - backend/src/services/project/forgeProject.service.ts
+      - backend/src/tests/fixtures/design-browser-server.ts
+      - backend/src/tests/website-to-code-sync.test.ts
+      - backend/package.json
+      - backend/package-lock.json
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  repair-and-qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://fixture:fixture@127.0.0.1:5432/forge_disposable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Resolve only the backend lockfile against reviewed package manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix backend --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --prefix backend
+          # Website-to-code AST tests use the qualified JS compiler from frontend.
+          npm ci --prefix frontend
+          npm run build --prefix backend
+      - name: Verify the HTML design importer and security rejection regression
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import tsx --test src/tests/ai-design.test.ts
+      - name: Commit only lockfile if focused checks pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only)"
+          if [ -z "$changed" ]; then
+            echo "Lockfile already synchronized"
+            exit 0
+          fi
+          if [ "$changed" != "backend/package-lock.json" ]; then
+            echo "Unexpected modified paths: $changed"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- backend/package-lock.json
+          git commit -m "fix(deps): synchronize reviewed Tailwind 4 backend lockfile"
+          git push origin HEAD:fix/tailwind-theme-vars-20261014
+      - name: Full website-to-code regression (must pass before merging into main)
+        working-directory: backend
+        run: npm run test:website-to-code

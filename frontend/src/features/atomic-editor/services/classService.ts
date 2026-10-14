@@ -91,7 +91,7 @@ export async function fetchClasses(): Promise<AtomicClass[]> {
         return parsed;
       }
     }
-  } catch (e) {
+  } catch {
     // Fallback to defaults
   }
   return DEFAULT_CLASSES;

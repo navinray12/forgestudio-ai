@@ -16,18 +16,18 @@ export function useAtomicGrid() {
     try {
       const list = AtomicGridService.getGrids();
       setGrids(list);
-      if (list.length > 0 && !activeGrid) {
-        setActiveGrid(list[0]);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load Atomic Grids.");
+      setActiveGrid((previous) => list.find((item) => item.id === previous?.id) ?? list[0] ?? null);
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load Atomic Grids.");
     } finally {
       setIsLoading(false);
     }
-  }, [activeGrid]);
+  }, []);
 
   useEffect(() => {
-    fetchGrids();
+    // Cancel stale initial loads on StrictMode remount or cleanup.
+    const timer = window.setTimeout(fetchGrids, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchGrids]);
 
   const filteredGrids = useMemo(() => {
@@ -44,8 +44,8 @@ export function useAtomicGrid() {
       setGrids((prev) => [...prev, created]);
       setActiveGrid(created);
       return created;
-    } catch (err: any) {
-      setError(err?.message || "Failed to create Grid.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create Grid.");
       throw err;
     }
   };
@@ -56,8 +56,8 @@ export function useAtomicGrid() {
       const updated = AtomicGridService.updateGrid(activeGrid.id, payload);
       setGrids((prev) => prev.map((g) => (g.id === activeGrid.id ? updated : g)));
       setActiveGrid(updated);
-    } catch (err: any) {
-      setError(err?.message || "Failed to update Grid.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to update Grid.");
     }
   };
 
@@ -69,8 +69,8 @@ export function useAtomicGrid() {
       if (activeGrid?.id === id) {
         setActiveGrid(remaining[0] || null);
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete Grid.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to delete Grid.");
     }
   };
 

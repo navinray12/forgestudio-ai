@@ -10,11 +10,11 @@ for(const status of [401,403,404,500])test(`AUTH-003: denied/unavailable load ${
  await assert.rejects(loadAuthorizedWebsite('https://example.test','site',new AbortController().signal));
 });
 test('TEN-001: wrong website identity in response is rejected',async()=>{
- const {loadAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/load-authorized-website.ts',{}, {fetch:async()=>({ok:true,json:async()=>({website:{id:'other',userPermission:'OWNER'}})})});
+ const {loadAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/load-authorized-website.ts',{}, {fetch:async()=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>({website:{id:'other',userPermission:'OWNER'}})})});
  await assert.rejects(loadAuthorizedWebsite('https://example.test','site',new AbortController().signal),/scope/);
 });
 test('AUTH-001: valid authorized response preserves current actor role',async()=>{
- let request;const {loadAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/load-authorized-website.ts',{}, {fetch:async(url,options)=>{request={url,options};return {ok:true,json:async()=>({website:{id:'site',userPermission:'VIEWER'}})};}});
+ let request;const {loadAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/load-authorized-website.ts',{}, {fetch:async(url,options)=>{request={url,options};return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({website:{id:'site',userPermission:'VIEWER'}})};}});
  const signal=new AbortController().signal;const data=await loadAuthorizedWebsite('https://example.test','site',signal);
  assert.equal(data.userPermission,'VIEWER');assert.equal(request.options.signal,signal);assert.equal(request.options.credentials,'include');
 });
@@ -27,6 +27,6 @@ test('FG-003: network failure does not become local-save success',async()=>{
  await assert.rejects(saveAuthorizedWebsite('https://example.test','site',{editorData:{}},{expectedVersion:1,key:'test-save-0001'}),/outcome is unknown/);
 });
 test('FG-003: acknowledgement must reference the saved site',async()=>{
- const {saveAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/save-authorized-website.ts',{}, {AbortSignal,fetch:async()=>({ok:true,json:async()=>({website:{id:'other'}})})});
+ const {saveAuthorizedWebsite}=await loadTypeScript('frontend/src/features/editor-access/save-authorized-website.ts',{}, {AbortSignal,fetch:async()=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>({website:{id:'other'}})})});
  await assert.rejects(saveAuthorizedWebsite('https://example.test','site',{editorData:{}},{expectedVersion:1,key:'test-save-0001'}),/acknowledgement/);
 });

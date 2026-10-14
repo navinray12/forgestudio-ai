@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { type CustomCodeSnippet, getCustomCodeSnippets, createCustomCodeSnippet, updateCustomCodeSnippet, deleteCustomCodeSnippet } from '../services/customCode.service';
 
 interface CustomCodeModalProps {
@@ -14,18 +14,27 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
 
     const [editingSnippet, setEditingSnippet] = useState<Partial<CustomCodeSnippet> | null>(null);
 
-    useEffect(() => {
-        if (isOpen && websiteId) {
-            loadSnippets();
-        }
-    }, [isOpen, websiteId]);
-
-    const loadSnippets = async () => {
+    const loadSnippets = useCallback(async () => {
         setIsLoading(true);
-        const data = await getCustomCodeSnippets(websiteId);
-        setSnippets(data);
-        setIsLoading(false);
-    };
+        try {
+            const data = await getCustomCodeSnippets(websiteId);
+            setSnippets(data);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [websiteId]);
+
+    useEffect(() => {
+        if (!isOpen || !websiteId) return;
+        let cancelled = false;
+        // Load asynchronously so stale responses cannot overwrite a different website.
+        void getCustomCodeSnippets(websiteId).then(data => {
+            if (cancelled) return;
+            setSnippets(data);
+            setIsLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, [isOpen, websiteId]);
 
     const handleSave = async () => {
         if (!editingSnippet?.title || !editingSnippet.language || !editingSnippet.placement) {
@@ -142,7 +151,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                                 <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Code Type *</label>
                                                 <select
                                                     value={editingSnippet.language || 'HTML'}
-                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, language: e.target.value as any }))}
+                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, language: e.target.value as CustomCodeSnippet['language'] }))}
                                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                                                 >
                                                     <option value="HTML">HTML (Meta tags, scripts)</option>
@@ -154,7 +163,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                                 <label className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">Execution Location *</label>
                                                 <select
                                                     value={editingSnippet.placement || 'HEAD'}
-                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, placement: e.target.value as any }))}
+                                                    onChange={(e) => setEditingSnippet(prev => ({ ...prev, placement: e.target.value as CustomCodeSnippet['placement'] }))}
                                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
                                                 >
                                                     <option value="HEAD">Head (Metadata, CSS bindings)</option>
@@ -264,7 +273,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                             ].map(opt => (
                                                 <div
                                                     key={opt.id}
-                                                    onClick={() => setEditingSnippet(p => ({ ...p, status: opt.id as any }))}
+                                                    onClick={() => setEditingSnippet(p => ({ ...p, status: opt.id as NonNullable<CustomCodeSnippet['status']> }))}
                                                     className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center gap-4 ${editingSnippet.status === opt.id || (!editingSnippet.status && opt.id === 'PUBLISHED') ? 'bg-indigo-500/10 border-indigo-500 ring-1 ring-indigo-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}
                                                 >
                                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${editingSnippet.status === opt.id || (!editingSnippet.status && opt.id === 'PUBLISHED') ? 'border-indigo-500' : 'border-slate-600'}`}>

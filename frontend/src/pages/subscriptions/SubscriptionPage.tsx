@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 
 interface Plan {
   id: string;
@@ -11,7 +11,7 @@ interface Plan {
   websiteLimit: number;
   storageLimitMb: number;
   aiCreditLimit: number;
-  features?: string[] | Record<string, any>;
+  features?: string[] | Record<string, unknown>;
   isActive: boolean;
 }
 
@@ -36,7 +36,6 @@ interface Invoice {
 }
 
 export default function SubscriptionPage() {
-  const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
@@ -44,12 +43,9 @@ export default function SubscriptionPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const planRequestInFlight = useRef(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem("token");
@@ -176,15 +172,20 @@ export default function SubscriptionPage() {
       } catch (e) {
         console.warn("Could not retrieve invoices:", e);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load subscription information.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load subscription information.");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const handleSelectPlan = async (plan: Plan) => {
-    if (subscription?.plan?.slug === plan.slug) return;
+    if (planRequestInFlight.current || subscription?.plan?.slug === plan.slug) return;
+    planRequestInFlight.current = true;
     setActionBusy(plan.slug);
     setError("");
     setSuccess("");
@@ -197,22 +198,23 @@ export default function SubscriptionPage() {
         credentials: "include",
         body: JSON.stringify({ planSlug: plan.slug }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error?.message || "Failed to select plan.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data?.success === false) {
+        throw new Error(data?.message || data?.error?.message || "Failed to select plan.");
       }
 
       setSuccess(`Plan changed to ${plan.name} successfully!`);
       await fetchData();
-    } catch (err: any) {
-      setError(err.message || "Could not complete plan update.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Could not complete plan update.");
     } finally {
+      planRequestInFlight.current = false;
       setActionBusy(null);
     }
   };
 
-  const parseFeatures = (features: any): string[] => {
-    if (Array.isArray(features)) return features;
+  const parseFeatures = (features: Plan["features"]): string[] => {
+    if (Array.isArray(features)) return features.map((feature) => String(feature));
     if (typeof features === "object" && features !== null) {
       return Object.entries(features).map(([k, v]) => `${k}: ${v}`);
     }
@@ -385,7 +387,7 @@ export default function SubscriptionPage() {
                   <div className="mt-8 pt-4 border-t border-slate-800/80">
                     <button
                       type="button"
-                      disabled={isCurrent || actionBusy === p.slug}
+                      disabled={isCurrent || actionBusy !== null}
                       onClick={() => handleSelectPlan(p)}
                       className={`w-full rounded-xl py-2.5 text-xs font-bold transition shadow-sm cursor-pointer ${
                         isCurrent

@@ -600,7 +600,7 @@ class FontRegistryClass {
    */
   public async fetchGoogleFontsFromApi(): Promise<boolean> {
     if (this.isLoadedFromApi) return true;
-    const apiKey = (import.meta as any).env?.VITE_GOOGLE_FONTS_API_KEY;
+    const apiKey = import.meta.env.VITE_GOOGLE_FONTS_API_KEY;
 
     if (!apiKey) {
       return false;
@@ -610,16 +610,19 @@ class FontRegistryClass {
       const res = await fetch(`https://www.googleapis.com/webfonts/v1/webfonts?key=${apiKey}&sort=popularity`);
       if (!res.ok) return false;
 
-      const data = await res.json();
-      if (data && Array.isArray(data.items)) {
-        data.items.slice(0, 500).forEach((item: any) => {
+      const data: unknown = await res.json();
+      if (typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items)) {
+        const isGoogleFont = (value: unknown): value is { family: string; category?: string; variants?: string[] } =>
+          typeof value === 'object' && value !== null && 'family' in value &&
+          typeof value.family === 'string' && value.family.trim().length > 0;
+        data.items.filter(isGoogleFont).slice(0, 500).forEach((item) => {
           const family = item.family;
-          const category: any = item.category === 'handwriting' ? 'handwriting' : item.category === 'display' ? 'display' : item.category === 'monospace' ? 'monospace' : item.category === 'serif' ? 'serif' : 'sans-serif';
+          const category: FontMetadata['category'] = item.category === 'handwriting' ? 'handwriting' : item.category === 'display' ? 'display' : item.category === 'monospace' ? 'monospace' : item.category === 'serif' ? 'serif' : 'sans-serif';
           
           const weightsSet = new Set<number>();
           let hasItalic = false;
 
-          (item.variants || []).forEach((v: string) => {
+          (Array.isArray(item.variants) ? item.variants : []).filter((v): v is string => typeof v === 'string').forEach((v: string) => {
             if (v.includes('italic')) hasItalic = true;
             const w = parseInt(v.replace('italic', ''), 10);
             if (!isNaN(w)) weightsSet.add(w);

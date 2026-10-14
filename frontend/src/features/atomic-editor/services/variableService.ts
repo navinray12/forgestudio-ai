@@ -54,7 +54,7 @@ export async function fetchVariables(): Promise<AtomicVariable[]> {
         return parsed;
       }
     }
-  } catch (e) {
+  } catch {
     // Fallback to defaults
   }
   return DEFAULT_VARIABLES;

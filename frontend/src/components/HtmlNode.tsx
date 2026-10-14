@@ -2,10 +2,10 @@ import React from "react";
 import DOMPurify from "dompurify";
 
 interface HtmlNodeProps {
-    el: any;
-    mergedProps: any;
+    el: { id?: React.Key; type: string; content?: string };
+    mergedProps: React.HTMLAttributes<HTMLDivElement>;
     optInnerClass?: string;
-    finalInnerStyles?: any;
+    finalInnerStyles?: React.CSSProperties;
     isEditorMode?: boolean; // if true, injects the placeholder snippet
 }
 

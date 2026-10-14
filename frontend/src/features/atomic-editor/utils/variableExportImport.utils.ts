@@ -20,7 +20,7 @@ export function exportVariablesToJson(variables: AtomicVariable[], filename = "f
       value: v.value,
       type: v.type,
       description: v.description,
-      category: (v as any).category,
+      category: "category" in v && typeof v.category === "string" ? v.category : undefined,
     })),
   };
 
@@ -102,7 +102,7 @@ export function parseAndValidateVariablesJson(rawJson: string): {
         variables: validatedItems,
       },
     };
-  } catch (err: any) {
+  } catch {
     return { isValid: false, error: "Failed to parse file as JSON. Please select a valid JSON file." };
   }
 }

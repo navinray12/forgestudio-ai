@@ -5,8 +5,16 @@ const LOCAL_STORAGE_KEY = "forgestudio_global_widgets";
 function getLocalGlobalWidgets(): GlobalWidget[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is GlobalWidget =>
+      typeof item === "object" && item !== null &&
+      "id" in item && typeof item.id === "string" &&
+      "name" in item && typeof item.name === "string" &&
+      "elements" in item && Array.isArray(item.elements)
+    );
+  } catch {
     return [];
   }
 }
@@ -14,7 +22,7 @@ function getLocalGlobalWidgets(): GlobalWidget[] {
 function saveLocalGlobalWidgets(widgets: GlobalWidget[]): void {
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(widgets));
-  } catch (e) {
+  } catch {
     // Ignore quota errors
   }
 }
@@ -65,7 +73,7 @@ export async function saveGlobalWidget(
         newWidget.id = data.template.id;
       }
     }
-  } catch (e) {
+  } catch {
     // Fallback to local storage
   }
 
@@ -89,23 +97,42 @@ export async function getGlobalWidgets(apiUrl: string): Promise<GlobalWidget[]> 
     });
 
     if (res.ok) {
-      const data = await res.json();
-      const rawTemplates = data.templates || data || [];
-      remoteWidgets = rawTemplates
-        .filter((t: any) => t.type === "GLOBAL_WIDGET" || t.category === "Global Widget")
-        .map((t: any) => ({
-          id: t.id,
-          userId: t.userId || "user-current",
-          name: t.name,
-          description: t.description || "",
-          category: t.category || "Global Widget",
-          elements: t.templateData?.elements || [],
-          isGlobalWidget: true,
-          createdAt: t.createdAt || new Date().toISOString(),
-          updatedAt: t.updatedAt || new Date().toISOString(),
-        }));
+      const data: unknown = await res.json();
+      const rawTemplates: unknown = Array.isArray(data)
+        ? data
+        : typeof data === "object" && data !== null && "templates" in data
+          ? data.templates
+          : [];
+      if (Array.isArray(rawTemplates)) {
+        const isTemplate = (value: unknown): value is Record<string, unknown> =>
+          typeof value === "object" && value !== null &&
+          "id" in value && typeof value.id === "string" &&
+          "name" in value && typeof value.name === "string";
+
+        remoteWidgets = rawTemplates
+          .filter(isTemplate)
+          .filter((template) => template.type === "GLOBAL_WIDGET" || template.category === "Global Widget")
+          .map((template): GlobalWidget => {
+            const templateData = template.templateData;
+            const elements = typeof templateData === "object" && templateData !== null &&
+              "elements" in templateData && Array.isArray(templateData.elements)
+              ? templateData.elements
+              : [];
+            return {
+              id: template.id as string,
+              userId: typeof template.userId === "string" ? template.userId : "user-current",
+              name: template.name as string,
+              description: typeof template.description === "string" ? template.description : "",
+              category: typeof template.category === "string" ? template.category : "Global Widget",
+              elements,
+              isGlobalWidget: true,
+              createdAt: typeof template.createdAt === "string" ? template.createdAt : new Date().toISOString(),
+              updatedAt: typeof template.updatedAt === "string" ? template.updatedAt : new Date().toISOString(),
+            };
+          });
+      }
     }
-  } catch (e) {
+  } catch {
     // Fallback to local
   }
 
@@ -154,11 +181,15 @@ export async function updateGlobalWidgetService(
         templateData: { elements: updated.elements, pageSettings: {} },
       }),
     });
-  } catch (e) {
+  } catch {
     // Local fallback
   }
 
-  saveLocalGlobalWidgets(localWidgets.map((w) => (w.id === id ? updated : w)));
+  // Remote-only widgets also need a local copy for the offline fallback.
+  saveLocalGlobalWidgets([
+    updated,
+    ...localWidgets.filter((widget) => widget.id !== id),
+  ]);
   return updated;
 }
 
@@ -171,7 +202,7 @@ export async function deleteGlobalWidgetService(apiUrl: string, id: string): Pro
       method: "DELETE",
       credentials: "include",
     });
-  } catch (e) {
+  } catch {
     // Local fallback
   }
 

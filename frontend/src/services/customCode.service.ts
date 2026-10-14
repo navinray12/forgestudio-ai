@@ -27,14 +27,36 @@ export async function getCustomCodeSnippets(websiteId: string): Promise<CustomCo
 
         if (!response.ok) return [];
         const data = await response.json();
-        return data.success ? data.snippets : [];
+        return data?.success && Array.isArray(data.snippets) ? data.snippets : [];
     } catch (error) {
         console.error("Failed to fetch custom code snippets:", error);
         return [];
     }
 }
 
-export async function createCustomCodeSnippet(websiteId: string, snippetData: Partial<CustomCodeSnippet>): Promise<any> {
+export interface CustomCodeMutationResult {
+    success: boolean;
+    message?: string;
+}
+
+function getRequestErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : "An unexpected request error occurred.";
+}
+
+async function readMutationResult(response: Response): Promise<CustomCodeMutationResult> {
+    let payload: unknown;
+    try {
+        payload = await response.json();
+    } catch {
+        return { success: false, message: `Custom code request failed (HTTP ${response.status}): invalid server response.` };
+    }
+    const result = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    const success = response.ok && result.success === true;
+    const message = typeof result.message === "string" ? result.message : undefined;
+    return { success, ...(message ? { message } : !success ? { message: `Custom code request failed (HTTP ${response.status}).` } : {}) };
+}
+
+export async function createCustomCodeSnippet(websiteId: string, snippetData: Partial<CustomCodeSnippet>): Promise<CustomCodeMutationResult> {
     try {
         const response = await fetch(`${API_URL}/custom-code/website/${websiteId}`, {
             method: "POST",
@@ -45,14 +67,14 @@ export async function createCustomCodeSnippet(websiteId: string, snippetData: Pa
             body: JSON.stringify(snippetData),
         });
 
-        return await response.json();
-    } catch (error: any) {
+        return await readMutationResult(response);
+    } catch (error: unknown) {
         console.error("Failed to create custom code snippet:", error);
-        return { success: false, message: error.message };
+        return { success: false, message: getRequestErrorMessage(error) };
     }
 }
 
-export async function updateCustomCodeSnippet(snippetId: string, snippetData: Partial<CustomCodeSnippet>): Promise<any> {
+export async function updateCustomCodeSnippet(snippetId: string, snippetData: Partial<CustomCodeSnippet>): Promise<CustomCodeMutationResult> {
     try {
         const response = await fetch(`${API_URL}/custom-code/${snippetId}`, {
             method: "PUT",
@@ -63,10 +85,10 @@ export async function updateCustomCodeSnippet(snippetId: string, snippetData: Pa
             body: JSON.stringify(snippetData),
         });
 
-        return await response.json();
-    } catch (error: any) {
+        return await readMutationResult(response);
+    } catch (error: unknown) {
         console.error("Failed to update custom code snippet:", error);
-        return { success: false, message: error.message };
+        return { success: false, message: getRequestErrorMessage(error) };
     }
 }
 
