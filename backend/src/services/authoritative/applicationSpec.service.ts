@@ -418,7 +418,31 @@ export class ApplicationSpecService {
     const history = this.specStore.get(spec.applicationId) || [];
     const latest = history[history.length - 1];
 
+    if (!latest) {
+      // A new application must start from the genesis checkpoint; accepting an
+      // arbitrary later revision would create an unverifiable history gap.
+      if (spec.revision !== 1 || spec.parentRevision !== 0) {
+        throw new AppError(
+          "The initial application revision must be 1 with parentRevision 0",
+          400,
+          "INVALID_INITIAL_REVISION"
+        );
+      }
+    }
+
     if (latest) {
+      // The application ID is one authority: never let a subsequent revision
+      // silently move that authority across projects or tenant boundaries.
+      if (spec.projectId !== latest.projectId || spec.tenantId !== latest.tenantId) {
+        throw new AppError(
+          "Application revision cannot change its project or tenant ownership",
+          409,
+          "APPLICATION_OWNERSHIP_CONFLICT"
+        );
+      }
+      if (spec.applicationId !== latest.applicationId) {
+        throw new AppError("Application identity cannot change across revisions", 409, "APPLICATION_IDENTITY_CONFLICT");
+      }
       if (spec.parentRevision !== latest.revision) {
         throw new AppError(
           `Revision conflict: expected parent revision ${latest.revision}, but received ${spec.parentRevision}`,
