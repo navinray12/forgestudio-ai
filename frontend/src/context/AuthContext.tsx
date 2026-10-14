@@ -36,11 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // StrictMode and remounts can settle an aborted bootstrap after the next
     // setup starts. Only the mounted effect may release the route's loading gate.
     let active = true;
-    // Start bootstrap after setup. An effect cleaned up by StrictMode must
-    // not issue a stale identity request or reopen the loading gate.
-    void Promise.resolve()
-      .then(() => { if (active) return checkAuth(); })
-      .finally(() => { if (active) setLoading(false); });
+    void checkAuth().finally(() => { if (active) setLoading(false); });
     return () => { active = false; ++generation.current; request.current?.abort(); };
   }, [checkAuth]);
   return <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, checkAuth, logout }}>{children}</AuthContext.Provider>;
