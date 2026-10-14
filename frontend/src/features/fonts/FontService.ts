@@ -41,7 +41,10 @@ class FontServiceClass {
   private saveRecentlyUsed() {
     try {
       localStorage.setItem(RECENT_KEY, JSON.stringify(this.recentlyUsed));
-    } catch (e) {}
+    } catch (error) {
+      // A storage quota or restricted browser context must not break font selection.
+      console.warn('Unable to save recently used fonts:', error);
+    }
   }
 
   public getFavorites(): FontMetadata[] {
