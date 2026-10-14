@@ -59,6 +59,21 @@ export interface ColumnDefinition {
   isPrimaryKey?: boolean;
 }
 
+/** Validate all column identities before any connection or DDL is attempted. */
+export function assertUniqueColumnNames(columns: ColumnDefinition[]): void {
+  if (!Array.isArray(columns) || columns.length === 0) {
+    throw new AppError("Table must contain at least one column", 400, "INVALID_COLUMNS");
+  }
+  const seen = new Set<string>();
+  for (const column of columns) {
+    const name = validateIdentifier(column.name);
+    if (seen.has(name)) {
+      throw new AppError(`Duplicate table column "${name}"`, 400, "DUPLICATE_COLUMN");
+    }
+    seen.add(name);
+  }
+}
+
 export interface TableSummary {
   name: string;
   columnCount: number;
@@ -297,9 +312,7 @@ export async function createTable(
   environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(payload.name);
-  if (!payload.columns || payload.columns.length === 0) {
-    throw new AppError("Table must contain at least one column", 400, "INVALID_COLUMNS");
-  }
+  assertUniqueColumnNames(payload.columns);
 
   const primaryKeys: string[] = [];
   const columnClauses: string[] = [];
