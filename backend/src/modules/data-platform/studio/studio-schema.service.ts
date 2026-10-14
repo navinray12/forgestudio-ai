@@ -369,7 +369,8 @@ export async function dropTable(
   environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(tableName);
-  const ddl = `DROP TABLE IF EXISTS "public"."${safeName}" CASCADE;`;
+  // RESTRICT is PostgreSQL's default: dependent objects must be reviewed and handled explicitly.
+  const ddl = `DROP TABLE IF EXISTS "public"."${safeName}" RESTRICT;`;
 
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
@@ -504,8 +505,11 @@ export async function mutateTableRow(
         values.push(val);
       }
 
+      if (updates.length === 0) {
+        throw new AppError("UPDATE requires at least one non-primary-key column", 400, "MISSING_UPDATABLE_COLUMNS");
+      }
       values.push(payload.primaryKeyValue);
-      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}" = $${idx} RETURNING *;`;
+      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}" = ${idx} RETURNING *;`;
       const res = await client.query(query, values);
       return res.rows[0] || null;
     }
