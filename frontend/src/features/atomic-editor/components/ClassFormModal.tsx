@@ -30,6 +30,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (classToEdit) {
       setName(classToEdit.name);
       setDescription(classToEdit.description || "");
@@ -47,6 +49,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
       });
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [classToEdit, defaultIsGlobal, isOpen]);
 
   if (!isOpen) return null;
