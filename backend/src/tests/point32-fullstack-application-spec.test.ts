@@ -10,6 +10,61 @@ import {
 } from "../services/authoritative/applicationSpec.service.js";
 
 describe("Point 32 — ApplicationSpec Domain Contract & Real Generator", () => {
+
+  it("rejects invalid physical tables, index references, enum values and fractional revisions", () => {
+    const spec: ApplicationSpec = {
+      schemaVersion: "1.0.0", applicationId: "app_model_safe", projectId: "project_model",
+      tenantId: "tenant_model", revision: 1.5, parentRevision: -1,
+      frameworkProfile: "react-vite", identityStrategy: "SINGLE_TENANT_DEDICATED",
+      requirementIds: [], entities: [
+        {
+          id: "ent_first", name: "First", physicalTableName: "shared_table",
+          isSoftDeletable: true, isAudited: true,
+          fields: [
+            { id: "fld_kind", name: "kind", physicalColumnName: "kind", type: "enum",
+              isNullable: false, sensitivity: "INTERNAL", visibility: "READ_WRITE",
+              lifecycleOwnership: "USER", enumOptions: ["OPEN", "OPEN"] },
+          ],
+          indexes: [
+            { name: "idx_kind", fields: ["does_not_exist"], isUnique: false },
+            { name: "idx_kind", fields: ["kind", "kind"], isUnique: false },
+          ],
+        },
+        {
+          id: "ent_second", name: "Second", physicalTableName: "SHARED_TABLE",
+          isSoftDeletable: true, isAudited: true,
+          fields: [
+            { id: "fld_bad", name: "bad", physicalColumnName: "bad; DROP TABLE x", type: "string",
+              isNullable: false, sensitivity: "INTERNAL", visibility: "READ_WRITE",
+              lifecycleOwnership: "USER" },
+          ],
+        },
+      ],
+      relationships: [], operations: [], actors: [], policies: [],
+      frontendBindings: [], jobs: [], retentionPolicies: [], acceptanceContracts: [],
+      createdAt: "2026-10-14T00:00:00Z", updatedAt: "2026-10-14T00:00:00Z",
+    };
+    const validation = ApplicationSpecService.validateApplicationSpec(spec);
+    expect(validation.valid).toBe(false);
+    for (const fragment of [
+      "revision must be a positive integer", "parentRevision must be a non-negative integer",
+      "Duplicate physical table", "invalid physical column identifier", "enumOptions",
+      "unknown field", "duplicate or invalid index name", "distinct, non-empty fields",
+    ]) {
+      expect(validation.errors.some((message) => message.includes(fragment)), fragment).toBe(true);
+    }
+
+    const safe: ApplicationSpec = {
+      ...spec, revision: 1, parentRevision: 0,
+      entities: [{
+        ...spec.entities[0], physicalTableName: "tasks",
+        fields: [{ ...spec.entities[0].fields[0], enumOptions: ["OPEN", "DONE"] }],
+        indexes: [{ name: "idx_kind", fields: ["kind"], isUnique: false }],
+      }],
+    };
+    expect(ApplicationSpecService.validateApplicationSpec(safe).valid).toBe(true);
+  });
+
   it("rejects non-genesis first revisions and cross-tenant/project revision hijacks", async () => {
     const spec: ApplicationSpec = {
       schemaVersion: "1.0.0", applicationId: "app_ownership_v21", projectId: "project_original",
