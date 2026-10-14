@@ -9,14 +9,21 @@ export function useTicket(ticketId: string | undefined) {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const fetchTicket = useCallback(async () => {
-    if (!ticketId) return;
-    try {
-      setLoading(true);
+    if (!ticketId) {
+      setTicket(null);
       setError(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setTicket(null);
+    try {
       const res = await ticketService.getTicket(ticketId);
       setTicket(res.ticket);
-    } catch (err: any) {
-      setError(err.message || "Failed to load ticket details");
+    } catch (err: unknown) {
+      setTicket(null);
+      setError(err instanceof Error ? err.message : "Failed to load ticket details");
     } finally {
       setLoading(false);
     }
