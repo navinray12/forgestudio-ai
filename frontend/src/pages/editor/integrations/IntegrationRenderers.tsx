@@ -31,6 +31,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   const [triggered, setTriggered] = useState(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
   const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
   const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
@@ -356,23 +357,31 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           <span className="text-lg font-extrabold text-amber-400">${amount} <span className="text-xs font-semibold text-slate-400">{currency}</span></span>
         </div>
         <p className="text-xs text-slate-300 mb-4 font-medium">{itemName}</p>
+        {paymentError && <p role="alert" className="mb-3 text-xs text-red-300">{paymentError}</p>}
         <button
           onClick={async () => {
             if (!isPreview) return;
+            setPaymentError(null);
             try {
               const res = await fetch(`${apiUrl}/api/integrations/paypal/create-order`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount, currency, itemName }),
+                body: JSON.stringify({ amount, currency, itemName, env }),
               });
               const data = await res.json();
-              if (data?.approveUrl) {
-                window.open(data.approveUrl, "_blank");
-              } else {
-                alert(`PayPal Checkout Initialized for ${itemName} ($${amount} ${currency})! Order ID: ${data?.orderId || "demo-id"}`);
+              if (!res.ok || data?.success !== true) {
+                throw new Error(typeof data?.message === "string" ? data.message : "PayPal order could not be created.");
               }
-            } catch {
-              alert(`PayPal Payment Demo Mode: Checkout trigger for ${itemName} ($${amount} ${currency})`);
+              if (data.simulated) {
+                setPaymentError("Development demo only: no PayPal order or payment was created.");
+                return;
+              }
+              if (typeof data.approveUrl !== "string" || !data.approveUrl.startsWith("https://")) {
+                throw new Error("PayPal did not return an approval URL.");
+              }
+              window.location.href = data.approveUrl;
+            } catch (error) {
+              setPaymentError(error instanceof Error ? error.message : "PayPal checkout is unavailable.");
             }
           }}
           className={`w-full py-3 px-6 rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${colorClasses[btnColor] || colorClasses.gold}`}
@@ -407,9 +416,11 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           <span className="text-lg font-bold text-indigo-200">${amount} <span className="text-xs font-normal text-slate-400">{currency}</span></span>
         </div>
         <p className="text-xs text-slate-300 mb-4 font-medium">{itemName}</p>
+        {paymentError && <p role="alert" className="mb-3 text-xs text-red-300">{paymentError}</p>}
         <button
           onClick={async () => {
             if (!isPreview) return;
+            setPaymentError(null);
             try {
               const res = await fetch(`${apiUrl}/api/integrations/stripe/create-checkout-session`, {
                 method: "POST",
@@ -417,13 +428,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
                 body: JSON.stringify({ amount, currency, itemName }),
               });
               const data = await res.json();
-              if (data?.sessionUrl) {
-                window.location.href = data.sessionUrl;
-              } else {
-                alert(`Stripe Checkout Triggered for ${itemName} ($${amount} ${currency})! Session ID: ${data?.sessionId || "demo-session"}`);
+              if (!res.ok || data?.success !== true || typeof data.sessionUrl !== "string") {
+                throw new Error(typeof data?.message === "string" ? data.message : "Stripe checkout could not be created.");
               }
-            } catch {
-              alert(`Stripe Payment Demo Mode: Triggered checkout for ${itemName} ($${amount} ${currency})`);
+              window.location.href = data.sessionUrl;
+            } catch (error) {
+              setPaymentError(error instanceof Error ? error.message : "Stripe checkout is unavailable.");
             }
           }}
           className="w-full py-3 px-6 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center justify-center gap-2"
