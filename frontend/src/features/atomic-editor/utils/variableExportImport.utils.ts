@@ -102,7 +102,7 @@ export function parseAndValidateVariablesJson(rawJson: string): {
         variables: validatedItems,
       },
     };
-  } catch (err: any) {
+  } catch {
     return { isValid: false, error: "Failed to parse file as JSON. Please select a valid JSON file." };
   }
 }
