@@ -44,6 +44,11 @@ jobs:
           for test_file in src/tests/ai-changeset-integration.test.ts src/tests/job-leases-integration.test.ts src/tests/ai-prompt-cleanup.test.ts src/tests/ai-site-brief.test.ts src/tests/ai-site-blueprint.test.ts src/tests/ai-site-repair.test.ts; do
             node --import tsx --test "$test_file"
           done
+      - name: AI assistant and provider fallback regression tests
+        working-directory: backend
+        run: |
+          node --import tsx --test src/tests/assistant-intent-routing.test.ts
+          node --import tsx --test src/tests/ai-gateway-provider-fallback.test.ts
       - name: Changed AI UI lint
         working-directory: frontend
         run: npx --no-install eslint src/features/ai/AiSiteAssistant.tsx src/features/ai/DesignAssistant.tsx src/features/ai/DesignProposalPreview.tsx src/features/editor-access/document-save-coordinator.ts
