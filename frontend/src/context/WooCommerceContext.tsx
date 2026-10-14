@@ -134,9 +134,25 @@ export const WooCommerceProvider: React.FC<{
   const [cart, setCart] = useState<WcCartItem[]>(() => {
     try {
       const saved = localStorage.getItem("fs_wc_cart");
-      return saved ? JSON.parse(saved) : [
-        { product: DEFAULT_PRODUCTS[0], quantity: 1 }
-      ];
+      if (!saved) return [{ product: DEFAULT_PRODUCTS[0], quantity: 1 }];
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item): item is WcCartItem => {
+        if (!item || typeof item !== "object") return false;
+        const entry = item as Record<string, unknown>;
+        const product = entry.product;
+        if (!product || typeof product !== "object") return false;
+        const details = product as Record<string, unknown>;
+        return typeof details.id === "string" &&
+          typeof details.name === "string" &&
+          typeof details.price === "string" &&
+          typeof entry.quantity === "number" &&
+          Number.isSafeInteger(entry.quantity) &&
+          entry.quantity > 0 &&
+          (entry.customPrice === undefined ||
+            (typeof entry.customPrice === "number" &&
+              Number.isFinite(entry.customPrice) && entry.customPrice >= 0));
+      });
     } catch {
       return [{ product: DEFAULT_PRODUCTS[0], quantity: 1 }];
     }
