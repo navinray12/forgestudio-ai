@@ -13,8 +13,11 @@ export function validateFormValues(
     const val = values[field.name];
     const strVal = val !== undefined && val !== null ? String(val).trim() : "";
 
+    // An unchecked checkbox is not a valid response to a required consent field.
+    const hasValue = field.type === "checkbox" ? val === true : Boolean(strVal);
+
     // Required check
-    if (field.required && !strVal) {
+    if (field.required && !hasValue) {
       errors[field.name] = `${field.label} is required.`;
       continue;
     }
