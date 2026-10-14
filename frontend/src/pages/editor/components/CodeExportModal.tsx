@@ -133,18 +133,17 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
   const handleDownloadZip = (type: "static" | "react" | "tailwind" | "nextjs") => {
     setError(null);
     downloadAuthenticatedFile(
-      `${API_ORIGIN}/api/v1/websites/${websiteId}/export/zip?type=${type}`,
+      `${API_ORIGIN}/api/v1/websites/${encodeURIComponent(websiteId)}/export/zip?type=${type}`,
       `${websiteName.toLowerCase().replace(/[^a-z0-9]/g, "_")}-${type}-export.zip`
     ).catch((err: Error) => setError(`ZIP export failed: ${err.message}`));
   };
 
   const handleDownloadHelloTheme = () => {
-    const link = document.createElement("a");
-    link.href = `${API_ORIGIN}/api/v1/plugins/wordpress/hello-theme/download`;
-    link.setAttribute("download", "hello-forgestudio-theme.zip");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setError(null);
+    void downloadAuthenticatedFile(
+      `${API_ORIGIN}/api/v1/plugins/wordpress/hello-theme/download`,
+      "hello-forgestudio-theme.zip"
+    ).catch((err: Error) => setError(`WordPress theme download failed: ${err.message}`));
   };
 
   return (
