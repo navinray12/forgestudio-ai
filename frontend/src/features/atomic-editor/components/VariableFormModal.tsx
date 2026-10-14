@@ -23,6 +23,8 @@ export const VariableFormModal: React.FC<VariableFormModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (variableToEdit) {
       setName(variableToEdit.name);
       setType(variableToEdit.type);
@@ -35,6 +37,8 @@ export const VariableFormModal: React.FC<VariableFormModalProps> = ({
       setDescription("");
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [variableToEdit, isOpen]);
 
   if (!isOpen) return null;
