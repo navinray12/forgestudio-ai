@@ -214,6 +214,14 @@ export const WooCommerceProvider: React.FC<{
     selectedAddOns?: Record<string, unknown>,
     customPrice?: number
   ) => {
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+      addNotice("error", "Please select a valid positive whole-number quantity.");
+      return;
+    }
+    if (customPrice !== undefined && (!Number.isFinite(customPrice) || customPrice < 0)) {
+      addNotice("error", "Custom price must be a valid non-negative amount.");
+      return;
+    }
     setCart((prev) => {
       const addOnsKey = selectedAddOns ? JSON.stringify(selectedAddOns) : "";
       const existingIdx = prev.findIndex((item) => {
@@ -249,6 +257,10 @@ export const WooCommerceProvider: React.FC<{
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
+    if (!Number.isSafeInteger(quantity)) {
+      addNotice("error", "Cart quantity must be a whole number.");
+      return;
+    }
     if (quantity <= 0) {
       removeFromCart(productId);
       return;
@@ -284,6 +296,9 @@ export const WooCommerceProvider: React.FC<{
     paymentMethod?: string;
     couponCode?: string;
   }): Promise<WcOrderReceipt> => {
+    if (cart.length === 0) {
+      throw new Error("Cannot place an order with an empty cart.");
+    }
     const orderItems = cart.map((i) => {
       const unitPrice = i.customPrice ?? parsePriceNum(i.product.price);
       const addOnSuffix = i.selectedAddOns && Object.keys(i.selectedAddOns).length > 0
