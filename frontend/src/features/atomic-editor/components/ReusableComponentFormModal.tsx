@@ -104,8 +104,8 @@ export const ReusableComponentFormModal: React.FC<ReusableComponentFormModalProp
         rootElement,
       });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save Reusable Component.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save Reusable Component.");
     } finally {
       setIsSubmitting(false);
     }
