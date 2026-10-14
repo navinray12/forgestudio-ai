@@ -15,6 +15,7 @@ interface CookieConsentBannerProps {
 
 export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config }) => {
   const [visible, setVisible] = useState(false);
+  const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
     // If not explicitly enabled, do not render
@@ -31,7 +32,9 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
         return () => clearTimeout(timer);
       }
     } catch {
-      setVisible(false);
+      // Storage can be blocked by privacy settings; never assume consent.
+      setVisible(true);
+      setStorageError(true);
     }
   }, [config?.enabled]);
 
@@ -44,7 +47,12 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
           version: "1.0",
         })
       );
-    } catch {}
+    } catch {
+      // Do not acknowledge consent if it cannot be persisted for this browser.
+      setStorageError(true);
+      return;
+    }
+    setStorageError(false);
     setVisible(false);
   };
 
@@ -68,6 +76,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
           : "bg-white/95 text-slate-800 border-slate-200 backdrop-blur-md"
       }`}
     >
+      {storageError && <p role="alert" className="mb-2 text-xs text-amber-300">Browser storage is unavailable. Your cookie choice could not be saved.</p>}
       <div className="flex items-start gap-3">
         <div className={`p-2 rounded-xl shrink-0 ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
           <Cookie className="w-5 h-5" />
