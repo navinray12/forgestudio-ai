@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -26,4 +26,26 @@ test("Schema Studio accepts only explicitly permitted safe SQL defaults", () => 
   for (const unsafe of ["0); DROP TABLE users;--", "now(); SELECT pg_sleep(30)", "'hello' || secret", "nextval('seq')"]) {
     assert.throws(() => validateColumnDefault(unsafe), /Unsupported column default/);
   }
+});
+
+test("Schema Studio row changes reject non-primary and composite key selectors", () => {
+  const singleKey = {
+    columns: [
+      { name: "id", isPrimaryKey: true },
+      { name: "email", isPrimaryKey: false },
+      { name: "label", isPrimaryKey: false },
+    ],
+  };
+  assert.doesNotThrow(() => assertSafeRowMutation(singleKey, "UPDATE", "id", { label: "updated" }));
+  assert.doesNotThrow(() => assertSafeRowMutation(singleKey, "DELETE", "id"));
+  assert.throws(() => assertSafeRowMutation(singleKey, "DELETE", "email"), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation(singleKey, "UPDATE", "email", { label: "updated" }), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation(singleKey, "UPDATE", "id", { missing: "value" }), /Unknown table column/);
+  assert.throws(() => assertSafeRowMutation({ columns: [
+    { name: "workspaceId", isPrimaryKey: true },
+    { name: "itemId", isPrimaryKey: true },
+  ] }, "DELETE", "workspaceId"), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation({ columns: [
+    { name: "label", isPrimaryKey: false },
+  ] }, "DELETE", "label"), /single-column primary key/);
 });
