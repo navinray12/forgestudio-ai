@@ -101,8 +101,9 @@ export function UnifiedAiAssistant({
     });
     if (!res.ok) throw new Error("Could not load latest website state");
     const data = await res.json().catch(() => null);
-    const version = Number(data?.website?.documentVersion);
-    if (!data?.website || !Number.isSafeInteger(version) || version < 0) {
+    const rawVersion = data?.website?.documentVersion;
+    const version = Number(rawVersion);
+    if (rawVersion === undefined || rawVersion === null || rawVersion === "" || !Number.isSafeInteger(version) || version < 0) {
       throw new Error("Website version is missing or invalid. Reload the editor and try again.");
     }
     return version;
@@ -180,7 +181,7 @@ export function UnifiedAiAssistant({
       if (data.url || data.imageUrl) {
         setGeneratedImages((prev) => [data.url || data.imageUrl, ...prev]);
         setSuccessMessage("Image generated successfully!");
-      } else if (data.images && Array.isArray(data.images)) {
+      } else if (Array.isArray(data.images) && data.images.length > 0) {
         setGeneratedImages((prev) => [...data.images, ...prev]);
         setSuccessMessage("Images generated successfully!");
       } else {
