@@ -10,6 +10,8 @@ import {
 import {
   createProjectHandler,
   getProjectHandler,
+  commitProjectApplicationSpecHandler,
+  getProjectApplicationSpecHandler,
   getProjectByWebsiteHandler,
   listProjectsHandler,
   updateProjectHandler,
@@ -293,6 +295,9 @@ router.get("/:id/snapshots", listSnapshotsHandler);
 
 // Project Manifest (Module 03)
 router.get("/:id/manifest", getManifestHandler);
+ // Versioned application domain contract. Auth and ownership enforced in the shared controller.
+router.post("/:id/application-spec/revisions", commitProjectApplicationSpecHandler);
+router.get("/:id/application-spec/:applicationId", getProjectApplicationSpecHandler);
 router.put("/:id/manifest", updateManifestHandler);
 
 // Unified Compiler / IR & Visual ↔ Code Sync (Modules 06 & 07)
