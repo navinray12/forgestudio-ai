@@ -167,8 +167,14 @@ export class AppGenerationService {
     }
     const run = rowToRun(inserted.rows[0]);
     setImmediate(() => {
-      this.processRun(run.id, input.tenantId).catch((err) => {
-        console.error(`[app-generation] run ${run.id} crashed:`, err?.message || err);
+      this.processRun(run.id, input.tenantId).catch(async () => {
+        // Unexpected failures must not strand a project in an active run state.
+        // Do not expose internal exception messages, which may contain provider credentials.
+        try {
+          await failUnexpectedGenerationRun(run.id);
+        } catch {
+          console.error(`[app-generation] Failed to persist unexpected failure for run ${run.id}`);
+        }
       });
     });
     return { run, created: true };
@@ -415,6 +421,25 @@ export class AppGenerationService {
  * Runs left in a non-terminal state by a process that stopped cannot be resumed safely (the
  * provider call or writes may have partially happened), so they are marked as interrupted.
  */
+/**
+ * Fail only a still-active generation after an unhandled worker error.
+ * This conditional write cannot erase a terminal result from a concurrent worker,
+ * and preserves the existing diagnostic history without leaking the thrown error.
+ */
+export async function failUnexpectedGenerationRun(runId: string): Promise<boolean> {
+  const { rowCount } = await pgPool.query(
+    `UPDATE forge_app_generation_runs
+     SET status = 'FAILED', "errorCode" = 'UNEXPECTED_GENERATION_FAILURE',
+         "errorMessage" = 'Application generation stopped unexpectedly. Review diagnostics and retry the failed run.',
+         diagnostics = COALESCE(diagnostics, '[]'::jsonb) ||
+           $2::jsonb,
+         "completedAt" = now(), "updatedAt" = now()
+     WHERE id = $1 AND status <> ALL($3::text[])`,
+    [runId, JSON.stringify([{ severity: "error", message: "An unexpected generation failure interrupted this run." }]), TERMINAL]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function reconcileInterruptedRuns(): Promise<number> {
   const { rowCount } = await pgPool.query(
     `UPDATE forge_app_generation_runs
