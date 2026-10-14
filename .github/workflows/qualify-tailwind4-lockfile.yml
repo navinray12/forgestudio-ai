@@ -39,8 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           node --import tsx --test src/tests/ai-design.test.ts
-          npm run test:website-to-code
-      - name: Commit only lockfile if checks pass
+      - name: Commit only lockfile if focused checks pass
         shell: bash
         run: |
           set -euo pipefail
@@ -59,3 +58,6 @@ jobs:
           git add -- backend/package-lock.json
           git commit -m "fix(deps): synchronize reviewed Tailwind 4 backend lockfile"
           git push origin HEAD:fix/tailwind-theme-vars-20261014
+      - name: Full website-to-code regression (must pass before merging into main)
+        working-directory: backend
+        run: npm run test:website-to-code
