@@ -2355,7 +2355,7 @@ export const FlipBoxWidgetRenderer = ({
   const showBack = isFlippedManual || isFlippedState;
 
   // Compute rotation styles based on flip direction
-  let frontRotate = "rotateY(0deg)";
+  const frontRotate = "rotateY(0deg)";
   let backRotate = "rotateY(180deg)";
   let flippedTransform = "rotateY(180deg)";
 
@@ -6253,9 +6253,9 @@ export const MegaMenuWidgetRenderer = ({
 
   const resolveMegaLink = (link: MegaMenuColumnLink) => {
     let displayLabel = link.label;
-    let displayDesc = link.description;
-    let displayBadge = link.badge;
-    let displayImage = link.image;
+    const displayDesc = link.description;
+    const displayBadge = link.badge;
+    const displayImage = link.image;
 
     const { resolvedUrl, targetPage } = resolveForgeLink(link.href, link.pageId, link.destinationType || link.linkType, { pages });
 
@@ -7621,7 +7621,7 @@ export const resolveShareAction = (
   const targetUrl = resolveShareDestinationUrl(el, netItem, pages, activePageId);
 
   let isPageNavigation = false;
-  let pageId = netItem?.pageId;
+  const pageId = netItem?.pageId;
   if (netItem?.destinationType === "page" && netItem.pageId) {
     isPageNavigation = true;
   }
