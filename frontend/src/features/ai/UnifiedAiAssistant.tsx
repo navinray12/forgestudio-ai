@@ -657,7 +657,7 @@ export function UnifiedAiAssistant({
 
                   <div className="space-y-2">
                     <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Detailed Findings:</h5>
-                    {(!Array.isArray(auditResult.findings) || auditResult.findings.length === 0) && (
+                    {(!Array.isArray(auditResult.findings) || !auditResult.findings.some((finding: unknown) => finding !== null && typeof finding === "object" && !Array.isArray(finding))) && (
                       <p className="text-xs text-slate-400">No detailed findings were returned by the audit service.</p>
                     )}
                     {(Array.isArray(auditResult.findings) ? auditResult.findings : [])
