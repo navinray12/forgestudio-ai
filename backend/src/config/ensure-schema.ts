@@ -2666,7 +2666,7 @@ export async function ensureDatabaseTables(): Promise<void> {
       "rootConfig" JSONB DEFAULT '{}'::jsonb,
       "packageCount" INTEGER DEFAULT 0,
       "serviceCount" INTEGER DEFAULT 0,
-      "hasCircularDependencies BOOLEAN DEFAULT false,
+      "hasCircularDependencies" BOOLEAN DEFAULT false,
       "lastScannedAt" TIMESTAMPTZ DEFAULT now(),
       "createdAt" TIMESTAMPTZ DEFAULT now(),
       "updatedAt" TIMESTAMPTZ DEFAULT now()
