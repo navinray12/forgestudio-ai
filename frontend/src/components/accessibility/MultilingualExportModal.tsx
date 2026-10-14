@@ -9,8 +9,8 @@ import type { MultilingualExportOptions } from "../../types/accessibility.types"
 export interface MultilingualExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activePage: any;
-  websiteData: any;
+  activePage: { elements?: unknown[]; slug?: string } | null;
+  websiteData: { name?: string; domain?: string; siteSettings?: { siteName?: string } } | null;
 }
 
 export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = ({
@@ -28,7 +28,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
 
   if (!isOpen) return null;
 
-  const elements = activePage?.elements || [];
+  const elements = Array.isArray(activePage?.elements) ? activePage.elements : [];
   const siteName = websiteData?.name || websiteData?.siteSettings?.siteName || "ForgeStudio Site";
   const baseUrl = websiteData?.domain || "https://example.com";
   const pageSlug = activePage?.slug || "";
@@ -126,11 +126,11 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
                 { id: "polylang", label: "Polylang", desc: "Polylang Strings Array" },
                 { id: "translatepress", label: "TranslatePress", desc: "TranslatePress Key Map" },
                 { id: "weglot", label: "Weglot API", desc: "Weglot Dynamic Words" },
-              ].map((eng) => (
+              ] as { id: MultilingualExportOptions["engine"]; label: string; desc: string }[]).map((eng) => (
                 <button
                   key={eng.id}
                   type="button"
-                  onClick={() => setEngine(eng.id as any)}
+                  onClick={() => setEngine(eng.id)}
                   className={`p-3 rounded-xl text-left border transition cursor-pointer ${
                     engine === eng.id
                       ? "bg-indigo-600/20 border-indigo-500 text-white shadow-md shadow-indigo-600/20"
