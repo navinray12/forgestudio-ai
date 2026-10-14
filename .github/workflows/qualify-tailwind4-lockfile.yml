@@ -11,6 +11,7 @@ on:
       - backend/src/services/compiler/visualCodeSync.service.ts
       - backend/src/services/project/forgeProject.service.ts
       - backend/src/tests/fixtures/design-browser-server.ts
+      - backend/src/tests/website-to-code-sync.test.ts
       - backend/package.json
       - backend/package-lock.json
   workflow_dispatch:
