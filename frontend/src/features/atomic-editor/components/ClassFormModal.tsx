@@ -58,8 +58,8 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
     try {
       await onSubmit({ name, styles, description, isGlobal });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Unable to save class.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Unable to save class.");
     } finally {
       setIsSubmitting(false);
     }
@@ -67,7 +67,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
 
   const previewClassKey = name.trim() ? `.${formatClassName(name)}` : ".class-name";
 
-  const updateStyleProp = (key: keyof ElementStyles, value: any) => {
+  const updateStyleProp = <K extends keyof ElementStyles>(key: K, value: ElementStyles[K]) => {
     setStyles((prev) => ({
       ...prev,
       [key]: value !== "" ? value : undefined,
