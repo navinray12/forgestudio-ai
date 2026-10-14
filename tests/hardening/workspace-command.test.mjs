@@ -29,7 +29,10 @@ async function fixture({auditFailure=false,journalFailure=false,conflicts=0}={})
     };
     const result=await run(tx);committed=state;return result;
   }};
-  const {workspaceCommand}=await loadTypeScript('backend/src/services/workspaces/command.ts',{'../../config/prisma.js':{prisma}});
+  const {workspaceCommand}=await loadTypeScript('backend/src/services/workspaces/command.ts',{
+    '../../config/prisma.js':{prisma},
+    '../../config/ensure-schema.js':{ensureDatabaseTables:async()=>{}},
+  });
   const input={actorId:'actor',operation:'WORKSPACE_CREATED',key:'test-key-123',payload:{name:'Engineering'},
     authorize:async()=>{if(!allowed)throw new Error('membership revoked');return {organizationId:'organization'};},
     execute:async(tx)=>{tx.change();return {resourceId:'workspace'};},
