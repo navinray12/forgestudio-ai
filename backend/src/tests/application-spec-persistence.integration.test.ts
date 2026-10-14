@@ -90,4 +90,54 @@ describe.skipIf(!enabled)("Durable ApplicationSpec revision history (disposable 
     await expect(ApplicationSpecService.getLatestSpecPersisted(applicationId, projectId, tenantId))
       .rejects.toThrow(/digest mismatch/);
   });
+  it("authorizes durable application revisions through the real project handlers", async () => {
+    const { commitProjectApplicationSpecHandler, getProjectApplicationSpecHandler } =
+      await import("../controllers/project.controller.js");
+    const scopedApplicationId = `app_api_${marker}`;
+    const body = { ...spec(1, 0), applicationId: scopedApplicationId, tenantId: userId };
+    const invoke = async (
+      handler: typeof commitProjectApplicationSpecHandler,
+      actorId: string,
+      suppliedBody: unknown = {},
+      params: Record<string, string> = {}
+    ) => {
+      let status = 0;
+      let payload: any;
+      let error: any;
+      const res: any = {
+        locals: { user: { id: actorId, role: "USER" } },
+        status(value: number) { status = value; return res; },
+        json(value: unknown) { payload = value; return res; },
+      };
+      await handler({ params: { id: projectId, ...params }, body: suppliedBody } as any, res,
+        (caught: unknown) => { error = caught; });
+      return { status, payload, error };
+    };
+
+    const stranger = randomUUID();
+    const blockedWrite = await invoke(commitProjectApplicationSpecHandler, stranger, body);
+    expect(blockedWrite.error?.statusCode ?? blockedWrite.error?.status).toBe(403);
+    const blockedScope = await invoke(commitProjectApplicationSpecHandler, userId,
+      { ...body, tenantId: "user-controlled-tenant" });
+    expect(blockedScope.error?.statusCode ?? blockedScope.error?.status).toBe(403);
+
+    const written = await invoke(commitProjectApplicationSpecHandler, userId, body);
+    expect(written.error).toBeUndefined();
+    expect(written.status).toBe(201);
+    expect(written.payload.digest).toMatch(/^[a-f0-9]{64}$/);
+
+    const hiddenRead = await invoke(getProjectApplicationSpecHandler, stranger, undefined,
+      { applicationId: scopedApplicationId });
+    expect(hiddenRead.error?.statusCode ?? hiddenRead.error?.status).toBe(403);
+    const visibleRead = await invoke(getProjectApplicationSpecHandler, userId, undefined,
+      { applicationId: scopedApplicationId });
+    expect(visibleRead.error).toBeUndefined();
+    expect(visibleRead.status).toBe(200);
+    expect(visibleRead.payload.spec.tenantId).toBe(userId);
+    expect(visibleRead.payload.digest).toBe(written.payload.digest);
+
+    const replay = await invoke(commitProjectApplicationSpecHandler, userId, body);
+    expect(replay.error?.statusCode ?? replay.error?.status).toBe(409);
+  });
+
 });
