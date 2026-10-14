@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { forumService } from "../services/forumService";
 import type { ForumTopic } from "../types/forum.types";
 
@@ -6,23 +6,46 @@ export function useForumTopicDetail(idOrSlug: string) {
   const [topic, setTopic] = useState<ForumTopic | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const mounted = useRef(false);
 
   const fetchTopic = useCallback(async () => {
-    if (!idOrSlug) return;
+    const request = ++requestId.current;
+    if (!idOrSlug) {
+      if (mounted.current) {
+        setTopic(null);
+        setError("No discussion topic was selected.");
+        setIsLoading(false);
+      }
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
       const res = await forumService.getTopic(idOrSlug);
-      setTopic(res.topic);
-    } catch (err: any) {
-      setError(err.message || "Failed to load topic");
+      if (mounted.current && request === requestId.current) {
+        setTopic(res.topic);
+      }
+    } catch (err: unknown) {
+      if (mounted.current && request === requestId.current) {
+        setError(err instanceof Error ? err.message : "Failed to load topic");
+      }
     } finally {
-      setIsLoading(false);
+      if (mounted.current && request === requestId.current) {
+        setIsLoading(false);
+      }
     }
   }, [idOrSlug]);
 
   useEffect(() => {
-    fetchTopic();
+    mounted.current = true;
+    void Promise.resolve().then(() => {
+      if (mounted.current) void fetchTopic();
+    });
+    return () => {
+      mounted.current = false;
+      requestId.current += 1;
+    };
   }, [fetchTopic]);
 
   const addReply = async (content: string, parentPostId?: string) => {
@@ -35,13 +58,13 @@ export function useForumTopicDetail(idOrSlug: string) {
   const toggleBookmark = async () => {
     if (!topic) return;
     const res = await forumService.toggleBookmark(topic.id);
-    setTopic((prev) => prev ? { ...prev, isBookmarked: res.bookmarked } : prev);
+    setTopic((prev) => prev && prev.id === topic.id ? { ...prev, isBookmarked: res.bookmarked } : prev);
   };
 
   const toggleFollow = async () => {
     if (!topic) return;
     const res = await forumService.toggleFollow(topic.id);
-    setTopic((prev) => prev ? { ...prev, isFollowed: res.followed } : prev);
+    setTopic((prev) => prev && prev.id === topic.id ? { ...prev, isFollowed: res.followed } : prev);
   };
 
   const toggleAcceptedAnswer = async (postId: string) => {
