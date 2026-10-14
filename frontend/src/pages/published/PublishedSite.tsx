@@ -936,8 +936,8 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                 if (typeof rawEditorData === "string") {
                     try {
                         rawEditorData = JSON.parse(rawEditorData);
-                    } catch (_e) {
-                        throw new Error("The saved website document is invalid.");
+                    } catch (parseError) {
+                        throw new Error("The saved website document is invalid.", { cause: parseError });
                     }
                 }
                 const editorData = isPreview 
