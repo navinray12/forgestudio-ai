@@ -121,9 +121,12 @@ export class PluginManagerCore {
                 }
                 plugin.state = "active";
                 console.log(`[PluginManager] Activated: ${id}`);
-            } catch (error: any) {
+            } catch (error: unknown) {
                 plugin.state = "error";
-                plugin.error = { message: "Failed during initialization", stack: error?.stack };
+                plugin.error = {
+                    message: "Failed during initialization",
+                    stack: error instanceof Error ? error.stack : undefined,
+                };
                 console.error(`[PluginManager] Error activating ${id}:`, error);
             }
         });
