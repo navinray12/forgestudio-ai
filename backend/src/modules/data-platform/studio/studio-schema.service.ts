@@ -458,6 +458,32 @@ export async function getTableRows(
 /**
  * Performs inline row mutations (INSERT, UPDATE, DELETE).
  */
+/**
+ * A single-column WHERE clause is only safe when it uniquely selects one row.
+ * Compound/no-primary-key tables must use a separate, reviewed row-edit workflow.
+ */
+export function assertSafeRowMutation(
+  details: Pick<TableDetails, "columns">,
+  action: "INSERT" | "UPDATE" | "DELETE",
+  primaryKeyColumn: string,
+  data?: Record<string, unknown>
+): void {
+  const knownColumns = new Set(details.columns.map((column) => column.name));
+  if (action === "UPDATE" || action === "DELETE") {
+    const keys = details.columns.filter((column) => column.isPrimaryKey);
+    if (keys.length !== 1 || keys[0].name !== primaryKeyColumn) {
+      throw new AppError("Row changes require the table's single-column primary key", 400, "UNSAFE_ROW_SELECTOR");
+    }
+  }
+  if (data && (action === "INSERT" || action === "UPDATE")) {
+    for (const key of Object.keys(data)) {
+      if (!knownColumns.has(key)) {
+        throw new AppError(`Unknown table column "${key}"`, 400, "INVALID_COLUMN");
+      }
+    }
+  }
+}
+
 export async function mutateTableRow(
   projectId: string,
   tableName: string,
@@ -471,6 +497,11 @@ export async function mutateTableRow(
 ): Promise<any> {
   const safeTable = validateIdentifier(tableName);
   const safePk = validateIdentifier(payload.primaryKeyColumn);
+  if (!["INSERT", "UPDATE", "DELETE"].includes(payload.action)) {
+    throw new AppError("Unknown mutation action", 400, "INVALID_ACTION");
+  }
+  const details = await getTableDetails(projectId, safeTable, environment);
+  assertSafeRowMutation(details, payload.action, safePk, payload.data);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const client = await pool.connect();
 
@@ -509,7 +540,7 @@ export async function mutateTableRow(
         throw new AppError("UPDATE requires at least one non-primary-key column", 400, "MISSING_UPDATABLE_COLUMNS");
       }
       values.push(payload.primaryKeyValue);
-      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}" = ${idx} RETURNING *;`;
+      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}"  = ${idx} RETURNING *;`;
       const res = await client.query(query, values);
       return res.rows[0] || null;
     }
