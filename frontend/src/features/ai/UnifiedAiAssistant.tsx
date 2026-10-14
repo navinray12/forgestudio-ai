@@ -103,7 +103,12 @@ export function UnifiedAiAssistant({
     const data = await res.json().catch(() => null);
     const rawVersion = data?.website?.documentVersion;
     const version = Number(rawVersion);
-    if (rawVersion === undefined || rawVersion === null || rawVersion === "" || !Number.isSafeInteger(version) || version < 0) {
+    if (
+      (typeof rawVersion !== "number" && typeof rawVersion !== "string") ||
+      (typeof rawVersion === "string" && rawVersion.trim() === "") ||
+      !Number.isSafeInteger(version) ||
+      version < 0
+    ) {
       throw new Error("Website version is missing or invalid. Reload the editor and try again.");
     }
     return version;
