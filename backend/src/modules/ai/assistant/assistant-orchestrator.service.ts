@@ -104,7 +104,15 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
     return "GENERATE_LAYOUT";
   }
 
-  // 11. Section generation
+  // 11. Explicit copywriting is not a request to insert a new page section.
+  // Check this before generic keywords such as "hero", "features" or "footer".
+  // Keep bare section-creation commands on the existing GENERATE_SECTION path.
+  if (/^\s*(?:please\s+)?(?:write|draft|compose|suggest|generate)\s+(?:(?:me|some|a|an|the)\s+)*(?:copy|text|content|headline|heading|title|subtitle|caption|description|paragraph|tagline|slogan|button\s+text|cta\s+text)\b/i.test(prompt)
+    || /^\s*(?:please\s+)?(?:write|draft|compose|suggest)\b[\s\S]*\b(?:copy|text|headline|heading|title|subtitle|caption|description|paragraph|tagline|slogan)\b/i.test(prompt)) {
+    return "GENERATE_TEXT";
+  }
+
+  // 12. Section generation
   if (p.includes("section") || p.includes("hero") || p.includes("pricing") || p.includes("testimonial") || p.includes("faq") || p.includes("footer") || p.includes("header") || p.includes("features")) {
     return "GENERATE_SECTION";
   }
