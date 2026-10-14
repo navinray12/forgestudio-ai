@@ -80,3 +80,10 @@ test("private artifacts are encrypted and path traversal is rejected", async t =
   assert.equal(await store.get(key), "PRIVATE_DESIGN_CONTENT");
   await assert.rejects(store.get("../.env"), { code: "AI_ARTIFACT_UNAVAILABLE" });
 });
+
+test("Tailwind utility classes preserve editable spacing and typography", async () => {
+  const result = await converter.convert('<main class="p-4 text-white bg-blue-500"><h1>Styled</h1></main>', "tailwind-utility-canary");
+  const styles = result[0]!.styles as JsonObject;
+  assert.ok(styles.paddingLeft && styles.paddingLeft !== "0px", "p-4 must generate nonzero padding");
+  assert.ok(styles.paddingRight && styles.paddingRight !== "0px", "p-4 must preserve both horizontal sides");
+});
