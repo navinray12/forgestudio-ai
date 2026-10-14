@@ -91,7 +91,7 @@ export interface ForumTopic {
   replyCount: number;
   lastActivityAt: string;
   tags: string[];
-  contextData?: any;
+  contextData?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   author?: ForumUser;
