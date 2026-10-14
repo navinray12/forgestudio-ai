@@ -7555,32 +7555,38 @@ export const getSocialShareUrl = (
   }
 
   switch (network) {
-    case "facebook":
+    case "facebook": {
       let fb = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
       if (textVal) fb += `&quote=${title}`;
       return fb;
-    case "twitter":
+    }
+    case "twitter": {
       let tw = `https://twitter.com/intent/tweet?url=${url}`;
       if (textVal) tw += `&text=${title}`;
       if (tagsVal) tw += `&hashtags=${encodedTags}`;
       return tw;
+    }
     case "linkedin":
       return `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
-    case "whatsapp":
+    case "whatsapp": {
       const whatsappMsg = encodeURIComponent(textVal ? `${textVal}\n${safeTarget}` : safeTarget);
       return `https://api.whatsapp.com/send?text=${whatsappMsg}`;
-    case "pinterest":
+    }
+    case "pinterest": {
       let pin = `https://pinterest.com/pin/create/button/?url=${url}`;
       if (textVal) pin += `&description=${title}`;
       return pin;
-    case "reddit":
+    }
+    case "reddit": {
       let rd = `https://www.reddit.com/submit?url=${url}`;
       if (textVal) rd += `&title=${title}`;
       return rd;
-    case "email":
+    }
+    case "email": {
       const subject = textVal ? title : encodeURIComponent("Check out this page!");
       const body = encodeURIComponent(textVal ? `${textVal}\n\n${safeTarget}` : safeTarget);
       return `mailto:?subject=${subject}&body=${body}`;
+    }
     case "copy":
       return safeTarget;
     default:
