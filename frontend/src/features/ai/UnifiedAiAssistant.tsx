@@ -147,9 +147,15 @@ export function UnifiedAiAssistant({
         setChangeset(data.result.changeset);
         setSuccessMessage(`Changeset generated for ${typeof data.intent === "string" ? data.intent.replace(/_/g, " ") : "your request"}. Review and apply below.`);
       } else if (data.intent === "ANALYZE_SITE") {
+        if (!data.result || typeof data.result !== "object" || Array.isArray(data.result)) {
+          throw new Error("The audit service returned no valid audit result.");
+        }
         setAuditResult(data.result);
         setActiveTab("audit");
       } else if (data.intent === "GENERATE_CODE") {
+        if (!data.result || typeof data.result !== "object" || Array.isArray(data.result)) {
+          throw new Error("The code generator returned no valid result.");
+        }
         setCodeResult(data.result);
         setActiveTab("code");
       } else {
