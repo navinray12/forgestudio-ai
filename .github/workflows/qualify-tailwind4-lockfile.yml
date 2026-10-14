@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/qualify-tailwind4-lockfile.yml
       - backend/src/modules/ai/design/converter.ts
+      - backend/src/services/compiler/pageSourceSync.ts
+      - backend/src/tests/fixtures/design-browser-server.ts
       - backend/package.json
       - backend/package-lock.json
   workflow_dispatch:
