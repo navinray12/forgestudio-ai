@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { load } from "cheerio";
 import postcss from "postcss";
-import tailwindcss from "tailwindcss";
+import tailwindPostcss from "@tailwindcss/postcss";
 import type { AnyNode, Element } from "domhandler";
 import { AppError } from "../../../utils/app-error.js";
 import type { JsonObject } from "../../../services/websites/document-policy.js";
@@ -76,8 +76,21 @@ export class HtmlDesignConverter implements DesignConverter {
     const styleTexts = $("style").toArray().map((el: AnyNode) => $(el).text());
     if (Buffer.byteLength(styleTexts.join("")) > 200_000) throw new ConversionError(["CSS_SIZE_LIMIT"]);
     const utilityClasses = $("[class]").toArray().map((el: AnyNode) => $(el).attr("class") || "").join(" ");
-    const compiled = await postcss([tailwindcss({ content: [{ raw: utilityClasses, extension: "html" }], corePlugins: { preflight: false }, theme: {}, plugins: [] })]).process("@tailwind utilities;", { from: undefined });
-    const css = postcss.parse([...styleTexts, compiled.css].join("\n"));
+    // Compile only explicitly imported utility classes; never scan local files.
+    const classNames = [...new Set(utilityClasses.split(/\s+/).filter(value =>
+      value.length > 0 && value.length <= 120 && !/[{};"\\]/.test(value)
+    ))].slice(0, 300);
+    const inlineSources = classNames.map(value => `@source inline("${value}");`).join("\n");
+    const compiled = await postcss([tailwindPostcss()]).process(
+      `@import "tailwindcss" source(none);\n${inlineSources}`,
+      { from: undefined }
+    );
+    const generated = postcss.parse(compiled.css);
+    // Do not apply Tailwind preflight rules to editable native nodes.
+    generated.walkAtRules("layer", layer => {
+      if (layer.params === "base") layer.remove();
+    });
+    const css = postcss.parse([...styleTexts, generated.toString()].join("\n"));
     const rules: Array<{ selector: string; widthMin: number; widthMax: number; weight: number; styles: Record<string, string> }> = [];
     css.walkAtRules(() => { /* Decorative at-rules ignored */ });
     css.walkRules(rule => {
