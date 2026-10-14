@@ -77,6 +77,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/browser-venv"
           "$RUNNER_TEMP/browser-venv/bin/pip" install playwright==1.57.0
+          "$RUNNER_TEMP/browser-venv/bin/python" -m playwright install --with-deps chromium
       - name: Existing compiled workspace and editor browser journey
         env:
           DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_browser
