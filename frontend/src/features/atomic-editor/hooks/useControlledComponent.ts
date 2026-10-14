@@ -13,13 +13,15 @@ export function useControlledComponent(
   const [isLockModalOpen, setIsLockModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    if (component) {
-      const keys = ControlledComponentService.getComponentLockSettings(component.id);
-      setAllowedKeys(keys);
-      const instanceOv = ControlledComponentService.getInstanceOverrides(instanceId);
-      setOverrides(instanceOv);
-    }
-  }, [component, instanceId]);
+    // Schedule the persisted-state sync outside the render effect and cancel
+    // stale reads if the selected component or instance changes quickly.
+    if (!component) return;
+    const timer = window.setTimeout(() => {
+      setAllowedKeys(ControlledComponentService.getComponentLockSettings(component.id));
+      setOverrides(ControlledComponentService.getInstanceOverrides(instanceId));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [component?.id, instanceId]);
 
   const resolvedProperties = useMemo<ResolvedComponentProperty[]>(() => {
     if (!component) return [];
