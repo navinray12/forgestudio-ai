@@ -231,8 +231,11 @@ export class ApplicationSpecService {
     if (!spec.applicationId) errors.push("applicationId is required");
     if (!spec.projectId) errors.push("projectId is required");
     if (!spec.tenantId) errors.push("tenantId is required");
-    if (typeof spec.revision !== "number" || spec.revision < 1) {
+    if (!Number.isSafeInteger(spec.revision) || spec.revision < 1) {
       errors.push("revision must be a positive integer");
+    }
+    if (!Number.isSafeInteger(spec.parentRevision) || spec.parentRevision < 0) {
+      errors.push("parentRevision must be a non-negative integer");
     }
 
     // Invariant 1: Must NOT contain raw credentials or customer row storage.
@@ -260,8 +263,20 @@ export class ApplicationSpecService {
     // Invariant 2: Entity & Field Identifiers must be stable and prefixed
     const entityIds = new Set<string>();
     const entityNames = new Set<string>();
+    const physicalTables = new Set<string>();
+    const isSafeSqlIdentifier = (value: unknown): value is string =>
+      typeof value === "string" && /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(value);
 
     for (const entity of spec.entities || []) {
+      if (!isSafeSqlIdentifier(entity.physicalTableName)) {
+        errors.push(`Entity '${entity.name}' has an invalid physical table identifier.`);
+      } else {
+        const physicalTable = entity.physicalTableName.toLowerCase();
+        if (physicalTables.has(physicalTable)) {
+          errors.push(`Duplicate physical table '${entity.physicalTableName}' detected.`);
+        }
+        physicalTables.add(physicalTable);
+      }
       if (!entity.id || !entity.id.startsWith("ent_")) {
         errors.push(`Entity '${entity.name}' has invalid ID '${entity.id}'. Must start with 'ent_'.`);
       }
@@ -288,6 +303,12 @@ export class ApplicationSpecService {
         fieldIds.add(field.id);
         const logicalName = field.name.toLowerCase();
         const physicalName = field.physicalColumnName.toLowerCase();
+        if (!isSafeSqlIdentifier(field.physicalColumnName)) {
+          errors.push(`Field '${field.name}' in entity '${entity.name}' has an invalid physical column identifier.`);
+        }
+        if (field.type === "enum" && (!Array.isArray(field.enumOptions) || field.enumOptions.length === 0 || new Set(field.enumOptions).size !== field.enumOptions.length)) {
+          errors.push(`Enum field '${field.name}' must declare distinct non-empty enumOptions.`);
+        }
         if (fieldNames.has(logicalName)) {
           errors.push(`Duplicate field name '${field.name}' in entity '${entity.name}'.`);
         }
@@ -296,6 +317,22 @@ export class ApplicationSpecService {
         }
         fieldNames.add(logicalName);
         physicalColumns.add(physicalName);
+      }
+      const indexNames = new Set<string>();
+      for (const index of entity.indexes || []) {
+        if (!isSafeSqlIdentifier(index.name) || indexNames.has(index.name.toLowerCase())) {
+          errors.push(`Entity '${entity.name}' has a duplicate or invalid index name '${index.name}'.`);
+        }
+        indexNames.add(index.name.toLowerCase());
+        if (!Array.isArray(index.fields) || index.fields.length === 0 || new Set(index.fields).size !== index.fields.length) {
+          errors.push(`Index '${index.name}' must use distinct, non-empty fields.`);
+        } else {
+          for (const fieldName of index.fields) {
+            if (!entity.fields.some((field) => field.id === fieldName || field.name === fieldName || field.physicalColumnName === fieldName)) {
+              errors.push(`Index '${index.name}' references unknown field '${fieldName}'.`);
+            }
+          }
+        }
       }
     }
 
