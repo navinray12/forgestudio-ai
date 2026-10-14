@@ -22,3 +22,16 @@ test("integration side effects are gated to their active element type", () => {
   assert.ok(source.includes("&jsonPath="), "dynamic proxy query parameter must remain compatible");
   assert.ok(source.includes("?postId="), "ACF API query parameter must remain compatible");
 });
+
+test("CRM lead capture does not announce successful sync when backend fails", () => {
+  assert.ok(source.includes("if (!res.ok || data?.success !== true)"));
+  assert.ok(source.includes("setCrmError("));
+  assert.ok(!source.includes("Synced lead data with CRM (Demo Mode)"));
+});
+
+test("webhook requires HTTP and application success, retaining failure feedback", () => {
+  assert.ok(source.includes("if (!response.ok || result?.success !== true)"));
+  assert.ok(source.includes("setWebhookError("));
+  assert.ok(source.includes('credentials: "include"'));
+  assert.ok(!source.includes("Fallback for demo mode"));
+});
