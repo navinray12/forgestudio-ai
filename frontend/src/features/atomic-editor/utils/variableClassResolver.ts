@@ -141,8 +141,8 @@ export function findClassesUsingVariable(
 
         if (
           cleanKey.toLowerCase() === variable.id.toLowerCase() ||
-          cleanKey.toLowerCase() === variable.key.toLowerCase() ||
-          keyOrId.toLowerCase() === `--${variable.key}`.toLowerCase()
+          cleanKey.toLowerCase() === variable.key.replace(/^--/, "").toLowerCase() ||
+          keyOrId.toLowerCase() === variable.key.toLowerCase()
         ) {
           isUsed = true;
           break;
