@@ -15,22 +15,22 @@ export type PluginState = "registered" | "active" | "error" | "inactive";
 
 export interface PluginError {
     message: string;
-    details?: any;
+    details?: unknown;
     stack?: string;
 }
 
 export interface PluginExtensionContext {
     hooks: {
-        addAction: (hookName: string, callback: (...args: any[]) => void, priority?: number) => void;
-        addFilter: <T>(hookName: string, callback: (value: T, ...args: any[]) => T, priority?: number) => void;
+        addAction: (hookName: string, callback: (...args: unknown[]) => void, priority?: number) => void;
+        addFilter: <T>(hookName: string, callback: (value: T, ...args: unknown[]) => T, priority?: number) => void;
     };
     elements: {
         registerElement: (config: { type: string; [key: string]: unknown }) => void;
     };
     logger: {
-        info: (msg: string, ...args: any[]) => void;
-        warn: (msg: string, ...args: any[]) => void;
-        error: (msg: string, ...args: any[]) => void;
+        info: (msg: string, ...args: unknown[]) => void;
+        warn: (msg: string, ...args: unknown[]) => void;
+        error: (msg: string, ...args: unknown[]) => void;
     };
 }
 
@@ -53,7 +53,7 @@ export class PluginManagerCore {
     private plugins: Map<string, PluginInstance> = new Map();
     private actions: Map<string, HookRegistration[]> = new Map();
     private filters: Map<string, HookRegistration[]> = new Map();
-    private registeredElements: Map<string, any> = new Map(); // Store custom element structures
+    private registeredElements: Map<string, { type: string; [key: string]: unknown }> = new Map(); // Store custom element structures
 
     private static instance: PluginManagerCore;
 
@@ -198,7 +198,7 @@ export class PluginManagerCore {
         this.actions.get(hook)!.sort((a, b) => a.priority - b.priority); // Chronological Deterministic Priority
     }
 
-    public doAction(hook: string, ...args: any[]) {
+    public doAction(hook: string, ...args: unknown[]) {
         const hooks = this.actions.get(hook) || [];
         for (const h of hooks) {
             try {
@@ -215,7 +215,7 @@ export class PluginManagerCore {
         this.filters.get(hook)!.sort((a, b) => a.priority - b.priority);
     }
 
-    public applyFilters<T>(hook: string, initialValue: T, ...args: any[]): T {
+    public applyFilters<T>(hook: string, initialValue: T, ...args: unknown[]): T {
         const hooks = this.filters.get(hook) || [];
         let value = initialValue;
         for (const h of hooks) {
