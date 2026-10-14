@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 interface Plan {
@@ -43,6 +43,7 @@ export default function SubscriptionPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const planRequestInFlight = useRef(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -183,7 +184,8 @@ export default function SubscriptionPage() {
   }, []);
 
   const handleSelectPlan = async (plan: Plan) => {
-    if (subscription?.plan?.slug === plan.slug) return;
+    if (planRequestInFlight.current || subscription?.plan?.slug === plan.slug) return;
+    planRequestInFlight.current = true;
     setActionBusy(plan.slug);
     setError("");
     setSuccess("");
@@ -196,8 +198,8 @@ export default function SubscriptionPage() {
         credentials: "include",
         body: JSON.stringify({ planSlug: plan.slug }),
       });
-      const data = await res.json();
-      if (!res.ok || data?.success === false) {
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data?.success === false) {
         throw new Error(data?.message || data?.error?.message || "Failed to select plan.");
       }
 
@@ -206,6 +208,7 @@ export default function SubscriptionPage() {
     } catch (err: unknown) {
       setError((err instanceof Error ? err.message : "") || "Could not complete plan update.");
     } finally {
+      planRequestInFlight.current = false;
       setActionBusy(null);
     }
   };
