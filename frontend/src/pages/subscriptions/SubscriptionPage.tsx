@@ -197,8 +197,8 @@ export default function SubscriptionPage() {
         body: JSON.stringify({ planSlug: plan.slug }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error?.message || "Failed to select plan.");
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || data?.error?.message || "Failed to select plan.");
       }
 
       setSuccess(`Plan changed to ${plan.name} successfully!`);
