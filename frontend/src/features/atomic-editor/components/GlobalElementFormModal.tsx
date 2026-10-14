@@ -68,14 +68,14 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
         description,
       });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save Global Element.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save Global Element.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const updateStyleProp = (key: keyof ElementStyles, value: any) => {
+  const updateStyleProp = (key: keyof ElementStyles, value: string) => {
     setStyles((prev) => ({
       ...prev,
       [key]: value !== "" ? value : undefined,
