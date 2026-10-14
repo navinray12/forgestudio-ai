@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { loadTypeScript } from './load-typescript.mjs';
 
@@ -40,4 +41,11 @@ for (const value of ['0', '-1', 'Infinity', '1000', '1.5', '', '2garbage']) {
 
 test('L-04: missing connection configuration fails without creating a fake database', async () => {
   await assert.rejects(load({ DATABASE_URL: '' }), /DATABASE_URL/);
+});
+
+
+test('DATA-003: monorepo workspace bootstrap declares a valid quoted circular-dependency column', () => {
+  const schema = readFileSync(new URL('../../backend/src/config/ensure-schema.ts', import.meta.url), 'utf8');
+  assert.match(schema, /"hasCircularDependencies"\s+BOOLEAN\s+DEFAULT\s+false/);
+  assert.doesNotMatch(schema, /"hasCircularDependencies\s+BOOLEAN/);
 });
