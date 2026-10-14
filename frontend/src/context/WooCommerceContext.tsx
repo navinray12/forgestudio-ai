@@ -222,10 +222,15 @@ export const WooCommerceProvider: React.FC<{
       });
 
       if (existingIdx > -1) {
-        const copy = [...prev];
-        copy[existingIdx].quantity += quantity;
-        if (customPrice !== undefined) copy[existingIdx].customPrice = customPrice;
-        return copy;
+        return prev.map((item, index) =>
+          index === existingIdx
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+                ...(customPrice !== undefined ? { customPrice } : {}),
+              }
+            : item
+        );
       }
       return [...prev, { product, quantity, selectedAddOns, customPrice }];
     });
