@@ -33,7 +33,9 @@ export function useVariables() {
   }, []);
 
   useEffect(() => {
-    loadVariables();
+    // Initialize asynchronously to avoid cascading state updates during effects.
+    const timer = window.setTimeout(() => { void loadVariables(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadVariables]);
 
   const filteredVariables = useMemo(() => {
