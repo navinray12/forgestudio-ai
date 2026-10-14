@@ -493,7 +493,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           {loading && <span className="text-[10px] text-sky-400 animate-pulse">Syncing live...</span>}
         </div>
         <div className="text-2xl font-bold text-sky-300">
-          {fetchedData}
+          {fetchedData || fallback}
         </div>
         <div className="text-[10px] text-slate-500 mt-2 truncate">
           Source: {apiUrlEndpoint} &rarr; Path: {jsonPath}
