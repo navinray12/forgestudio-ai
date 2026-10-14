@@ -46,8 +46,8 @@ export const VariableFormModal: React.FC<VariableFormModalProps> = ({
     try {
       await onSubmit({ name, type, value, description });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Unable to save variable.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Unable to save variable.");
     } finally {
       setIsSubmitting(false);
     }
