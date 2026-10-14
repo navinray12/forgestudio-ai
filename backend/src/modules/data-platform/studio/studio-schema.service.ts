@@ -5,14 +5,50 @@ import { AppError } from "../../../utils/app-error.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
 export function validateIdentifier(identifier: string): string {
-  if (!identifier || !/^[a-zA-Z0-9_]+$/.test(identifier)) {
+  // PostgreSQL truncates identifiers after 63 bytes. Refuse collisions rather
+  // than silently applying a migration to a different table or column.
+  if (typeof identifier !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier) || Buffer.byteLength(identifier, "utf8") > 63) {
     throw new AppError(
-      `Invalid SQL identifier "${identifier}". Only alphanumeric characters and underscores are allowed.`,
+      `Invalid SQL identifier "${identifier}". Use 1–63 bytes, starting with a letter or underscore, followed by letters, numbers or underscores.`,
       400,
       "INVALID_IDENTIFIER"
     );
   }
-  return identifier.slice(0, 63);
+  return identifier;
+}
+
+/** Only documented PostgreSQL scalar types and bounded type parameters. */
+export function validateColumnType(type: string): string {
+  if (typeof type !== "string") {
+    throw new AppError("Invalid column type", 400, "INVALID_TYPE");
+  }
+  const value = type.trim().toUpperCase();
+  if (/^(TEXT|INTEGER|INT|BIGINT|SMALLINT|BOOLEAN|BOOL|TIMESTAMP|TIMESTAMPTZ|DATE|JSONB|JSON|UUID|REAL|FLOAT8)$/.test(value)) {
+    return value;
+  }
+  const varchar = /^(VARCHAR)\(([1-9][0-9]{0,4})\)$/.exec(value);
+  if (varchar && Number(varchar[2]) <= 10485760) return value;
+  const numeric = /^(NUMERIC|DECIMAL)\(([1-9][0-9]?),([0-9]{1,2})\)$/.exec(value);
+  if (numeric && Number(numeric[2]) <= 1000 && Number(numeric[3]) <= Number(numeric[2])) return value;
+  if (value === "VARCHAR" || value === "NUMERIC" || value === "DECIMAL") return value;
+  throw new AppError(`Unsupported column type "${type}"`, 400, "INVALID_TYPE");
+}
+
+/**
+ * DDL expressions cannot be parameterized; reject arbitrary SQL in UI defaults.
+ * Keep common scalar literals and well-known database-generated values.
+ */
+export function validateColumnDefault(value: string): string {
+  if (typeof value !== "string") {
+    throw new AppError("Invalid column default", 400, "INVALID_DEFAULT");
+  }
+  const candidate = value.trim();
+  if (
+    /^(NULL|TRUE|FALSE|CURRENT_DATE|CURRENT_TIMESTAMP|NOW\(\)|GEN_RANDOM_UUID\(\))$/i.test(candidate) ||
+    /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(candidate) ||
+    /^'(?:[^']|'')*'$/.test(candidate)
+  ) return candidate;
+  throw new AppError("Unsupported column default expression; use a scalar literal or an approved database function.", 400, "INVALID_DEFAULT");
 }
 
 export interface ColumnDefinition {
@@ -265,29 +301,17 @@ export async function createTable(
     throw new AppError("Table must contain at least one column", 400, "INVALID_COLUMNS");
   }
 
-  const allowedTypes = new Set([
-    "VARCHAR", "TEXT", "INTEGER", "INT", "BIGINT", "SMALLINT",
-    "BOOLEAN", "BOOL", "TIMESTAMP", "TIMESTAMPTZ", "DATE",
-    "JSONB", "JSON", "UUID", "NUMERIC", "DECIMAL", "REAL", "FLOAT8",
-  ]);
-
   const primaryKeys: string[] = [];
   const columnClauses: string[] = [];
 
   for (const col of payload.columns) {
     const safeColName = validateIdentifier(col.name);
-    const upperType = col.type.toUpperCase().trim();
-
-    // Support VARCHAR(n)
-    const baseType = upperType.split("(")[0];
-    if (!allowedTypes.has(baseType)) {
-      throw new AppError(`Unsupported column type "${col.type}"`, 400, "INVALID_TYPE");
-    }
+    const upperType = validateColumnType(col.type);
 
     let clause = `"${safeColName}" ${upperType}`;
 
-    if (col.defaultValue && col.defaultValue.trim() !== "") {
-      clause += ` DEFAULT ${col.defaultValue}`;
+    if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue.trim() !== "") {
+      clause += ` DEFAULT ${validateColumnDefault(col.defaultValue)}`;
     }
 
     if (col.isNullable === false || col.isPrimaryKey) {
