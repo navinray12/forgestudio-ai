@@ -20,11 +20,108 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
 }) => {
   const innerStyles = getInnerStyles(resolvedStyles);
 
+  // All integrations share this component. Hooks must run in the same order
+  // when an existing canvas element changes its integration type.
+  const [fetchedData, setFetchedData] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [triggered, setTriggered] = useState(false);
+  const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
+  const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
+  const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
+
   // Helper for safe style value getters with fallback defaults
   const getProp = (prop: string, fallback: string): string => {
     const val = getStyleVal(prop);
     return val !== undefined && val !== "" ? val : fallback;
   };
+
+
+  const dynamicApiEndpoint = getProp("dynamicApiUrl", "https://api.github.com/repos/facebook/react");
+  const dynamicJsonPath = getProp("dynamicJsonPath", "stargazers_count");
+  const dynamicFallback = getProp("dynamicFallbackText", "Loading dynamic stats...");
+  const acfFieldKey = getProp("acfFieldKey", "hero_banner_text");
+  const acfPostId = getProp("acfPostId", "1");
+  const toolsetFieldSlug = getProp("toolsetFieldSlug", "wpcf-custom-header");
+  const podsFieldKey = getProp("podsFieldKey", "pod_title");
+
+  useEffect(() => {
+  if (el.type !== "dynamic-data") return;
+    let isMounted = true;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Use backend dynamic data proxy for CORS safety
+        const proxyUrl = `${apiUrl}/api/integrations/dynamic-data/fetch?url=${encodeURIComponent(dynamicApiEndpoint)}&jsonPath=${encodeURIComponent(dynamicJsonPath)}`;
+        const res = await fetch(proxyUrl);
+        const json = await res.json();
+        if (isMounted && json?.value !== undefined) {
+          setFetchedData(String(json.value));
+        } else if (isMounted) {
+          setFetchedData(dynamicFallback);
+        }
+      } catch {
+        if (isMounted) setFetchedData(dynamicFallback);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [dynamicApiEndpoint, dynamicJsonPath, dynamicFallback, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "acf-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/acf-fields?postId=${acfPostId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[acfFieldKey]) {
+          setAcfVal(String(d.fields[acfFieldKey]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [acfFieldKey, acfPostId, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "toolset-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/toolset-fields`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[toolsetFieldSlug]) {
+          setToolsetVal(String(d.fields[toolsetFieldSlug]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [toolsetFieldSlug, apiUrl, el.type]);
+
+  useEffect(() => {
+  if (el.type !== "pods-integration") return;
+    let isMounted = true;
+    fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/pods-fields`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.fields?.[podsFieldKey]) {
+          setPodsVal(String(d.fields[podsFieldKey]));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [podsFieldKey, apiUrl, el.type]);
 
   // ==========================================
   // F-411: Google Maps Renderer
@@ -386,35 +483,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
     const apiUrlEndpoint = getProp("dynamicApiUrl", "https://api.github.com/repos/facebook/react");
     const jsonPath = getProp("dynamicJsonPath", "stargazers_count");
     const fallback = getProp("dynamicFallbackText", "Loading dynamic stats...");
-    const [fetchedData, setFetchedData] = useState<string>(fallback);
-    const [loading, setLoading] = useState<boolean>(false);
 
-    useEffect(() => {
-      let isMounted = true;
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          // Use backend dynamic data proxy for CORS safety
-          const proxyUrl = `${apiUrl}/api/integrations/dynamic-data/fetch?url=${encodeURIComponent(apiUrlEndpoint)}&jsonPath=${encodeURIComponent(jsonPath)}`;
-          const res = await fetch(proxyUrl);
-          const json = await res.json();
-          if (isMounted && json?.value !== undefined) {
-            setFetchedData(String(json.value));
-          } else if (isMounted) {
-            setFetchedData(fallback);
-          }
-        } catch {
-          if (isMounted) setFetchedData(fallback);
-        } finally {
-          if (isMounted) setLoading(false);
-        }
-      };
 
-      fetchData();
-      return () => {
-        isMounted = false;
-      };
-    }, [apiUrlEndpoint, jsonPath, apiUrl]);
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-slate-800 text-white shadow-md">
@@ -479,9 +549,6 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if (el.type === "crm-integration") {
     const provider = getProp("crmProvider", "hubspot");
     const title = getProp("crmFormTitle", "Subscribe for Enterprise Updates");
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [status, setStatus] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -547,7 +614,6 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if (el.type === "webhook-integration") {
     const webhookUrl = getProp("webhookUrl", "https://hooks.zapier.com/hooks/catch/12345/abcde");
     const eventType = getProp("webhookTriggerEvent", "onButtonClick");
-    const [triggered, setTriggered] = useState(false);
 
     const handleWebhookTrigger = async () => {
       setTriggered(true);
@@ -592,22 +658,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   if ((el.type as string) === "acf-integration") {
     const fieldKey = getProp("acfFieldKey", "hero_banner_text");
     const postId = getProp("acfPostId", "1");
-    const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/acf-fields?postId=${postId}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldKey]) {
-            setAcfVal(String(d.fields[fieldKey]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldKey, postId, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-amber-500/40 text-white shadow-md">
@@ -627,22 +679,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   // ==========================================
   if ((el.type as string) === "toolset-integration") {
     const fieldSlug = getProp("toolsetFieldSlug", "wpcf-custom-header");
-    const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/toolset-fields`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldSlug]) {
-            setToolsetVal(String(d.fields[fieldSlug]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldSlug, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-blue-500/40 text-white shadow-md">
@@ -662,22 +700,8 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   // ==========================================
   if ((el.type as string) === "pods-integration") {
     const fieldKey = getProp("podsFieldKey", "pod_title");
-    const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
 
-    useEffect(() => {
-      let isMounted = true;
-      fetch(`${apiUrl}/api/v1/websites/demo-site/wordpress/pods-fields`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (isMounted && d?.fields?.[fieldKey]) {
-            setPodsVal(String(d.fields[fieldKey]));
-          }
-        })
-        .catch(() => {});
-      return () => {
-        isMounted = false;
-      };
-    }, [fieldKey, apiUrl]);
+
 
     return (
       <div className="w-full p-4 rounded-xl bg-slate-900 border border-emerald-500/40 text-white shadow-md">
