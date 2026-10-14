@@ -51,7 +51,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-    } catch (_e) {
+    } catch {
       // Fallback
     }
 
@@ -178,7 +178,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     try {
       localStorage.removeItem(STORAGE_KEY);
-    } catch (_e) {
+    } catch {
       // Fallback
     }
   }, []);
