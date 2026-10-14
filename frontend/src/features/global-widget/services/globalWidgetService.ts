@@ -5,7 +5,15 @@ const LOCAL_STORAGE_KEY = "forgestudio_global_widgets";
 function getLocalGlobalWidgets(): GlobalWidget[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is GlobalWidget =>
+      typeof item === "object" && item !== null &&
+      "id" in item && typeof item.id === "string" &&
+      "name" in item && typeof item.name === "string" &&
+      "elements" in item && Array.isArray(item.elements)
+    );
   } catch {
     return [];
   }
