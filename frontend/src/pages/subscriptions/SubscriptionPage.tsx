@@ -211,7 +211,7 @@ export default function SubscriptionPage() {
   };
 
   const parseFeatures = (features: Plan["features"]): string[] => {
-    if (Array.isArray(features)) return features;
+    if (Array.isArray(features)) return features.map((feature) => String(feature));
     if (typeof features === "object" && features !== null) {
       return Object.entries(features).map(([k, v]) => `${k}: ${v}`);
     }
