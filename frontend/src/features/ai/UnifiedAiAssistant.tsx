@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Sparkles, Wand2, Palette, Layout, FileText, Code2, Play, Search, BookOpen, CheckCircle2, AlertCircle, X, ChevronRight, RefreshCw, Zap } from "lucide-react";
 import { DesignAssistant } from "./DesignAssistant";
 
@@ -43,7 +43,6 @@ export function UnifiedAiAssistant({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [detectedIntent, setDetectedIntent] = useState<string>("Smart Action");
 
   // Changeset state
   const [changeset, setChangeset] = useState<any>(null);
@@ -61,30 +60,30 @@ export function UnifiedAiAssistant({
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
 
   // Update intent indicator as user types
-  useEffect(() => {
+  const detectedIntent = useMemo(() => {
     const p = prompt.toLowerCase();
     if (p.includes("audit") || p.includes("analyze") || p.includes("accessibility")) {
-      setDetectedIntent("Site Audit");
+      return ("Site Audit");
     } else if (p.includes("seo") || p.includes("meta")) {
-      setDetectedIntent("SEO Metadata");
+      return ("SEO Metadata");
     } else if (p.includes("remove background") || p.includes("transparent")) {
-      setDetectedIntent("Background Removal");
+      return ("Background Removal");
     } else if (p.includes("image") || p.includes("photo") || p.includes("illustration")) {
-      setDetectedIntent("Image Generation");
+      return ("Image Generation");
     } else if (p.includes("code") || p.includes("script") || p.includes("html") || p.includes("css")) {
-      setDetectedIntent("Code Generation");
+      return ("Code Generation");
     } else if (p.includes("animate") || p.includes("motion") || p.includes("fade") || p.includes("slide")) {
-      setDetectedIntent("Animation");
+      return ("Animation");
     } else if (p.includes("container") || p.includes("grid") || p.includes("flex")) {
-      setDetectedIntent("Container / Layout");
+      return ("Container / Layout");
     } else if (p.includes("section") || p.includes("hero") || p.includes("pricing") || p.includes("testimonial")) {
-      setDetectedIntent("Section Generation");
+      return ("Section Generation");
     } else if (p.includes("rewrite") || p.includes("tone") || p.includes("shorten") || p.includes("expand")) {
-      setDetectedIntent("Content Refinement");
+      return ("Content Refinement");
     } else if (p.includes("design") || p.includes("stitch") || p.includes("claude") || p.includes("full site")) {
-      setDetectedIntent("Full Design Pipeline");
+      return ("Full Design Pipeline");
     } else {
-      setDetectedIntent("Smart Assistant");
+      return ("Smart Assistant");
     }
   }, [prompt]);
 
