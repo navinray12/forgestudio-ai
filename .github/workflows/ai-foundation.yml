@@ -41,7 +41,7 @@ jobs:
         working-directory: backend
         run: |
           set -e
-          for test_file in src/tests/ai-changeset-integration.test.js src/tests/job-leases-integration.test.js src/tests/ai-prompt-cleanup.test.js src/tests/ai-site-brief.test.js src/tests/ai-site-blueprint.test.js src/tests/ai-site-repair.test.js; do
+          for test_file in src/tests/ai-changeset-integration.test.ts src/tests/job-leases-integration.test.ts src/tests/ai-prompt-cleanup.test.ts src/tests/ai-site-brief.test.ts src/tests/ai-site-blueprint.test.ts src/tests/ai-site-repair.test.ts; do
             node --import tsx --test "$test_file"
           done
       - name: Changed AI UI lint
@@ -51,7 +51,7 @@ jobs:
         working-directory: backend
         run: |
           set -e
-          for test_file in src/tests/ai-design.test.js src/tests/ai-design-integration.test.js; do
+          for test_file in src/tests/ai-design.test.ts src/tests/ai-design-integration.test.ts; do
             node --import tsx --test "$test_file"
           done
       - name: Browser save coordinator ordering
@@ -60,7 +60,7 @@ jobs:
         working-directory: backend
         run: |
           set -e
-          for test_file in src/tests/workspace-integration.test.js; do
+          for test_file in src/tests/workspace-integration.test.ts; do
             node --import tsx --test "$test_file"
           done
       - run: npm run build --prefix frontend
