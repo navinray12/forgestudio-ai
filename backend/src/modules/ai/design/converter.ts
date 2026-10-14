@@ -36,12 +36,12 @@ export class HtmlDesignConverter implements DesignConverter {
       const item = $(element);
       return element.type === "tag" && element.name === "link"
         ? Boolean(item.attr("href"))
-        : /url\\s*\\(|@import\\b|expression\\s*\\(/i.test(item.html() || "");
+        : /url\s*\(|@import\b|expression\s*\(/i.test(item.html() || "");
     })) throw new ConversionError(["EXTERNAL_STYLES_UNSUPPORTED"]);
     if ($("*").toArray().some(element => {
       if (element.type !== "tag") return false;
       return Object.entries(element.attribs).some(([name, value]) =>
-        /^on/i.test(name) || /url\\s*\\(|expression\\s*\\(|javascript\\s*:/i.test(value)
+        /^on/i.test(name) || /url\s*\(|expression\s*\(|javascript\s*:/i.test(value)
       );
     })) throw new ConversionError(["UNSAFE_ATTRIBUTE"]);
     if ($("*").length > 1800) throw new ConversionError(["ELEMENT_LIMIT"]);
