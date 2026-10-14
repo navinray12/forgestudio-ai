@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause, requireMutatedRow } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -93,4 +93,14 @@ test("Schema Studio validates requested sort instead of silently falling back", 
   assert.throws(() => buildStudioOrderClause(details, "display_name", "SIDEWAYS"), /Invalid sort order/);
   assert.throws(() => buildStudioOrderClause(details, 'id"; DROP TABLE users', "ASC"), /Invalid SQL identifier/);
   assert.equal(buildStudioOrderClause({ columns: [{ name: "label", isPrimaryKey: false }] }, "label"), 'ORDER BY "label" ASC');
+});
+
+test("Schema Studio does not acknowledge an UPDATE or DELETE that matched no row", () => {
+  const row = { id: 0, label: "" };
+  assert.equal(requireMutatedRow(row, "UPDATE"), row);
+  assert.equal(requireMutatedRow(row, "DELETE"), row);
+  assert.throws(() => requireMutatedRow(undefined, "UPDATE"), (error: any) =>
+    error.code === "ROW_NOT_FOUND" && error.statusCode === 404);
+  assert.throws(() => requireMutatedRow(null, "DELETE"), (error: any) =>
+    error.code === "ROW_NOT_FOUND" && error.statusCode === 404);
 });
