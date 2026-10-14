@@ -39,18 +39,18 @@ jobs:
       - run: npm run build --prefix backend
       - name: AI and worker contracts (fixtures, no live provider requests)
         working-directory: backend
-        run: node --test dist/tests/ai-changeset-integration.test.js dist/tests/job-leases-integration.test.js dist/tests/ai-prompt-cleanup.test.js dist/tests/ai-site-brief.test.js dist/tests/ai-site-blueprint.test.js dist/tests/ai-site-repair.test.js
+        run: node --import tsx --test src/tests/ai-changeset-integration.test.js src/tests/job-leases-integration.test.js src/tests/ai-prompt-cleanup.test.js src/tests/ai-site-brief.test.js src/tests/ai-site-blueprint.test.js src/tests/ai-site-repair.test.js
       - name: Changed AI UI lint
         working-directory: frontend
         run: npx --no-install eslint src/features/ai/AiSiteAssistant.tsx src/features/ai/DesignAssistant.tsx src/features/ai/DesignProposalPreview.tsx src/features/editor-access/document-save-coordinator.ts
       - name: Design importer, provider boundaries and durable execution
         working-directory: backend
-        run: node --test dist/tests/ai-design.test.js dist/tests/ai-design-integration.test.js
+        run: node --import tsx --test src/tests/ai-design.test.js src/tests/ai-design-integration.test.js
       - name: Browser save coordinator ordering
         run: node --experimental-vm-modules --test tests/hardening/document-coordinator.test.mjs tests/hardening/design-styles.test.mjs
       - name: Existing workspace and document contracts on migrated schema
         working-directory: backend
-        run: node --test dist/tests/workspace-integration.test.js
+        run: node --import tsx --test src/tests/workspace-integration.test.js
       - run: npm run build --prefix frontend
       - run: docker compose config --quiet
       - name: Install browser qualification tools
