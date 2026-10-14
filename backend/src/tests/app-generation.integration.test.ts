@@ -278,6 +278,31 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(retry.run.retryOfRunId).toBe(first.run.id);
   });
 
+  it("serializes simultaneous admission for one project across distinct idempotency keys", async () => {
+    const project = await newProject();
+    const { provider } = scriptedProvider([]);
+    const slow = { ...provider, generate: () => new Promise<never>(() => undefined) };
+    const service = new AppGenerationService({ providerFactory: () => slow as any, filesystem: fs });
+    const base = {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Clinic appointments booking",
+    };
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) => service.createRun({ ...base, idempotencyKey: `concurrent-${i}` }))
+    );
+    const accepted = results.filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled");
+    const rejected = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    expect(accepted).toHaveLength(1);
+    expect(rejected).toHaveLength(7);
+    expect(rejected.every((result) => result.reason?.code === "GENERATION_IN_PROGRESS")).toBe(true);
+    const { rows } = await pgPool.query(
+      `SELECT count(*)::int AS count FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[])`,
+      [project.id, ["FAILED", "SOURCE_WRITTEN"]]
+    );
+    expect(rows[0].count).toBe(1);
+    await reconcileInterruptedRuns();
+  });
+
   it("never overwrites source that ForgeStudio did not generate", async () => {
     const project = await newProject();
     await fs.writeFile(project.id, "forge-app/server/app.ts", { content: "// hand-written\nexport const mine = 1;\n", authorId: users.owner.id });

@@ -134,38 +134,61 @@ export class AppGenerationService {
   async createRun(input: CreateRunInput): Promise<{ run: AppGenerationRun; created: boolean }> {
     const { mode, brief, templateId, idempotencyKey } = normalizeInput(input);
 
-    const existing = await pgPool.query(
-      `SELECT * FROM forge_app_generation_runs WHERE "projectId" = $1 AND "idempotencyKey" = $2`,
-      [input.projectId, idempotencyKey]
-    );
-    if (existing.rows[0]) {
-      const run = rowToRun(existing.rows[0]);
-      if (run.mode !== mode || run.brief !== brief || run.templateId !== templateId) {
-        throw new AppError("This idempotency key was already used for a different request", 409, "IDEMPOTENCY_CONFLICT");
+    // Admission must be serialized across server processes, not only within this
+    // worker. The transaction-scoped advisory lock is released on commit/rollback.
+    const client = await pgPool.connect();
+    let run: AppGenerationRun;
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('forge-app-generation'), hashtext($1::text))",
+        [input.projectId]
+      );
+
+      const existing = await client.query(
+        `SELECT * FROM forge_app_generation_runs WHERE "projectId" = $1 AND "idempotencyKey" = $2`,
+        [input.projectId, idempotencyKey]
+      );
+      if (existing.rows[0]) {
+        const previous = rowToRun(existing.rows[0]);
+        if (previous.mode !== mode || previous.brief !== brief || previous.templateId !== templateId) {
+          throw new AppError("This idempotency key was already used for a different request", 409, "IDEMPOTENCY_CONFLICT");
+        }
+        await client.query("COMMIT");
+        return { run: previous, created: false };
       }
-      return { run, created: false };
+
+      const active = await client.query(
+        `SELECT id FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[]) LIMIT 1`,
+        [input.projectId, TERMINAL]
+      );
+      if (active.rows[0]) {
+        throw new AppError("A generation is already running for this project", 409, "GENERATION_IN_PROGRESS");
+      }
+
+      const inserted = await client.query(
+        `INSERT INTO forge_app_generation_runs ("projectId", "requestedById", mode, status, brief, "templateId", "idempotencyKey", "retryOfRunId")
+         VALUES ($1, $2, $3, 'QUEUED', $4, $5, $6, $7)
+         ON CONFLICT ("projectId", "idempotencyKey") DO NOTHING
+         RETURNING *`,
+        [input.projectId, input.requestedById, mode, brief, templateId, idempotencyKey, input.retryOfRunId ?? null]
+      );
+      if (!inserted.rows[0]) {
+        // A request bypassing this lock may have inserted this idempotency key.
+        // Do not recursively create a run: fail safely and let the caller replay.
+        throw new AppError("Generation idempotency key is being processed; retry the request", 409, "IDEMPOTENCY_IN_PROGRESS");
+      }
+      run = rowToRun(inserted.rows[0]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
 
-    const active = await pgPool.query(
-      `SELECT id FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[]) LIMIT 1`,
-      [input.projectId, TERMINAL]
-    );
-    if (active.rows[0]) {
-      throw new AppError("A generation is already running for this project", 409, "GENERATION_IN_PROGRESS");
-    }
-
-    const inserted = await pgPool.query(
-      `INSERT INTO forge_app_generation_runs ("projectId", "requestedById", mode, status, brief, "templateId", "idempotencyKey", "retryOfRunId")
-       VALUES ($1, $2, $3, 'QUEUED', $4, $5, $6, $7)
-       ON CONFLICT ("projectId", "idempotencyKey") DO NOTHING
-       RETURNING *`,
-      [input.projectId, input.requestedById, mode, brief, templateId, idempotencyKey, input.retryOfRunId ?? null]
-    );
-    if (!inserted.rows[0]) {
-      // A concurrent request with the same key won the insert; return its run.
-      return this.createRun(input);
-    }
-    const run = rowToRun(inserted.rows[0]);
+    // Start only after the transaction commits, otherwise a worker might claim
+    // a run before it is visible outside the admission transaction.
     setImmediate(() => {
       this.processRun(run.id, input.tenantId).catch(async () => {
         // Unexpected failures must not strand a project in an active run state.
