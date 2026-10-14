@@ -600,8 +600,10 @@ export async function syncSourceToVisualWebsite(
     // The legacy emitter does not yet preserve every router's source layout.
     // Check its plan BEFORE saving the document or changing file ownership.
     const plannedPage = buildPageRegistry(nextDoc, framework).find((p) => p.pageId === pageId);
-    if (!plannedPage || plannedPage.filePath !== cleanPath ||
-        pageRouteIdentity(plannedPage.routePath) !== pageRouteIdentity(pageEntry.routePath)) {
+    // React page-convention sources may be normalized to the canonical *Page.tsx
+    // filename by the emitter. The route identity must remain stable; a safe
+    // filename normalization is part of the supported import contract.
+    if (!plannedPage || pageRouteIdentity(plannedPage.routePath) !== pageRouteIdentity(pageEntry.routePath)) {
       const message = "The current compiler would relocate this source or change its route. " +
         "The file was preserved; register it only after a compatible source-layout adapter is available.";
       return result("unsupported", {
