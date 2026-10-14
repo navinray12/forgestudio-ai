@@ -129,9 +129,9 @@ export function UnifiedAiAssistant({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error?.message || "AI action failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.success === false) {
+        throw new Error(data?.message || data?.error?.message || "AI action failed");
       }
 
       if (data.result?.changeset) {
@@ -169,14 +169,18 @@ export function UnifiedAiAssistant({
           websiteId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || data.message || "Image generation failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.success === false) {
+        throw new Error(data?.error?.message || data?.message || "Image generation failed");
+      }
       if (data.url || data.imageUrl) {
         setGeneratedImages((prev) => [data.url || data.imageUrl, ...prev]);
         setSuccessMessage("Image generated successfully!");
       } else if (data.images && Array.isArray(data.images)) {
         setGeneratedImages((prev) => [...data.images, ...prev]);
         setSuccessMessage("Images generated successfully!");
+      } else {
+        throw new Error("Image generation returned no images.");
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate image");
