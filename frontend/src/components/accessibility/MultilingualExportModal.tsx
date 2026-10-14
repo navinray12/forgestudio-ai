@@ -126,11 +126,11 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
                 { id: "polylang", label: "Polylang", desc: "Polylang Strings Array" },
                 { id: "translatepress", label: "TranslatePress", desc: "TranslatePress Key Map" },
                 { id: "weglot", label: "Weglot API", desc: "Weglot Dynamic Words" },
-              ] as { id: MultilingualExportOptions["engine"]; label: string; desc: string }[]).map((eng) => (
+              ] as const).map((eng) => (
                 <button
                   key={eng.id}
                   type="button"
-                  onClick={() => setEngine(eng.id)}
+                  onClick={() => setEngine(eng.id as MultilingualExportOptions['engine'])}
                   className={`p-3 rounded-xl text-left border transition cursor-pointer ${
                     engine === eng.id
                       ? "bg-indigo-600/20 border-indigo-500 text-white shadow-md shadow-indigo-600/20"
