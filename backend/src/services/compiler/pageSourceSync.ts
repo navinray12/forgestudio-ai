@@ -1180,7 +1180,7 @@ export async function reconcilePageSource(input: PageReconcileInput): Promise<Pa
         if (at >= 0 || saved.length !== canonical.length) {
           const token = at >= 0 ? saved[at] : canonical[saved.length];
           diagnostics.push({
-            severity: "warning",
+            severity: "error",
             code: "CUSTOM_CODE_OUTSIDE_PROTECTED_REGION",
             message: `Code outside the page's JSX and its protected regions differs from the generated page (near "${String(token).slice(0, 40)}"). Move custom logic into a // [forge-protect-start: ...] region.`,
             filePath,
