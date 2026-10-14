@@ -537,6 +537,14 @@ export function assertSafeRowMutation(
   }
 }
 
+/** An update or deletion with no matching primary key must not report success. */
+export function requireMutatedRow<T>(row: T | null | undefined, action: "UPDATE" | "DELETE"): T {
+  if (row === null || row === undefined) {
+    throw new AppError(`Cannot ${action.toLowerCase()} row: primary key was not found`, 404, "ROW_NOT_FOUND");
+  }
+  return row;
+}
+
 export async function mutateTableRow(
   projectId: string,
   tableName: string,
@@ -567,7 +575,7 @@ export async function mutateTableRow(
         `DELETE FROM "public"."${safeTable}" WHERE "${safePk}" = $1 RETURNING *;`,
         [payload.primaryKeyValue]
       );
-      return res.rows[0] || null;
+      return requireMutatedRow(res.rows[0], "DELETE");
     }
 
     if (payload.action === "UPDATE") {
@@ -595,7 +603,7 @@ export async function mutateTableRow(
       values.push(payload.primaryKeyValue);
       const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}"  = $${idx} RETURNING *;`;
       const res = await client.query(query, values);
-      return res.rows[0] || null;
+      return requireMutatedRow(res.rows[0], "UPDATE");
     }
 
     if (payload.action === "INSERT") {
