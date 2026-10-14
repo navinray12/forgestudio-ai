@@ -365,17 +365,17 @@ export async function createTable(
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
-  // Record migration in Prisma
+  // Record migration in Prisma after tenant DDL succeeds.
   const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
-    await prisma.databaseMigrationRecord.create({
-      data: {
-        databaseId: dbRecord.id,
-        migrationName: `create_table_${safeName}_${Date.now()}`,
-        checksum,
-        sqlScript: ddl,
-        executionTimeMs: durationMs,
-      },
-    });
+  await prisma.databaseMigrationRecord.create({
+    data: {
+      databaseId: dbRecord.id,
+      migrationName: `create_table_${safeName}_${Date.now()}`,
+      checksum,
+      sqlScript: ddl,
+      executionTimeMs: durationMs,
+    },
+  });
 }
 
 /**
@@ -405,20 +405,16 @@ export async function dropTable(
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
-
-
-  {
-    const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
-    await prisma.databaseMigrationRecord.create({
-      data: {
-        databaseId: dbRecord.id,
-        migrationName: `drop_table_${safeName}_${Date.now()}`,
-        checksum,
-        sqlScript: ddl,
-        executionTimeMs: durationMs,
-      },
-    });
-  }
+  const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
+  await prisma.databaseMigrationRecord.create({
+    data: {
+      databaseId: dbRecord.id,
+      migrationName: `drop_table_${safeName}_${Date.now()}`,
+      checksum,
+      sqlScript: ddl,
+      executionTimeMs: durationMs,
+    },
+  });
 }
 
 /**
