@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -48,4 +48,13 @@ test("Schema Studio row changes reject non-primary and composite key selectors",
   assert.throws(() => assertSafeRowMutation({ columns: [
     { name: "label", isPrimaryKey: false },
   ] }, "DELETE", "label"), /single-column primary key/);
+});
+
+
+test("Schema Studio rejects duplicate column identities before issuing DDL", () => {
+  const column = (name: string) => ({ name, type: "TEXT" });
+  assert.doesNotThrow(() => assertUniqueColumnNames([column("id"), column("ID"), column("label")]));
+  assert.throws(() => assertUniqueColumnNames([column("id"), column("id")]), /Duplicate table column/);
+  assert.throws(() => assertUniqueColumnNames([column("id"), column("bad-name")]), /Invalid SQL identifier/);
+  assert.throws(() => assertUniqueColumnNames([]), /Table must contain at least one column/);
 });
