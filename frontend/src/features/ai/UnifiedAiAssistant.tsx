@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import { Sparkles, Wand2, Palette, Layout, FileText, Code2, Play, Search, BookOpen, CheckCircle2, AlertCircle, X, ChevronRight, RefreshCw, Zap } from "lucide-react";
 import { DesignAssistant } from "./DesignAssistant";
 
