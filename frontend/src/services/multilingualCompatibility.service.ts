@@ -22,17 +22,21 @@ export function generateHreflangTags(baseUrl: string, pageSlug: string, language
 /**
  * Exports site content strings into format compatible with WPML, Polylang, TranslatePress, or Weglot
  */
-export function exportMultilingualStrings(elements: any[], options: MultilingualExportOptions): string {
+export function exportMultilingualStrings(elements: unknown[], options: MultilingualExportOptions): string {
   const stringsToTranslate: { id: string; type: string; originalText: string }[] = [];
 
-  const extractStrings = (items: any[]) => {
-    if (!Array.isArray(items)) return;
+  const extractStrings = (items: unknown[]) => {
     for (const item of items) {
-      if (!item) continue;
-      if (item.content && typeof item.content === "string" && item.content.trim()) {
-        stringsToTranslate.push({ id: item.id, type: item.type, originalText: item.content.trim() });
+      if (!item || typeof item !== "object") continue;
+      const element = item as Record<string, unknown>;
+      if (typeof element.content === "string" && element.content.trim()) {
+        stringsToTranslate.push({
+          id: String(element.id ?? ""),
+          type: String(element.type ?? ""),
+          originalText: element.content.trim(),
+        });
       }
-      if (item.children) extractStrings(item.children);
+      if (Array.isArray(element.children)) extractStrings(element.children);
     }
   };
 
