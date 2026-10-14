@@ -142,7 +142,7 @@ export const WooCommerceProvider: React.FC<{
     }
   });
 
-  const [notices, setNotices] = useState<WcNotice[]>([
+  const [notices, setNotices] = useState<WcNotice[]>(() => [
     {
       id: "wc-init-notice",
       type: "info",
