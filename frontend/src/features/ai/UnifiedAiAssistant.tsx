@@ -149,7 +149,7 @@ export function UnifiedAiAssistant({
         setCodeResult(data.result);
         setActiveTab("code");
       } else {
-        setSuccessMessage(`Action completed: ${data.intent ? data.intent.replace(/_/g, " ") : "Request processed"}`);
+        setSuccessMessage(`Action completed: ${typeof data.intent === "string" ? data.intent.replace(/_/g, " ") : "Request processed"}`);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
