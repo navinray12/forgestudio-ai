@@ -12,7 +12,7 @@ export interface WcCartItem {
   product: SiteProduct;
   quantity: number;
   selectedVariant?: string;
-  selectedAddOns?: Record<string, any>;
+  selectedAddOns?: Record<string, unknown>;
   customPrice?: number;
 }
 
@@ -38,7 +38,7 @@ interface WooCommerceContextType {
   addToCart: (
     product: SiteProduct,
     quantity?: number,
-    selectedAddOns?: Record<string, any>,
+    selectedAddOns?: Record<string, unknown>,
     customPrice?: number
   ) => void;
   removeFromCart: (productId: string) => void;
@@ -59,8 +59,8 @@ interface WooCommerceContextType {
   placeOrder: (checkoutData: {
     customerName: string;
     customerEmail: string;
-    billingAddress?: any;
-    shippingAddress?: any;
+    billingAddress?: unknown;
+    shippingAddress?: unknown;
     paymentMethod?: string;
     couponCode?: string;
   }) => Promise<WcOrderReceipt>;
@@ -211,7 +211,7 @@ export const WooCommerceProvider: React.FC<{
   const addToCart = (
     product: SiteProduct,
     quantity = 1,
-    selectedAddOns?: Record<string, any>,
+    selectedAddOns?: Record<string, unknown>,
     customPrice?: number
   ) => {
     setCart((prev) => {
@@ -279,8 +279,8 @@ export const WooCommerceProvider: React.FC<{
   const placeOrder = async (checkoutData: {
     customerName: string;
     customerEmail: string;
-    billingAddress?: any;
-    shippingAddress?: any;
+    billingAddress?: unknown;
+    shippingAddress?: unknown;
     paymentMethod?: string;
     couponCode?: string;
   }): Promise<WcOrderReceipt> => {
