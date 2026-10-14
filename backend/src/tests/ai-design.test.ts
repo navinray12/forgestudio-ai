@@ -25,6 +25,7 @@ test("HTML becomes deterministic native elements with responsive styles", async 
   const first = await converter.convert(htmlFixture, "fixture"), second = await converter.convert(htmlFixture, "fixture");
   assert.deepEqual(first, second);
   const root = first[0]!, main = (root.children as JsonObject[])[0]!, heading = (main.children as JsonObject[])[0]!;
+  assert.equal(root.content, "body", "full HTML documents retain their body root");
   assert.equal(main.type, "container"); assert.equal(heading.headingLevel, "h1");
   assert.equal((main.styles as JsonObject).paddingLeft, "20px");
   assert.equal(((main.responsiveStyles as JsonObject).mobile as JsonObject).gridTemplateColumns, "1fr");
@@ -83,6 +84,7 @@ test("private artifacts are encrypted and path traversal is rejected", async t =
 
 test("Tailwind utility classes preserve editable spacing and typography", async () => {
   const result = await converter.convert('<main class="p-4 text-white bg-blue-500"><h1>Styled</h1></main>', "tailwind-utility-canary");
+  assert.equal(result[0]!.content, "main", "HTML fragments use the authored element, not a synthetic body");
   const styles = result[0]!.styles as JsonObject;
   assert.ok(styles.paddingLeft && styles.paddingLeft !== "0px", "p-4 must generate nonzero padding");
   assert.ok(styles.paddingRight && styles.paddingRight !== "0px", "p-4 must preserve both horizontal sides");
