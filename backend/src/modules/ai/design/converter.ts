@@ -92,6 +92,18 @@ export class HtmlDesignConverter implements DesignConverter {
     });
     const css = postcss.parse([...styleTexts, generated.toString()].join("\n"));
     const rules: Array<{ selector: string; widthMin: number; widthMax: number; weight: number; styles: Record<string, string> }> = [];
+    // Tailwind 4 defines tokens such as --spacing in its theme layer on :root/:host.
+    // These are inherited CSS variables, not editable style rules. Resolve them
+    // before converting utilities such as p-4: calc(var(--spacing) * 4).
+    const themeVariables: Record<string, string> = {};
+    css.walkRules(rule => {
+      if (!rule.selectors.some(selector => selector.trim() === ":root" || selector.trim() === ":host")) return;
+      rule.walkDecls(decl => {
+        if (decl.prop.startsWith("--") && !/url\s*\(|expression\s*\(|javascript|[<>;{}\\]/i.test(decl.value)) {
+          themeVariables[decl.prop] = decl.value;
+        }
+      });
+    });
     css.walkAtRules(() => { /* Decorative at-rules ignored */ });
     css.walkRules(rule => {
       if (rules.length > 5000) throw new ConversionError(["CSS_RULE_LIMIT"]);
@@ -141,7 +153,7 @@ export class HtmlDesignConverter implements DesignConverter {
       }
 
       const computed = [1440, 768, 390].map((width, index) => {
-        const resolved = { ...inherited[index] };
+        const resolved = { ...themeVariables, ...inherited[index] };
         for (const rule of rules) if (width >= rule.widthMin && width <= rule.widthMax) {
           try { if (rule.selector === ":root") Object.assign(resolved, Object.fromEntries(Object.entries(rule.styles).filter(([key]) => inheritedKeys.has(key) || key.startsWith("--")))); else if ($(el).is(rule.selector)) Object.assign(resolved, rule.styles); }
           catch {}
