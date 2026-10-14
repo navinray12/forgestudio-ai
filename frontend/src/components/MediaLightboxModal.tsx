@@ -37,7 +37,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
   }, [currentIndex, isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || items.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
