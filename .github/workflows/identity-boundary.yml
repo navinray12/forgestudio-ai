@@ -51,12 +51,12 @@ jobs:
         working-directory: backend
         run: |
           set -o pipefail
-          for test_file in src/tests/smtp-delivery.test.ts; do node --import tsx --test "$test_file"; done 2>&1 | tee "$RUNNER_TEMP/identity-adapters.tap"
+          for test_file in src/tests/oidc-adapter.test.ts src/tests/smtp-delivery.test.ts; do node --import tsx --test "$test_file"; done 2>&1 | tee "$RUNNER_TEMP/identity-adapters.tap"
       - name: Existing workspace and document PostgreSQL contracts
         working-directory: backend
         run: |
           npx --no-install prisma db push
-          for test_file in ; do node --import tsx --test "$test_file"; done 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
+          node --import tsx --test src/tests/workspace-integration.test.ts 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
       - name: Identity migration and negative HTTP contracts
         env:
           DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_identity
@@ -64,7 +64,7 @@ jobs:
         run: |
           createdb -h 127.0.0.1 -U postgres forge_identity
           npx --no-install prisma db push
-          for test_file in ; do node --import tsx --test "$test_file"; done 2>&1 | tee "$RUNNER_TEMP/identity-security.tap"
+          node --import tsx --test src/tests/identity-security.test.ts 2>&1 | tee "$RUNNER_TEMP/identity-security.tap"
       - name: Actual WebSocket authorization and revocation
         env:
           DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_presence
@@ -72,7 +72,7 @@ jobs:
         run: |
           createdb -h 127.0.0.1 -U postgres forge_presence
           npx --no-install prisma db push
-          for test_file in ; do node --import tsx --test "$test_file"; done 2>&1 | tee "$RUNNER_TEMP/presence-security.tap"
+          node --import tsx --test src/tests/presence-security.test.ts 2>&1 | tee "$RUNNER_TEMP/presence-security.tap"
       - name: Prepare browser runner
         run: |
           python3 -m venv "$RUNNER_TEMP/browser-venv"
