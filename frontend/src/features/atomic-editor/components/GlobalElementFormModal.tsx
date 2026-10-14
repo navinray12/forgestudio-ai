@@ -28,6 +28,8 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (elementToEdit) {
       setName(elementToEdit.name);
       setElementType(elementToEdit.elementType);
@@ -47,6 +49,8 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
       });
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [elementToEdit, isOpen]);
 
   if (!isOpen) return null;
@@ -64,14 +68,14 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
         description,
       });
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save Global Element.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save Global Element.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const updateStyleProp = (key: keyof ElementStyles, value: any) => {
+  const updateStyleProp = (key: keyof ElementStyles, value: string) => {
     setStyles((prev) => ({
       ...prev,
       [key]: value !== "" ? value : undefined,

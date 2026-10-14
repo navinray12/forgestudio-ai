@@ -11,6 +11,8 @@ import {
 import type { EditorElement, Breakpoint } from "../editor/types";
 import { resolveDynamicTokens } from "../editor/types";
 import type { PopupConfig } from "../../types/popup.types";
+import { readPreviewCommand } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
+import { loadSiteSnapshot } from "../../features/developer-workspace/services/loadSiteSnapshot";
 
 const BackgroundSlideshow: React.FC<{ urls: string[]; interval?: number }> = ({ urls, interval }) => {
     const [index, setIndex] = useState(0);
@@ -295,11 +297,11 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
     const stickyStyles = resolveStickyStyles(el);
 
     // Defer Background Image safely via F-355
-    let finalMergedStyles: any = {
+    const finalMergedStyles: any = {
         ...(optClass ? {} : resolvedStyles),
         ...stickyStyles
     };
-    let finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
+    const finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
 
     // Keep backgroundImage strictly inline safely
     if (resolvedStyles.backgroundImage) {
@@ -841,7 +843,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
 
     const [loading, setLoading] = useState(true);
     // Incremented by the editor preview's "reload" message to re-run the site fetch effect.
-    const [reloadToken, setReloadToken] = useState(0);
+    const [reloadTick, setReloadTick] = useState(0);
     const [errorMessage, setErrorMessage] = useState("");
     const [elements, setElements] = useState<EditorElement[]>([]);
     const [pages, setPages] = useState<PageConfig[]>([]);
@@ -921,44 +923,29 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
 
     useEffect(() => {
         if (!websiteId) return;
+        const controller = new AbortController();
+        let active = true;
 
         const fetchWebsite = async () => {
             try {
                 setLoading(true);
-                let res: Response;
-                if (isPreview) {
-                    res = await fetch(`${apiUrl}/api/websites/${websiteId}`, { credentials: "include" });
-                    if (!res.ok) {
-                        res = await fetch(`${apiUrl}/api/v1/websites/${websiteId}`, { credentials: "include" });
-                    }
-                    if (!res.ok) {
-                        res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
-                    }
-                } else {
-                    res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
-                    if (!res.ok && res.status !== 404) {
-                        const fallback = await fetch(`${apiUrl}/api/websites/public/${websiteId}`);
-                        if (fallback.ok) res = fallback;
-                    }
-                }
-                const data = await res.json();
-
-                if (!res.ok) throw new Error(data?.message || "This website is unavailable.");
-
-                const site = data.website || data;
+                setErrorMessage("");
+                const site = await loadSiteSnapshot(apiUrl, websiteId, isPreview, controller.signal);
+                // Aborted/obsolete requests may resolve anyway (custom transports/tests).
+                if (!active || controller.signal.aborted) return;
                 let rawEditorData = site?.editorData;
                 if (typeof rawEditorData === "string") {
                     try {
                         rawEditorData = JSON.parse(rawEditorData);
-                    } catch (_e) {
-                        rawEditorData = {};
+                    } catch (parseError) {
+                        throw new Error("The saved website document is invalid.", { cause: parseError });
                     }
                 }
                 const editorData = isPreview 
                     ? (rawEditorData || {}) 
                     : (rawEditorData?.publishedData || rawEditorData || {});
 
-                if (editorData?.siteParts) setSitePartsState(editorData.siteParts);
+                setSitePartsState(editorData?.siteParts ?? null);
                 const loadedSiteParts = editorData?.siteParts;
 
                 if (editorData?.pages && editorData.pages.length > 0) {
@@ -1002,30 +989,37 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     setPages([defaultPage]);
                     setActivePageId("home");
                     setElements(editorData.elements);
+                } else {
+                    setPages([]);
+                    setElements([]);
+                    setActivePageId("home");
                 }
-                if (editorData?.popups) setPopups(editorData.popups);
-                if (editorData?.breakpoints) setBreakpoints(editorData.breakpoints);
-                if (editorData?.globalSettings) setGlobalSettings(editorData.globalSettings);
-                if (editorData?.globalVariables) setGlobalVariables(editorData.globalVariables);
-                if (editorData?.globalClasses) setGlobalClasses(editorData.globalClasses);
-                if (site?.customCodeSnippets) setCustomCodeSnippets(site.customCodeSnippets);
-                if (site?.status) setSiteStatus(site.status);
-                if (site?.themeLocationRules) _setThemeRules(site.themeLocationRules);
-                if (editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent) {
-                    setCookieConsentConfig(editorData.siteSettings?.cookieConsent || editorData.cookieConsent);
-                }
-                if (site?.editorData?.experiments) {
-                    setExperiments(site.editorData.experiments);
-                }
+                setPopups(editorData?.popups || []);
+                setBreakpoints(editorData?.breakpoints || DEFAULT_BREAKPOINTS);
+                setGlobalSettings(editorData?.globalSettings || {});
+                setGlobalVariables(editorData?.globalVariables || []);
+                setGlobalClasses(editorData?.globalClasses || []);
+                setCustomCodeSnippets(site?.customCodeSnippets || []);
+                setSiteStatus(site?.status || "DRAFT");
+                _setThemeRules(site?.themeLocationRules || []);
+                setCookieConsentConfig(editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent || null);
+                setExperiments(isPreview ? [] : (rawEditorData?.experiments || []));
 
             } catch (_err: any) {
+                if (!active || controller.signal.aborted) return;
                 setErrorMessage("This website is unavailable.");
+                setElements([]);
+                setPages([]);
+                setCustomCodeSnippets([]);
+                setExperiments([]);
+                setSitePartsState(null);
             } finally {
-                setLoading(false);
+                if (active && !controller.signal.aborted) setLoading(false);
             }
         };
-        fetchWebsite();
-    }, [websiteId, apiUrl, pageSlug, reloadToken]);
+        void fetchWebsite();
+        return () => { active = false; controller.abort(); };
+    }, [websiteId, apiUrl, pageSlug, isPreview, reloadTick]);
 
     // Phase 3 Subsystem 2: A/B Split Testing & Impression Telemetry
     useEffect(() => {
@@ -1103,29 +1097,33 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     type: "forge:preview:route-changed",
                     route: isHome ? "/" : `/${cleanSlug}`,
                     pageId: page.id,
-                }, "*");
+                }, window.location.origin);
             }
         }
     };
 
     useEffect(() => {
         const handleParentMessage = (e: MessageEvent) => {
-            if (e.data?.type === "forge:preview:set-route") {
-                const target = e.data.route;
+            const command = readPreviewCommand(e, {
+                parent: window.parent, self: window, origin: window.location.origin, isPreview,
+            });
+            if (!command) return;
+            if (command.type === "route") {
+                const target = command.route;
                 if (!target || !pages || pages.length === 0) return;
                 const matched = findTargetPage(pages, target);
                 if (matched && matched.id !== activePageId) {
                     setActivePageId(matched.id);
                     setElements(matched.elements || []);
                 }
-            } else if (e.data?.type === "forge:preview:reload") {
-                setReloadToken((token) => token + 1);
+            } else if (command.type === "reload") {
+                setReloadTick((value) => value + 1);
             }
         };
 
         window.addEventListener("message", handleParentMessage);
         return () => window.removeEventListener("message", handleParentMessage);
-    }, [pages, activePageId]);
+    }, [pages, activePageId, isPreview]);
 
     useEffect(() => {
         const handlePopState = () => {

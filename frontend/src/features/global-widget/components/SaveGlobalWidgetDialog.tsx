@@ -26,15 +26,31 @@ export const SaveGlobalWidgetDialog: React.FC<SaveGlobalWidgetDialogProps> = ({
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setName(elementToSave?.content || (elementToSave as any)?.name || "My Global Widget");
+    if (!isOpen) return;
+
+    let active = true;
+    const customName = elementToSave && "name" in elementToSave &&
+      typeof elementToSave.name === "string" ? elementToSave.name : "";
+    const initialName = elementToSave?.content || customName || "My Global Widget";
+
+    // Initialize after the effect setup, avoiding synchronous cascading renders.
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setName(initialName);
       setDescription("");
       setValidationError(null);
-      setTimeout(() => {
-        nameInputRef.current?.focus();
-        nameInputRef.current?.select();
-      }, 50);
-    }
+    });
+
+    const focusTimer = setTimeout(() => {
+      if (!active) return;
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }, 50);
+
+    return () => {
+      active = false;
+      clearTimeout(focusTimer);
+    };
   }, [isOpen, elementToSave]);
 
   useEffect(() => {

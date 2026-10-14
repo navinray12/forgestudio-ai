@@ -858,13 +858,13 @@ Flags:
             hostPort: 3000,
           });
           resultData = { run };
-          const ports = Object.entries(run.portBindings).map(([container, host]) => `${host} -> ${container}`).join(", ");
+          const ports = Object.entries(run.portBindings || {}).map(([container, host]) => `${host} -> ${container}`).join(", ");
           stdout = `Container started: ${run.id} [ports: ${ports || "none"}]`;
         } else if (subCommand === "list" || !subCommand) {
           const runs = await dockerfileGeneratorService.listContainers(projId);
           resultData = { runs };
           stdout = `Running Containers (${runs.length}):\n` +
-            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
+            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port bindings: ${JSON.stringify(r.portBindings)} [status: ${r.status}]`).join("\n");
         } else if (subCommand === "stop") {
           const runId = subArgs[0];
           if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");

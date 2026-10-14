@@ -37,7 +37,7 @@ export class SmtpOtpDelivery implements IdentityDeliveryPort {
     };
     const transporter = nodemailer.createTransport(options);
     const deadline = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => { socket?.destroy(new Error("SMTP_DEADLINE")); reject(new Error("SMTP_DEADLINE")); }, 20000);
+      timer = setTimeout(() => { socket?.destroy(new Error("SMTP_DEADLINE")); reject(new Error("SMTP_DEADLINE")); }, 8000);
     });
     try {
       const result = await Promise.race([transporter.sendMail({ from, to: email, subject: "Forge sign-in verification",
@@ -47,7 +47,7 @@ export class SmtpOtpDelivery implements IdentityDeliveryPort {
       }
     } catch (err: any) {
       if (process.env.NODE_ENV !== "production") {
-        console.error(`[SMTP Error] Delivery to ${email} failed:`, err?.message || err);
+        console.error("[SMTP Error] Identity delivery failed (details redacted)");
       }
       // Provider errors may contain credentials or SMTP conversation; never expose/log them.
       throw new AppError("Security email delivery failed.", 503, "IDENTITY_DELIVERY_UNAVAILABLE");

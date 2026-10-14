@@ -8,43 +8,33 @@ export function getCleanFontName(fontFamily: string): string {
 /**
  * Traverses an element AST tree to collect all active font families used across all devices and states.
  */
-export function collectFontsFromElements(elements: any[]): Set<string> {
+export function collectFontsFromElements(elements: unknown[]): Set<string> {
   const fonts = new Set<string>();
 
-  function traverse(node: any) {
-    if (!node || typeof node !== 'object') return;
-
-    if (node.style && typeof node.style === 'object') {
-      checkStyleObject(node.style);
-    }
-
-    if (node.desktopStyle) checkStyleObject(node.desktopStyle);
-    if (node.tabletStyle) checkStyleObject(node.tabletStyle);
-    if (node.mobileStyle) checkStyleObject(node.mobileStyle);
-    if (node.hoverStyle) checkStyleObject(node.hoverStyle);
-
-    if (Array.isArray(node.children)) {
-      node.children.forEach(traverse);
-    }
-
-    if (Array.isArray(node.items)) {
-      node.items.forEach(traverse);
+  function checkStyleObject(value: unknown) {
+    if (typeof value !== 'object' || value === null || !('fontFamily' in value)) return;
+    if (typeof value.fontFamily !== 'string') return;
+    const cleanName = getCleanFontName(value.fontFamily);
+    if (cleanName && !['inherit', 'sans-serif', 'serif', 'monospace', 'system-ui'].includes(cleanName)) {
+      fonts.add(cleanName);
     }
   }
 
-  function checkStyleObject(styleObj: Record<string, any>) {
-    if (styleObj.fontFamily && typeof styleObj.fontFamily === 'string') {
-      const cleanName = getCleanFontName(styleObj.fontFamily);
-      if (cleanName && cleanName !== 'inherit' && cleanName !== 'sans-serif' && cleanName !== 'serif' && cleanName !== 'monospace' && cleanName !== 'system-ui') {
-        fonts.add(cleanName);
-      }
+  function traverse(node: unknown) {
+    if (typeof node !== 'object' || node === null) return;
+    if (Array.isArray(node)) {
+      node.forEach(traverse);
+      return;
     }
+    const element = node as Record<string, unknown>;
+    for (const styleKey of ['style', 'styles', 'desktopStyle', 'tabletStyle', 'mobileStyle', 'hoverStyle']) {
+      checkStyleObject(element[styleKey]);
+    }
+    if (Array.isArray(element.children)) element.children.forEach(traverse);
+    if (Array.isArray(element.items)) element.items.forEach(traverse);
   }
 
-  if (Array.isArray(elements)) {
-    elements.forEach(traverse);
-  }
-
+  if (Array.isArray(elements)) elements.forEach(traverse);
   return fonts;
 }
 
@@ -82,7 +72,7 @@ export function buildGoogleFontsUrl(fontFamilies: Set<string> | string[]): strin
 /**
  * Injects or updates a dynamic <link> stylesheet in the DOM document head for active fonts.
  */
-export function syncDocumentFonts(elements: any[]): void {
+export function syncDocumentFonts(elements: unknown[]): void {
   const usedFonts = collectFontsFromElements(elements);
   const cssUrl = buildGoogleFontsUrl(usedFonts);
 

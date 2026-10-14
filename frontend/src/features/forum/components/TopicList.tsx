@@ -1,14 +1,14 @@
 import React, { useState } from "react";
-import type { ForumTopic, ForumCategory } from "../types/forum.types";
+import type { ForumTopic, ForumCategory, ForumTopicFilters } from "../types/forum.types";
 import { TopicCard } from "./TopicCard";
 import { ForumCategoryList } from "./ForumCategoryList";
-import { SlidersHorizontal, CheckCircle2, Clock, Flame, MessageSquareOff, Bookmark } from "lucide-react";
+import { CheckCircle2, Clock, Flame, MessageSquareOff } from "lucide-react";
 
 interface TopicListProps {
   topics: ForumTopic[];
   categories: ForumCategory[];
   onSelectTopic: (topic: ForumTopic) => void;
-  onFilterChange: (filters: any) => void;
+  onFilterChange: (filters: Partial<ForumTopicFilters>) => void;
   isLoading?: boolean;
 }
 

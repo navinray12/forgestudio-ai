@@ -3,7 +3,8 @@
  * routes and the source files generated for them. It is derived from the
  * canonical visual document by the same compiler the generators use, so the
  * Visual Editor, the Code Workspace and the export can never disagree about
- * which file belongs to which page.
+ * which file belongs to which page. Visual Editor, Code Workspace and export share this mapping.
+ * Callers must still validate source ownership and route collisions before committing changes.
  *
  * Extended for Blueprint Point 36:
  * - Framework-specific router profiles (Next.js App Router, Pages Router, React/Vite)
@@ -763,3 +764,12 @@ export function reconcilePersistedCheckpoint(pages: RegisteredPage[], existingFi
 
   return { reconciledPages, missingFiles };
 }
+
+// Keep the existing import surface; pure recognition/preflight is independently testable.
+export {
+  classifyPageEntry,
+  normalizePageSourcePath,
+  pageRouteIdentity,
+  resolvePageSourceTarget,
+} from "./pageRecognition.js";
+export type { PageEntryClassification, PageSourceTarget, PageSourceIdentity } from "./pageRecognition.js";

@@ -5,7 +5,6 @@ import {
   prismaMigrationStatus, prismaMigrationRecover, diagnosePorts,
 } from "../controllers/health.controller.js";
 
-import { runInspect } from "./inspect-runner.js";
 
 const router = Router();
 const staff = [requireAuth, requireRole(["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"])] as const;
@@ -19,5 +18,14 @@ router.post("/prisma-migration-recover", ...staff, prismaMigrationRecover);
 router.get("/diagnose-ports", ...staff, diagnosePorts);
 router.get("/sign-off", ...staff, signOffReport);
 router.post("/dev/sanitize-demo", ...staff, sanitizeDemo);
-router.get("/inspect-diagnostic", runInspect);
+router.get("/inspect-diagnostic", ...staff, async (req, res, next) => {
+  try {
+    // Import after the role gate; this diagnostic depends on database-backed
+    // services and must never be initialized by anonymous requests.
+    const { runInspect } = await import("./inspect-runner.js");
+    await runInspect(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
 export default router;

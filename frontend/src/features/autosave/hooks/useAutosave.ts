@@ -291,7 +291,7 @@ export function useAutosave({
             setStatus("saved");
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         isSavingRef.current = false;
         queuedPayloadRef.current = null;
         console.error("Autosave error:", err);

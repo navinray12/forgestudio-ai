@@ -51,7 +51,8 @@ export async function runDesignExecution(executionId: string, job: { id: string;
       console.log(`[Worker] Stage ${key} COMPLETED for execution ${executionId}`);
       return value;
     } catch (error) {
-      console.error(`[Worker] Stage ${key} FAILED for execution ${executionId}:`, (error as any)?.message || error);
+      // A provider exception may contain prompts, credentials or raw response bodies.
+      console.error(`[Worker] Stage ${key} FAILED for execution ${executionId}`);
       if (error instanceof AppError) throw error;
       if (external) throw new AppError("External design outcome requires reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
       throw error;
@@ -87,11 +88,10 @@ export async function runDesignExecution(executionId: string, job: { id: string;
       const projectId = await stage("PROJECT", () => ports.designer.createProject(`Forge ${executionId}`), true);
       const pages: JsonObject[] = [];
       for (let index = 0; index < plan.pages.length; index++) {
-        const page = plan.pages[index]!;
         // Provider failures are not replaced with locally synthesised designs: a failed or uncertain
         // provider step fails the execution (FAILED / RECONCILIATION_REQUIRED) so nothing that was
         // not produced by the AI designer is presented as an AI result.
-        const screen = await stage(`SCREEN_${index}`, () => ports.designer.generate(projectId,
+        // Existing completed checkpoints remain reusable.
           `${DESIGN_CONTRACT}\nShared design: ${plan.design}\nSite routes: ${JSON.stringify(plan.pages.map(item => ({ name: item.name, slug: item.slug })))}\nPage: ${page.name}\n${page.brief}`), true);
         const html = await stage(`EXPORT_${index}`, () => ports.designer.html(projectId, screen.screenId));
         const elements = await stage(`CONVERT_${index}`, () => ports.converter.convert(html, `${executionId}:${index}`));

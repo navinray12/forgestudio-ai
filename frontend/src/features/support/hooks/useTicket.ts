@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ticketService } from "../services/ticketService";
 import type { SupportTicket } from "../types/support.types";
 
@@ -7,18 +7,29 @@ export function useTicket(ticketId: string | undefined) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const requestVersion = useRef(0);
 
   const fetchTicket = useCallback(async () => {
-    if (!ticketId) return;
-    try {
-      setLoading(true);
+    const version = ++requestVersion.current;
+    if (!ticketId) {
+      setTicket(null);
       setError(null);
-      const res = await ticketService.getTicket(ticketId);
-      setTicket(res.ticket);
-    } catch (err: any) {
-      setError(err.message || "Failed to load ticket details");
-    } finally {
       setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setTicket(null);
+    try {
+      const res = await ticketService.getTicket(ticketId);
+      if (requestVersion.current === version) setTicket(res.ticket);
+    } catch (err: unknown) {
+      if (requestVersion.current === version) {
+        setTicket(null);
+        setError(err instanceof Error ? err.message : "Failed to load ticket details");
+      }
+    } finally {
+      if (requestVersion.current === version) setLoading(false);
     }
   }, [ticketId]);
 
@@ -32,8 +43,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.addMessage(ticketId, content, type);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -45,8 +54,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.updateStatus(ticketId, status);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -58,8 +65,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.updatePriority(ticketId, priority);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -71,8 +76,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.assignAgent(ticketId, agentId);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }

@@ -572,6 +572,14 @@ function isContainerType(element: any): boolean {
  */
 function setText(element: any, text: string) {
   element.content = text;
+  // A code edit establishes one canonical text value. Keep historic editor
+  // documents that explicitly use textContent/text compatible, but do not
+  // leave duplicate aliases that can mask a later canvas edit to content.
+  if (["heading", "text", "paragraph", "blockquote"].includes(String(element.type).toLowerCase())) {
+    delete element.textContent;
+    delete element.text;
+    return;
+  }
   if ("textContent" in element) element.textContent = text;
   if ("text" in element) element.text = text;
   if (String(element.type).toLowerCase() === "button") {

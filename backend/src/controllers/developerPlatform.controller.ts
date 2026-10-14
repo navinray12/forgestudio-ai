@@ -326,8 +326,7 @@ export class DeveloperPlatformController {
 
   static async getImportStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const jobId = paramStr(req.params.jobId);
-      const user = (req as any).user || res.locals.user;
+      const user = (req as any).user || res.locals?.user;
       const job = await repositoryAcquisitionService.getImportJob(jobId, user?.id);
       res.json({ success: true, job });
     } catch (err) {
@@ -338,13 +337,15 @@ export class DeveloperPlatformController {
   static async commitImport(req: Request, res: Response, next: NextFunction) {
     try {
       const jobId = paramStr(req.params.jobId);
-      const user = (req as any).user || res.locals.user;
+      const projectId = paramStr(req.params.id);
+      const user = (req as any).user || res.locals?.user;
       const { projectName, files } = req.body ?? {};
+      const resolvedProjectName = typeof projectName === "string" && projectName.trim() ? projectName.trim() : (projectId || "imported-app");
       const result = await repositoryAcquisitionService.commitImport({
         jobId,
-        projectName: typeof projectName === "string" && projectName.trim() ? projectName.trim() : "imported-app",
+        projectName: resolvedProjectName,
         ownerId: user?.id,
-        files: Array.isArray(files) ? files : [],
+        files: Array.isArray(files) ? files : (files || []),
       });
       res.json({ success: true, result });
     } catch (err) {

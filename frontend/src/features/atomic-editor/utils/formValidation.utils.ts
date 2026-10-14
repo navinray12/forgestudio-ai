@@ -5,7 +5,7 @@ import type { FormFieldConfig, FormValidationResult } from "../types/atomicForm.
  */
 export function validateFormValues(
   fields: FormFieldConfig[],
-  values: Record<string, any>
+  values: Record<string, unknown>
 ): FormValidationResult {
   const errors: Record<string, string> = {};
 
@@ -13,8 +13,11 @@ export function validateFormValues(
     const val = values[field.name];
     const strVal = val !== undefined && val !== null ? String(val).trim() : "";
 
+    // An unchecked checkbox is not a valid response to a required consent field.
+    const hasValue = field.type === "checkbox" ? val === true : Boolean(strVal);
+
     // Required check
-    if (field.required && !strVal) {
+    if (field.required && !hasValue) {
       errors[field.name] = `${field.label} is required.`;
       continue;
     }
@@ -32,14 +35,17 @@ export function validateFormValues(
     // URL format check
     if (field.type === "url") {
       try {
-        new URL(strVal);
+        const parsedUrl = new URL(strVal);
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+          errors[field.name] = "Please enter an HTTP or HTTPS URL.";
+        }
       } catch {
         errors[field.name] = `Please enter a valid URL (e.g. https://example.com).`;
       }
     }
 
     // Number check
-    if (field.type === "number" && isNaN(Number(strVal))) {
+    if (field.type === "number" && !Number.isFinite(Number(strVal))) {
       errors[field.name] = `Please enter a valid numeric value.`;
     }
 

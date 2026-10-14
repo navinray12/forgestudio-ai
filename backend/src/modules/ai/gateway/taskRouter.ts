@@ -75,12 +75,21 @@ export class TaskRouter {
     return { primaryProvider: primary, model: bestModel.id, fallbacks };
   }
 
+  /** Select a model supported by each provider in the fallback chain. */
+  public resolveModelForProvider(request: AiGatewayRequest, provider: AiProviderName): string {
+    // A caller-supplied model belongs to the selected primary provider. It cannot
+    // safely be passed unchanged to a different provider after an error.
+    const primary = this.resolveRoutingChain(request).primaryProvider;
+    if (provider === primary && request.model) return request.model;
+    return ModelRegistry.getBestModelForTask(request.task, provider).id;
+  }
+
   /**
    * Route request with automatic fallback, exponential backoff, circuit-breaker checks,
    * and telemetry logging.
    */
   public async executeWithFallback(request: AiGatewayRequest): Promise<AiGatewayResponse> {
-    const { primaryProvider, model, fallbacks } = this.resolveRoutingChain(request);
+    const { primaryProvider, fallbacks } = this.resolveRoutingChain(request);
     const candidateProviders = [primaryProvider, ...fallbacks];
     let lastError: Error | null = null;
 
@@ -95,7 +104,8 @@ export class TaskRouter {
       const byokKey = await this.resolveByokKey(provider, request.userId, request.projectId);
 
       try {
-        const response = await this.executeWithRetry(adapter, { ...request, model, provider }, byokKey);
+        const providerModel = this.resolveModelForProvider(request, provider);
+        const response = await this.executeWithRetry(adapter, { ...request, model: providerModel, provider }, byokKey);
         this.recordSuccess(provider);
         await this.logTelemetry(request, response, "SUCCESS");
         return response;

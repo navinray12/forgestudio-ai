@@ -1,0 +1,34 @@
+name: Payment integrity qualification
+on:
+  pull_request:
+    paths:
+      - 'backend/src/services/integration.service.ts'
+      - 'backend/src/controllers/integration.controller.ts'
+      - 'backend/src/tests/paypal-payment-integrity.test.ts'
+      - 'frontend/src/pages/editor/integrations/IntegrationRenderers.tsx'
+      - '.github/workflows/payment-integrity.yml'
+  push:
+    branches: [fix/tailwind-theme-vars-20261014]
+    paths:
+      - 'backend/src/services/integration.service.ts'
+      - 'backend/src/tests/paypal-payment-integrity.test.ts'
+      - '.github/workflows/payment-integrity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paypal-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install backend locked dependencies
+        run: npm ci --prefix backend
+      - name: Reject fake PayPal payments and check provider responses
+        working-directory: backend
+        run: node --import tsx --test src/tests/paypal-payment-integrity.test.ts

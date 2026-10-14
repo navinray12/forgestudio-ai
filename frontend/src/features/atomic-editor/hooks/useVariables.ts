@@ -25,7 +25,7 @@ export function useVariables() {
     try {
       const data = await fetchVariables();
       setVariables(data);
-    } catch (err: any) {
+    } catch {
       setError("Unable to load variables.");
     } finally {
       setIsLoading(false);
@@ -33,7 +33,9 @@ export function useVariables() {
   }, []);
 
   useEffect(() => {
-    loadVariables();
+    // Initialize asynchronously to avoid cascading state updates during effects.
+    const timer = window.setTimeout(() => { void loadVariables(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadVariables]);
 
   const filteredVariables = useMemo(() => {

@@ -20,7 +20,7 @@ export const GridSettings: React.FC<GridSettingsProps> = ({
     rowGap: grid.rowGap,
   };
 
-  const handleRespChange = (key: keyof typeof currentResp, value: any) => {
+  const handleRespChange = (key: keyof typeof currentResp, value: GridContainerConfig["columns"] | GridContainerConfig["columnGap"] | GridContainerConfig["rowGap"]) => {
     const updatedResp = {
       ...grid.responsive,
       [breakpoint]: {
@@ -111,7 +111,7 @@ export const GridSettings: React.FC<GridSettingsProps> = ({
           </label>
           <select
             value={grid.alignItems}
-            onChange={(e) => onUpdateGrid({ alignItems: e.target.value as any })}
+            onChange={(e) => onUpdateGrid({ alignItems: e.target.value as GridContainerConfig["alignItems"] })}
             className="w-full rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-purple-500 cursor-pointer"
           >
             <option value="stretch">Stretch</option>

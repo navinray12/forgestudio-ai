@@ -1,0 +1,24 @@
+diff --git a/backend/scripts/verify-workspace-refresh.cjs b/backend/scripts/verify-workspace-refresh.cjs
+--- a/backend/scripts/verify-workspace-refresh.cjs
++++ b/backend/scripts/verify-workspace-refresh.cjs
+@@ -6,7 +6,7 @@
+ const fs = require('node:fs');
+ const path = require('node:path');
+ const vm = require('node:vm');
+-const ts = require('typescript');
++const ts = require('./test-typescript-api.cjs');
+ const root = path.resolve(__dirname, '../..');
+ const read = file => fs.readFileSync(path.join(root,file),'utf8');
+ function evaluate(code, globals={}) {
+diff --git a/backend/scripts/verify-page-registration.cjs b/backend/scripts/verify-page-registration.cjs
+--- a/backend/scripts/verify-page-registration.cjs
++++ b/backend/scripts/verify-page-registration.cjs
+@@ -10,7 +10,7 @@
+ const fs = require('node:fs');
+ const path = require('node:path');
+ const vm = require('node:vm');
+-const ts = require('typescript');
++const ts = require('./test-typescript-api.cjs');
+ const root = path.resolve(__dirname, '..');
+ 
+ function loadSource(relativePath, dependencies) {

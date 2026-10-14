@@ -22,6 +22,7 @@ import { DesignAssistant } from "../../features/ai/DesignAssistant";
 import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
 import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
+import { decideWorkspaceRefresh } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
 import { publishingService } from "../../features/publishing/services/publishingService";
 import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
@@ -2142,6 +2143,7 @@ export default function WebsiteEditor() {
   // Real-Time Workspace Synchronization: listen for Code Workspace updates
   const activePageIdRef = useRef(activePageId);
   activePageIdRef.current = activePageId;
+  const workspaceReloadSequence = useRef(0);
   const hasUnsavedRef = useRef(hasUnsavedDocumentChanges);
   hasUnsavedRef.current = hasUnsavedDocumentChanges;
   const websiteDocVerRef = useRef(website?.documentVersion ?? 1);
@@ -2149,19 +2151,23 @@ export default function WebsiteEditor() {
 
   const reloadWebsiteFromWorkspace = useCallback(async (forced = false) => {
     if (!websiteId) return;
+    const requestSequence = ++workspaceReloadSequence.current;
     try {
       const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, AbortSignal.timeout(15000));
-      if (!loadedSite) return;
+      if (!loadedSite || requestSequence !== workspaceReloadSequence.current) return;
 
       const serverVer = loadedSite.documentVersion ?? 1;
-      if (!forced && serverVer <= websiteDocVerRef.current) return;
+      const decision = decideWorkspaceRefresh(serverVer, websiteDocVerRef.current, hasUnsavedRef.current, forced);
+      if (decision === "invalid" || decision === "stale") return;
 
-      if (hasUnsavedRef.current() && !forced) {
+      if (decision === "dirty") {
         setSaveMessage(`Code Workspace updated (v${serverVer}). Save or switch pages to merge.`);
         setTimeout(() => setSaveMessage(""), 5000);
         return;
       }
 
+      // Advance synchronously so a delayed response cannot roll this snapshot back.
+      websiteDocVerRef.current = serverVer;
       documentWriter.initialize(serverVer);
       lastSavedEditorDataRef.current = loadedSite.editorData ?? null;
       setWebsite(loadedSite);
@@ -2270,6 +2276,7 @@ export default function WebsiteEditor() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      ++workspaceReloadSequence.current;
       channel?.close();
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("focus", handleFocus);
