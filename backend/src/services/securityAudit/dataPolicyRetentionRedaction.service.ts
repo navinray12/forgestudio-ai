@@ -25,9 +25,10 @@ export class DataPolicyRetentionRedactionService {
     { regex: /("token"\s*:\s*)"[^"]+"/gi, replacement: '$1"[REDACTED_TOKEN]"' },
     { regex: /("secret"\s*:\s*)"[^"]+"/gi, replacement: '$1"[REDACTED_SECRET]"' },
     { regex: /("apiKey"\s*:\s*)"[^"]+"/gi, replacement: '$1"[REDACTED_API_KEY]"' },
-    { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g, replacement: "[REDACTED_EMAIL]" },
-    { regex: /\b\+?[1-9]\d{1,14}\b/g, replacement: "[REDACTED_PHONE]" },
+    // Card numbers must be classified before the generic phone pattern.
     { regex: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b/g, replacement: "[REDACTED_CREDIT_CARD]" },
+    { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g, replacement: "[REDACTED_EMAIL]" },
+    { regex: /(?<!\d)\+?[1-9]\d{1,14}(?!\d)/g, replacement: "[REDACTED_PHONE]" },
   ];
 
   /**

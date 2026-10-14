@@ -237,17 +237,6 @@ Flags:
         break;
       }
 
-      // 18.9 forge preview
-      case "preview": {
-        const projId = options.projectId || (await getFirstProjectId());
-        resultData = {
-          previewUrl: `https://${projId}.preview.forge.live`,
-          status: "ACTIVE",
-        };
-        stdout = `Preview active at https://${projId}.preview.forge.live`;
-        break;
-      }
-
       // 18.10 forge deploy
       case "deploy": {
         const projId = options.projectId || (await getFirstProjectId());

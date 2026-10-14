@@ -400,7 +400,12 @@ export function transformPageToWordPress(
   const gutenbergBlocksTree = buildGutenbergBlockTree(elements, mediaReferences, forms, stats);
 
   // 2. Serialize block tree into WordPress comment syntax
-  const rawMarkup = serializeGutenbergBlocks(gutenbergBlocksTree);
+  // WordPress accepts both `core/foo` and the canonical `foo` namespace for
+  // built-in blocks. The public publishing contract uses the shorter form;
+  // keep the serializer's explicit namespace for lower-level callers.
+  const rawMarkup = serializeGutenbergBlocks(gutenbergBlocksTree)
+    .replace(/wp:core\//g, "wp:")
+    .replace(/\/wp:core\//g, "/wp:");
 
   // 3. Sanitize HTML content inside blocks using F-499 security engine
   const { sanitizedHtml: content, warnings: sanitizationWarnings } = sanitizeHtml(rawMarkup);
@@ -433,7 +438,8 @@ export function transformPageToWordPress(
     .toLowerCase()
     .replace(/^\//, "")
     .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-") || "home";
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "home";
 
   return {
     title: page.name || "Untitled Page",
@@ -546,9 +552,15 @@ export function sanitizeHtml(rawHtml: string): { sanitizedHtml: string; warnings
   }
 
   // 6. Validate private network URLs (localhost, 127.0.0.1, file://)
-  if (/(?:file:\/\/|http:\/\/(?:localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[0-1]))[^\s"'>]*)/gi.test(html)) {
+  if (/(?:file:\/\/|http:\/\/(?:localhost|127\.0\.0\.1|169\.254\.|192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[0-1]))[^\s"'>]*)/gi.test(html)) {
     warnings.push("Localhost or private network URLs were sanitized.");
-    html = html.replace(/(?:file:\/\/|http:\/\/(?:localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[0-1]))[^\s"'>]*)/gi, "#");
+    html = html.replace(/(?:file:\/\/|http:\/\/(?:localhost|127\.0\.0\.1|169\.254\.|192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[0-1]))[^\s"'>]*)/gi, "#");
+  }
+
+  // CSS URL expressions can execute script in permissive renderers.
+  if (/url\(\s*["']?\s*(?:javascript|vbscript):/gi.test(html)) {
+    warnings.push("Executable CSS URL schemes were sanitized.");
+    html = html.replace(/url\(\s*["']?\s*(?:javascript|vbscript):[^)]*\)/gi, "url(#)");
   }
 
   return { sanitizedHtml: html, warnings };
@@ -593,7 +605,8 @@ export function transformPageToHTML(
     .toLowerCase()
     .replace(/^\//, "")
     .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-") || "home";
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "home";
 
   const meta: Record<string, any> = {
     _forgestudio_page_id: page.id,
