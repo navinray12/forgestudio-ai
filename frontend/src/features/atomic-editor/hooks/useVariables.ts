@@ -25,7 +25,7 @@ export function useVariables() {
     try {
       const data = await fetchVariables();
       setVariables(data);
-    } catch (err: any) {
+    } catch {
       setError("Unable to load variables.");
     } finally {
       setIsLoading(false);
