@@ -285,7 +285,8 @@ export async function runDesignExecution(executionId: string, job: { id: string;
       console.log(`[Worker] Stage ${key} COMPLETED for execution ${executionId}`);
       return value;
     } catch (error) {
-      console.error(`[Worker] Stage ${key} FAILED for execution ${executionId}:`, (error as any)?.message || error);
+      // A provider exception may contain prompts, credentials or raw response bodies.
+      console.error(`[Worker] Stage ${key} FAILED for execution ${executionId}`);
       if (error instanceof AppError) throw error;
       if (external) throw new AppError("External design outcome requires reconciliation", 503, "AI_EXTERNAL_OUTCOME_UNKNOWN");
       throw error;
