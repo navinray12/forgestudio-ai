@@ -67,7 +67,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
 
   const previewClassKey = name.trim() ? `.${formatClassName(name)}` : ".class-name";
 
-  const updateStyleProp = <K extends keyof ElementStyles>(key: K, value: ElementStyles[K]) => {
+  const updateStyleProp = <K extends keyof ElementStyles,>(key: K, value: ElementStyles[K]) => {
     setStyles((prev) => ({
       ...prev,
       [key]: value !== "" ? value : undefined,
