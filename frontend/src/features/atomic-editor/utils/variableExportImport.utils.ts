@@ -20,7 +20,7 @@ export function exportVariablesToJson(variables: AtomicVariable[], filename = "f
       value: v.value,
       type: v.type,
       description: v.description,
-      category: (v as any).category,
+      category: "category" in v && typeof v.category === "string" ? v.category : undefined,
     })),
   };
 
