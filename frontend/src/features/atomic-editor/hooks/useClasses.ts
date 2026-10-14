@@ -29,7 +29,9 @@ export function useClasses() {
   }, []);
 
   useEffect(() => {
-    loadClasses();
+    // Initialize asynchronously to avoid cascading state updates during effects.
+    const timer = window.setTimeout(() => { void loadClasses(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadClasses]);
 
   const filteredClasses = useMemo(() => {
