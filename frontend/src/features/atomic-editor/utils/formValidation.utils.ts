@@ -5,7 +5,7 @@ import type { FormFieldConfig, FormValidationResult } from "../types/atomicForm.
  */
 export function validateFormValues(
   fields: FormFieldConfig[],
-  values: Record<string, any>
+  values: Record<string, unknown>
 ): FormValidationResult {
   const errors: Record<string, string> = {};
 
