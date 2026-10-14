@@ -23,6 +23,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
   const [sourceLang, setSourceLang] = useState<string>("en");
   const [targetLangs, setTargetLangs] = useState<string[]>(["es", "fr", "de"]);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
   if (!isOpen) return null;
@@ -47,10 +48,16 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
     );
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(exportedJson);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(exportedJson);
+      setCopyError(null);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setCopyError("Copy failed. Select the JSON in the preview and copy it manually.");
+    }
   };
 
   const handleDownload = () => {
@@ -248,6 +255,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
               </div>
             </div>
 
+            {copyError && <p role="alert" className="text-amber-300 text-xs">{copyError}</p>}
             <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
               <pre className="p-4 text-xs font-mono text-indigo-300 overflow-x-auto max-h-64 leading-relaxed">
                 {exportedJson}
