@@ -27,7 +27,10 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [crmError, setCrmError] = useState<string | null>(null);
   const [triggered, setTriggered] = useState(false);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
   const [acfVal, setAcfVal] = useState<string>("Welcome to ForgeStudio Dynamic Content");
   const [toolsetVal, setToolsetVal] = useState<string>("Toolset Types Dynamic Header");
   const [podsVal, setPodsVal] = useState<string>("Pods Framework Custom Content");
@@ -553,6 +556,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!isPreview) return;
+      setCrmError(null);
       try {
         const res = await fetch(`${apiUrl}/api/integrations/crm/submit-lead`, {
           method: "POST",
@@ -560,9 +564,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           body: JSON.stringify({ provider, name, email }),
         });
         const data = await res.json();
-        setStatus(data?.message || "Lead successfully synced with CRM!");
-      } catch {
-        setStatus("Synced lead data with CRM (Demo Mode).");
+        if (!res.ok || data?.success !== true) {
+          throw new Error(typeof data?.message === "string" ? data.message : "CRM rejected the lead.");
+        }
+        setStatus("Lead successfully synced with CRM.");
+      } catch (error) {
+        setCrmError(error instanceof Error ? error.message : "Unable to sync lead to CRM.");
       }
     };
 
@@ -575,11 +582,12 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           </span>
         </div>
         {status ? (
-          <div className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs font-medium">
+          <div role="status" className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs font-medium">
             {status}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            {crmError && <p role="alert" className="text-xs text-red-300">{crmError}</p>}
             <input
               type="text"
               placeholder="Full Name"
@@ -616,17 +624,28 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
     const eventType = getProp("webhookTriggerEvent", "onButtonClick");
 
     const handleWebhookTrigger = async () => {
-      setTriggered(true);
+      if (!isPreview || webhookLoading) return;
+      setWebhookLoading(true);
+      setWebhookError(null);
+      setTriggered(false);
       try {
-        await fetch(`${apiUrl}/api/integrations/webhook/dispatch`, {
+        const response = await fetch(`${apiUrl}/api/integrations/webhook/dispatch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ webhookUrl, eventType, timestamp: new Date().toISOString() }),
         });
-      } catch {
-        // Fallback for demo mode
+        const result = await response.json();
+        if (!response.ok || result?.success !== true) {
+          throw new Error(typeof result?.message === "string" ? result.message : "Webhook dispatch failed.");
+        }
+        setTriggered(true);
+        setTimeout(() => setTriggered(false), 3000);
+      } catch (error) {
+        setWebhookError(error instanceof Error ? error.message : "Unable to dispatch webhook.");
+      } finally {
+        setWebhookLoading(false);
       }
-      setTimeout(() => setTriggered(false), 3000);
     };
 
     return (
@@ -638,15 +657,17 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
           </span>
         </div>
         <p className="text-[11px] text-slate-400 mb-4 font-mono truncate">{webhookUrl}</p>
+        {webhookError && <p role="alert" className="mb-3 text-xs text-red-300">{webhookError}</p>}
         <button
           onClick={handleWebhookTrigger}
+          disabled={webhookLoading || !isPreview}
           className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition-all shadow ${
             triggered
               ? "bg-emerald-500 text-slate-950"
               : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white"
           }`}
         >
-          {triggered ? "Webhook Triggered Successfully ✓" : "Fire Webhook Event"}
+          {webhookLoading ? "Sending webhook..." : triggered ? "Webhook Dispatched ✓" : "Fire Webhook Event"}
         </button>
       </div>
     );
