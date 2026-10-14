@@ -121,7 +121,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
               1. Select Multilingual Translation Engine
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
+              {([
                 { id: "wpml", label: "WPML Package", desc: "WordPress WPML String Trans" },
                 { id: "polylang", label: "Polylang", desc: "Polylang Strings Array" },
                 { id: "translatepress", label: "TranslatePress", desc: "TranslatePress Key Map" },
