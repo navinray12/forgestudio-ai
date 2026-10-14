@@ -360,17 +360,13 @@ export async function createTable(
   const ddl = `CREATE TABLE "public"."${safeName}" (\n  ${columnClauses.join(",\n  ")}\n);`;
 
   const dbRecord = await requireMigrationLedger(projectId, environment);
-  const dbRecord = await requireMigrationLedger(projectId, environment);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
   // Record migration in Prisma
-
-
-  {
-    const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
+  const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
     await prisma.databaseMigrationRecord.create({
       data: {
         databaseId: dbRecord.id,
@@ -380,7 +376,6 @@ export async function createTable(
         executionTimeMs: durationMs,
       },
     });
-  }
 }
 
 /**
@@ -404,6 +399,7 @@ export async function dropTable(
   // RESTRICT is PostgreSQL's default: dependent objects must be reviewed and handled explicitly.
   const ddl = buildDropTableStatement(safeName);
 
+  const dbRecord = await requireMigrationLedger(projectId, environment);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
   await pool.query(ddl);
