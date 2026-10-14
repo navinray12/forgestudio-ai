@@ -1,27 +1,43 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { ForumReport } from "../types/forum.types";
 import { forumService } from "../services/forumService";
-import { Shield, AlertTriangle, Check, X, Eye } from "lucide-react";
+import { Shield, Check } from "lucide-react";
 
 export const ForumModerationQueue: React.FC = () => {
   const [reports, setReports] = useState<ForumReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const activeRequest = useRef(0);
+  const mounted = useRef(false);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
+    const request = ++activeRequest.current;
     setIsLoading(true);
+    setError(null);
     try {
       const res = await forumService.listReports();
-      setReports(res.reports || []);
-    } catch (err) {
-      console.error(err);
+      if (mounted.current && request === activeRequest.current) {
+        setReports(res.reports || []);
+      }
+    } catch (err: unknown) {
+      if (mounted.current && request === activeRequest.current) {
+        setError(err instanceof Error ? err.message : "Could not load moderation reports.");
+      }
     } finally {
-      setIsLoading(false);
+      if (mounted.current && request === activeRequest.current) setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchReports();
-  }, []);
+    mounted.current = true;
+    void Promise.resolve().then(() => {
+      if (mounted.current) void fetchReports();
+    });
+    return () => {
+      mounted.current = false;
+      activeRequest.current += 1;
+    };
+  }, [fetchReports]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6">
@@ -37,6 +53,14 @@ export const ForumModerationQueue: React.FC = () => {
 
       {isLoading ? (
         <div className="h-40 bg-slate-900 border border-slate-800 rounded-3xl animate-pulse" />
+      ) : error ? (
+        <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-950/20 p-5">
+          <p className="text-sm text-red-300">Moderation reports could not be loaded: {error}</p>
+          <button type="button" onClick={() => void fetchReports()}
+            className="mt-3 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700">
+            Retry loading reports
+          </button>
+        </div>
       ) : reports.length > 0 ? (
         <div className="space-y-4">
           {reports.map((rep) => (
