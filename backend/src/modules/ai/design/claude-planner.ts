@@ -31,8 +31,7 @@ export class ClaudeDesignPlanner implements DesignPlanner {
     try {
       let response = await this.callAnthropic(this.model, 4096, system, data, signal);
       if (!response.ok && response.status === 404 && this.model !== "claude-3-5-sonnet-20241022") {
-        const errorText = await response.text().catch(() => "");
-        console.warn(`[CLAUDE PLANNER] Model ${this.model} returned ${response.status} (${errorText.slice(0, 120)}). Retrying with claude-3-5-sonnet-20241022...`);
+        console.warn(`[CLAUDE PLANNER] Model unavailable (${response.status}); retrying with a compatible fallback.`);
         response = await this.callAnthropic("claude-3-5-sonnet-20241022", 4096, system, data, signal);
       }
       if (!response.ok) {
