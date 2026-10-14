@@ -8,14 +8,14 @@ export interface HreflangTag {
 /**
  * Generates <link rel="alternate" hreflang="..." href="..."> tags for SEO multilingual indexing
  */
-export function generateHreflangTags(baseUrl: string, pageSlug: string, languages: string[]): HreflangTag[] {
+export function generateHreflangTags(baseUrl: string, pageSlug: string, languages: string[], sourceLanguage = "en"): HreflangTag[] {
   const cleanBase = baseUrl.replace(/\/$/, "");
   const cleanSlug = pageSlug ? pageSlug.replace(/^\//, "") : "";
   const path = cleanSlug ? `/${cleanSlug}` : "";
 
   return languages.map((lang) => ({
     lang,
-    url: lang === "en" ? `${cleanBase}${path}` : `${cleanBase}/${lang}${path}`,
+    url: lang === sourceLanguage ? `${cleanBase}${path}` : `${cleanBase}/${lang}${path}`,
   }));
 }
 
