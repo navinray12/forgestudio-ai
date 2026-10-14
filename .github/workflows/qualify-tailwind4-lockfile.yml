@@ -5,6 +5,9 @@ on:
       - fix/tailwind-theme-vars-20261014
     paths:
       - .github/workflows/qualify-tailwind4-lockfile.yml
+      - backend/src/modules/ai/design/converter.ts
+      - backend/package.json
+      - backend/package-lock.json
   workflow_dispatch:
 permissions:
   contents: write
