@@ -1,0 +1,39 @@
+name: Apply compatible dependency repairs
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dependency-lockfile-apply.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/assistant-text-intent-20261013' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.18.0'
+      - name: Apply compatible backend lockfile fixes (no force)
+        run: npm audit fix --prefix backend --package-lock-only --ignore-scripts --no-fund || true
+      - name: Apply compatible frontend lockfile fixes (no force)
+        run: npm audit fix --prefix frontend --package-lock-only --ignore-scripts --no-fund || true
+      - name: Verify lockfiles install without lifecycle scripts
+        run: |
+          npm ci --prefix backend --ignore-scripts --no-audit --no-fund
+          npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
+      - name: Commit only compatible lockfile updates to repair branch
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          git add -- backend/package-lock.json frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No compatible updates remain."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(deps): apply compatible audited lockfile updates'
+          git push origin "HEAD:refs/heads/$PR_BRANCH"
