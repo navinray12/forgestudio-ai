@@ -38,6 +38,7 @@ jobs:
       - name: Exercise website-to-code regressions
         run: npm run test:website-to-code --prefix backend
       - name: Require zero high or critical npm advisories
+        if: always()
         run: npm audit --prefix backend --audit-level high --json > "$RUNNER_TEMP/backend-audit.json"
       - name: Commit only tested lockfile update
         env:
