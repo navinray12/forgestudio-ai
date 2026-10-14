@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { submissionKeyFor, type SubmissionKeySlot } from "../../../utils/submissionKey";
 import {
   Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
   ChevronDown, ChevronRight, Layers, Type, Image as ImageIcon, Box, Grid,
@@ -307,6 +308,7 @@ export const FormWidgetRenderer = ({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
   const [honeypotVal, setHoneypotVal] = useState("");
+  const submissionKey = useRef<SubmissionKeySlot["current"]>(null);
 
   // Active step fields
   const activeStep = steps[currentStepIndex] || steps[0];
@@ -430,13 +432,15 @@ export const FormWidgetRenderer = ({
           data: formData,
           honeypotValue: honeypotVal,
         };
+        const body = JSON.stringify(payload);
         const res = await fetch(`${apiUrl}/api/forms/submit`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json", "Idempotency-Key": submissionKeyFor(submissionKey, body) },
+          body,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.message || "Submission failed");
+        if (!res.ok) throw new Error(data?.error?.message || data?.message || "Submission failed");
+        submissionKey.current = null;
         setSubmitted(true);
         setFormData({});
         // Handle redirect

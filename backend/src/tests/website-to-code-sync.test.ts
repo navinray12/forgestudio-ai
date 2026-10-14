@@ -23,6 +23,14 @@ vi.mock("../config/prisma.js", async () => {
   };
 });
 
+// Checkpoints and sync-state writes use PostgreSQL row locks in production; this suite's database
+// is in memory, so the module is replaced by a contract-preserving in-memory version.
+vi.mock("../services/workspace/workspaceCheckpoints.service.js", async (importOriginal) => {
+  const real: any = await importOriginal();
+  const { memoryCheckpointsModule } = await import("./helpers/memoryCheckpoints.js");
+  return memoryCheckpointsModule(() => mem.current, real);
+});
+
 // The real gateway runs the editor's save command (PostgreSQL transaction, permissions,
 // journal). Its contract is kept here: the write succeeds only at the expected version.
 vi.mock("../services/websites/documentGateway.js", async () => {

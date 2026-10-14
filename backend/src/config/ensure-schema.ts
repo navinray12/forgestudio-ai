@@ -1,10 +1,13 @@
 import { pgPool } from "./prisma.js";
 
+const failedSchemaSteps: string[] = [];
+
 async function execSafe(label: string, sql: string) {
   try {
     await pgPool.query(sql);
   } catch (err: any) {
     if (err?.code !== "42701" && err?.code !== "42P07") {
+      failedSchemaSteps.push(label);
       console.warn(`[DATABASE] Schema notice (${label}):`, err?.message || err);
     }
   }
@@ -21,6 +24,8 @@ export async function ensureDatabaseTables(): Promise<void> {
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "organizationId" UUID;
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "workspaceId" UUID;
     ALTER TABLE websites ADD COLUMN IF NOT EXISTS "approvalWorkflowEnabled" BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE websites ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ(6);
+    ALTER TABLE websites ADD COLUMN IF NOT EXISTS "teamId" UUID;
   `);
 
   // 2. Organizations
@@ -1620,6 +1625,23 @@ export async function ensureDatabaseTables(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_forge_db_mig_proj ON forge_database_migrations("projectId");
   `);
 
+  // Same SQL as prisma/migrations/20261013160000_migration_authority_lifecycle.
+  await execSafe("migration authority lifecycle", `
+    -- One migration authority (blueprint §43, WP-21). Additive only.
+    -- The existing row per migration becomes the durable plan and its lifecycle record.
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS plan JSONB;
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS lifecycle JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS "leaseToken" VARCHAR(64);
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS "leaseExpiresAt" TIMESTAMPTZ;
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS "requestKey" VARCHAR(128);
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS "createdById" UUID;
+    ALTER TABLE forge_database_migrations ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now();
+    -- A repeated plan request returns the plan it already created.
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_forge_db_mig_request ON forge_database_migrations ("databaseId", "requestKey") WHERE "requestKey" IS NOT NULL;
+    -- The fenced lease: at most one migration may be executing against a database, on any instance.
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_forge_db_mig_in_flight ON forge_database_migrations ("databaseId") WHERE status IN ('APPLYING', 'VALIDATING');
+  `);
+
   await execSafe("forge_database_backups table", `
     CREATE TABLE IF NOT EXISTS forge_database_backups (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2666,7 +2688,7 @@ export async function ensureDatabaseTables(): Promise<void> {
       "rootConfig" JSONB DEFAULT '{}'::jsonb,
       "packageCount" INTEGER DEFAULT 0,
       "serviceCount" INTEGER DEFAULT 0,
-      "hasCircularDependencies BOOLEAN DEFAULT false,
+      "hasCircularDependencies" BOOLEAN DEFAULT false,
       "lastScannedAt" TIMESTAMPTZ DEFAULT now(),
       "createdAt" TIMESTAMPTZ DEFAULT now(),
       "updatedAt" TIMESTAMPTZ DEFAULT now()
@@ -3171,7 +3193,375 @@ export async function ensureDatabaseTables(): Promise<void> {
     );
   `);
 
-  console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
+  // Databases created before Prisma's enum have STAGING but not PREVIEW (and vice versa); both
+  // labels are kept valid so neither API value fails at the database (additive, nothing renamed).
+  await execSafe("database environment enum labels", `
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'DatabaseEnvironment') THEN
+        ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'PREVIEW';
+        ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'STAGING';
+      END IF;
+    END $$;
+  `);
+
+  // Recoverable CMS entry trash and approved purge requests (blueprint §10).
+  await execSafe("content trash and purge requests", `
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deletedById" UUID;
+ALTER TABLE "custom_entries" ADD COLUMN IF NOT EXISTS "deleteReason" TEXT;
+
+CREATE TABLE IF NOT EXISTS "content_purge_requests" (
+  "id" UUID NOT NULL,
+  "websiteId" UUID NOT NULL,
+  "manifest" JSONB NOT NULL,
+  "manifestHash" TEXT NOT NULL,
+  "reason" TEXT NOT NULL,
+  "requestedById" UUID NOT NULL,
+  "approvedById" UUID,
+  "approvedAt" TIMESTAMP(3),
+  "singleOwnerException" BOOLEAN NOT NULL DEFAULT false,
+  "status" TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+  "expiresAt" TIMESTAMP(3) NOT NULL,
+  "executedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "content_purge_requests_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "content_purge_requests_websiteId_fkey" FOREIGN KEY ("websiteId") REFERENCES "websites"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "content_purge_requests_websiteId_status_idx" ON "content_purge_requests"("websiteId", "status");
+  `);
+
+  // Durable Visual Editor <-> Code Workspace checkpoints (blueprint §33.3, §34).
+  await execSafe("forge_workspace_checkpoints table", `
+    CREATE TABLE IF NOT EXISTS forge_workspace_checkpoints (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      sequence BIGINT NOT NULL,
+      origin VARCHAR(16) NOT NULL CHECK (origin IN ('CODE', 'VISUAL')),
+      kind VARCHAR(16) NOT NULL CHECK (kind IN ('SYNCHRONIZED', 'DRAFT', 'CONFLICT', 'SOURCE_ONLY')),
+      "filePath" TEXT,
+      message TEXT,
+      "documentVersion" INTEGER,
+      "documentHash" VARCHAR(64),
+      "sourceManifest" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "changeSetId" VARCHAR(128),
+      response JSONB,
+      "createdById" UUID,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_workspace_checkpoint_sequence UNIQUE ("projectId", sequence),
+      CONSTRAINT uq_workspace_checkpoint_change_set UNIQUE ("projectId", "changeSetId")
+    );
+  `);
+
+  // Full-stack application generation runs (blueprint §38): durable job state and evidence.
+  await execSafe("forge_app_generation_runs table", `
+    CREATE TABLE IF NOT EXISTS forge_app_generation_runs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "requestedById" UUID NOT NULL,
+      mode VARCHAR(32) NOT NULL CHECK (mode IN ('AI_PROVIDER', 'APPROVED_TEMPLATE')),
+      status VARCHAR(32) NOT NULL,
+      brief TEXT NOT NULL DEFAULT '',
+      "templateId" VARCHAR(64),
+      "idempotencyKey" VARCHAR(128) NOT NULL,
+      "retryOfRunId" UUID REFERENCES forge_app_generation_runs(id) ON DELETE SET NULL,
+      provider VARCHAR(32),
+      model VARCHAR(128),
+      "providerRequestIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "inputTokens" INTEGER,
+      "outputTokens" INTEGER,
+      "providerCalls" INTEGER NOT NULL DEFAULT 0,
+      "repairAttempts" INTEGER NOT NULL DEFAULT 0,
+      "appModel" JSONB,
+      spec JSONB,
+      files JSONB NOT NULL DEFAULT '[]'::jsonb,
+      diagnostics JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "errorCode" VARCHAR(64),
+      "errorMessage" TEXT,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "completedAt" TIMESTAMPTZ,
+      CONSTRAINT uq_app_generation_idempotency UNIQUE ("projectId", "idempotencyKey")
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_generation_runs_project ON forge_app_generation_runs ("projectId", "createdAt" DESC);
+  `);
+
+  await execSafe("custom post type label columns", `
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "singular" TEXT;
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "plural" TEXT;
+    ALTER TABLE custom_post_types ADD COLUMN IF NOT EXISTS "hasArchive" BOOLEAN NOT NULL DEFAULT false;
+  `);
+
+  // Same SQL as prisma/migrations/20261013110000_durable_lead_intake.
+  await execSafe("durable lead intake", `
+    -- Durable lead intake (blueprint §12). Additive only.
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "formId" VARCHAR(255) NOT NULL,
+      "formName" VARCHAR(255) NOT NULL DEFAULT 'Contact Form',
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "formName" VARCHAR(255) DEFAULT 'Contact Form';
+    ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "idempotencyKey" VARCHAR(200);
+    ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "requestHash" CHAR(64);
+    ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "leadId" UUID;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_form_submissions_idempotency
+      ON form_submissions ("websiteId", "idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS forge_leads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "submissionId" UUID REFERENCES form_submissions(id) ON DELETE SET NULL,
+      provenance VARCHAR(30) NOT NULL DEFAULT 'WEBSITE_FORM',
+      "formId" VARCHAR(255),
+      "displayName" VARCHAR(255),
+      email VARCHAR(320),
+      phone VARCHAR(64),
+      stage VARCHAR(20) NOT NULL DEFAULT 'NEW' CHECK (stage IN ('NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST', 'SPAM')),
+      "assignedToId" UUID REFERENCES users(id) ON DELETE SET NULL,
+      "qualificationEvidence" TEXT,
+      revision INTEGER NOT NULL DEFAULT 1,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "stageChangedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_leads_website ON forge_leads ("websiteId", "createdAt" DESC);
+    CREATE INDEX IF NOT EXISTS idx_forge_leads_website_stage ON forge_leads ("websiteId", stage);
+
+    CREATE TABLE IF NOT EXISTS forge_lead_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "leadId" UUID NOT NULL REFERENCES forge_leads(id) ON DELETE CASCADE,
+      "websiteId" UUID NOT NULL,
+      "actorId" UUID,
+      type VARCHAR(30) NOT NULL,
+      "fromStage" VARCHAR(20),
+      "toStage" VARCHAR(20),
+      note TEXT,
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_forge_lead_events_lead ON forge_lead_events ("leadId", "createdAt");
+  `);
+
+  // Same SQL as prisma/migrations/20261013120000_durable_workflow_definitions.
+  await execSafe("durable workflow definitions", `
+    -- Durable, immutable workflow definitions (blueprint §15). Additive only.
+    CREATE TABLE IF NOT EXISTS forge_workflow_definitions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "workflowKey" VARCHAR(100) NOT NULL,
+      version INTEGER NOT NULL CHECK (version >= 1),
+      status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PUBLISHED', 'DEPRECATED')),
+      name VARCHAR(200) NOT NULL,
+      definition JSONB NOT NULL,
+      "definitionHash" CHAR(64) NOT NULL,
+      "createdById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "publishedById" UUID,
+      "publishedAt" TIMESTAMPTZ,
+      CONSTRAINT uq_forge_workflow_version UNIQUE ("websiteId", "workflowKey", version)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_forge_workflow_published
+      ON forge_workflow_definitions ("websiteId", "workflowKey") WHERE status = 'PUBLISHED';
+
+    CREATE OR REPLACE FUNCTION forge_workflow_definitions_guard() RETURNS trigger AS $fn$
+    BEGIN
+      IF NEW."websiteId" IS DISTINCT FROM OLD."websiteId" OR NEW."workflowKey" IS DISTINCT FROM OLD."workflowKey"
+         OR NEW.version IS DISTINCT FROM OLD.version OR NEW.name IS DISTINCT FROM OLD.name
+         OR NEW.definition IS DISTINCT FROM OLD.definition OR NEW."definitionHash" IS DISTINCT FROM OLD."definitionHash"
+         OR NEW."createdById" IS DISTINCT FROM OLD."createdById" OR NEW."createdAt" IS DISTINCT FROM OLD."createdAt" THEN
+        RAISE EXCEPTION 'workflow definitions are immutable' USING ERRCODE = 'check_violation';
+      END IF;
+      IF NEW.status IS DISTINCT FROM OLD.status
+         AND NOT ((OLD.status = 'DRAFT' AND NEW.status = 'PUBLISHED') OR (OLD.status = 'PUBLISHED' AND NEW.status = 'DEPRECATED')) THEN
+        RAISE EXCEPTION 'illegal workflow status transition % -> %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+      END IF;
+      RETURN NEW;
+    END;
+    $fn$ LANGUAGE plpgsql;
+    DROP TRIGGER IF EXISTS trg_forge_workflow_definitions_guard ON forge_workflow_definitions;
+    CREATE TRIGGER trg_forge_workflow_definitions_guard BEFORE UPDATE ON forge_workflow_definitions
+      FOR EACH ROW EXECUTE FUNCTION forge_workflow_definitions_guard();
+  `);
+
+  // Same SQL as prisma/migrations/20261013130000_website_purge_requests.
+  await execSafe("website purge requests", `
+    -- Approved website purge (blueprint §10). Additive only.
+    -- Deliberately no foreign key to websites: the request must outlive the website it purges.
+    CREATE TABLE IF NOT EXISTS website_purge_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL,
+      manifest JSONB NOT NULL,
+      "manifestHash" CHAR(64) NOT NULL,
+      reason VARCHAR(500) NOT NULL,
+      "requestedById" UUID NOT NULL,
+      "approvedById" UUID,
+      "approvedAt" TIMESTAMPTZ,
+      "executedById" UUID,
+      "executedAt" TIMESTAMPTZ,
+      "singleOwnerException" BOOLEAN NOT NULL DEFAULT false,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING_APPROVAL'
+        CHECK (status IN ('PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'EXECUTED', 'EXPIRED')),
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_website_purge_requests_website ON website_purge_requests ("websiteId", status);
+  `);
+
+  // Same SQL as prisma/migrations/20261013140000_environment_bindings.
+  await execSafe("environment bindings", `
+    -- Persistent environment bindings (blueprint §42.1, WP-17). Additive only.
+    -- One row per project and environment class; "secretRef" holds a vault key reference, never a credential.
+    CREATE TABLE IF NOT EXISTS forge_environment_bindings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE CASCADE,
+      "environmentClass" VARCHAR(20) NOT NULL CHECK ("environmentClass" IN ('DEVELOPMENT', 'STAGING', 'PRODUCTION')),
+      "bindingId" VARCHAR(120) NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+      "applicationId" VARCHAR(120) NOT NULL,
+      "databaseProvider" VARCHAR(30) NOT NULL DEFAULT 'postgresql',
+      "targetFingerprint" CHAR(64) NOT NULL,
+      "safeDisplayLabel" VARCHAR(120) NOT NULL,
+      "secretRef" VARCHAR(300) NOT NULL CHECK ("secretRef" !~ '://[^/]*:[^/]*@' AND position('password=' in "secretRef") = 0),
+      roles JSONB NOT NULL,
+      "poolLimits" JSONB NOT NULL,
+      "protectionLevel" VARCHAR(30) NOT NULL,
+      "verificationHistory" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RETIRED')),
+      "createdById" UUID,
+      "updatedById" UUID,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_environment_binding UNIQUE ("projectId", "environmentClass")
+    );
+  `);
+
+  // Same SQL as prisma/migrations/20261013150000_website_records_benchmark_runs.
+  await execSafe("website records and benchmark runs", `
+    -- Durable state for the blueprint v2 feature routers (WP-01, WP-16). Additive only.
+    -- One row per website, kind and key. "tenantId" is derived from verified membership, never from the
+    -- client. "requestHash" makes a repeated identical write a replay instead of a new revision.
+    CREATE TABLE IF NOT EXISTS forge_website_records (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+      "tenantId" VARCHAR(64) NOT NULL,
+      kind VARCHAR(40) NOT NULL,
+      "recordKey" VARCHAR(200) NOT NULL,
+      data JSONB NOT NULL,
+      "requestHash" CHAR(64) NOT NULL,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      "createdById" UUID NOT NULL,
+      "updatedById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_website_records UNIQUE ("websiteId", kind, "recordKey")
+    );
+
+    -- Operator-submitted benchmark runs (blueprint §03). Platform-wide, so there is no website scope.
+    CREATE TABLE IF NOT EXISTS forge_benchmark_runs (
+      "runId" VARCHAR(64) PRIMARY KEY,
+      "requestHash" CHAR(64) NOT NULL,
+      report JSONB NOT NULL,
+      "recordedById" UUID NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT uq_forge_benchmark_runs_request UNIQUE ("requestHash")
+    );
+  `);
+
+  // Same SQL as prisma/migrations/20261013170000_tenant_rls_stage1.
+  await execSafe("tenant row-level security, stage 1", `
+    -- Tenant row-level security, stage 1 (blueprint §18, WP-02/WP-19). Additive and reversible
+    -- (prisma/rls/rollback_stage1.sql). It changes nothing for the table owner or a superuser:
+    -- policies apply to the restricted roles below, which the application switches to inside a
+    -- transaction (platform/tenancy/rls.ts). Stage 2 (prisma/rls/stage2_force.sql) is applied
+    -- separately, once every owner-level path to a table has been converted.
+
+    -- Restricted roles. They cannot log in, own nothing and hold only the grants listed here.
+    DO $$ BEGIN
+      CREATE ROLE forge_tenant_rls NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN
+      CREATE ROLE forge_platform_rls NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT NOCREATEDB NOCREATEROLE;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    -- The application role must be able to switch to them (a superuser can anyway).
+    DO $$ BEGIN
+      EXECUTE format('GRANT forge_tenant_rls, forge_platform_rls TO %I', current_user);
+    EXCEPTION WHEN OTHERS THEN NULL; END $$;
+    GRANT USAGE ON SCHEMA public TO forge_tenant_rls, forge_platform_rls;
+
+    -- The tenant authorised for the current transaction. Unset or empty means none; a value that is
+    -- not a UUID is an error, so the statement fails rather than matching anything.
+    CREATE OR REPLACE FUNCTION forge_current_tenant() RETURNS uuid
+      LANGUAGE sql STABLE
+      AS $fn$ SELECT NULLIF(current_setting('app.tenant_id', true), '')::uuid $fn$;
+
+    -- Ownership differs per table family. A website belongs to its workspace, else its organization,
+    -- else its owner; a project to its workspace, else its owner. These run with the owner's rights
+    -- so the restricted role needs no access to websites or forge_projects themselves.
+    CREATE OR REPLACE FUNCTION forge_website_tenant(site uuid) RETURNS uuid
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+      AS $fn$ SELECT COALESCE(w."workspaceId", w."organizationId", w."userId") FROM websites w WHERE w.id = site $fn$;
+    CREATE OR REPLACE FUNCTION forge_project_tenant(project uuid) RETURNS uuid
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+      AS $fn$ SELECT COALESCE(p."workspaceId", p."ownerId") FROM forge_projects p WHERE p.id = project AND p."deletedAt" IS NULL $fn$;
+    REVOKE ALL ON FUNCTION forge_website_tenant(uuid), forge_project_tenant(uuid) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION forge_current_tenant(), forge_website_tenant(uuid), forge_project_tenant(uuid) TO forge_tenant_rls;
+
+    -- forge_website_records: owned through its website. A row may only be written with the tenant
+    -- of the transaction in its own "tenantId" column.
+    ALTER TABLE forge_website_records ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS forge_website_records_tenant ON forge_website_records;
+    CREATE POLICY forge_website_records_tenant ON forge_website_records FOR ALL TO forge_tenant_rls
+      USING (forge_website_tenant("websiteId") = forge_current_tenant())
+      WITH CHECK (forge_website_tenant("websiteId") = forge_current_tenant() AND "tenantId" = forge_current_tenant()::text);
+    GRANT SELECT, INSERT, UPDATE ON forge_website_records TO forge_tenant_rls;
+
+    -- forge_workflow_definitions: owned through its website; it has no tenant column of its own.
+    ALTER TABLE forge_workflow_definitions ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS forge_workflow_definitions_tenant ON forge_workflow_definitions;
+    CREATE POLICY forge_workflow_definitions_tenant ON forge_workflow_definitions FOR ALL TO forge_tenant_rls
+      USING (forge_website_tenant("websiteId") = forge_current_tenant())
+      WITH CHECK (forge_website_tenant("websiteId") = forge_current_tenant());
+    GRANT SELECT, INSERT, UPDATE ON forge_workflow_definitions TO forge_tenant_rls;
+
+    -- forge_environment_bindings: owned through its project.
+    ALTER TABLE forge_environment_bindings ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS forge_environment_bindings_tenant ON forge_environment_bindings;
+    CREATE POLICY forge_environment_bindings_tenant ON forge_environment_bindings FOR ALL TO forge_tenant_rls
+      USING (forge_project_tenant("projectId") = forge_current_tenant())
+      WITH CHECK (forge_project_tenant("projectId") = forge_current_tenant());
+    GRANT SELECT, INSERT, UPDATE ON forge_environment_bindings TO forge_tenant_rls;
+
+    -- forge_benchmark_runs: platform data with no tenant. Only the platform role, and only in a
+    -- transaction explicitly marked as platform administration. The tenant role has no grant on it.
+    ALTER TABLE forge_benchmark_runs ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS forge_benchmark_runs_platform ON forge_benchmark_runs;
+    CREATE POLICY forge_benchmark_runs_platform ON forge_benchmark_runs FOR ALL TO forge_platform_rls
+      USING (current_setting('app.platform_admin', true) = 'on')
+      WITH CHECK (current_setting('app.platform_admin', true) = 'on');
+    GRANT SELECT, INSERT ON forge_benchmark_runs TO forge_platform_rls;
+
+    -- The workspace lifecycle trigger on website-owned tables checks that the website's workspace is
+    -- not archived. It reads websites and workspaces, which the restricted roles cannot (and must
+    -- not) read, so it runs with its owner's rights. Its logic does not depend on the caller.
+    DO $$ BEGIN
+      ALTER FUNCTION forge_workspace_child_admission() SECURITY DEFINER SET search_path = public, pg_temp;
+    EXCEPTION WHEN undefined_function THEN NULL; END $$;
+  `);
+
+  if (failedSchemaSteps.length > 0) {
+    console.warn(
+      `⚠️ [DATABASE] Schema self-healing finished with ${failedSchemaSteps.length} failed step(s): ${failedSchemaSteps.join(", ")}`
+    );
+  } else {
+    console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
+  }
+  failedSchemaSteps.length = 0;
 }
 
 

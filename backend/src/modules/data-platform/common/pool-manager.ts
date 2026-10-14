@@ -20,9 +20,12 @@ export async function ensureDataPlatformTables(): Promise<void> {
   try {
     await pgPool.query(`
       DO $$ BEGIN
-        CREATE TYPE "DatabaseEnvironment" AS ENUM ('PRODUCTION', 'STAGING', 'DEVELOPMENT');
+        CREATE TYPE "DatabaseEnvironment" AS ENUM ('DEVELOPMENT', 'PREVIEW', 'PRODUCTION', 'STAGING');
       EXCEPTION WHEN duplicate_object THEN null;
       END $$;
+      -- Older databases have only one of PREVIEW/STAGING; both labels are kept valid (additive).
+      ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'PREVIEW';
+      ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'STAGING';
       DO $$ BEGIN
         CREATE TYPE "DatabaseProvisioningStatus" AS ENUM ('PENDING', 'PROVISIONING', 'READY', 'FAILED', 'SUSPENDED');
       EXCEPTION WHEN duplicate_object THEN null;

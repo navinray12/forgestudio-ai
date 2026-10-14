@@ -59,6 +59,7 @@ export async function runModules46to52TestSuite(): Promise<{
   // MODULE 46: Serverless & Edge Functions
   // ------------------------------------------------------------
   console.log("\n--- Module 46: Serverless & Edge Functions ---");
+  process.env.FORGE_FUNCTION_ISOLATION_BACKEND = process.env.FORGE_FUNCTION_ISOLATION_BACKEND || "isolated-process";
 
   // 46.1 Create Function
   const orderFn = await serverlessFunctionService.createFunction(projId, {

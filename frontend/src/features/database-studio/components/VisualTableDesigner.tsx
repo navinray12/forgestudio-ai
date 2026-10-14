@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Plus, Trash2, Key, X, Table, ShieldCheck } from "lucide-react";
-import type { ColumnDefinition } from "../types/studio.types";
+import type { ColumnDefinition, StudioEnvironment } from "../types/studio.types";
 
 interface VisualTableDesignerProps {
   projectId: string;
   apiBase: string;
+  environment: StudioEnvironment;
   isOpen: boolean;
   onClose: () => void;
   onTableCreated: (tableName: string) => void;
@@ -25,6 +26,7 @@ const DATA_TYPES = [
 export const VisualTableDesigner: React.FC<VisualTableDesignerProps> = ({
   projectId,
   apiBase,
+  environment,
   isOpen,
   onClose,
   onTableCreated,
@@ -98,6 +100,7 @@ export const VisualTableDesigner: React.FC<VisualTableDesignerProps> = ({
         body: JSON.stringify({
           name: tableName.trim(),
           columns,
+          environment,
         }),
       });
 

@@ -17,7 +17,8 @@ import { fixtureHasMigration } from "./migration-fixture.js";
 
 export async function runDocumentContracts(t: TestContext) {
   if (!await fixtureHasMigration("20260928140000_document_concurrency")) {
-    await pgPool.query('ALTER TABLE websites DROP COLUMN "documentVersion", DROP COLUMN "performanceSettings"');
+    // Undo everything the migration creates so the replay also works on a fixture replayed before.
+    await pgPool.query('DROP FUNCTION IF EXISTS forge_advance_document_version() CASCADE; ALTER TABLE websites DROP COLUMN IF EXISTS "documentVersion", DROP COLUMN IF EXISTS "performanceSettings"');
     await pgPool.query(readFileSync('prisma/migrations/20260928140000_document_concurrency/migration.sql','utf8'));
   }
   const owner = await prisma.user.create({data:{fullName:'Document owner',email:`doc-owner-${randomUUID()}@example.test`,status:'ACTIVE',emailVerified:true}});

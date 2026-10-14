@@ -1,23 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Play, Clock, CheckCircle2, AlertTriangle, Database, Download } from "lucide-react";
-import type { QueryResult } from "../types/studio.types";
+import type { QueryResult, StudioEnvironment } from "../types/studio.types";
 
 interface MonacoSqlEditorProps {
   projectId: string;
   apiBase: string;
+  environment: StudioEnvironment;
   defaultQuery?: string;
 }
 
 export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
   projectId,
   apiBase,
+  environment,
   defaultQuery = "SELECT * FROM information_schema.tables WHERE table_schema = 'public' LIMIT 50;",
 }) => {
   const [sql, setSql] = useState<string>(defaultQuery);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // PRODUCTION queries run read-only on the server unless writes are explicitly allowed
+  // (owners/admins only). The opt-in resets whenever the environment changes.
+  const [allowWrite, setAllowWrite] = useState(false);
+  const isProduction = environment === "PRODUCTION";
+  useEffect(() => setAllowWrite(false), [environment]);
 
   const handleRunQuery = async () => {
     if (!sql.trim()) return;
@@ -28,7 +35,7 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ sql }),
+        body: JSON.stringify({ sql, environment, allowWrite: isProduction ? allowWrite : undefined }),
       });
 
       const json = await res.json();
@@ -72,6 +79,16 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {isProduction && (
+            <label className="flex items-center gap-1.5 text-[11px] font-mono text-rose-300">
+              <input
+                type="checkbox"
+                checked={allowWrite}
+                onChange={(e) => setAllowWrite(e.target.checked)}
+              />
+              Allow writes to PRODUCTION
+            </label>
+          )}
           {result && (
             <button
               onClick={handleExportJson}

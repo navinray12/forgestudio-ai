@@ -1,51 +1,34 @@
-import "dotenv/config"; // tsx reload trigger 5
+import "dotenv/config"; // tsx reload trigger 8
 import http from "http";
 import app from "./app.js";
 import { startScheduler } from "./services/scheduleWorker.js";
-import { initPresenceWebSocketServer } from "./services/collaboration/presence.service.js";
 import { pgPool, prisma } from "./config/prisma.js";
 
 import { validateIdentityConfiguration } from "./modules/identity/composition.js";
 import { ensureDatabaseTables } from "./config/ensure-schema.js";
+import { reconcileInterruptedRuns } from "./services/appGeneration/appGeneration.service.js";
 validateIdentityConfiguration();
 
 const PORT = process.env.PORT || 5000;
 
-import {
-  realtimeWss,
-  handleRealtimeWebSocketConnection,
-} from "./modules/data-platform/data-layer/realtime.service.js";
-import {
-  terminalWss,
-  handleTerminalWebSocketConnection,
-} from "./services/terminal/forgeTerminal.service.js";
+import { attachWebSocketGateways } from "./websocketGateways.js";
+import { unifiedMigrationAuthority } from "./services/migration/unifiedMigrationAuthority.service.js";
 
 const server = http.createServer(app);
-const presenceWss = initPresenceWebSocketServer(server, undefined, { attachUpgradeListener: false });
+// Presence, workspace sync (/ws/workspace-sync), data realtime and terminal gateways.
+const gateways = attachWebSocketGateways(server);
 
-server.on("upgrade", (req, socket, head) => {
-  try {
-    const pathname = new URL(req.url ?? "", "http://localhost").pathname;
-    if (pathname.startsWith("/ws/presence") || pathname.startsWith("/ws/collaboration")) {
-      (presenceWss as any).upgrade(req, socket, head);
-    } else if (pathname.startsWith("/ws/realtime")) {
-      realtimeWss.handleUpgrade(req, socket, head, (ws) => {
-        handleRealtimeWebSocketConnection(ws, req);
-      });
-    } else if (pathname.startsWith("/ws/terminal")) {
-      terminalWss.handleUpgrade(req, socket, head, (ws) => {
-        handleTerminalWebSocketConnection(ws, req);
-      });
-    } else {
-      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-      socket.destroy();
-    }
-  } catch {
-    socket.destroy();
-  }
-});
-
-void ensureDatabaseTables().then(() => {
+void ensureDatabaseTables().then(async () => {
+  const interrupted = await reconcileInterruptedRuns().catch((err) => {
+    console.error("[app-generation] could not reconcile interrupted runs:", err?.message || err);
+    return 0;
+  });
+  if (interrupted > 0) console.warn(`[app-generation] marked ${interrupted} interrupted generation run(s) as failed`);
+  // A migration left in flight by a process that died is resolved from what its target database
+  // holds (never re-run). Anything still held by a live session is left for the next start.
+  void unifiedMigrationAuthority.reconcileInterrupted().then((resolved) => {
+    if (resolved.length > 0) console.warn(`[migrations] reconciled ${resolved.length} interrupted migration(s): ${resolved.map((r) => `${r.id}=${r.status}`).join(", ")}`);
+  }).catch((err) => console.error("[migrations] could not reconcile interrupted migrations:", err?.message || err));
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     startScheduler();
@@ -67,6 +50,7 @@ async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(JSON.stringify({ event: "server.shutdown", signal }));
+  await gateways.close().catch(() => undefined);
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await prisma.$disconnect().catch(() => undefined);
   await pgPool.end().catch(() => undefined);

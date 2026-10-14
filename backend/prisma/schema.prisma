@@ -89,10 +89,14 @@ model Website {
   performanceSettings Json                @default("{}")
   createdAt          DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime              @default(now()) @updatedAt @db.Timestamptz(6)
+  deletedAt          DateTime?             @db.Timestamptz(6)
   user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   customCodeSnippets CustomCodeSnippet[]
   formSubmissions    FormSubmission[]
   customPostTypes    CustomPostType[]
+  contentPurgeRequests ContentPurgeRequest[]
+  leads              Lead[]
+  workflowDefinitions WorkflowDefinitionVersion[]
   themeLocationRules ThemeLocationRule[]
   sftpConnections    SftpConnection[]
   pluginIntegrations PluginIntegration[]
@@ -383,15 +387,19 @@ model CustomCodeRevision {
 }
 
 model FormSubmission {
-  id        String   @id @default(uuid()) @db.Uuid
-  websiteId String   @db.Uuid
-  formId    String
-  data      Json
-  ipAddress String?
-  status    String   @default("NEW")
-  createdAt DateTime @default(now())
+  id             String   @id @default(uuid()) @db.Uuid
+  websiteId      String   @db.Uuid
+  formId         String
+  data           Json
+  ipAddress      String?
+  status         String   @default("NEW")
+  createdAt      DateTime @default(now())
+  idempotencyKey String?  @db.VarChar(200)
+  requestHash    String?  @db.Char(64)
+  leadId         String?  @db.Uuid
 
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  leads   Lead[]
 
   @@index([websiteId])
   @@index([formId])
@@ -404,6 +412,9 @@ model CustomPostType {
   name        String
   slug        String
   description String?
+  singular    String?
+  plural      String?
+  hasArchive  Boolean  @default(false)
   supports    Json     @default("[\"title\", \"editor\", \"thumbnail\"]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -515,6 +526,9 @@ model CustomEntry {
   data       Json     @default("{}")
   status     String   @default("PUBLISHED")
   authorId   String?  @db.Uuid
+  deletedAt    DateTime?
+  deletedById  String?  @db.Uuid
+  deleteReason String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -1722,6 +1736,8 @@ enum DatabaseEnvironment {
   DEVELOPMENT
   PREVIEW
   PRODUCTION
+  /// Kept for databases whose enum was first created by the runtime setup with STAGING.
+  STAGING
 }
 
 enum DatabaseProvisioningStatus {
@@ -1864,4 +1880,175 @@ model StorageObject {
   @@map("storage_objects")
 }
 
+/// Approved, exact-manifest permanent deletion of trashed CMS content (blueprint §10).
+model ContentPurgeRequest {
+  id                   String    @id @default(uuid()) @db.Uuid
+  websiteId            String    @db.Uuid
+  manifest             Json
+  manifestHash         String
+  reason               String
+  requestedById        String    @db.Uuid
+  approvedById         String?   @db.Uuid
+  approvedAt           DateTime?
+  singleOwnerException Boolean   @default(false)
+  status               String    @default("PENDING_APPROVAL")
+  expiresAt            DateTime
+  executedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId, status])
+  @@map("content_purge_requests")
+}
+
+/// Durable lead created atomically with its form submission (blueprint §12).
+model Lead {
+  id                    String   @id @default(uuid()) @db.Uuid
+  websiteId             String   @db.Uuid
+  submissionId          String?  @db.Uuid
+  provenance            String   @default("WEBSITE_FORM") @db.VarChar(30)
+  formId                String?  @db.VarChar(255)
+  displayName           String?  @db.VarChar(255)
+  email                 String?  @db.VarChar(320)
+  phone                 String?  @db.VarChar(64)
+  stage                 String   @default("NEW") @db.VarChar(20)
+  assignedToId          String?  @db.Uuid
+  qualificationEvidence String?
+  revision              Int      @default(1)
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime @default(now()) @db.Timestamptz(6)
+  stageChangedAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  website    Website         @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  submission FormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  events     LeadEvent[]
+
+  @@index([websiteId, createdAt(sort: Desc)], map: "idx_forge_leads_website")
+  @@index([websiteId, stage], map: "idx_forge_leads_website_stage")
+  @@map("forge_leads")
+}
+
+/// Immutable audit/notes trail for a lead.
+model LeadEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  leadId    String   @db.Uuid
+  websiteId String   @db.Uuid
+  actorId   String?  @db.Uuid
+  type      String   @db.VarChar(30)
+  fromStage String?  @db.VarChar(20)
+  toStage   String?  @db.VarChar(20)
+  note      String?
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt], map: "idx_forge_lead_events_lead")
+  @@map("forge_lead_events")
+}
+
+/// Immutable workflow definition version (blueprint §15). Immutability and the legal status
+/// transitions are enforced by a migration-owned trigger; "one PUBLISHED version" by a partial index.
+model WorkflowDefinitionVersion {
+  id             String    @id @default(uuid()) @db.Uuid
+  websiteId      String    @db.Uuid
+  workflowKey    String    @db.VarChar(100)
+  version        Int
+  status         String    @default("DRAFT") @db.VarChar(20)
+  name           String    @db.VarChar(200)
+  definition     Json
+  definitionHash String    @db.Char(64)
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  publishedById  String?   @db.Uuid
+  publishedAt    DateTime? @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, workflowKey, version], map: "uq_forge_workflow_version")
+  @@map("forge_workflow_definitions")
+}
+
+/// Approved permanent purge of a trashed website (blueprint §10). No relation to Website on purpose:
+/// the request is the surviving record of who requested, approved and executed the purge.
+model WebsitePurgeRequest {
+  id                   String    @id @default(uuid()) @db.Uuid
+  websiteId            String    @db.Uuid
+  manifest             Json
+  manifestHash         String    @db.Char(64)
+  reason               String    @db.VarChar(500)
+  requestedById        String    @db.Uuid
+  approvedById         String?   @db.Uuid
+  approvedAt           DateTime? @db.Timestamptz(6)
+  executedById         String?   @db.Uuid
+  executedAt           DateTime? @db.Timestamptz(6)
+  singleOwnerException Boolean   @default(false)
+  status               String    @default("PENDING_APPROVAL") @db.VarChar(20)
+  expiresAt            DateTime  @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([websiteId, status], map: "idx_website_purge_requests_website")
+  @@map("website_purge_requests")
+}
+
+/// Persistent environment binding (blueprint §42.1). forge_projects is managed by the runtime schema
+/// setup rather than Prisma, so the projectId foreign key and the CHECK constraints (including the
+/// one that refuses credential-shaped secretRef values) are migration-owned SQL.
+model EnvironmentBindingRecord {
+  id                  String   @id @default(uuid()) @db.Uuid
+  projectId           String   @db.Uuid
+  environmentClass    String   @db.VarChar(20)
+  bindingId           String   @db.VarChar(120)
+  version             Int      @default(1)
+  applicationId       String   @db.VarChar(120)
+  databaseProvider    String   @default("postgresql") @db.VarChar(30)
+  targetFingerprint   String   @db.Char(64)
+  safeDisplayLabel    String   @db.VarChar(120)
+  secretRef           String   @db.VarChar(300)
+  roles               Json
+  poolLimits          Json
+  protectionLevel     String   @db.VarChar(30)
+  verificationHistory Json     @default("[]")
+  status              String   @default("ACTIVE") @db.VarChar(20)
+  createdById         String?  @db.Uuid
+  updatedById         String?  @db.Uuid
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([projectId, environmentClass], map: "uq_forge_environment_binding")
+  @@map("forge_environment_bindings")
+}
+
+/// Durable state for the blueprint v2 feature routers (WP-01, WP-16). The websites foreign key is
+/// migration-owned SQL; the table is read and written through services/websiteRecords.service.ts.
+model WebsiteRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  websiteId   String   @db.Uuid
+  tenantId    String   @db.VarChar(64)
+  kind        String   @db.VarChar(40)
+  recordKey   String   @db.VarChar(200)
+  data        Json
+  requestHash String   @db.Char(64)
+  revision    Int      @default(1)
+  createdById String   @db.Uuid
+  updatedById String   @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([websiteId, kind, recordKey], map: "uq_forge_website_records")
+  @@map("forge_website_records")
+}
+
+/// Operator-submitted benchmark run (blueprint §03). Platform-wide, so there is no website scope.
+model BenchmarkRunRecord {
+  runId        String   @id @db.VarChar(64)
+  requestHash  String   @unique(map: "uq_forge_benchmark_runs_request") @db.Char(64)
+  report       Json
+  recordedById String   @db.Uuid
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("forge_benchmark_runs")
+}

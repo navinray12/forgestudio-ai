@@ -341,11 +341,17 @@ Flags:
         } else if (action === "migrate") {
           const migrations = await migrationEngine.listMigrations(dbEntity.id);
           const pending = migrations.filter((m) => m.status === "PENDING");
+          // Each migration goes through the migration authority. A production database is never
+          // migrated from here: the run stops and reports that an approval is required.
+          let applied = 0;
           for (const m of pending) {
-            await migrationEngine.applyMigration(dbEntity.id, m.id);
+            await migrationEngine.applyMigration(dbEntity.id, m.id, {
+              actor: options.userId ? { id: options.userId } : undefined,
+            });
+            applied++;
           }
-          resultData = { applied: pending.length };
-          stdout = `Applied ${pending.length} pending migration(s) successfully.`;
+          resultData = { applied };
+          stdout = `Applied ${applied} pending migration(s).`;
         } else if (action === "backup") {
           const backup = await forgeDatabaseService.createBackup(dbEntity.id, subArgs[0] || "cli-manual-backup");
           resultData = backup;
@@ -827,7 +833,7 @@ Flags:
         } else {
           const graph = await monorepoDiscoveryService.discoverMonorepo(projId);
           resultData = { graph };
-          stdout = `Monorepo Workspaces (${graph.packages.length} packages):\n` +
+          stdout = `Monorepo Workspaces (${graph.packages.length} packages${graph.hasCircularDependencies ? ", circular dependencies detected" : ""}):\n` +
             graph.packages.map((p: any) => `* [${p.type}] ${p.name} -> ${p.path}`).join("\n");
         }
         break;
@@ -852,12 +858,13 @@ Flags:
             hostPort: 3000,
           });
           resultData = { run };
-          stdout = `Container started: ${run.id} [port bindings: ${JSON.stringify(run.portBindings)}]`;
+          const ports = Object.entries(run.portBindings).map(([container, host]) => `${host} -> ${container}`).join(", ");
+          stdout = `Container started: ${run.id} [ports: ${ports || "none"}]`;
         } else if (subCommand === "list" || !subCommand) {
           const runs = await dockerfileGeneratorService.listContainers(projId);
           resultData = { runs };
           stdout = `Running Containers (${runs.length}):\n` +
-            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port bindings: ${JSON.stringify(r.portBindings)} [status: ${r.status}]`).join("\n");
+            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
         } else if (subCommand === "stop") {
           const runId = subArgs[0];
           if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");
@@ -876,7 +883,7 @@ Flags:
         if (subCommand === "validate") {
           const validation = await dockerfileGeneratorService.validateInfrastructure(projId);
           resultData = { validation };
-          stdout = `Infrastructure Validation:\n* Valid: ${validation.isValid}\n* Syntax errors (${validation.syntaxErrors.length}): ${validation.syntaxErrors.join(", ") || "None"}\n* Dangerous configurations (${validation.dangerousConfigs.length}): ${validation.dangerousConfigs.join(", ") || "None"}\n* Detected secret references: ${validation.detectedSecrets.length}`;
+          stdout = `Infrastructure Validation:\n* Valid: ${validation.isValid}\n* Security score: ${validation.securityScore}\n* Syntax errors (${validation.syntaxErrors.length}): ${validation.syntaxErrors.join(", ") || "None"}\n* Detected secrets (${validation.detectedSecrets.length}): ${validation.detectedSecrets.join(", ") || "None"}\n* Dangerous configs (${validation.dangerousConfigs.length}): ${validation.dangerousConfigs.join(", ") || "None"}`;
         } else if (subCommand === "kubernetes") {
           const manifests = await dockerfileGeneratorService.generateKubernetesManifests(projId, {
             serviceName: "web",

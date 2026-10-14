@@ -50,6 +50,27 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return data;
 }
 
+export interface AppGenerationRun {
+  id: string;
+  mode: "AI_PROVIDER" | "APPROVED_TEMPLATE";
+  status: "QUEUED" | "PLANNING" | "GENERATING_SOURCE" | "WRITING_SOURCE" | "SOURCE_WRITTEN" | "FAILED";
+  brief: string;
+  templateId: string | null;
+  provider: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  providerCalls: number;
+  repairAttempts: number;
+  appModel: { applicationName: string; entities: Array<{ name: string; fields: Array<{ name: string; type: string; required: boolean }> }> } | null;
+  files: Array<{ path: string; role: string; written: boolean }>;
+  diagnostics: Array<{ severity: "info" | "warn" | "error"; message: string }>;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export const developerPlatformService = {
   // =========================================================================
   // Module 57: Collaborative Development
@@ -196,6 +217,35 @@ export const developerPlatformService = {
   // =========================================================================
   // Module 59: Project Import & Migration
   // =========================================================================
+  // Full-stack application generation (durable runs; AI provider or approved template)
+  async listAppGenerationTemplates(projectId: string): Promise<{ templates: Array<{ id: string; applicationName: string; entities: string[] }> }> {
+    return request(`/${projectId}/app-generation-templates`);
+  },
+
+  async startAppGeneration(
+    projectId: string,
+    input: { mode: "AI_PROVIDER"; brief: string } | { mode: "APPROVED_TEMPLATE"; templateId: string },
+    idempotencyKey: string
+  ): Promise<{ run: AppGenerationRun }> {
+    return request(`/${projectId}/app-generations`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getAppGeneration(projectId: string, runId: string): Promise<{ run: AppGenerationRun }> {
+    return request(`/${projectId}/app-generations/${runId}`);
+  },
+
+  async listAppGenerations(projectId: string): Promise<{ runs: AppGenerationRun[] }> {
+    return request(`/${projectId}/app-generations`);
+  },
+
+  async retryAppGeneration(projectId: string, runId: string): Promise<{ run: AppGenerationRun }> {
+    return request(`/${projectId}/app-generations/${runId}/retry`, { method: "POST" });
+  },
+
   async startProjectImport(projectId: string, source: any): Promise<{ job: any }> {
     return request<{ job: any }>(`/${projectId}/import/start`, {
       method: "POST",

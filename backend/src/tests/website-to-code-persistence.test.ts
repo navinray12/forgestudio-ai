@@ -20,6 +20,14 @@ vi.mock("../config/prisma.js", async () => {
   };
 });
 
+// Checkpoints and sync-state writes use PostgreSQL row locks in production; this suite's database
+// is in memory, so the module is replaced by a contract-preserving in-memory version.
+vi.mock("../services/workspace/workspaceCheckpoints.service.js", async (importOriginal) => {
+  const real: any = await importOriginal();
+  const { memoryCheckpointsModule } = await import("./helpers/memoryCheckpoints.js");
+  return memoryCheckpointsModule(() => mem.current, real);
+});
+
 const store = () => mem.current as ReturnType<typeof createMemoryDb>;
 
 const ALICE = { id: "11111111-1111-4111-8111-111111111111", role: "USER" };

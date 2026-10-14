@@ -1,3 +1,9 @@
+import {
+  createWebsitePurgeRequest,
+  listWebsitePurgeRequests,
+  approveWebsitePurgeRequest,
+  executeWebsitePurgeRequest,
+} from "../services/websitePurge.service.js";
 import { syncBridgedProjectForWebsite } from "../services/project/forgeProject.service.js";
 import { documentWriteContext } from "../services/websites/document-request.js";
 import { documentETag } from "../services/websites/document-policy.js";
@@ -11,6 +17,9 @@ import {
   updateWebsite,
   deleteWebsite,
   getWebsiteRoles,
+  getTrashedWebsites,
+  restoreWebsite,
+  purgeWebsite,
 } from "../services/website.service.js";
 
 /**
@@ -203,12 +212,114 @@ export async function deleteWebsiteHandler(
     const user = res.locals.user;
     const websiteId = req.params.id as string;
 
-    await deleteWebsite(websiteId, user.id);
+    const result = await deleteWebsite(websiteId, user.id);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/websites/trash/list
+ * Fetch all trashed websites for current authenticated user
+ */
+export async function getTrashedWebsitesHandler(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websites = await getTrashedWebsites(user.id);
 
     return res.status(200).json({
       success: true,
-      message: "Website deleted successfully",
+      websites,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/websites/:id/restore
+ * Restore a website from trash
+ */
+export async function restoreWebsiteHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websiteId = req.params.id as string;
+
+    const result = await restoreWebsite(websiteId, user.id);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/websites/:id/purge
+ * Permanently purge a website and its cascading records
+ */
+export async function purgeWebsiteHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = res.locals.user;
+    const websiteId = req.params.id as string;
+    const { confirmNameOrSlug, forceImmediatePurge } = req.body || {};
+
+    const result = await purgeWebsite(websiteId, user.id, {
+      confirmNameOrSlug: confirmNameOrSlug || (req.query.confirm as string),
+      forceImmediatePurge: Boolean(forceImmediatePurge || req.query.force === "true"),
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+const sessionAuthTime = (res: Response) => (res.locals.session?.authTime ? new Date(res.locals.session.authTime) : null);
+
+export async function createWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await createWebsitePurgeRequest(req.params.id as string, res.locals.user.id, sessionAuthTime(res), req.body || {});
+    return res.status(201).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listWebsitePurgeRequestsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    return res.json({ success: true, data: await listWebsitePurgeRequests(req.params.id as string, res.locals.user.id) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = await approveWebsitePurgeRequest(req.params.id as string, req.params.requestId as string, res.locals.user.id);
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function executeWebsitePurgeRequestHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await executeWebsitePurgeRequest(req.params.id as string, req.params.requestId as string, res.locals.user.id, sessionAuthTime(res));
+    return res.json(result);
   } catch (error) {
     next(error);
   }

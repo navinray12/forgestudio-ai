@@ -1,7 +1,7 @@
 import { saveWebsiteDocument, type DocumentWriteContext, type DocumentPatch } from "./websites/save-document.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
-import { getScopedWebsite, listScopedOwnedWebsites } from "./websites/scoped-access.js";
+import { getScopedWebsite, listScopedOwnedWebsites, getScopedWebsiteInTransaction } from "./websites/scoped-access.js";
 import { createPersonalWebsite } from "./websites/create-personal-website.js";
 import crypto from "crypto";
 import { canUserAccessResource } from "./permission.service.js";
@@ -208,8 +208,8 @@ export async function updateCookieConsentConfig(websiteId: string, userId: strin
 /**
  * Get a single website by ID with ownership check
  */
-export async function getWebsiteById(websiteId: string, userId: string): Promise<any> {
-  return getScopedWebsite(websiteId, userId);
+export async function getWebsiteById(websiteId: string, userId: string, options?: { allowTrash?: boolean }): Promise<any> {
+  return getScopedWebsite(websiteId, userId, options);
 }
 
 /**
@@ -290,29 +290,140 @@ export async function updateWebsiteEditorData(websiteId: string, userId: string,
 }
 
 /**
- * Delete a website with ownership check
+ * Move a website to the trash (Soft Delete).
+ * Backward-compatible lifecycle: sets status to TRASH and sets deletedAt timestamp.
+ * Preserves revisions, deployments, CMS records, form submissions, and files intact.
+ * Authoritative: Owner only.
  */
-export async function deleteWebsite(websiteId: string, userId: string) {
-  // Extract permission boundaries
+export async function trashWebsite(websiteId: string, userId: string) {
+  // Extract permission boundaries (using standard getWebsiteById)
   const website = await getWebsiteById(websiteId, userId);
 
   if (website.userPermission !== "OWNER") {
-    throw new AppError("Only the owner can delete this project.", 403, "FORBIDDEN");
+    throw new AppError("Only the owner can move this project to the trash.", 403, "FORBIDDEN");
   }
 
-  try {
-    if (db?.website?.delete) {
-      await db.website.delete({
-        where: { id: websiteId },
-      });
-      return { success: true };
-    }
-
-    throw new AppError("Website repository adapter is unavailable", 503, "PERSISTENCE_UNAVAILABLE");
-  } catch (error) {
-    console.error("Error deleting website:", error);
-    throw new AppError("Failed to delete website", 500, "DELETE_FAILED");
+  if (website.status === "TRASH") {
+    return {
+      success: true,
+      message: "Website is already in the trash.",
+      websiteId,
+      status: "TRASH",
+      deletedAt: website.deletedAt,
+    };
   }
+
+  const trashedAt = new Date();
+
+  const updated = await db.website.update({
+    where: { id: websiteId },
+    data: {
+      status: "TRASH",
+      deletedAt: trashedAt,
+    },
+  });
+
+  await recordAuditLog({
+    userId,
+    action: "WEBSITE_TRASHED",
+    targetResource: `website:${websiteId}`,
+    details: {
+      websiteName: website.name,
+      previousStatus: website.status,
+      trashedAt: trashedAt.toISOString(),
+      preserves: ["revisions", "deployments", "formSubmissions", "customPostTypes"],
+    },
+  });
+
+  return {
+    success: true,
+    message: "Website moved to trash.",
+    website: updated,
+  };
+}
+
+/**
+ * Backward compatibility alias: deleteWebsite calls trashWebsite.
+ */
+export const deleteWebsite = trashWebsite;
+
+/**
+ * Restore a website from the trash.
+ * Transitions status back to DRAFT and clears deletedAt.
+ * Authoritative: Owner or ADMIN.
+ */
+export async function restoreWebsite(websiteId: string, userId: string) {
+  const website = await getScopedWebsiteInTransaction(db, websiteId, userId, { allowTrash: true });
+
+  if (website.userPermission !== "OWNER" && website.userPermission !== "ADMIN") {
+    throw new AppError("Only owners or administrators can restore a website from the trash.", 403, "FORBIDDEN");
+  }
+
+  if (website.status !== "TRASH") {
+    return {
+      success: true,
+      message: "Website is not in trash.",
+      website,
+    };
+  }
+
+  const updated = await db.website.update({
+    where: { id: websiteId },
+    data: {
+      status: "DRAFT",
+      deletedAt: null,
+    },
+  });
+
+  await recordAuditLog({
+    userId,
+    action: "WEBSITE_RESTORED",
+    targetResource: `website:${websiteId}`,
+    details: {
+      websiteName: website.name,
+      restoredAt: new Date().toISOString(),
+      newStatus: "DRAFT",
+    },
+  });
+
+  return {
+    success: true,
+    message: "Website restored successfully.",
+    website: updated,
+  };
+}
+
+/**
+ * List all trashed websites owned by the user.
+ */
+export async function getTrashedWebsites(userId: string) {
+  return listScopedOwnedWebsites(userId, { onlyTrash: true });
+}
+
+export interface PurgeWebsiteOptions {
+  confirmNameOrSlug: string;
+  forceImmediatePurge?: boolean;
+}
+
+/**
+ * Direct purge is no longer available: permanent deletion requires an approved purge request
+ * (services/websitePurge.service.ts, blueprint §10). The owner check is kept so that non-owners
+ * learn nothing about the website.
+ */
+export async function purgeWebsite(
+  websiteId: string,
+  userId: string,
+  _options: PurgeWebsiteOptions
+): Promise<never> {
+  const website = await getScopedWebsiteInTransaction(db, websiteId, userId, { allowTrash: true });
+  if (website.userPermission !== "OWNER") {
+    throw new AppError("Only the project owner can permanently purge a website.", 403, "FORBIDDEN");
+  }
+  throw new AppError(
+    "Permanent deletion requires an approved purge request: POST /api/websites/:id/purge-requests, approval by another owner or admin, then execute.",
+    409,
+    "PURGE_APPROVAL_REQUIRED"
+  );
 }
 
 export async function getWebsiteRoles(websiteId: string, userId: string) {
@@ -878,7 +989,9 @@ export async function getPublicWebsiteById(websiteId: string): Promise<PublicWeb
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(websiteId);
 
   const website = await prisma.website.findFirst({
-    where: isUuid ? { id: websiteId } : { slug: websiteId },
+    where: isUuid
+      ? { id: websiteId, status: { not: "TRASH" }, deletedAt: null }
+      : { slug: websiteId, status: { not: "TRASH" }, deletedAt: null },
     select: {
       id: true,
       name: true,
@@ -901,7 +1014,7 @@ export async function getPublicWebsiteById(websiteId: string): Promise<PublicWeb
     },
   });
 
-  if (!website) {
+  if (!website || website.status === "TRASH") {
     throw new AppError("This website is unavailable.", 404, "NOT_FOUND");
   }
 

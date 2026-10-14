@@ -53,27 +53,41 @@ function scopeRelations(actorId: string) {
   } as const;
 }
 
-export async function getScopedWebsiteInTransaction(tx: WorkspaceTransaction, websiteId: string, actorId: string) {
+export async function getScopedWebsiteInTransaction(
+  tx: WorkspaceTransaction,
+  websiteId: string,
+  actorId: string,
+  options?: { allowTrash?: boolean }
+) {
     await requireActiveActor(tx, actorId);
     const row = await tx.website.findUnique({ where: { id: websiteId }, include: { ...scopeRelations(actorId), customCodeSnippets: true } });
     const role = row && resolveWebsiteRole(row, actorId);
     if (!row || !role) throw new AppError("Website not found or access denied", 404, "WEBSITE_NOT_FOUND");
+    if (row.status === "TRASH" && !options?.allowTrash) {
+      throw new AppError("This website is in the trash. Restore it before accessing or editing.", 410, "WEBSITE_IN_TRASH");
+    }
     const { organization, workspace, collaborators, granularPermissions, ...website } = row;
     return { ...website, userPermission: role, workspaceStatus: workspace?.lifecycleStatus ?? "ACTIVE" };
 }
 
-export async function getScopedWebsite(websiteId: string, actorId: string) {
-  return prisma.$transaction(tx => getScopedWebsiteInTransaction(tx, websiteId, actorId));
+export async function getScopedWebsite(websiteId: string, actorId: string, options?: { allowTrash?: boolean }) {
+  return prisma.$transaction(tx => getScopedWebsiteInTransaction(tx, websiteId, actorId, options));
 }
 
-export async function listScopedOwnedWebsites(actorId: string) {
+export async function listScopedOwnedWebsites(actorId: string, options?: { includeTrash?: boolean; onlyTrash?: boolean }) {
   return prisma.$transaction(async (tx) => {
     await requireActiveActor(tx, actorId);
+    const whereCondition: any = { userId: actorId };
+    if (options?.onlyTrash) {
+      whereCondition.status = "TRASH";
+    } else if (!options?.includeTrash) {
+      whereCondition.status = { not: "TRASH" };
+    }
     const rows = await tx.website.findMany({
-      where: { userId: actorId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 200,
+      where: whereCondition, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 200,
       select: {
         id: true, userId: true, organizationId: true, workspaceId: true,
-        name: true, slug: true, status: true, createdAt: true, updatedAt: true,
+        name: true, slug: true, status: true, createdAt: true, updatedAt: true, deletedAt: true,
         ...scopeRelations(actorId),
         wpConnection: { select: { id: true, siteUrl: true, wpSiteName: true, status: true, lastVerifiedAt: true, createdAt: true } },
       },

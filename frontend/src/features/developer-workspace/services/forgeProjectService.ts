@@ -1,4 +1,5 @@
 import { downloadAuthenticatedFile } from "../../../utils/downloadFile";
+import type { CanvasEditPlan } from "./canvasSourceSync";
 
 const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/v1/projects`;
 
@@ -189,6 +190,34 @@ export interface ProjectFile {
   updatedAt: string;
 }
 
+type VisualPropValue = string | number | boolean;
+
+/** Mirrors JsxMutation in backend/src/services/compiler/jsxAstMutation.ts. */
+export type VisualSourceMutation =
+  | { type: "SET_TEXT"; text: string }
+  | { type: "SET_PROP"; name: string; value: VisualPropValue | null }
+  | { type: "SET_CLASSES"; classes?: string[]; add?: string[]; remove?: string[] }
+  | { type: "SET_STYLE"; style: Record<string, string | number | null> }
+  | {
+      type: "INSERT";
+      parentId: string;
+      index?: number;
+      element: { tag: string; text?: string; classes?: string[]; props?: Record<string, VisualPropValue>; style?: Record<string, string | number> };
+    }
+  | { type: "REMOVE" }
+  | { type: "REORDER"; index: number }
+  | { type: "MOVE"; parentId: string; index?: number };
+
+export interface VisualSourceSyncResult {
+  success: boolean;
+  updated: boolean;
+  code?: string;
+  diagnostics: Array<{ severity: string; code: string; message: string; filePath?: string }>;
+  content: string;
+  version?: number;
+  changedRange?: { startLine: number; endLine: number };
+}
+
 export const forgeProjectService = {
   // Project Model
   async createProject(payload: {
@@ -274,11 +303,31 @@ export const forgeProjectService = {
       isProtected?: boolean;
       reason?: string;
     }
-  ): Promise<{ file: ProjectFile; sync?: CodeSyncResult | null }> {
-    return request<{ file: ProjectFile; sync?: CodeSyncResult | null }>(`/${projectId}/files`, {
-      method: "POST",
-      body: JSON.stringify({ path: filePath, ...payload }),
-    });
+  ): Promise<{
+    file: ProjectFile;
+    sync?: CodeSyncResult | null;
+    checkpoint?: { id: string; sequence: number; kind: string };
+    replayed?: boolean;
+  }> {
+    // One change-set id per save. If the response is lost (network error), the save is retried
+    // once with the same id and the server returns the already-committed result instead of
+    // writing again. HTTP errors such as 409 conflicts are not retried.
+    const changeSetId = crypto.randomUUID();
+    const send = () =>
+      request<{ file: ProjectFile; sync?: CodeSyncResult | null; checkpoint?: { id: string; sequence: number; kind: string }; replayed?: boolean }>(
+        `/${projectId}/files`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": changeSetId },
+          body: JSON.stringify({ path: filePath, ...payload }),
+        }
+      );
+    try {
+      return await send();
+    } catch (err) {
+      if (err instanceof TypeError) return send();
+      throw err;
+    }
   },
 
   async deleteFile(projectId: string, filePath: string): Promise<{ success: boolean; path: string }> {
@@ -343,18 +392,35 @@ export const forgeProjectService = {
     });
   },
 
+  /**
+   * Applies one visual edit to an element of a source file. A rejected edit (HTTP 422) resolves
+   * with `success: false` and its diagnostics; `updated` is true only when the file changed.
+   */
   async syncVisualToCode(
     projectId: string,
     filePath: string,
-    element: any
-  ): Promise<{ success: boolean; diagnostics: any[]; content: string }> {
-    return request<{ success: boolean; diagnostics: any[]; content: string }>(
-      `/${projectId}/sync/visual-to-code`,
-      {
-        method: "POST",
-        body: JSON.stringify({ filePath, element }),
-      }
-    );
+    element: { id: string; textContent?: string; content?: string; buttonText?: string },
+    options: { mutation?: VisualSourceMutation; expectedRevision?: number } = {}
+  ): Promise<VisualSourceSyncResult> {
+    return request<VisualSourceSyncResult>(`/${projectId}/sync/visual-to-code`, {
+      method: "POST",
+      body: JSON.stringify({ filePath, element, ...options }),
+      allowFailure: true,
+    });
+  },
+
+  /**
+   * The element edits that carry a canvas change (visual document before/after) into the
+   * project's hand-written page files. Read-only; apply the edits with `syncVisualToCode`.
+   */
+  async planVisualToCode(
+    projectId: string,
+    body: { before: unknown; after: unknown; paths?: string[] }
+  ): Promise<CanvasEditPlan> {
+    return request<CanvasEditPlan>(`/${projectId}/sync/visual-to-code/plan`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   },
 
   /**

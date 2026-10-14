@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
+  Sparkles,
   Users,
   Puzzle,
   Download,
@@ -23,13 +24,14 @@ import {
   FileCheck,
 } from "lucide-react";
 import { developerPlatformService } from "../services/developerPlatformService";
+import { AppGenerationPanel } from "./AppGenerationPanel";
 
 interface Props {
   projectId: string;
   onLog?: (msg: string, type?: "info" | "success" | "warn" | "error") => void;
 }
 
-type TabKey = "collaboration" | "extensions" | "import" | "monorepo" | "containers";
+type TabKey = "collaboration" | "extensions" | "import" | "monorepo" | "containers" | "generate";
 
 export const DeveloperPlatformPanel: React.FC<Props> = ({ projectId, onLog }) => {
   const [activeTab, setActiveTab] = useState<TabKey>("collaboration");
@@ -326,6 +328,18 @@ export const DeveloperPlatformPanel: React.FC<Props> = ({ projectId, onLog }) =>
             <Box className="w-3.5 h-3.5" />
             <span>Containers & Infra</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("generate")}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "generate"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/40"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Generate App</span>
+          </button>
         </div>
 
         <button
@@ -340,6 +354,8 @@ export const DeveloperPlatformPanel: React.FC<Props> = ({ projectId, onLog }) =>
 
       {/* Main Panel Content Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {activeTab === "generate" && <AppGenerationPanel projectId={projectId} onLog={onLog} />}
+
         {/* ========================================================================= */}
         {/* TAB 1: COLLABORATION */}
         {/* ========================================================================= */}

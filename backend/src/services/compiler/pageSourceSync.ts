@@ -565,10 +565,15 @@ function isContainerType(element: any): boolean {
   return type === "container" || type === "div-block";
 }
 
+/**
+ * The Visual Editor edits `content`. The textContent/text aliases are only kept in step where an
+ * element already has them: adding them here would shadow every later canvas edit, because the
+ * generator prefers them over `content` (resolveElementText).
+ */
 function setText(element: any, text: string) {
   element.content = text;
-  element.textContent = text;
-  element.text = text;
+  if ("textContent" in element) element.textContent = text;
+  if ("text" in element) element.text = text;
   if (String(element.type).toLowerCase() === "button") {
     element.buttonText = text;
   }
@@ -967,7 +972,8 @@ function indexNodes(root: JsxNode, into: Map<string, JsxNode>) {
   root.children.forEach((child) => indexNodes(child, into));
 }
 
-async function generatePageFile(
+/** The page file the generator produces for `filePath` from a visual document, and its root element ID. */
+export async function generatePageFile(
   editorData: any,
   framework: ProjectFramework,
   project: ProjectIdentity,
@@ -1179,8 +1185,10 @@ export async function reconcilePageSource(input: PageReconcileInput): Promise<Pa
         const at = saved.findIndex((token, index) => token !== canonical[index]);
         if (at >= 0 || saved.length !== canonical.length) {
           const token = at >= 0 ? saved[at] : canonical[saved.length];
+          // An error, not a warning: otherwise the save reports "unchanged", the file is treated as
+          // generated again, and the next regeneration silently discards this custom code.
           diagnostics.push({
-            severity: "warning",
+            severity: "error",
             code: "CUSTOM_CODE_OUTSIDE_PROTECTED_REGION",
             message: `Code outside the page's JSX and its protected regions differs from the generated page (near "${String(token).slice(0, 40)}"). Move custom logic into a // [forge-protect-start: ...] region.`,
             filePath,

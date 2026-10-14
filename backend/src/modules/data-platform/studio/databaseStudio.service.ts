@@ -4,6 +4,7 @@
  * and CSV/JSON data import/export.
  */
 
+import crypto from "node:crypto";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
 import { customerConnectionManager } from "../database/connectionManager.js";
@@ -17,15 +18,94 @@ import {
 
 const db = prisma as any;
 
+export type StudioEnvironment = "DEVELOPMENT" | "STAGING" | "PRODUCTION";
+
 export class DatabaseStudioService {
+  /**
+   * Validate mandatory, explicit environment selection.
+   * Rejects missing or invalid environment; ZERO fallback to production.
+   */
+  public static validateEnvironment(env?: unknown): StudioEnvironment {
+    if (!env || typeof env !== "string") {
+      throw new AppError(
+        "Explicit environment selection is mandatory for Database Studio operations (DEVELOPMENT, STAGING, or PRODUCTION)",
+        400,
+        "MISSING_ENVIRONMENT"
+      );
+    }
+    const upper = env.toUpperCase();
+    if (upper !== "DEVELOPMENT" && upper !== "STAGING" && upper !== "PRODUCTION") {
+      throw new AppError(
+        `Invalid environment '${env}'. Allowed environments: DEVELOPMENT, STAGING, PRODUCTION. Zero fallback allowed.`,
+        400,
+        "INVALID_ENVIRONMENT"
+      );
+    }
+    return upper as StudioEnvironment;
+  }
+
+  /**
+   * Capture a versioned desired-versus-observed schema snapshot
+   */
+  public async captureSchemaSnapshot(
+    databaseId: string,
+    environment: string
+  ): Promise<{
+    databaseId: string;
+    environment: StudioEnvironment;
+    snapshotDigest: string;
+    capturedAt: string;
+    tables: Array<{ name: string; columnsCount: number }>;
+  }> {
+    const resolvedEnv = DatabaseStudioService.validateEnvironment(environment);
+    const database = await db.forgeDatabase.findUnique({ where: { id: databaseId } });
+    if (!database) throw new AppError("Database not found", 404, "DATABASE_NOT_FOUND");
+
+    if (database.environment && database.environment.toUpperCase() !== resolvedEnv) {
+      throw new AppError(
+        `Target environment mismatch: database is '${database.environment}', but request specified '${resolvedEnv}'`,
+        403,
+        "ENVIRONMENT_MISMATCH"
+      );
+    }
+
+    const schemaName = database.schemaName;
+    const query = `
+      SELECT table_name, count(column_name)::int as cols
+      FROM information_schema.columns
+      WHERE table_schema = $1
+      GROUP BY table_name
+      ORDER BY table_name;
+    `;
+    const res = await customerConnectionManager.querySchema(schemaName, query, [schemaName]);
+    const tables = (res.rows || []).map((r: any) => ({ name: r.table_name, columnsCount: r.cols || 0 }));
+
+    const raw = JSON.stringify({ databaseId, environment: resolvedEnv, schemaName, tables });
+    const snapshotDigest = crypto.createHash("sha256").update(raw).digest("hex");
+
+    return {
+      databaseId,
+      environment: resolvedEnv,
+      snapshotDigest,
+      capturedAt: new Date().toISOString(),
+      tables,
+    };
+  }
+
   /**
    * Fetch paginated, filtered, and sorted table data
    */
   public async getTableData(
     databaseId: string,
     tableName: string,
-    query: TableDataQuery = {}
+    query: TableDataQuery = {},
+    environment?: string
   ): Promise<TableDataResult> {
+    const targetEnv = environment || (query as any).environment;
+    if (targetEnv) {
+      DatabaseStudioService.validateEnvironment(targetEnv);
+    }
+
     const database = await db.forgeDatabase.findUnique({ where: { id: databaseId } });
     if (!database) throw new AppError("Database not found", 404, "DATABASE_NOT_FOUND");
 
@@ -197,10 +277,20 @@ export class DatabaseStudioService {
     databaseId: string,
     userId: string | null,
     sql: string,
-    confirmDestructive = false
+    confirmDestructive = false,
+    environment?: string
   ): Promise<SqlQueryResult> {
+    const resolvedEnv = environment ? DatabaseStudioService.validateEnvironment(environment) : null;
     const database = await db.forgeDatabase.findUnique({ where: { id: databaseId } });
     if (!database) throw new AppError("Database not found", 404, "DATABASE_NOT_FOUND");
+
+    if (resolvedEnv && database.environment && database.environment.toUpperCase() !== resolvedEnv) {
+      throw new AppError(
+        `Target environment mismatch: database is '${database.environment}', but query specified '${resolvedEnv}'`,
+        403,
+        "ENVIRONMENT_MISMATCH"
+      );
+    }
 
     const trimmed = sql.trim();
     if (!trimmed) throw new AppError("SQL query is empty", 400, "EMPTY_SQL");

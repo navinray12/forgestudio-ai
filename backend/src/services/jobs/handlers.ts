@@ -84,6 +84,18 @@ export function initJobHandlers() {
     return { status: "DELIVERED", statusCode: res.status };
   });
 
+  // 3b. FORM_NOTIFICATION_EMAIL: enqueued in the same transaction as the lead (blueprint §12).
+  // A thrown error leaves the job for retry; an accepted SMTP handoff is not proof of inbox delivery.
+  registerJobHandler("FORM_NOTIFICATION_EMAIL", async (payload) => {
+    const { websiteId, to, subject, html, fromName } = payload || {};
+    if (!websiteId || !to || !subject) {
+      throw new Error("Missing websiteId, to or subject in FORM_NOTIFICATION_EMAIL payload");
+    }
+    const { sendSiteEmail } = await import("../siteMailer.service.js");
+    const result = await sendSiteEmail(websiteId, { to, subject, html, fromName });
+    return { status: "HANDED_TO_MAIL_SERVER", messageId: (result as any)?.messageId ?? null };
+  });
+
   // 4. MEDIA_OPTIMIZATION Handler
   registerJobHandler("MEDIA_OPTIMIZATION", async (payload) => {
     const { assetUrl, dimensions, quality } = payload;

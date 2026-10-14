@@ -12,19 +12,19 @@ import { enableTableRealtime } from "./realtime.service.js";
 import { generateProjectTypeScriptSdk } from "./sdk-generator.service.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 import { AppError } from "../../../utils/app-error.js";
+import { resolveExplicitEnvironment } from "../common/project-access.js";
 
 function getParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] || "";
   return param || "";
 }
 
+/**
+ * Fails closed (blueprint §42.4): a missing or unknown environment is rejected. It previously fell
+ * back to PRODUCTION, so a request for an unrecognised environment ran against production data.
+ */
 function resolveEnvironment(req: Request): DatabaseEnvironment {
-  const raw = (req.query.environment as string) || (req.query.env as string) || "PRODUCTION";
-  const upper = raw.toUpperCase();
-  if (upper === "DEVELOPMENT" || upper === "PREVIEW" || upper === "PRODUCTION") {
-    return upper as DatabaseEnvironment;
-  }
-  return "PRODUCTION";
+  return resolveExplicitEnvironment(req);
 }
 
 /**

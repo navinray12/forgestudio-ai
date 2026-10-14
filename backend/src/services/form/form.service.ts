@@ -3,8 +3,8 @@ import { AppError } from "../../utils/app-error.js";
 import { getWebsiteById } from "../website.service.js";
 import { enqueueJob } from "../jobs/jobRunner.js";
 import { assertSafeUrl, isSafeUrl } from "../../utils/ssrf.guard.js";
-import { sendSiteEmail } from "../siteMailer.service.js";
 import { IntegrationService } from "../integration.service.js";
+import { acceptSubmission, isKnownSubmissionKey, type LeadNotification } from "../leads/leadIntake.service.js";
 import nodemailer from "nodemailer";
 
 // In-memory rate limiting map: ip -> timestamps[]
@@ -115,6 +115,8 @@ export interface FormSubmitPayload {
   formId: string;
   formName: string;
   fields: Record<string, any>;
+  /** Client-generated per submission attempt; a retry with the same key returns the original receipt. */
+  idempotencyKey?: string;
   actions?: {
     activeActions?: string[];
     emailConfig?: {
@@ -276,6 +278,7 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
     conditionalLogic,
     fieldConfigs,
     metadata,
+    idempotencyKey,
   } = payload;
 
   if (!websiteId || !formId) {
@@ -291,10 +294,12 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
     };
   }
 
-  // 2. IP Rate Limiter Check
+  // 2. IP Rate Limiter Check. A retry of an already-committed submission (same idempotency key)
+  // is not a new submission: it must be able to recover its original receipt (blueprint §12).
   const clientIp = metadata?.ip || "unknown";
   const rateLimit = spamProtection?.rateLimitPerMinute ?? 5;
-  if (!checkRateLimit(clientIp, rateLimit)) {
+  const isRetry = await isKnownSubmissionKey(websiteId, idempotencyKey);
+  if (!isRetry && !checkRateLimit(clientIp, rateLimit)) {
     throw new AppError(
       "Too many form submissions from your IP. Please wait a minute and try again.",
       429,
@@ -330,98 +335,90 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
   const activeActions = actions?.activeActions || (actions as any)?.submitActions || ["database"];
   const executionResults: Record<string, boolean> = {};
 
-  // 4. Action: Database Persistence
-  if (activeActions.includes("database")) {
-    try {
-      const dataJsonStr = JSON.stringify(sanitizedFields);
-      const metaJsonStr = JSON.stringify(sanitizedMetadata);
-
-      await prisma.$queryRaw`
-        INSERT INTO form_submissions (id, "websiteId", "formId", "formName", data, metadata, "createdAt")
-        VALUES (gen_random_uuid(), ${websiteId}::uuid, ${formId}, ${formName || "Contact Form"}, ${dataJsonStr}::jsonb, ${metaJsonStr}::jsonb, NOW())
-      `;
-      executionResults.database = true;
-    } catch (dbErr) {
-      console.error("Error saving form submission to database:", dbErr);
-      executionResults.database = false;
-    }
-  }
-
-  // 5. Action: Webhook Dispatcher
+  // 4. Durable acceptance (blueprint §12): the submission, its lead, the audit event and the
+  // webhook/email notification jobs commit in one transaction. Nothing below runs, and no success
+  // is returned, unless that commit succeeded. Delivery happens afterwards from background_jobs.
+  const notifications: LeadNotification[] = [];
   if (activeActions.includes("webhook") && actions?.webhookConfig?.endpointUrl) {
     const endpoint = actions.webhookConfig.endpointUrl.trim();
     const ssrfCheck = isSafeUrl(endpoint);
-
     if (!ssrfCheck.safe) {
       console.warn(`[Form Webhook] Blocked unsafe endpoint URL "${endpoint}": ${ssrfCheck.reason}`);
       executionResults.webhook = false;
     } else {
-      try {
-        const webhookPayload = {
-          event: "form.submitted",
-          websiteId,
-          formId,
-          formName,
-          fields: sanitizedFields,
-          metadata: sanitizedMetadata,
-        };
-
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "User-Agent": "ForgeStudio-Form-Webhook/1.0",
-        };
-
-        if (actions.webhookConfig.secretKey) {
-          headers["X-Webhook-Secret"] = actions.webhookConfig.secretKey;
-        }
-
-        // Dispatch async without blocking response; enqueue retry on failure
-        fetch(endpoint, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(webhookPayload),
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              console.warn(`[Form Webhook] Endpoint returned HTTP ${res.status}, enqueuing retry job`);
-              await enqueueJob(
-                "WEBHOOK_RETRY",
-                {
-                  url: endpoint,
-                  event: "form.submitted",
-                  headers,
-                  body: webhookPayload,
-                },
-                { maxAttempts: 5, runAt: new Date(Date.now() + 15000) }
-              );
-            }
-          })
-          .catch(async (webhookErr) => {
-            console.error("[Form Webhook] Dispatch network error, enqueuing retry job:", webhookErr);
-            try {
-              await enqueueJob(
-                "WEBHOOK_RETRY",
-                {
-                  url: endpoint,
-                  event: "form.submitted",
-                  headers,
-                  body: webhookPayload,
-                },
-                { maxAttempts: 5, runAt: new Date(Date.now() + 15000) }
-              );
-            } catch (jobErr) {
-              console.error("Failed to enqueue WEBHOOK_RETRY job:", jobErr);
-            }
-          });
-
-        executionResults.webhook = true;
-      } catch (err) {
-        console.error("Webhook trigger error:", err);
-        executionResults.webhook = false;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "User-Agent": "ForgeStudio-Form-Webhook/1.0",
+      };
+      if (actions.webhookConfig.secretKey) {
+        headers["X-Webhook-Secret"] = actions.webhookConfig.secretKey;
       }
+      notifications.push({
+        type: "WEBHOOK_RETRY",
+        payload: {
+          url: endpoint,
+          event: "form.submitted",
+          headers,
+          body: { event: "form.submitted", websiteId, formId, formName, fields: sanitizedFields, metadata: sanitizedMetadata },
+        },
+      });
+      executionResults.webhook = true;
     }
   }
+  if (activeActions.includes("email") && actions?.emailConfig?.toEmail) {
+    const toEmail = actions.emailConfig.toEmail.trim();
+    const subject = actions.emailConfig.subject || "New Lead Received";
+    const fromName = actions.emailConfig.fromName || "ForgeStudio Forms";
 
+    // Build HTML summary of form fields
+    const rowsHtml = Object.entries(sanitizedFields)
+      .map(
+        ([k, v]) =>
+          `<tr><td style="padding:6px;font-weight:bold;border:1px solid #ddd">${k}</td><td style="padding:6px;border:1px solid #ddd">${String(
+            v
+          )}</td></tr>`
+      )
+      .join("");
+
+    const htmlBody = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;">
+        <h2 style="color:#333;margin-top:0;">New Lead from ${formName || "Website Form"}</h2>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          ${rowsHtml}
+        </table>
+        <p style="font-size:12px;color:#777;">Website ID: ${websiteId} | Form ID: ${formId} | Submitted: ${sanitizedMetadata.submittedAt}</p>
+      </div>
+    `;
+
+    notifications.push({ type: "FORM_NOTIFICATION_EMAIL", payload: { websiteId, to: toEmail, subject, html: htmlBody, fromName } });
+    executionResults.email = true;
+  }
+
+  const receipt = await acceptSubmission({
+    websiteId,
+    formId,
+    formName,
+    data: sanitizedFields,
+    metadata: sanitizedMetadata,
+    idempotencyKey,
+    notifications,
+  });
+  executionResults.database = true;
+  if (receipt.replayed) {
+    // The original request already ran its integrations; a retry must not repeat them.
+    return {
+      success: true,
+      message: actions?.successMessage || "Thank you! Your submission has been received.",
+      receipt,
+      actionsExecuted: executionResults,
+      redirectUrl: actions?.redirectConfig?.url || undefined,
+      openInNewTab: actions?.redirectConfig?.openInNewTab || false,
+      popupId: actions?.popupConfig?.popupId || undefined,
+    };
+  }
+
+  // 5. Post-commit integrations. These run only after the lead is durable; failures are retried
+  // through background jobs where supported and never change the accepted receipt.
   // 5b. Action: Google Sheets Connector
   if (activeActions.includes("google_sheets") && actions?.googleSheetsConfig?.webhookUrl) {
     const gsUrl = actions.googleSheetsConfig.webhookUrl.trim();
@@ -503,52 +500,10 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
     executionResults.zapier = true;
   }
 
-  // 6. Action: Email Notification Dispatcher (F-435 / F-436)
-  if (activeActions.includes("email") && actions?.emailConfig?.toEmail) {
-    const toEmail = actions.emailConfig.toEmail.trim();
-    const subject = actions.emailConfig.subject || "New Lead Received";
-    const fromName = actions.emailConfig.fromName || "ForgeStudio Forms";
-
-    // Build HTML summary of form fields
-    const rowsHtml = Object.entries(sanitizedFields)
-      .map(
-        ([k, v]) =>
-          `<tr><td style="padding:6px;font-weight:bold;border:1px solid #ddd">${k}</td><td style="padding:6px;border:1px solid #ddd">${String(
-            v
-          )}</td></tr>`
-      )
-      .join("");
-
-    const htmlBody = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;">
-        <h2 style="color:#333;margin-top:0;">New Lead from ${formName || "Website Form"}</h2>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          ${rowsHtml}
-        </table>
-        <p style="font-size:12px;color:#777;">Website ID: ${websiteId} | Form ID: ${formId} | Submitted: ${sanitizedMetadata.submittedAt}</p>
-      </div>
-    `;
-
-    try {
-      // Dispatches via per-site SMTP (or platform fallback) and records in email_delivery_logs
-      sendSiteEmail(websiteId, {
-        to: toEmail,
-        subject,
-        html: htmlBody,
-        fromName,
-      }).catch((mailErr: any) => {
-        console.error("[Form Email Dispatch] Delivery error:", mailErr);
-      });
-      executionResults.email = true;
-    } catch (sendErr) {
-      console.error("[Form Email Dispatch] Failed to invoke sendSiteEmail:", sendErr);
-      executionResults.email = false;
-    }
-  }
-
   return {
     success: true,
     message: actions?.successMessage || "Thank you! Your submission has been received.",
+    receipt,
     actionsExecuted: executionResults,
     redirectUrl: actions?.redirectConfig?.url || undefined,
     openInNewTab: actions?.redirectConfig?.openInNewTab || false,
@@ -572,8 +527,9 @@ export async function getWebsiteSubmissions(websiteId: string, userId: string) {
     `;
     return submissions || [];
   } catch (error) {
+    // An empty list would read as "no leads"; report the failure instead.
     console.error("Error fetching form submissions:", error);
-    return [];
+    throw new AppError("Submissions could not be loaded. Please retry.", 503, "SUBMISSIONS_UNAVAILABLE");
   }
 }
 

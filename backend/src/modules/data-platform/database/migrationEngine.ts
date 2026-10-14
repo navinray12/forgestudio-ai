@@ -1,15 +1,37 @@
 /**
- * ForgeStudio Module 25: Database Migration Engine
- * Serializes, validates, applies, and rolls back customer database migrations with advisory locks.
+ * ForgeStudio Execution Blueprint v2.1 — Points 31 & 33
+ * Module 25: Database Migration Engine with Integrity, Verification & Recovery
+ *
+ * Enforces:
+ * 1. Target binding: Validates that every migration belongs to authorized project, tenant, and exact database.
+ * 2. Checksum verification: Validates checksums before execution and detects drift across applied migrations.
+ * 3. Environment binding: Strict environment resolution (DEVELOPMENT, STAGING, PRODUCTION).
+ * 4. Non-transactional migration support: Safe execution of DDL like CREATE INDEX CONCURRENTLY outside BEGIN blocks.
+ * 5. Control-plane reconciliation: DDL success followed by control-plane write failure does NOT produce a false FAILED/PENDING status.
+ * 6. Forward-recovery & operator reconciliation when rollback is unsafe.
  */
 
 import crypto from "node:crypto";
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
-import { customerConnectionManager } from "./connectionManager.js";
 import { MigrationRecord } from "./database.types.js";
 
 const db = prisma as any;
+
+export interface MigrationExecutionOptions {
+  environment?: "DEVELOPMENT" | "STAGING" | "PRODUCTION";
+  projectId?: string;
+  tenantId?: string;
+  runInTransaction?: boolean;
+}
+
+export interface MigrationIntegrityReport {
+  databaseId: string;
+  isConsistent: boolean;
+  appliedCount: number;
+  driftsDetected: Array<{ migrationName: string; recordedChecksum: string; computedChecksum: string }>;
+  unreconciledMigrations: string[];
+}
 
 export class MigrationEngine {
   /**
@@ -53,6 +75,11 @@ export class MigrationEngine {
    * List all migrations for a customer database
    */
   public async listMigrations(databaseId: string): Promise<MigrationRecord[]> {
+    // Fail closed on malformed identifiers instead of surfacing a raw driver error
+    // (or, worse, reporting an unknown database as consistent).
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(databaseId)) {
+      throw new AppError("Invalid database identifier", 400, "INVALID_DATABASE_ID");
+    }
     return await db.forgeDatabaseMigration.findMany({
       where: { databaseId },
       orderBy: { createdAt: "asc" },
@@ -60,116 +87,108 @@ export class MigrationEngine {
   }
 
   /**
-   * Apply a specific pending migration using an atomic transaction and PostgreSQL advisory lock
+   * Verify integrity and detect checksum drift across all applied migrations
    */
-  public async applyMigration(databaseId: string, migrationId: string): Promise<MigrationRecord> {
-    const migration = await db.forgeDatabaseMigration.findUnique({
-      where: { id: migrationId },
-    });
-    if (!migration) throw new AppError("Migration not found", 404, "MIGRATION_NOT_FOUND");
-    if (migration.status === "APPLIED") {
-      throw new AppError("Migration has already been applied", 400, "MIGRATION_ALREADY_APPLIED");
+  public async verifyMigrationIntegrity(databaseId: string): Promise<MigrationIntegrityReport> {
+    const migrations = await this.listMigrations(databaseId);
+    const applied = migrations.filter((m) => m.status === "APPLIED");
+    const driftsDetected: MigrationIntegrityReport["driftsDetected"] = [];
+    const unreconciledMigrations: string[] = [];
+
+    for (const m of applied) {
+      const currentChecksum = this.computeChecksum(m.upSql);
+      if (currentChecksum !== m.checksum) {
+        driftsDetected.push({
+          migrationName: m.name,
+          recordedChecksum: m.checksum,
+          computedChecksum: currentChecksum,
+        });
+      }
     }
 
-    const database = await db.forgeDatabase.findUnique({ where: { id: databaseId } });
-    if (!database) throw new AppError("Database not found", 404, "DATABASE_NOT_FOUND");
-
-    const schemaName = database.schemaName;
-    const startTime = Date.now();
-
-    // Acquire lock and execute inside transaction
-    try {
-      await customerConnectionManager.executeInSchema(schemaName, async (client) => {
-        // Advisory lock on hash of databaseId
-        const lockId = Math.abs(
-          crypto.createHash("sha256").update(databaseId).digest().readInt32BE(0)
-        );
-        const lockRes = await client.query("SELECT pg_try_advisory_lock($1) as locked", [lockId]);
-        if (!lockRes.rows[0]?.locked) {
-          throw new AppError("Database migration in progress by another worker", 409, "MIGRATION_LOCKED");
-        }
-
-        try {
-          await client.query("BEGIN;");
-
-          // Execute migration SQL
-          await client.query(migration.upSql);
-
-          // Record inside customer's internal _forge_migrations table
-          await client.query(
-            `INSERT INTO _forge_migrations (name, checksum, execution_time_ms, applied_at)
-             VALUES ($1, $2, $3, now())
-             ON CONFLICT (name) DO UPDATE SET checksum = $2, applied_at = now();`,
-            [migration.name, migration.checksum, Date.now() - startTime]
-          );
-
-          await client.query("COMMIT;");
-        } catch (execErr) {
-          await client.query("ROLLBACK;");
-          throw execErr;
-        } finally {
-          await client.query("SELECT pg_advisory_unlock($1)", [lockId]);
-        }
-      });
-
-      const durationMs = Date.now() - startTime;
-      const updated = await db.forgeDatabaseMigration.update({
-        where: { id: migrationId },
-        data: {
-          status: "APPLIED",
-          executionTimeMs: durationMs,
-          appliedAt: new Date(),
-          errorMessage: null,
-        },
-      });
-
-      return updated;
-    } catch (err: any) {
-      await db.forgeDatabaseMigration.update({
-        where: { id: migrationId },
-        data: {
-          status: "FAILED",
-          errorMessage: err.message || "Migration execution failed",
-        },
-      });
-      throw new AppError(`Migration failed: ${err.message}`, 500, "MIGRATION_FAILED");
+    for (const m of migrations) {
+      if (["RECONCILIATION_REQUIRED", "UNCERTAIN", "PARTIALLY_APPLIED", "RECOVERY_REQUIRED", "APPLYING", "VALIDATING"].includes(m.status as string)) {
+        unreconciledMigrations.push(m.name);
+      }
     }
+
+    return {
+      databaseId,
+      isConsistent: driftsDetected.length === 0 && unreconciledMigrations.length === 0,
+      appliedCount: applied.length,
+      driftsDetected,
+      unreconciledMigrations,
+    };
   }
 
   /**
-   * Rollback an applied migration
+   * Applies a migration through the migration authority (preflight, dual rehearsal, approval,
+   * fenced execution, evidence). This engine no longer sends DDL itself: there is one execution
+   * path. For a PRODUCTION database the run stops after the rehearsal and reports that an explicit
+   * approval is required.
    */
-  public async rollbackMigration(databaseId: string, migrationId: string): Promise<MigrationRecord> {
-    const migration = await db.forgeDatabaseMigration.findUnique({
-      where: { id: migrationId },
-    });
-    if (!migration) throw new AppError("Migration not found", 404, "MIGRATION_NOT_FOUND");
-    if (migration.status !== "APPLIED") {
-      throw new AppError("Only applied migrations can be rolled back", 400, "CANNOT_ROLLBACK");
+  public async applyMigration(
+    databaseId: string,
+    migrationId: string,
+    options: MigrationExecutionOptions & { actor?: { id: string; canAdminister?: boolean } } = {}
+  ): Promise<MigrationRecord> {
+    const { unifiedMigrationAuthority } = await import("../../../services/migration/unifiedMigrationAuthority.service.js");
+    const result = await unifiedMigrationAuthority.runGoverned(
+      migrationId,
+      options.actor ?? { id: "00000000-0000-0000-0000-000000000000" },
+      { databaseId, projectId: options.projectId, environment: options.environment }
+    );
+    if (result.approvalRequired) {
+      throw new AppError(
+        "This is a production database: the migration was checked and rehearsed, and now needs an explicit approval before it can be executed.",
+        409,
+        "APPROVAL_REQUIRED"
+      );
     }
-    if (!migration.downSql) {
-      throw new AppError("Migration does not contain a downSql definition", 400, "NO_DOWN_SQL");
-    }
+    return result.migration as unknown as MigrationRecord;
+  }
 
+  /** Resolves a migration whose outcome is unknown by inspecting the target database. Runs no DDL. */
+  public async reconcileMigrationState(databaseId: string, migrationId: string): Promise<MigrationRecord> {
+    const { unifiedMigrationAuthority } = await import("../../../services/migration/unifiedMigrationAuthority.service.js");
+    return (await unifiedMigrationAuthority.reconcile(migrationId, { databaseId })) as unknown as MigrationRecord;
+  }
+
+  /**
+   * Reverts an applied migration by running its down SQL as a new governed plan, so the revert
+   * passes the same checks and rehearsals as any other change. Production is not reverted this
+   * way: a production revert is a forward-fix plan with its own explicit approval.
+   */
+  public async rollbackMigration(
+    databaseId: string,
+    migrationId: string,
+    options: { actor?: { id: string; canAdminister?: boolean } } = {}
+  ): Promise<MigrationRecord> {
+    const { unifiedMigrationAuthority, normalizeEnvironment } = await import("../../../services/migration/unifiedMigrationAuthority.service.js");
+    const migration = await db.forgeDatabaseMigration.findUnique({ where: { id: migrationId } });
+    if (!migration) throw new AppError("Migration not found", 404, "MIGRATION_NOT_FOUND");
+    if (migration.databaseId !== databaseId) {
+      throw new AppError("Migration does not belong to the target database", 403, "MIGRATION_TARGET_MISMATCH");
+    }
+    if (migration.status !== "APPLIED") throw new AppError("Only applied migrations can be rolled back", 400, "CANNOT_ROLLBACK");
+    if (!migration.downSql) throw new AppError("Migration does not contain a downSql definition", 400, "NO_DOWN_SQL");
     const database = await db.forgeDatabase.findUnique({ where: { id: databaseId } });
     if (!database) throw new AppError("Database not found", 404, "DATABASE_NOT_FOUND");
-
-    const schemaName = database.schemaName;
-
-    await customerConnectionManager.executeTransactionInSchema(schemaName, async (client) => {
-      await client.query(migration.downSql);
-      await client.query("DELETE FROM _forge_migrations WHERE name = $1", [migration.name]);
+    if (normalizeEnvironment(database.environment) === "PRODUCTION") {
+      throw new AppError("A production migration is not rolled back automatically; create and approve a forward-fix plan.", 409, "ROLLBACK_REQUIRES_FORWARD_FIX");
+    }
+    // One statement per line-terminated ";" (the form down SQL is stored in).
+    const statements = String(migration.downSql).split(/;[ \t]*(?:\r?\n|$)/).map((part: string) => part.trim()).filter(Boolean);
+    const plan = await unifiedMigrationAuthority.createPlan({
+      databaseId,
+      projectId: migration.projectId,
+      name: `${String(migration.name).slice(0, 150)}__revert_${crypto.randomBytes(3).toString("hex")}`,
+      statements,
+      reverts: migrationId,
+      createdById: options.actor?.id ?? null,
     });
-
-    const updated = await db.forgeDatabaseMigration.update({
-      where: { id: migrationId },
-      data: {
-        status: "ROLLED_BACK",
-        errorMessage: null,
-      },
-    });
-
-    return updated;
+    await unifiedMigrationAuthority.runGoverned(plan.id, options.actor ?? { id: "00000000-0000-0000-0000-000000000000" }, { databaseId });
+    return await db.forgeDatabaseMigration.findUnique({ where: { id: migrationId } });
   }
 }
 

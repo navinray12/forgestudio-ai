@@ -389,8 +389,7 @@ export async function syncProjectFromWebsite(
       slug: project.slug,
       framework,
     },
-    user.id,
-    { unholdPaths: pagePaths }
+    user.id
   );
 
   if (!result.success) {
@@ -398,33 +397,33 @@ export async function syncProjectFromWebsite(
     return { synced: false, stale: true, error: firstError?.message || "Source generation failed" };
   }
 
-  const current = await db.forgeProject.findUnique({ where: { id: project.id } });
-  const currentMetadata = (
-    current?.metadata && typeof current.metadata === "object" ? current.metadata : metadata
-  ) as Record<string, any>;
-
-  let nextCodeSync = currentMetadata.codeSync ? { ...currentMetadata.codeSync } : undefined;
-  if (nextCodeSync) {
-    for (const p of pagePaths) {
-      delete nextCodeSync[p];
+  // Hand-written page files held by a code sync are preserved (never silently overwritten); their
+  // hold records stay until the user resolves them. Only regenerated pages are released.
+  const heldBack = new Set(result.heldBackPaths || []);
+  const { updateProjectMetadataAtomic, recordCheckpoint } = await import("../workspace/workspaceCheckpoints.service.js");
+  await updateProjectMetadataAtomic(project.id, (current) => {
+    let nextCodeSync = current.codeSync ? { ...current.codeSync } : undefined;
+    if (nextCodeSync) {
+      for (const p of pagePaths) if (!heldBack.has(p)) delete nextCodeSync[p];
+      if (Object.keys(nextCodeSync).length === 0) nextCodeSync = undefined;
     }
-    if (Object.keys(nextCodeSync).length === 0) {
-      nextCodeSync = undefined;
-    }
-  }
-
-  await db.forgeProject.update({
-    where: { id: project.id },
-    data: {
-      metadata: {
-        ...currentMetadata,
-        visualSync: baseline,
-        codeSync: nextCodeSync,
-      },
-    },
+    current.visualSync = baseline;
+    if (nextCodeSync) current.codeSync = nextCodeSync;
+    else delete current.codeSync;
   });
 
   const conflicts = (result.heldBackPaths || []).filter((path) => pagePaths.has(path));
+  await recordCheckpoint({
+    projectId: project.id,
+    websiteId: site?.id,
+    origin: "VISUAL",
+    kind: conflicts.length > 0 ? "CONFLICT" : "SYNCHRONIZED",
+    message:
+      conflicts.length > 0
+        ? `Visual changes were applied; hand-edited files were held back: ${conflicts.join(", ")}`
+        : "Source regenerated from the saved visual document.",
+    actorId: user.id,
+  });
   return { synced: true, stale: false, ...(conflicts.length > 0 ? { conflicts } : {}) };
 }
 

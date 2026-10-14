@@ -21,6 +21,12 @@ const db = prisma as any;
 // In-memory real-time presence registry for ultra-fast broadcasts
 const PROJECT_PRESENCE = new Map<string, Map<string, PeerPresence>>();
 
+/** Stable per-user presence color when the client does not supply one. */
+function presenceColorFor(userId: string): string {
+  const hash = crypto.createHash("sha256").update(userId).digest();
+  return `hsl(${hash.readUInt16BE(0) % 360}, 70%, 50%)`;
+}
+
 export class CollaborationEngineService {
   /**
    * Update or register user presence in a project
@@ -429,13 +435,11 @@ export class CollaborationEngineService {
    * Heartbeat / register user session
    */
   async heartbeatSession(projectId: string, userId: string, data?: any): Promise<any> {
-    const user = await db.user.findUnique({ where: { id: userId }, select: { fullName: true } });
-    if (!user) throw new AppError("Authenticated collaborator not found", 401, "UNAUTHENTICATED");
     return this.updatePresence({
       projectId,
       userId,
-      name: user.fullName || "Collaborator",
-      color: `#${crypto.createHash("sha256").update(userId).digest("hex").slice(0, 6)}`,
+      name: typeof data?.name === "string" && data.name ? data.name : userId,
+      color: typeof data?.color === "string" && data.color ? data.color : presenceColorFor(userId),
       socketId: data?.socketId || userId,
       status: "ONLINE",
       activeFile: data?.activeFile,

@@ -3,8 +3,8 @@ import { ts } from "./tsCompiler.js";
 import { AppError } from "../../utils/app-error.js";
 import { readFile, writeFile, listFiles, sanitizeAndNormalizePath } from "../project/forgeFilesystem.service.js";
 import { prisma } from "../../config/prisma.js";
+import { updateProjectMetadataAtomic } from "../workspace/workspaceCheckpoints.service.js";
 import { extractProtectedRegions, injectProtectedRegions } from "../generator/sourcePreservation.service.js";
-import { escapeJsxText } from "../generator/jsxRenderer.js";
 import { compileAndSyncProject } from "./unifiedCompiler.service.js";
 import {
   buildPageRegistry,
@@ -27,6 +27,9 @@ import {
   reconcilePageSource,
 } from "./pageSourceSync.js";
 import { saveDocumentFromCode } from "../websites/documentGateway.js";
+import { applyJsxMutation, type JsxMutation, type JsxMutationCode, type JsxMutationResult } from "./jsxAstMutation.js";
+
+export type { JsxMutation, JsxMutationCode, JsxMutationResult };
 
 const db = prisma as any;
 
@@ -34,6 +37,19 @@ export type { SyncDiagnostic } from "./pageSourceSync.js";
 export { extractProtectedRegions, injectProtectedRegions };
 
 export type SyncMode = "VISUAL_TO_CODE" | "CODE_TO_VISUAL" | "BIDIRECTIONAL" | "MANUAL";
+
+export type CodeOwnershipBoundary =
+  | "VISUAL_COMPOSITION"
+  | "SOURCE_OWNED"
+  | "CMS_CONTENT"
+  | "APPLICATION_SPEC_OWNED";
+
+export interface WorkspaceCheckpointReference {
+  checkpointId: string;
+  revision: number;
+  hash: string;
+  timestamp: string;
+}
 
 export interface SyncConflict {
   elementId?: string;
@@ -52,8 +68,9 @@ export interface SyncConflict {
  * - conflict: the visual page changed since this code was generated; nothing was overwritten
  * - reverted: the code edit was discarded in favour of the visual document
  * - error: the document was updated but its source could not be regenerated
+ * - draft_saved: invalid draft saved safely without destroying last valid semantic checkpoint
  */
-export type CodeSyncStatus = PageSyncStatus | "conflict" | "reverted" | "error";
+export type CodeSyncStatus = PageSyncStatus | "conflict" | "reverted" | "error" | "draft_saved";
 
 export interface VisualCodeSyncResult {
   success: boolean;
@@ -68,6 +85,7 @@ export interface VisualCodeSyncResult {
   updatedFiles: string[];
   documentVersion?: number;
   reconciledEditorData?: any;
+  checkpointId?: string;
 }
 
 export interface CodeSyncOptions {
@@ -274,68 +292,130 @@ export function parseSourceCodeToElements(
 }
 
 /**
- * Target Visual -> Code targeted reconciliation for an updated element
+ * Applies one visual edit to a JSX element through the TypeScript AST (see jsxAstMutation.ts for
+ * the supported mutations and the reasons an edit is rejected). A string is shorthand for SET_TEXT.
+ * `updated` is true only when the returned content differs from the source.
+ */
+export function updateJsxElementViaAst(
+  sourceCode: string,
+  elementId: string,
+  change?: string | JsxMutation,
+  fileName = "component.tsx"
+): JsxMutationResult {
+  if (change === undefined || change === null) {
+    return { updated: false, content: sourceCode, code: "INVALID_MUTATION", diagnostic: "No mutation supplied." };
+  }
+  const mutation: JsxMutation = typeof change === "string" ? { type: "SET_TEXT", text: change } : change;
+  return applyJsxMutation(sourceCode, String(elementId), mutation, fileName);
+}
+
+export interface SyncVisualElementOptions {
+  authorId?: string;
+  expectedRevision?: number;
+  /** The edit to apply. Without it, the element's text (textContent/content/buttonText) is synced. */
+  mutation?: JsxMutation;
+}
+
+export interface VisualElementSyncResult {
+  /** False when the edit was rejected. A request that matches the source already is a success. */
+  success: boolean;
+  /** True only when the source file was changed and written. */
+  updated: boolean;
+  code?: JsxMutationCode;
+  diagnostics: SyncDiagnostic[];
+  content: string;
+  /** The file version after the request. */
+  version?: number;
+  changedRange?: { startLine: number; endLine: number };
+}
+
+/**
+ * Visual -> code edit of one element in a persisted source file, bound to the expected file
+ * revision. The file is written only when the AST mutation changed it and the result parses;
+ * a rejected or no-op edit leaves the file and its version untouched.
  */
 export async function syncVisualElementToSource(
   projectId: string,
   filePath: string,
   element: any,
-  authorId?: string
-): Promise<{ success: boolean; diagnostics: SyncDiagnostic[]; content: string }> {
-  const diagnostics: SyncDiagnostic[] = [];
+  authorIdOrOptions?: string | SyncVisualElementOptions
+): Promise<VisualElementSyncResult> {
+  const options: SyncVisualElementOptions =
+    typeof authorIdOrOptions === "string"
+      ? { authorId: authorIdOrOptions }
+      : authorIdOrOptions || {};
+
   const file = await readFile(projectId, filePath);
 
   if (!file.content) {
     throw new AppError(`Target source file '${filePath}' is empty`, 400, "EMPTY_SOURCE_FILE");
   }
+  const source: string = file.content;
 
-  if (file.isProtected) {
-    diagnostics.push({
-      severity: "warning",
-      code: "FILE_PROTECTED",
-      message: `File '${filePath}' is protected. Sync skipped.`,
-      filePath,
-    });
-    return { success: false, diagnostics, content: file.content };
+  // Revision-bound validation
+  if (options.expectedRevision !== undefined && file.version !== undefined) {
+    if (file.version !== options.expectedRevision) {
+      throw new AppError(
+        `Revision conflict: expected file version ${options.expectedRevision}, but found ${file.version}`,
+        409,
+        "REVISION_CONFLICT"
+      );
+    }
   }
 
-  // Preserve protected manual code regions
-  const protectedRegions = extractProtectedRegions(file.content);
+  const rejected = (code: JsxMutationCode | undefined, diagnosticCode: string, message: string): VisualElementSyncResult => ({
+    success: false,
+    updated: false,
+    code,
+    diagnostics: [{ severity: "error", code: diagnosticCode, message, filePath }],
+    content: source,
+    version: file.version,
+  });
 
-  const elementId = element.id;
+  if (file.isProtected) {
+    return rejected("SOURCE_OWNED", "FILE_PROTECTED", `File '${filePath}' is protected. Sync skipped.`);
+  }
+
+  const elementId = element?.id;
   if (!elementId) {
     throw new AppError("Visual element must possess a stable ID for sync", 400, "MISSING_ELEMENT_ID");
   }
 
-  let updatedContent = file.content;
-  const newText = element.textContent || element.content || element.buttonText;
-
-  // Search by data-forge-id
-  const safeId = String(elementId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(
-    `(<[a-zA-Z0-9]+[^>]*data-forge-id=["']${safeId}["'][^>]*>)([\\s\\S]*?)(<\\/[a-zA-Z0-9]+>)`
-  );
-
-  if (typeof newText === "string" && pattern.test(updatedContent)) {
-    const text = escapeJsxText(newText);
-    updatedContent = updatedContent.replace(pattern, (_m, open: string, _old: string, close: string) => `${open}${text}${close}`);
+  const text = element.textContent ?? element.content ?? element.buttonText;
+  const mutation: JsxMutation | undefined = options.mutation ?? (typeof text === "string" ? { type: "SET_TEXT", text } : undefined);
+  if (!mutation) {
+    throw new AppError("A mutation or the element's text is required for visual sync", 400, "MISSING_MUTATION");
   }
 
-  // Re-inject protected regions
-  updatedContent = injectProtectedRegions(updatedContent, protectedRegions);
+  const result = updateJsxElementViaAst(source, String(elementId), mutation, filePath);
+  if (!result.updated) {
+    if (result.code === "NO_CHANGE") {
+      return {
+        success: true,
+        updated: false,
+        code: "NO_CHANGE",
+        diagnostics: [{ severity: "info", code: "NO_CHANGE", message: result.diagnostic || "No change", filePath }],
+        content: source,
+        version: file.version,
+      };
+    }
+    return rejected(result.code, `VISUAL_SYNC_${result.code ?? "REJECTED"}`, result.diagnostic || "The edit was not applied.");
+  }
 
-  // Persist updated source
-  await writeFile(projectId, filePath, {
-    content: updatedContent,
+  const written = await writeFile(projectId, filePath, {
+    content: result.content,
     expectedVersion: file.version,
-    authorId,
-    reason: `Visual sync for element: ${elementId}`,
+    authorId: options.authorId,
+    reason: `Visual ${mutation.type} for element: ${elementId}`,
   });
 
   return {
     success: true,
-    diagnostics,
-    content: updatedContent,
+    updated: true,
+    diagnostics: [],
+    content: result.content,
+    version: (written as any)?.version,
+    changedRange: result.changedRange,
   };
 }
 
@@ -357,12 +437,9 @@ function projectMetadata(project: any): Record<string, any> {
   return project?.metadata && typeof project.metadata === "object" ? project.metadata : {};
 }
 
+/** Row-locked so concurrent syncs of different pages cannot overwrite each other's state. */
 async function updateProjectMetadata(projectId: string, mutate: (metadata: Record<string, any>) => void) {
-  const project = await db.forgeProject.findUnique({ where: { id: projectId } });
-  if (!project) return;
-  const metadata = { ...projectMetadata(project) };
-  mutate(metadata);
-  await db.forgeProject.update({ where: { id: projectId }, data: { metadata } });
+  await updateProjectMetadataAtomic(projectId, mutate);
 }
 
 /** Ownership decides whether regeneration may rewrite the file */
@@ -583,8 +660,12 @@ export async function syncSourceToVisualWebsite(
   const page = target.page;
   const baseline = metadata.visualSync || {};
   const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
-  const basePageHash: string | undefined = baseline.pages?.[page.key]?.hash ?? previousEntry?.basePageHash;
-  const baseSharedHash: string | undefined = baseline.sharedHash ?? previousEntry?.baseSharedHash;
+  // A held file was not regenerated by later visual saves, so the code it contains is still based
+  // on the page as it was when the hold started; the latest visual baseline is not its base.
+  const basePageHash: string | undefined = previousEntry
+    ? previousEntry.basePageHash
+    : baseline.pages?.[page.key]?.hash;
+  const baseSharedHash: string | undefined = previousEntry ? previousEntry.baseSharedHash : baseline.sharedHash;
 
   /** Keep the saved code as hand-written source until the two sides agree again */
   const holdAsCode = async (status: CodeSyncStatus, message: string, diagnostics: SyncDiagnostic[]) => {

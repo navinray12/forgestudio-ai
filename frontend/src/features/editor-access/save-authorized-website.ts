@@ -1,7 +1,9 @@
 export interface DocumentAcknowledgement {
   id: string; name: string; slug: string; status: string; documentVersion: number; updatedAt: string;
   /** Present when the website has a developer project: outcome of regenerating its source from this save */
-  codeSync?: { synced: boolean; stale: boolean; pending?: boolean; error?: string; conflicts?: string[] };
+  codeSync?: { synced: boolean; stale: boolean; pending?: boolean; error?: string; conflicts?: string[]; projectId?: string };
+  /** Outcome of applying this save's canvas edits to hand-written page files (set by the editor, not the server). */
+  sourceSync?: import("../developer-workspace/services/canvasSourceSync").CanvasSourceSyncOutcome;
 }
 export interface DocumentWriteOptions { expectedVersion: number; key: string; signal?: AbortSignal; }
 export class DocumentSaveError extends Error {

@@ -252,19 +252,34 @@ export async function writeFile(
     }
 
     const nextVersion = existing.version + 1;
-    const updated = await db.forgeProjectFile.update({
-      where: { id: existing.id },
-      data: {
-        content,
-        encoding,
-        sizeBytes,
-        contentHash,
-        mimeType,
-        version: nextVersion,
-        isGenerated: options.isGenerated !== undefined ? options.isGenerated : existing.isGenerated,
-        isProtected: options.isProtected !== undefined ? options.isProtected : existing.isProtected,
-      },
-    });
+    const data = {
+      content,
+      encoding,
+      sizeBytes,
+      contentHash,
+      mimeType,
+      version: nextVersion,
+      isGenerated: options.isGenerated !== undefined ? options.isGenerated : existing.isGenerated,
+      isProtected: options.isProtected !== undefined ? options.isProtected : existing.isProtected,
+    };
+    let updated;
+    if (options.expectedVersion !== undefined) {
+      // Compare-and-set: of two writers holding the same expected version, exactly one succeeds.
+      const { count } = await db.forgeProjectFile.updateMany({
+        where: { id: existing.id, version: options.expectedVersion },
+        data,
+      });
+      if (count === 0) {
+        throw new AppError(
+          `Concurrency conflict: file '${cleanPath}' has been modified (expected v${options.expectedVersion})`,
+          409,
+          "CONCURRENCY_CONFLICT"
+        );
+      }
+      updated = await db.forgeProjectFile.findUnique({ where: { id: existing.id } });
+    } else {
+      updated = await db.forgeProjectFile.update({ where: { id: existing.id }, data });
+    }
 
     // Create immutable audit revision
     await db.forgeProjectRevision.create({

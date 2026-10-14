@@ -44,6 +44,19 @@ import {
   aiHostingRoutes,
   elementorCloudRoutes,
   exportRoutes,
+  serviceObjectivesRoutes,
+  adaptiveInfrastructureRoutes,
+  hostingExportRoutes,
+  securityAuditRoutes,
+  workflowsCommunicationRoutes,
+  formsLeadsRoutes,
+  ownerExperienceRoutes,
+  marketingAnalyticsRoutes,
+  searchQualityRoutes,
+  deliveryAndCommercialRoutes,
+  componentRoutes,
+  benchmarkRoutes,
+  capabilityRoutes,
 } from "./routes/index.js";
 
 import identityRoutes from "./modules/identity/http/oidc.routes.js";
@@ -156,6 +169,7 @@ export function createApplication(
       message: "API is healthy",
     });
   });
+
 
   // Auth & Session Rate Limiting (F-439)
   app.use("/api/v1/auth/login", authRateLimiter);
@@ -273,6 +287,31 @@ export function createApplication(
   app.use("/api/v1/apikeys", apiKeysRoutes);
   app.use("/api/apikeys", apiKeysRoutes);
   app.use("/api/v1/developer", developerRoutes);
+  // Blueprint v2 feature routers. Every route requires authentication; website-scoped operations
+  // derive the tenant from verified membership (tenantScope.middleware) and keep their state in
+  // PostgreSQL. Each router lists, next to its routes, the operations it does not expose because
+  // they still hold process-local state, trust client-asserted results or report work they do not do.
+  // release-integrity is not mounted either: it was a second, in-memory release state machine that
+  // reported LIVE_VERIFIED without deploying, and its gate evaluation attested client-supplied
+  // results as a trusted verifier. The durable release authority is deployments/publishing.service.
+  for (const [path, router] of [
+    ["service-objectives", serviceObjectivesRoutes],
+    ["adaptive-infrastructure", adaptiveInfrastructureRoutes],
+    ["hosting-export", hostingExportRoutes],
+    ["security-audit", securityAuditRoutes],
+    ["workflows-communication", workflowsCommunicationRoutes],
+    ["forms-leads", formsLeadsRoutes],
+    ["owner-experience", ownerExperienceRoutes],
+    ["marketing-analytics", marketingAnalyticsRoutes],
+    ["search-quality", searchQualityRoutes],
+    ["delivery-governance", deliveryAndCommercialRoutes],
+    ["components", componentRoutes],
+    ["benchmark", benchmarkRoutes],
+    ["capabilities", capabilityRoutes],
+  ] as const) {
+    app.use(`/api/v1/${path}`, router);
+    app.use(`/api/${path}`, router);
+  }
   app.use("/api/developer", developerRoutes);
 
   // Milestone 1: Feature 35 & 36 - Code Intelligence & Repository Knowledge Graph

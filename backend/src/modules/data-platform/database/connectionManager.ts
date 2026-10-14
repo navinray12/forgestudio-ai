@@ -48,8 +48,12 @@ export class CustomerConnectionManager {
       try {
         await client.query(`RESET search_path;`);
         await client.query(`RESET statement_timeout;`);
-      } catch {}
-      client.release();
+        client.release();
+      } catch (resetErr) {
+        // FAIL-CLOSED: If session settings cannot be cleanly reset, destroy/discard the client!
+        // Never return a tainted client back to the pool where other tenants could inherit settings.
+        client.release(true);
+      }
     }
   }
 

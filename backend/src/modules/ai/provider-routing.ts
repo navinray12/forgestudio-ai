@@ -16,18 +16,24 @@ export function siteGenerationProviderFromSnapshot(snapshot: { provider: string;
 }
 
 export function siteGenerationProvider(): AiProvider {
-  const chosen = (process.env.AI_SITE_PROVIDER || "openai").toLowerCase();
-  switch (chosen) {
+  const configured = process.env.AI_SITE_PROVIDER?.trim().toLowerCase();
+  // An unrecognised value fails closed instead of silently routing to
+  // whichever key happens to exist. "openai" (the default) keeps its documented
+  // key-based fallback when no OpenAI key is configured.
+  switch (configured) {
     case "anthropic":
       return new AnthropicProvider();
     case "gemini":
       return new GeminiProvider();
     case "openai":
-    default:
+    case undefined:
+    case "":
       if (process.env.OPENAI_API_KEY) return new OpenAiProvider();
       if (process.env.ANTHROPIC_API_KEY) return new AnthropicProvider();
       if (process.env.GEMINI_API_KEY) return new GeminiProvider();
       return new OpenAiProvider();
+    default:
+      throw new AppError("AI provider configuration is invalid", 503, "AI_NOT_CONFIGURED");
   }
 }
 export type PlatformAiCapability =

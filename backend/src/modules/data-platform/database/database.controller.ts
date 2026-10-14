@@ -11,7 +11,11 @@ import {
   restoreBackup,
 } from "./database-backup.service.js";
 import { TenantPoolManager } from "../common/pool-manager.js";
-import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
+import {
+  verifyProjectAccess,
+  resolveExplicitEnvironment,
+  assertCanModify,
+} from "../common/project-access.js";
 
 function getParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] || "";
@@ -44,27 +48,6 @@ function serializeBackupRecord(backup: any) {
   };
 }
 
-async function verifyProjectAccess(websiteId: string, userId: string) {
-  const website = await prisma.website.findFirst({
-    where: {
-      id: websiteId,
-      OR: [
-        { userId },
-        { collaborators: { some: { userId } } },
-        { team: { members: { some: { userId } } } },
-        { workspace: { members: { some: { userId } } } },
-        { organization: { members: { some: { userId } } } },
-      ],
-    },
-  });
-
-  if (!website) {
-    throw new AppError("Project not found or access denied", 404, "NOT_FOUND");
-  }
-
-  return website;
-}
-
 /**
  * POST /api/v1/projects/:projectId/database/provision
  */
@@ -80,11 +63,7 @@ export async function provisionDatabaseHandler(
 
     await verifyProjectAccess(projectId, user.id);
 
-    const envRaw = (req.body?.environment as string) || "PRODUCTION";
-    const allowedEnvs = new Set(["DEVELOPMENT", "PREVIEW", "PRODUCTION"]);
-    const environment: DatabaseEnvironment = allowedEnvs.has(envRaw.toUpperCase())
-      ? (envRaw.toUpperCase() as DatabaseEnvironment)
-      : "PRODUCTION";
+    const environment = resolveExplicitEnvironment(req);
 
     const database = await provisionDatabase(projectId, environment);
 
@@ -113,8 +92,7 @@ export async function getDatabaseStatusHandler(
 
     await verifyProjectAccess(projectId, user.id);
 
-    const envRaw = (req.query.environment as string) || "PRODUCTION";
-    const environment = envRaw.toUpperCase() as DatabaseEnvironment;
+    const environment = resolveExplicitEnvironment(req);
 
     const database = await prisma.projectDatabase.findUnique({
       where: {
@@ -163,8 +141,7 @@ export async function triggerBackupHandler(
 
     await verifyProjectAccess(projectId, user.id);
 
-    const envRaw = (req.body?.environment as string) || "PRODUCTION";
-    const environment = envRaw.toUpperCase() as DatabaseEnvironment;
+    const environment = resolveExplicitEnvironment(req);
 
     const backup = await createBackup(projectId, environment);
 
@@ -218,7 +195,7 @@ export async function restoreBackupHandler(
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
 
     // Verify backup belongs to project
     const backup = await prisma.projectDatabaseBackup.findUnique({
@@ -229,6 +206,8 @@ export async function restoreBackupHandler(
     if (!backup || backup.database.websiteId !== projectId) {
       throw new AppError("Backup not found for this project", 404, "BACKUP_NOT_FOUND");
     }
+
+    assertCanModify(backup.database.environment, access, "restore backups");
 
     await restoreBackup(backupId);
 
@@ -254,7 +233,7 @@ export async function deprovisionDatabaseHandler(
     const user = res.locals.user || (req as any).user;
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
-    await verifyProjectAccess(projectId, user.id);
+    const access = await verifyProjectAccess(projectId, user.id);
 
     const confirm = req.body?.confirm === true || req.query.confirm === "true";
     if (!confirm) {
@@ -265,8 +244,8 @@ export async function deprovisionDatabaseHandler(
       );
     }
 
-    const envRaw = (req.body?.environment as string) || (req.query.environment as string) || "PRODUCTION";
-    const environment = envRaw.toUpperCase() as DatabaseEnvironment;
+    const environment = resolveExplicitEnvironment(req);
+    assertCanModify(environment, access, "deprovision databases");
 
     await deprovisionDatabase(projectId, environment);
 

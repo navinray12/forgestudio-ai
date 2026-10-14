@@ -405,7 +405,7 @@ export async function promoteArtifact(params: {
   }
 
   const project = await forgeProjectService.getProjectById(projectId);
-  const targetUrl = computeDeploymentUrl(project.slug, targetEnvironment, `promo_${Date.now()}`);
+  const promoteStart = Date.now();
 
   const logs: DeploymentLogEntry[] = [
     {
@@ -426,16 +426,22 @@ export async function promoteArtifact(params: {
       artifactId: sourceDeployment.artifactId,
       commitHash: sourceDeployment.commitHash,
       branch: sourceDeployment.branch,
-      url: targetUrl,
       config: sourceDeployment.config,
       logs,
-      healthCheck: {
-        passed: true,
-        statusCode: 200,
-        lastCheckedAt: new Date().toISOString(),
-      },
-      durationMs: 150,
       createdById: userId || null,
+    },
+  });
+
+  // The URL is derived from the new deployment's own id, and its health is observed rather than assumed.
+  const targetUrl = computeDeploymentUrl(projectId, project.slug, targetEnvironment, promoted.id);
+  const promotedHealth = await executeHealthCheck(targetUrl, { path: "/", expectedStatus: 200, timeoutMs: 4000 });
+  const promotedRecord = await db.forgeDeployment.update({
+    where: { id: promoted.id },
+    data: {
+      url: targetUrl,
+      healthCheck: { ...promotedHealth, lastCheckedAt: new Date().toISOString() },
+      durationMs: Date.now() - promoteStart,
+      updatedAt: new Date(),
     },
   });
 
@@ -448,10 +454,11 @@ export async function promoteArtifact(params: {
       promotedDeploymentId: promoted.id,
       targetEnvironment,
       artifactId: sourceDeployment.artifactId,
+      healthCheckPassed: promotedHealth.passed,
     },
   });
 
-  return promoted;
+  return promotedRecord;
 }
 
 /**
@@ -510,13 +517,16 @@ export async function rollbackDeployment(params: {
       config: target.config,
       logs,
       rollbackFromId: target.id,
-      healthCheck: {
-        passed: true,
-        statusCode: 200,
-        lastCheckedAt: new Date().toISOString(),
-      },
-      durationMs: 200,
       createdById: userId || null,
+    },
+  });
+
+  const rollbackHealth = await executeHealthCheck(target.url, { path: "/", expectedStatus: 200, timeoutMs: 4000 });
+  const rolledBackRecord = await db.forgeDeployment.update({
+    where: { id: rolledBackDeployment.id },
+    data: {
+      healthCheck: { ...rollbackHealth, lastCheckedAt: new Date().toISOString() },
+      updatedAt: new Date(),
     },
   });
 
@@ -528,10 +538,11 @@ export async function rollbackDeployment(params: {
       rolledBackDeploymentId: rolledBackDeployment.id,
       restoredDeploymentId: target.id,
       environment: target.environment,
+      healthCheckPassed: rollbackHealth.passed,
     },
   });
 
-  return rolledBackDeployment;
+  return rolledBackRecord;
 }
 
 /**

@@ -36,6 +36,15 @@ export interface AiGenerationResult {
   model: string;
   provider: string;
   requestId?: string;
+  /** Token counts reported by the provider response; absent when the provider did not report them. */
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
+/** Builds usage only from numeric counts actually present in a provider response. */
+export function reportedUsage(inputTokens: unknown, outputTokens: unknown): AiGenerationResult["usage"] {
+  return typeof inputTokens === "number" && typeof outputTokens === "number"
+    ? { inputTokens, outputTokens }
+    : undefined;
 }
 
 export interface AiProvider {

@@ -1,5 +1,5 @@
 import { AppError } from "../../utils/app-error.js";
-import type { AiGenerationRequest, AiGenerationResult, AiProvider } from "./ai-provider.js";
+import { reportedUsage, type AiGenerationRequest, type AiGenerationResult, type AiProvider } from "./ai-provider.js";
 import { SITE_BLUEPRINT_INSTRUCTIONS, SITE_BLUEPRINT_JSON_SCHEMA } from "./site-blueprint.js";
 
 /** Server-only Gemini generateContent adapter; model output is validated by the changeset service. */
@@ -57,6 +57,7 @@ export class GeminiProvider implements AiProvider {
       }
       const body = await response.json().catch(() => null) as {
         responseId?: unknown;
+        usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown };
         candidates?: Array<{ finishReason?: unknown; content?: { parts?: Array<{ text?: unknown; thought?: unknown }> } }>;
       } | null;
       const candidate = body?.candidates?.length === 1 ? body.candidates[0] : undefined;
@@ -67,7 +68,8 @@ export class GeminiProvider implements AiProvider {
       }
       return {
         text: texts[0], model: activeModel, provider: this.name,
-        requestId: typeof body?.responseId === "string" ? body.responseId : undefined
+        requestId: typeof body?.responseId === "string" ? body.responseId : undefined,
+        usage: reportedUsage(body?.usageMetadata?.promptTokenCount, body?.usageMetadata?.candidatesTokenCount),
       };
     } catch (error) {
       if (error instanceof AppError) throw error;

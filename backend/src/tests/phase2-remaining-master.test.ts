@@ -42,7 +42,6 @@ import { browserDevToolsService } from "../modules/quality-platform/browser-devt
 import { forgeDomainService, getDomainProviderMode } from "../services/hosting/forgeDomain.service.js";
 
 // 6. Full Stack Generator Fallback (Milestone F)
-import { fullStackGeneratorService } from "../services/generator/fullStackGenerator.service.js";
 import { forgeProjectService } from "../services/project/forgeProject.service.js";
 import { forgeFilesystemService } from "../services/project/forgeFilesystem.service.js";
 
@@ -286,27 +285,7 @@ export async function runPhase2RemainingMasterTestSuite(): Promise<{
   assert.equal(typeof dnsPropagation, "boolean");
   pass("Feature 31: Real Node DNS resolver propagation verified");
 
-  // --------------------------------------------------------------------------
-  // MILESTONE F: Feature 08 (Full Stack Generator Fallback)
-  // --------------------------------------------------------------------------
-  console.log("\n--- Testing Milestone F: Full-Stack Generator ---");
-
-  const fullstackRes = await fullStackGeneratorService.generateFullStackProject({
-    projectId,
-    prompt: "Build an enterprise analytics platform with dashboard and backend API",
-    framework: "fullstack",
-    authorId: testUserId,
-    useAiIfAvailable: false, // Forces deterministic local fallback verification
-  });
-  assert.equal(fullstackRes.success, true);
-  assert.equal(fullstackRes.strategy, "DETERMINISTIC_LOCAL_FALLBACK");
-  assert.ok(fullstackRes.filesCreated >= 6, "Must generate full project file bundle");
-  pass(`Feature 08: Deterministic Full-Stack Generator fallback generated ${fullstackRes.filesCreated} files without AI errors`);
-
-  // Verify server entrypoint written
-  const serverFile = await forgeFilesystemService.readFile(projectId, "server/index.ts");
-  assert.ok(serverFile.content.includes("express"), "Server file must contain Express backend");
-  pass("Feature 08: Full-stack backend Express entrypoint verified in forge_project_files");
+  // Feature 08 (full-stack generation) is covered by app-generation.integration.test.ts.
 
   console.log("\n============================================================");
   console.log(`ALL 11 REMAINING PHASE 2 CAPABILITIES PASSED (${testsRun}/${testsRun})`);

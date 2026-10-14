@@ -1,4 +1,5 @@
-import { useState, useId } from "react";
+import { useState, useId, useRef } from "react";
+import { submissionKeyFor, type SubmissionKeySlot } from "../../../../utils/submissionKey";
 import type {
   FormWidgetConfig,
   FormFieldConfig,
@@ -111,6 +112,7 @@ export default function FormWidgetRenderer({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [honeypotVal, setHoneypotVal] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionKey = useRef<SubmissionKeySlot["current"]>(null);
   const [submissionStatus, setSubmissionStatus] = useState<"idle" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -254,17 +256,19 @@ export default function FormWidgetRenderer({
         fieldConfigs: config.fields,
       };
 
+      const body = JSON.stringify(payload);
       const res = await fetch(`${apiUrl}/api/forms/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": submissionKeyFor(submissionKey, body) },
+        body,
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.message || config.actions.errorMessage || "Submission failed");
+        throw new Error(data?.error?.message || data?.message || config.actions.errorMessage || "Submission failed");
       }
 
+      submissionKey.current = null;
       setSubmissionStatus("success");
       setStatusMessage(data.message || config.actions.successMessage || "Thank you! Submission received.");
       setFormData({});

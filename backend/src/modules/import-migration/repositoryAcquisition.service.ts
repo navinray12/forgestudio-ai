@@ -38,7 +38,7 @@ export class RepositoryAcquisitionService {
       const body = arg2 || {};
       params = {
         sourceType: body.sourceType || "GIT",
-        sourceUrl: body.sourceUrl,
+        sourceUrl: body.sourceUrl || body.repoUrl,
         projectName: body.projectName || arg1,
         ownerId: arg3 || "anonymous",
         files: body.files || [],
@@ -60,10 +60,19 @@ export class RepositoryAcquisitionService {
     });
 
     // Stage 2: ACQUIRE & VERIFY
-    // Populate sample files if none provided (e.g. from git clone or simulated acquisition)
-    let acquiredFiles = files;
+    // This pipeline analyses files supplied by the caller. It does not clone repositories, so an
+    // import without files fails instead of analysing invented placeholder content.
+    const acquiredFiles = files;
     if (acquiredFiles.length === 0) {
-      acquiredFiles = this.generateSampleAcquiredFiles(sourceUrl || projectName);
+      await db.forgeImportJob.update({
+        where: { id: job.id },
+        data: { status: "FAILED", stage: "ACQUIRE" },
+      });
+      throw new AppError(
+        "No files were supplied. Cloning from a repository URL is not supported by this importer; use GitHub import or upload the project files.",
+        422,
+        "IMPORT_FILES_REQUIRED"
+      );
     }
 
     // Verify files safety (no path traversal, reasonable size)
@@ -139,6 +148,13 @@ export class RepositoryAcquisitionService {
     };
   }
 
+  /** Returns an import job owned by the caller. */
+  async getImportJob(jobId: string, ownerId: string) {
+    const job = await db.forgeImportJob.findUnique({ where: { id: jobId } });
+    if (!job || job.ownerId !== ownerId) throw new AppError("Import job not found", 404, "NOT_FOUND");
+    return job;
+  }
+
   /**
    * Finalize and commit the import into a real, isolated Forge Project
    */
@@ -174,7 +190,16 @@ export class RepositoryAcquisitionService {
     );
 
     // Write all acquired files into the project filesystem
-    const filesToWrite = files && files.length > 0 ? files : this.generateSampleAcquiredFiles(projectName);
+    if (job.ownerId !== ownerId) throw new AppError("Import job not found", 404, "NOT_FOUND");
+    if (!files || files.length === 0) {
+      throw new AppError("The files to import must be supplied when committing an import.", 422, "IMPORT_FILES_REQUIRED");
+    }
+    for (const f of files) {
+      if (f.path.includes("..") || f.path.startsWith("/")) {
+        throw new AppError(`Unsafe file path detected in import: '${f.path}'`, 400, "UNSAFE_PATH");
+      }
+    }
+    const filesToWrite = files;
     for (const f of filesToWrite) {
       await forgeFilesystemService.writeFile(project.id, f.path, f.content, ownerId);
     }
@@ -233,56 +258,6 @@ export class RepositoryAcquisitionService {
     };
   }
 
-  /**
-   * Helper generating realistic acquired files when importing from Git/URL
-   */
-  private generateSampleAcquiredFiles(name: string) {
-    const slug = name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
-    return [
-      {
-        path: "package.json",
-        content: JSON.stringify(
-          {
-            name: slug,
-            version: "1.0.0",
-            type: "module",
-            scripts: {
-              dev: "vite",
-              build: "vite build",
-              preview: "vite preview",
-              test: "vitest run",
-            },
-            dependencies: {
-              react: "^19.0.0",
-              "react-dom": "^19.0.0",
-            },
-            devDependencies: {
-              vite: "^6.0.0",
-              typescript: "^5.7.0",
-            },
-          },
-          null,
-          2
-        ),
-      },
-      {
-        path: "vite.config.ts",
-        content: 'import { defineConfig } from "vite";\nexport default defineConfig({});\n',
-      },
-      {
-        path: "src/main.tsx",
-        content: 'import React from "react";\nimport { createRoot } from "react-dom/client";\nimport App from "./App";\ncreateRoot(document.getElementById("root")!).render(<App />);\n',
-      },
-      {
-        path: "src/App.tsx",
-        content: `export default function App() {\n  return (\n    <main className="p-8">\n      <h1 className="text-3xl font-bold">Imported App: ${name}</h1>\n      <p className="mt-2 text-gray-600">Successfully ingested into ForgeStudio.</p>\n    </main>\n  );\n}\n`,
-      },
-      {
-        path: "index.html",
-        content: `<!DOCTYPE html>\n<html>\n<head><title>${name}</title></head>\n<body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>\n</html>`,
-      },
-    ];
-  }
 }
 
 export const repositoryAcquisitionService = new RepositoryAcquisitionService();

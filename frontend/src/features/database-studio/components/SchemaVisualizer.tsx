@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Key, ArrowRight, RefreshCw, Layers, Search } from "lucide-react";
-import type { TableNode, TableEdge } from "../types/studio.types";
+import type { StudioEnvironment, TableNode, TableEdge } from "../types/studio.types";
 
 interface SchemaVisualizerProps {
   projectId: string;
   apiBase: string;
+  environment: StudioEnvironment;
 }
 
-export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({ projectId, apiBase }) => {
+export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({ projectId, apiBase, environment }) => {
   const [nodes, setNodes] = useState<TableNode[]>([]);
   const [edges, setEdges] = useState<TableEdge[]>([]);
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({ projectId, a
   const fetchDiagram = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/studio/diagram`, {
+      const res = await fetch(`${apiBase}/api/v1/projects/${projectId}/studio/diagram?environment=${environment}`, {
         credentials: "include",
       });
       const json = await res.json();
@@ -33,7 +34,7 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({ projectId, a
 
   useEffect(() => {
     fetchDiagram();
-  }, [projectId]);
+  }, [projectId, environment]);
 
   const filteredNodes = nodes.filter((n) =>
     n.name.toLowerCase().includes(search.toLowerCase())
