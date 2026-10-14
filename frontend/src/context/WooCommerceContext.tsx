@@ -339,6 +339,12 @@ export const WooCommerceProvider: React.FC<{
         if (!response.ok) {
           throw new Error(`Commerce order was not accepted (HTTP ${response.status}).`);
         }
+        // Some integrations return HTTP 200 with an application-level failure.
+        // Never clear the buyer's cart if the backend explicitly rejected it.
+        const result: unknown = await response.json().catch(() => null);
+        if (result && typeof result === "object" && "success" in result && result.success === false) {
+          throw new Error("Commerce order was rejected by the backend.");
+        }
       } catch (err) {
         // Keep the cart intact; an unconfirmed server order must not be reported
         // as successfully placed or cause the buyer to lose their selections.
