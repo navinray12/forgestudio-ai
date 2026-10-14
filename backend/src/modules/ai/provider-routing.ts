@@ -23,11 +23,12 @@ export function siteGenerationProvider(): AiProvider {
     case "gemini":
       return new GeminiProvider();
     case "openai":
-    default:
       if (process.env.OPENAI_API_KEY) return new OpenAiProvider();
       if (process.env.ANTHROPIC_API_KEY) return new AnthropicProvider();
       if (process.env.GEMINI_API_KEY) return new GeminiProvider();
       return new OpenAiProvider();
+    default:
+      throw new AppError("AI provider configuration is invalid", 503, "AI_NOT_CONFIGURED");
   }
 }
 export type PlatformAiCapability =
