@@ -521,6 +521,91 @@ export class ApplicationSpecService {
   }
 
   /**
+   * Durable revision writer for the authoritative project-backed ApplicationSpec.
+   * This is an opt-in storage path while older synchronous callers are migrated;
+   * it never falls back to memory if PostgreSQL is unavailable.
+   *
+   * Application IDs are globally unique across projects. The transaction-wide
+   * lock serializes genesis and subsequent writes even when no history exists.
+   * A persisted revision is immutable: retries must read the existing record
+   * rather than silently overwriting it.
+   */
+  public static async commitRevisionPersisted(spec: ApplicationSpec): Promise<{
+    success: boolean;
+    revision: number;
+    digest: string;
+    spec: ApplicationSpec;
+  }> {
+    const validation = this.validateApplicationSpec(spec);
+    if (!validation.valid) {
+      throw new AppError(
+        `ApplicationSpec validation failed: ${validation.errors.join("; ")}`,
+        422,
+        "INVALID_APPLICATION_SPEC"
+      );
+    }
+    const { pgPool } = await import("../../config/prisma.js");
+    const client = await pgPool.connect();
+    try {
+      await client.query("BEGIN");
+      // Stable transaction-level advisory lock includes uncommitted genesis.
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [spec.applicationId]);
+      const { rows } = await client.query(
+        `SELECT "projectId", "tenantId", "revision" FROM forge_application_spec_revisions
+         WHERE "applicationId" = $1 ORDER BY "revision" DESC LIMIT 1 FOR UPDATE`,
+        [spec.applicationId]
+      );
+      const latest = rows[0] as { projectId: string; tenantId: string; revision: number } | undefined;
+      if (!latest) {
+        if (spec.revision !== 1 || spec.parentRevision !== 0) {
+          throw new AppError("The initial application revision must be 1 with parentRevision 0", 400, "INVALID_INITIAL_REVISION");
+        }
+      } else {
+        if (String(latest.projectId) !== spec.projectId || latest.tenantId !== spec.tenantId) {
+          throw new AppError("Application revision cannot change its project or tenant ownership", 409, "APPLICATION_OWNERSHIP_CONFLICT");
+        }
+        if (spec.parentRevision !== latest.revision || spec.revision !== latest.revision + 1) {
+          throw new AppError(`Revision conflict: current revision is ${latest.revision}`, 409, "REVISION_CONFLICT");
+        }
+      }
+      const snapshot = structuredClone(spec);
+      const digest = this.computeDigest(snapshot);
+      await client.query(
+        `INSERT INTO forge_application_spec_revisions
+         ("applicationId", "revision", "parentRevision", "projectId", "tenantId", "digest", "spec")
+         VALUES ($1, $2, $3, $4::uuid, $5, $6, $7::jsonb)`,
+        [spec.applicationId, spec.revision, spec.parentRevision, spec.projectId, spec.tenantId, digest, JSON.stringify(snapshot)]
+      );
+      await client.query("COMMIT");
+      return { success: true, revision: spec.revision, digest, spec: structuredClone(snapshot) };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Project- and tenant-scoped durable read. Never returns another tenant's spec. */
+  public static async getLatestSpecPersisted(
+    applicationId: string, projectId: string, tenantId: string
+  ): Promise<ApplicationSpec | null> {
+    const { pgPool } = await import("../../config/prisma.js");
+    const { rows } = await pgPool.query(
+      `SELECT "spec", "digest" FROM forge_application_spec_revisions
+       WHERE "applicationId" = $1 AND "projectId" = $2::uuid AND "tenantId" = $3
+       ORDER BY "revision" DESC LIMIT 1`,
+      [applicationId, projectId, tenantId]
+    );
+    if (!rows[0]) return null;
+    const snapshot = rows[0].spec as ApplicationSpec;
+    if (this.computeDigest(snapshot) !== rows[0].digest) {
+      throw new AppError("Stored application revision digest mismatch", 409, "APPLICATION_SPEC_INTEGRITY_ERROR");
+    }
+    return structuredClone(snapshot);
+  }
+
+  /**
    * Diff two ApplicationSpec revisions to compute change impact
    */
   public static diffSpecs(oldSpec: ApplicationSpec, newSpec: ApplicationSpec) {
