@@ -273,7 +273,7 @@ const CustomCodeModal: React.FC<CustomCodeModalProps> = ({ isOpen, onClose, webs
                                             ].map(opt => (
                                                 <div
                                                     key={opt.id}
-                                                    onClick={() => setEditingSnippet(p => ({ ...p, status: opt.id }))}
+                                                    onClick={() => setEditingSnippet(p => ({ ...p, status: opt.id as NonNullable<CustomCodeSnippet['status']> }))}
                                                     className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center gap-4 ${editingSnippet.status === opt.id || (!editingSnippet.status && opt.id === 'PUBLISHED') ? 'bg-indigo-500/10 border-indigo-500 ring-1 ring-indigo-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`}
                                                 >
                                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${editingSnippet.status === opt.id || (!editingSnippet.status && opt.id === 'PUBLISHED') ? 'border-indigo-500' : 'border-slate-600'}`}>
