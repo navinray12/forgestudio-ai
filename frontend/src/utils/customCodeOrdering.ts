@@ -92,7 +92,7 @@ export function getOrderedCustomCode(
 
     applicable.sort((a, b) => {
         // 1. Location (Although DOM rendering already splits by Head/Body conceptually for HTML, let's strictly order them here)
-        const locOpts: any = { "head": 1, "body-start": 2, "body-end": 3 };
+        const locOpts: Record<CustomCodeSnippetData['location'], number> = { "head": 1, "body-start": 2, "body-end": 3 };
         const locDiff = locOpts[a.data.location] - locOpts[b.data.location];
         if (locDiff !== 0) return locDiff;
 
