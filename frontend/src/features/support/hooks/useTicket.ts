@@ -32,8 +32,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.addMessage(ticketId, content, type);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -45,8 +43,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.updateStatus(ticketId, status);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -58,8 +54,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.updatePriority(ticketId, priority);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -71,8 +65,6 @@ export function useTicket(ticketId: string | undefined) {
       setSubmitting(true);
       await ticketService.assignAgent(ticketId, agentId);
       await fetchTicket();
-    } catch (err: any) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
