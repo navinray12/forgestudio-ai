@@ -28,6 +28,8 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     if (elementToEdit) {
       setName(elementToEdit.name);
       setElementType(elementToEdit.elementType);
@@ -47,6 +49,8 @@ export const GlobalElementFormModal: React.FC<GlobalElementFormModalProps> = ({
       });
     }
     setErrorMsg(null);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [elementToEdit, isOpen]);
 
   if (!isOpen) return null;
