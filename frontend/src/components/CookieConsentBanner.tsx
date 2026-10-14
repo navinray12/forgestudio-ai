@@ -76,7 +76,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
           : "bg-white/95 text-slate-800 border-slate-200 backdrop-blur-md"
       }`}
     >
-      {storageError && <p role="alert" className="mb-2 text-xs text-amber-300">Browser storage is unavailable. Your cookie choice could not be saved.</p>}
+      {storageError && <p role="alert" className={`mb-2 text-xs ${config.theme === "light" ? "text-amber-800" : "text-amber-300"}`}>Browser storage is unavailable. Your cookie choice could not be saved.</p>}
       <div className="flex items-start gap-3">
         <div className={`p-2 rounded-xl shrink-0 ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
           <Cookie className="w-5 h-5" />
