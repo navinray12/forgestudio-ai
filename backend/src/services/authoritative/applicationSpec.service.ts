@@ -337,27 +337,18 @@ export class ApplicationSpecService {
    * Deterministic SHA-256 digest of an ApplicationSpec
    */
   public static computeDigest(spec: ApplicationSpec): string {
-    const canonical = JSON.stringify({
-      schemaVersion: spec.schemaVersion,
-      applicationId: spec.applicationId,
-      projectId: spec.projectId,
-      tenantId: spec.tenantId,
-      revision: spec.revision,
-      frameworkProfile: spec.frameworkProfile,
-      identityStrategy: spec.identityStrategy,
-      requirementIds: [...spec.requirementIds].sort(),
-      entities: spec.entities.map((e) => ({
-        id: e.id,
-        name: e.name,
-        tableName: e.physicalTableName,
-        fields: e.fields.map((f) => ({ id: f.id, name: f.name, type: f.type })),
-      })),
-      operations: spec.operations.map((o) => ({
-        id: o.id,
-        name: o.name,
-        method: o.method,
-        routePath: o.routePath,
-      })),
+    // The release identity must cover the ENTIRE authoritative spec, including
+    // policies, relationships, job behavior, retention, bindings and defaults.
+    // Sorting object keys makes logically identical JSON inputs hash identically;
+    // array order remains part of the explicit contract.
+    const canonical = JSON.stringify(spec, (_key, value: unknown) => {
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        return Object.fromEntries(
+          Object.entries(value as Record<string, unknown>)
+            .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        );
+      }
+      return value;
     });
 
     return crypto.createHash("sha256").update(canonical).digest("hex");
@@ -402,14 +393,17 @@ export class ApplicationSpecService {
     }
 
     const digest = this.computeDigest(spec);
-    history.push({ ...spec });
+    // Store an independent snapshot; callers must not be able to mutate the
+    // accepted revision (or a subsequent release's approval evidence).
+    const snapshot = structuredClone(spec);
+    history.push(snapshot);
     this.specStore.set(spec.applicationId, history);
 
     return {
       success: true,
       revision: spec.revision,
       digest,
-      spec,
+      spec: structuredClone(snapshot),
     };
   }
 
@@ -419,7 +413,7 @@ export class ApplicationSpecService {
   public static getLatestSpec(applicationId: string): ApplicationSpec | null {
     const history = this.specStore.get(applicationId);
     if (!history || history.length === 0) return null;
-    return history[history.length - 1];
+    return structuredClone(history[history.length - 1]);
   }
 
   /**

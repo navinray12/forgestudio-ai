@@ -10,6 +10,71 @@ import {
 } from "../services/authoritative/applicationSpec.service.js";
 
 describe("Point 32 — ApplicationSpec Domain Contract & Real Generator", () => {
+  it("binds the digest to security policy, field defaults and retention behavior", () => {
+    const base = {
+      schemaVersion: "1.0.0", applicationId: "app_digest", projectId: "project_digest",
+      tenantId: "tenant_digest", revision: 1, parentRevision: 0,
+      frameworkProfile: "react-vite" as const, identityStrategy: "SINGLE_TENANT_DEDICATED" as const,
+      requirementIds: ["REQ-1"], entities: [{
+        id: "ent_item", name: "Item", physicalTableName: "items",
+        isSoftDeletable: true, isAudited: true,
+        fields: [{
+          id: "fld_name", name: "name", physicalColumnName: "name",
+          type: "string" as const, isNullable: false, defaultValue: "A",
+          sensitivity: "INTERNAL" as const, visibility: "READ_WRITE" as const,
+          lifecycleOwnership: "USER" as const,
+        }],
+      }],
+      relationships: [], operations: [], actors: [],
+      policies: [{
+        id: "policy_item", name: "item_access", actorId: "actor_1",
+        resourceEntityId: "ent_item", effect: "ALLOW" as const, actions: ["READ" as const],
+      }],
+      frontendBindings: [], jobs: [],
+      retentionPolicies: [{
+        entityId: "ent_item", retentionDays: 30,
+        archiveStrategy: "ANONYMIZE" as const, legalBasis: "test",
+      }],
+      acceptanceContracts: [], createdAt: "2026-10-14T00:00:00Z",
+      updatedAt: "2026-10-14T00:00:00Z",
+    };
+    const original = ApplicationSpecService.computeDigest(base);
+    expect(ApplicationSpecService.computeDigest({
+      ...base, policies: [{ ...base.policies[0], effect: "DENY" }],
+    })).not.toBe(original);
+    expect(ApplicationSpecService.computeDigest({
+      ...base, retentionPolicies: [{ ...base.retentionPolicies[0], retentionDays: 90 }],
+    })).not.toBe(original);
+    expect(ApplicationSpecService.computeDigest({
+      ...base, entities: [{ ...base.entities[0], fields: [{
+        ...base.entities[0].fields[0], defaultValue: "B",
+      }] }],
+    })).not.toBe(original);
+    const reordered = { ...base, tenantId: base.tenantId, projectId: base.projectId };
+    expect(ApplicationSpecService.computeDigest(reordered)).toBe(original);
+  });
+
+  it("does not let returned or caller-owned objects mutate committed application revisions", async () => {
+    const spec: ApplicationSpec = {
+      schemaVersion: "1.0.0", applicationId: "app_snapshot_v21",
+      projectId: "project_snapshot", tenantId: "tenant_snapshot",
+      revision: 1, parentRevision: 0, frameworkProfile: "react-vite",
+      identityStrategy: "SINGLE_TENANT_DEDICATED", requirementIds: [],
+      entities: [], relationships: [], operations: [], actors: [], policies: [],
+      frontendBindings: [], jobs: [], retentionPolicies: [], acceptanceContracts: [],
+      createdAt: "2026-10-14T00:00:00Z", updatedAt: "2026-10-14T00:00:00Z",
+    };
+    const result = await ApplicationSpecService.commitRevision(spec);
+    const digest = result.digest;
+    spec.requirementIds.push("MUTATED_ORIGINAL");
+    result.spec.requirementIds.push("MUTATED_RESPONSE");
+    const retrieved = ApplicationSpecService.getLatestSpec(spec.applicationId);
+    expect(retrieved?.requirementIds).toEqual([]);
+    expect(retrieved && ApplicationSpecService.computeDigest(retrieved)).toBe(digest);
+    if (retrieved) retrieved.requirementIds.push("MUTATED_READ");
+    expect(ApplicationSpecService.getLatestSpec(spec.applicationId)?.requirementIds).toEqual([]);
+  });
+
   it("validates that ApplicationSpec enforces stable ent_ and fld_ prefixes", () => {
     const invalidSpec: ApplicationSpec = {
       schemaVersion: "1.0.0",

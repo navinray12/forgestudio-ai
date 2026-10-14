@@ -49,6 +49,9 @@ jobs:
         run: |
           node --import tsx --test src/tests/assistant-intent-routing.test.ts
           node --import tsx --test src/tests/ai-gateway-provider-fallback.test.ts
+      - name: ApplicationSpec full-contract digest and revision integrity
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point32-fullstack-application-spec.test.ts
       - name: Schema Studio SQL safety regression tests
         working-directory: backend
         run: node --import tsx --test src/tests/schema-studio-ddl-validation.test.ts
