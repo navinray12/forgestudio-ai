@@ -212,7 +212,13 @@ export class HtmlDesignConverter implements DesignConverter {
         ...(type === "container" ? { children, layout: layout(styles[0]!), responsiveLayout: { tablet: layout(styles[1]!), mobile: layout(styles[2]!) } } : {}),
       };
     };
-    const body = $("body").get(0) || $("main").get(0) || $("div").get(0);
+    // Cheerio synthesizes html/body wrappers for fragments. Import the supplied
+    // root element for fragments, but retain the body root for full documents.
+    const fullDocument = /<\\s*(?:html|body)(?:\\s|>)/i.test(html);
+    const body = fullDocument
+      ? $("body").get(0) || $("main").get(0) || $("div").get(0)
+      : $("body").children().filter((_index, element) => element.type === "tag" && !["script", "style", "link", "meta"].includes(element.name)).get(0)
+        || $("main").get(0) || $("div").get(0);
     if (!body) throw new ConversionError(["HTML_PAGE_REQUIRED"]);
     const result = walk(body, "root", [{}, {}, {}], 0);
     if (!result) throw new ConversionError(["EMPTY_DOCUMENT"]);
