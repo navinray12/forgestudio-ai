@@ -81,7 +81,7 @@ jobs:
           FORGE_BROWSER_FIXTURE_PATH: ${{ runner.temp }}/forge-design-browser.json
         shell: bash
         run: |
-          node backend/dist/tests/fixtures/design-browser-server.js > "$RUNNER_TEMP/forge-design-api.log" 2>&1 &
+          (cd backend && exec node --import tsx src/tests/fixtures/design-browser-server.ts) > "$RUNNER_TEMP/forge-design-api.log" 2>&1 &
           api_pid=$!
           npm --prefix frontend run preview -- --host 127.0.0.1 --port 55174 > "$RUNNER_TEMP/forge-design-ui.log" 2>&1 &
           ui_pid=$!
