@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const source = readFileSync(new URL("../../frontend/src/pages/editor/integrations/IntegrationRenderers.tsx", import.meta.url), "utf8");
 const branchStart = source.indexOf('if (el.type === "google-maps")');
-const hookPattern = /\buse(?:State|Effect)\s*\(/g;
+const hookPattern = /\buse(?:State|Effect)(?:<[^\n>]+>)?\s*\(/g;
 
 test("integration renderer keeps React hooks before all type-based early returns", () => {
   assert.ok(branchStart > 0, "expected renderer branches");
