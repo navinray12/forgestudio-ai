@@ -303,6 +303,21 @@ export async function getSchemaDiagram(
   return { tables: nodes, relationships: edges };
 }
 
+/** Fail closed before tenant DDL if its migration ledger is not registered. */
+export function assertMigrationLedgerRegistered<T extends { id: string }>(record: T | null): T {
+  if (!record?.id) {
+    throw new AppError("Project database is not registered for migration tracking", 409, "MIGRATION_LEDGER_MISSING");
+  }
+  return record;
+}
+
+async function requireMigrationLedger(projectId: string, environment: DatabaseEnvironment) {
+  const record = await prisma.projectDatabase.findUnique({
+    where: { websiteId_environment: { websiteId: projectId, environment } },
+  });
+  return assertMigrationLedgerRegistered(record);
+}
+
 /**
  * Creates a new table via visual DDL and records the migration in Prisma.
  */
@@ -344,22 +359,17 @@ export async function createTable(
 
   const ddl = `CREATE TABLE "public"."${safeName}" (\n  ${columnClauses.join(",\n  ")}\n);`;
 
+  const dbRecord = await requireMigrationLedger(projectId, environment);
+  const dbRecord = await requireMigrationLedger(projectId, environment);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
   // Record migration in Prisma
-  const dbRecord = await prisma.projectDatabase.findUnique({
-    where: {
-      websiteId_environment: {
-        websiteId: projectId,
-        environment,
-      },
-    },
-  });
 
-  if (dbRecord) {
+
+  {
     const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
     await prisma.databaseMigrationRecord.create({
       data: {
@@ -399,16 +409,9 @@ export async function dropTable(
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
-  const dbRecord = await prisma.projectDatabase.findUnique({
-    where: {
-      websiteId_environment: {
-        websiteId: projectId,
-        environment,
-      },
-    },
-  });
 
-  if (dbRecord) {
+
+  {
     const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
     await prisma.databaseMigrationRecord.create({
       data: {
