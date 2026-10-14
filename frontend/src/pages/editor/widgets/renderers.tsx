@@ -322,7 +322,7 @@ export const FormWidgetRenderer = ({
     const strTargetVal = targetVal !== undefined && targetVal !== null ? String(targetVal) : "";
     const ruleValue = value !== undefined && value !== null ? String(value) : "";
 
-    let conditionMet = false;
+    let conditionMet: boolean;
     switch (operator) {
       case "equals":
         conditionMet = strTargetVal === ruleValue;
