@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Cookie, Shield, X } from "lucide-react";
+import { Cookie, X } from "lucide-react";
 
 export interface CookieConsentConfig {
   enabled?: boolean;
@@ -20,7 +20,6 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
   useEffect(() => {
     // If not explicitly enabled, do not render
     if (!config?.enabled) {
-      setVisible(false);
       return;
     }
 
@@ -33,8 +32,12 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
       }
     } catch {
       // Storage can be blocked by privacy settings; never assume consent.
-      setVisible(true);
-      setStorageError(true);
+      // Schedule a UI update outside the effect body; never assume consent.
+      const timer = setTimeout(() => {
+        setVisible(true);
+        setStorageError(true);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [config?.enabled]);
 
