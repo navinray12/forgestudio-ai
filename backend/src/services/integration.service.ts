@@ -126,6 +126,9 @@ export class IntegrationService {
     }
 
     const { token, baseUrl } = await paypalAccessToken();
+    // An editor must never silently send a sandbox request to live PayPal (or vice versa).
+    const authorizedEnv = baseUrl.includes(".sandbox.") ? "sandbox" : "live";
+    if (env !== authorizedEnv) throw new Error("Requested PayPal environment differs from the server configuration");
     const response = await fetch(baseUrl + "/v2/checkout/orders", {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
