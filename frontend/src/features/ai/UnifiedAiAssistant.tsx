@@ -100,8 +100,12 @@ export function UnifiedAiAssistant({
       headers: { ...getAuthHeaders() },
     });
     if (!res.ok) throw new Error("Could not load latest website state");
-    const data = await res.json();
-    return Number(data.website.documentVersion);
+    const data = await res.json().catch(() => null);
+    const version = Number(data?.website?.documentVersion);
+    if (!data?.website || !Number.isSafeInteger(version) || version < 0) {
+      throw new Error("Website version is missing or invalid. Reload the editor and try again.");
+    }
+    return version;
   }
 
   // Handle Assistant Submit
@@ -136,7 +140,7 @@ export function UnifiedAiAssistant({
 
       if (data.result?.changeset) {
         setChangeset(data.result.changeset);
-        setSuccessMessage(`Changeset generated for ${data.intent.replace(/_/g, " ")}. Review and apply below.`);
+        setSuccessMessage(`Changeset generated for ${typeof data.intent === "string" ? data.intent.replace(/_/g, " ") : "your request"}. Review and apply below.`);
       } else if (data.intent === "ANALYZE_SITE") {
         setAuditResult(data.result);
         setActiveTab("audit");
