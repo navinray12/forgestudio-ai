@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 interface Plan {
   id: string;
@@ -11,7 +11,7 @@ interface Plan {
   websiteLimit: number;
   storageLimitMb: number;
   aiCreditLimit: number;
-  features?: string[] | Record<string, any>;
+  features?: string[] | Record<string, unknown>;
   isActive: boolean;
 }
 
@@ -36,7 +36,6 @@ interface Invoice {
 }
 
 export default function SubscriptionPage() {
-  const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
@@ -176,8 +175,8 @@ export default function SubscriptionPage() {
       } catch (e) {
         console.warn("Could not retrieve invoices:", e);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load subscription information.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load subscription information.");
     } finally {
       setLoading(false);
     }
@@ -204,14 +203,14 @@ export default function SubscriptionPage() {
 
       setSuccess(`Plan changed to ${plan.name} successfully!`);
       await fetchData();
-    } catch (err: any) {
-      setError(err.message || "Could not complete plan update.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Could not complete plan update.");
     } finally {
       setActionBusy(null);
     }
   };
 
-  const parseFeatures = (features: any): string[] => {
+  const parseFeatures = (features: Plan["features"]): string[] => {
     if (Array.isArray(features)) return features;
     if (typeof features === "object" && features !== null) {
       return Object.entries(features).map(([k, v]) => `${k}: ${v}`);
