@@ -1,9 +1,10 @@
-name: Tailwind dependency override candidate
+name: Tailwind 4 security migration canary
 on:
   pull_request:
     branches: [fix/main-ai-security-20261014]
     paths:
       - 'backend/package.json'
+      - 'backend/src/modules/ai/design/converter.ts'
       - '.github/workflows/backend-audit-override-candidate.yml'
   workflow_dispatch:
 permissions:
@@ -23,22 +24,26 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24.18.0'
-      - name: Resolve lockfile with existing Tailwind 3 and patched transitives
+      - name: Resolve Tailwind 4 lockfile with its official PostCSS plugin
         run: npm install --prefix backend --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Install candidate without changing application source
-        run: npm ci --prefix backend --no-audit --no-fund
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
       - name: Compile full backend
         run: npm run build --prefix backend
       - name: Exercise AI design conversion and security tests
         working-directory: backend
         run: node --import tsx --test src/tests/ai-design.test.ts
+      - name: Exercise website-to-code regressions
+        run: npm run test:website-to-code --prefix backend
       - name: Require zero high or critical npm advisories
         run: npm audit --prefix backend --audit-level high --json > "$RUNNER_TEMP/backend-audit.json"
       - name: Commit only tested lockfile update
         env:
           PR_BRANCH: ${{ github.head_ref }}
         run: |
-          git add -- backend/package-lock.json
+          git add -- backend/package.json backend/package-lock.json backend/src/modules/ai/design/converter.ts
           if git diff --cached --quiet; then exit 0; fi
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(deps): lock tested Tailwind transitive security updates'
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(deps): qualify Tailwind 4 runtime migration'
           git push origin "HEAD:refs/heads/$PR_BRANCH"
