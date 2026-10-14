@@ -178,15 +178,19 @@ export function UnifiedAiAssistant({
       if (!res.ok || !data || data.success === false) {
         throw new Error(data?.error?.message || data?.message || "Image generation failed");
       }
-      if (data.url || data.imageUrl) {
-        setGeneratedImages((prev) => [data.url || data.imageUrl, ...prev]);
-        setSuccessMessage("Image generated successfully!");
-      } else if (Array.isArray(data.images) && data.images.length > 0) {
-        setGeneratedImages((prev) => [...data.images, ...prev]);
-        setSuccessMessage("Images generated successfully!");
-      } else {
-        throw new Error("Image generation returned no images.");
+      const singleImage = [data.url, data.imageUrl].find(
+        (url): url is string => typeof url === "string" && url.trim().length > 0
+      );
+      const imageList: string[] = singleImage
+        ? [singleImage]
+        : Array.isArray(data.images)
+          ? data.images.filter((url: unknown): url is string => typeof url === "string" && url.trim().length > 0)
+          : [];
+      if (imageList.length === 0) {
+        throw new Error("Image generation returned no valid image URLs.");
       }
+      setGeneratedImages((prev) => [...imageList, ...prev]);
+      setSuccessMessage(imageList.length === 1 ? "Image generated successfully!" : "Images generated successfully!");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate image");
     } finally {
