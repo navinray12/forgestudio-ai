@@ -198,9 +198,9 @@ export function UnifiedAiAssistant({
         credentials: "include",
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || err.error?.message || "Failed to apply changeset");
+      const applyResult = await res.json().catch(() => null);
+      if (!res.ok || applyResult?.success === false) {
+        throw new Error(applyResult?.message || applyResult?.error?.message || "Failed to apply changeset");
       }
 
       setSuccessMessage("Changes applied successfully to your website!");
@@ -220,11 +220,15 @@ export function UnifiedAiAssistant({
     if (!changeset?.id) return;
     setBusy(true);
     try {
-      await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
+      const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
         method: "POST",
         headers: { ...getAuthHeaders() },
         credentials: "include",
       });
+      const cancelResult = await res.json().catch(() => null);
+      if (!res.ok || cancelResult?.success === false) {
+        throw new Error(cancelResult?.message || cancelResult?.error?.message || "Failed to discard changeset");
+      }
       setChangeset(null);
       setSuccessMessage("Changeset discarded.");
     } catch (err: unknown) {
