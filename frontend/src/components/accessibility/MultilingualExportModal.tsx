@@ -40,7 +40,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
   };
 
   const exportedJson = exportMultilingualStrings(elements, options);
-  const hreflangTags = generateHreflangTags(baseUrl, pageSlug, [sourceLang, ...targetLangs]);
+  const hreflangTags = generateHreflangTags(baseUrl, pageSlug, [sourceLang, ...targetLangs], sourceLang);
 
   const handleToggleTargetLang = (langCode: string) => {
     setTargetLangs((prev) =>
