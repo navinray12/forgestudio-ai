@@ -74,7 +74,7 @@ export const forumService = {
   },
 
   async getTopic(idOrSlug: string): Promise<{ topic: ForumTopic }> {
-    return request<{ topic: ForumTopic }>(`/topics/${idOrSlug}`);
+    return request<{ topic: ForumTopic }>(`/topics/${encodeURIComponent(idOrSlug)}`);
   },
 
   async createTopic(payload: {
@@ -85,7 +85,7 @@ export const forumService = {
     websiteId?: string;
     tags?: string[];
     visibility?: string;
-    contextData?: any;
+    contextData?: Record<string, unknown>;
   }): Promise<{ success: boolean; topic: ForumTopic }> {
     return request<{ success: boolean; topic: ForumTopic }>("/topics", {
       method: "POST",
@@ -99,28 +99,28 @@ export const forumService = {
     content: string,
     parentPostId?: string
   ): Promise<{ success: boolean; post: ForumPost }> {
-    return request<{ success: boolean; post: ForumPost }>(`/topics/${topicId}/posts`, {
+    return request<{ success: boolean; post: ForumPost }>(`/topics/${encodeURIComponent(topicId)}/posts`, {
       method: "POST",
       body: JSON.stringify({ content, parentPostId }),
     });
   },
 
   async editPost(postId: string, content: string): Promise<{ success: boolean; post: ForumPost }> {
-    return request<{ success: boolean; post: ForumPost }>(`/posts/${postId}`, {
+    return request<{ success: boolean; post: ForumPost }>(`/posts/${encodeURIComponent(postId)}`, {
       method: "PATCH",
       body: JSON.stringify({ content }),
     });
   },
 
   async deletePost(postId: string): Promise<{ success: boolean; message: string }> {
-    return request<{ success: boolean; message: string }>(`/posts/${postId}`, {
+    return request<{ success: boolean; message: string }>(`/posts/${encodeURIComponent(postId)}`, {
       method: "DELETE",
     });
   },
 
   // Solution Acceptance & Reactions
   async toggleAcceptedAnswer(postId: string): Promise<{ success: boolean; isAccepted: boolean }> {
-    return request<{ success: boolean; isAccepted: boolean }>(`/posts/${postId}/accept`, {
+    return request<{ success: boolean; isAccepted: boolean }>(`/posts/${encodeURIComponent(postId)}/accept`, {
       method: "POST",
     });
   },
@@ -129,7 +129,7 @@ export const forumService = {
     postId: string,
     type: string = "LIKE"
   ): Promise<{ success: boolean; reacted: boolean; type: string }> {
-    return request<{ success: boolean; reacted: boolean; type: string }>(`/posts/${postId}/reactions`, {
+    return request<{ success: boolean; reacted: boolean; type: string }>(`/posts/${encodeURIComponent(postId)}/reactions`, {
       method: "POST",
       body: JSON.stringify({ type }),
     });
@@ -137,13 +137,13 @@ export const forumService = {
 
   // Bookmarks & Follows
   async toggleBookmark(topicId: string): Promise<{ success: boolean; bookmarked: boolean }> {
-    return request<{ success: boolean; bookmarked: boolean }>(`/topics/${topicId}/bookmark`, {
+    return request<{ success: boolean; bookmarked: boolean }>(`/topics/${encodeURIComponent(topicId)}/bookmark`, {
       method: "POST",
     });
   },
 
   async toggleFollow(topicId: string): Promise<{ success: boolean; followed: boolean }> {
-    return request<{ success: boolean; followed: boolean }>(`/topics/${topicId}/follow`, {
+    return request<{ success: boolean; followed: boolean }>(`/topics/${encodeURIComponent(topicId)}/follow`, {
       method: "POST",
     });
   },
@@ -181,7 +181,7 @@ export const forumService = {
     action: string,
     reason?: string
   ): Promise<{ success: boolean; topic: ForumTopic }> {
-    return request<{ success: boolean; topic: ForumTopic }>(`/topics/${topicId}/moderate`, {
+    return request<{ success: boolean; topic: ForumTopic }>(`/topics/${encodeURIComponent(topicId)}/moderate`, {
       method: "POST",
       body: JSON.stringify({ action, reason }),
     });
