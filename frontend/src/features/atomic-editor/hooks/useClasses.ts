@@ -21,7 +21,7 @@ export function useClasses() {
     try {
       const data = await fetchClasses();
       setClasses(data);
-    } catch (err: any) {
+    } catch {
       setError("Unable to load classes.");
     } finally {
       setIsLoading(false);
