@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { protectCookieMutations } from "./middlewares/browser-origin.js";
+import { AppError } from "./utils/app-error.js";
 
 import {
   loginRoutes,
@@ -129,7 +130,7 @@ export function createApplication(
         if (process.env.NODE_ENV !== "production" && (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(requestOrigin))) {
           return callback(null, true);
         }
-        return callback(new Error("CORS origin not allowed"), false);
+        return callback(new AppError("The request origin is not allowed.", 403, "ORIGIN_REJECTED"), false);
       },
       credentials: true,
     })
