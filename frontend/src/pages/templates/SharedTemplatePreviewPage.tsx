@@ -7,6 +7,16 @@ import { useAuth } from "../../context/AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+type PreviewElement = {
+  id?: string;
+  type?: string;
+  content?: React.ReactNode;
+  children?: PreviewElement[];
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error && error.message ? error.message : fallback;
+
 export const SharedTemplatePreviewPage: React.FC = () => {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
@@ -19,27 +29,27 @@ export const SharedTemplatePreviewPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!shareToken) {
-      setError("This template is no longer available.");
-      setIsLoading(false);
-      return;
-    }
+    if (!shareToken) return;
 
+    let cancelled = false;
     const fetchSharedTemplate = async () => {
-      setIsLoading(true);
-      setError(null);
-
       try {
         const data = await getPublicTemplate(API_URL, shareToken);
-        setTemplate(data);
-      } catch (err: any) {
-        setError(err?.message || "This template is no longer available or sharing is disabled.");
+        if (!cancelled) {
+          setTemplate(data);
+          setError(null);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(getErrorMessage(err, "This template is no longer available or sharing is disabled."));
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    fetchSharedTemplate();
+    void fetchSharedTemplate();
+    return () => { cancelled = true; };
   }, [shareToken]);
 
   const handleUseTemplate = async () => {
@@ -70,14 +80,14 @@ export const SharedTemplatePreviewPage: React.FC = () => {
       });
 
       setImportSuccess(true);
-    } catch (err: any) {
-      alert(err?.message || "Failed to add shared template to your library.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to add shared template to your library."));
     } finally {
       setIsImporting(false);
     }
   };
 
-  const renderElementTreeSummary = (items: any[], level = 0) => {
+  const renderElementTreeSummary = (items: PreviewElement[], level = 0): React.ReactNode => {
     if (!items || items.length === 0) return null;
     return (
       <ul className={`space-y-1.5 ${level > 0 ? "ml-4 border-l border-slate-200 pl-3 mt-1.5" : ""}`}>
@@ -104,6 +114,8 @@ export const SharedTemplatePreviewPage: React.FC = () => {
   };
 
   const elements = template?.templateData?.elements || [];
+  const visibleError = shareToken ? error : "This template is no longer available.";
+  const visibleLoading = Boolean(shareToken) && isLoading;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -140,7 +152,7 @@ export const SharedTemplatePreviewPage: React.FC = () => {
       {/* Main Body */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* Loading State */}
-        {isLoading && (
+        {visibleLoading && (
           <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-purple-600 border-t-transparent" />
             <p className="text-sm text-slate-400 font-medium">
@@ -150,7 +162,7 @@ export const SharedTemplatePreviewPage: React.FC = () => {
         )}
 
         {/* Error State */}
-        {!isLoading && error && (
+        {!visibleLoading && visibleError && (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-rose-900/50 bg-rose-950/30 p-8 text-center my-12 space-y-4 max-w-md mx-auto">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-900/50 text-rose-300 text-3xl">
               🚫
@@ -160,7 +172,7 @@ export const SharedTemplatePreviewPage: React.FC = () => {
                 Template Unavailable
               </h2>
               <p className="text-xs text-rose-300/80 leading-relaxed">
-                {error}
+                {visibleError}
               </p>
             </div>
             <button
@@ -198,7 +210,7 @@ export const SharedTemplatePreviewPage: React.FC = () => {
         )}
 
         {/* Template Detail Card */}
-        {!isLoading && !error && template && !importSuccess && (
+        {!visibleLoading && !visibleError && template && !importSuccess && (
           <div className="rounded-3xl border border-slate-800 bg-slate-900/80 shadow-2xl p-6 sm:p-8 space-y-6 backdrop-blur-md">
             {/* Header info */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
@@ -248,7 +260,7 @@ export const SharedTemplatePreviewPage: React.FC = () => {
 
               {elements.length > 0 ? (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 max-h-96 overflow-y-auto">
-                  {renderElementTreeSummary(elements)}
+                  {renderElementTreeSummary(elements as unknown as PreviewElement[])}
                 </div>
               ) : (
                 <div className="p-6 text-center text-xs text-slate-500 rounded-2xl border border-dashed border-slate-800">
