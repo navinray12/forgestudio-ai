@@ -374,6 +374,15 @@ export async function createTable(
 }
 
 /**
+ * Do not hide a missing table with IF EXISTS: a no-op must not be recorded
+ * as a successful destructive migration.
+ */
+export function buildDropTableStatement(tableName: string): string {
+  const safeName = validateIdentifier(tableName);
+  return `DROP TABLE "public"."${safeName}" RESTRICT;`;
+}
+
+/**
  * Drops a table and records the migration in Prisma.
  */
 export async function dropTable(
@@ -383,7 +392,7 @@ export async function dropTable(
 ): Promise<void> {
   const safeName = validateIdentifier(tableName);
   // RESTRICT is PostgreSQL's default: dependent objects must be reviewed and handled explicitly.
-  const ddl = `DROP TABLE IF EXISTS "public"."${safeName}" RESTRICT;`;
+  const ddl = buildDropTableStatement(safeName);
 
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
