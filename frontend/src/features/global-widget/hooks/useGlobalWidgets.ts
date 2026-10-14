@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { GlobalWidget, CreateGlobalWidgetPayload, UpdateGlobalWidgetPayload } from "../types/globalWidget.types";
 import {
   getGlobalWidgets,
@@ -18,22 +18,36 @@ export function useGlobalWidgets({ apiUrl }: UseGlobalWidgetsParams) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [previewWidget, setPreviewWidget] = useState<GlobalWidget | null>(null);
+  const requestId = useRef(0);
+  const mounted = useRef(false);
 
   const fetchWidgets = useCallback(async () => {
+    const request = ++requestId.current;
     setIsLoading(true);
     setError(null);
     try {
       const data = await getGlobalWidgets(apiUrl);
-      setGlobalWidgets(data);
-    } catch (err: any) {
-      setError(err?.message || "Unable to load Global Widgets.");
+      if (mounted.current && request === requestId.current) {
+        setGlobalWidgets(data);
+      }
+    } catch (err: unknown) {
+      if (mounted.current && request === requestId.current) {
+        setError(err instanceof Error ? err.message : "Unable to load Global Widgets.");
+      }
     } finally {
-      setIsLoading(false);
+      if (mounted.current && request === requestId.current) setIsLoading(false);
     }
   }, [apiUrl]);
 
   useEffect(() => {
-    fetchWidgets();
+    mounted.current = true;
+    void Promise.resolve().then(() => {
+      if (mounted.current) void fetchWidgets();
+    });
+    return () => {
+      mounted.current = false;
+      requestId.current += 1;
+    };
   }, [fetchWidgets]);
 
   const filteredWidgets = useMemo(() => {
@@ -56,8 +70,8 @@ export function useGlobalWidgets({ apiUrl }: UseGlobalWidgetsParams) {
         const created = await saveGlobalWidget(apiUrl, payload);
         setGlobalWidgets((prev) => [created, ...prev.filter((w) => w.id !== created.id)]);
         return created;
-      } catch (err: any) {
-        setError(err?.message || "Unable to save Global Widget.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Unable to save Global Widget.");
         throw err;
       } finally {
         setIsSaving(false);
@@ -73,18 +87,16 @@ export function useGlobalWidgets({ apiUrl }: UseGlobalWidgetsParams) {
       try {
         const updated = await updateGlobalWidgetService(apiUrl, id, payload);
         setGlobalWidgets((prev) => prev.map((w) => (w.id === id ? updated : w)));
-        if (previewWidget?.id === id) {
-          setPreviewWidget(updated);
-        }
+        setPreviewWidget((prev) => prev?.id === id ? updated : prev);
         return updated;
-      } catch (err: any) {
-        setError(err?.message || "Unable to update Global Widget.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Unable to update Global Widget.");
         throw err;
       } finally {
         setIsSaving(false);
       }
     },
-    [apiUrl, previewWidget]
+    [apiUrl]
   );
 
   const removeWidget = useCallback(
@@ -93,15 +105,13 @@ export function useGlobalWidgets({ apiUrl }: UseGlobalWidgetsParams) {
       try {
         await deleteGlobalWidgetService(apiUrl, id);
         setGlobalWidgets((prev) => prev.filter((w) => w.id !== id));
-        if (previewWidget?.id === id) {
-          setPreviewWidget(null);
-        }
-      } catch (err: any) {
-        setError(err?.message || "Unable to delete Global Widget.");
+        setPreviewWidget((prev) => prev?.id === id ? null : prev);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Unable to delete Global Widget.");
         throw err;
       }
     },
-    [apiUrl, previewWidget]
+    [apiUrl]
   );
 
   return {
