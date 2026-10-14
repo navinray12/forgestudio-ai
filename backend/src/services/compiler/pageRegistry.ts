@@ -16,6 +16,12 @@ import crypto from "node:crypto";
 import { AppError } from "../../utils/app-error.js";
 import { visualDocumentToIR, pageComponentName } from "./unifiedCompiler.service.js";
 
+export {
+  normalizePageSourcePath,
+  pageRouteIdentity,
+  resolvePageSourceTarget,
+} from "./pageRecognition.js";
+
 export type ProjectFramework = "react" | "nextjs";
 export type RouterProfile = "nextjs-app-router" | "nextjs-pages-router" | "react-vite";
 
