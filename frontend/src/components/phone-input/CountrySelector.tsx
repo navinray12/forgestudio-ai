@@ -36,15 +36,16 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
     };
   }, [isOpen]);
 
-  // Focus search input on open
+  // Focus search input on open and reset the query after the dropdown closes.
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (isOpen) {
         searchInputRef.current?.focus();
-      }, 50);
-    } else {
-      setSearchQuery("");
-    }
+      } else {
+        setSearchQuery("");
+      }
+    }, isOpen ? 50 : 0);
+    return () => window.clearTimeout(timeoutId);
   }, [isOpen]);
 
   // Handle keyboard navigation
