@@ -1,4 +1,8 @@
-export interface CustomCodeSnippetData { name: string; priority: number; location: 'head' | 'body-start' | 'body-end'; codeType: 'css' | 'html' | 'javascript'; conditions?: any; scope?: string; enabled?: boolean; } export interface CustomCodeSnippet { id: string; status: string; draft?: CustomCodeSnippetData; published?: CustomCodeSnippetData; }
+export interface CustomCodeSnippetData { name: string; priority: number; location: 'head' | 'body-start' | 'body-end'; codeType: 'css' | 'html' | 'javascript'; conditions?: {
+    excludes?: { type: string; operator: string; value: string }[];
+    includes?: { type: string; operator: string; value: string }[];
+    applyTo?: string;
+}; scope?: string; enabled?: boolean; } export interface CustomCodeSnippet { id: string; status: string; draft?: CustomCodeSnippetData; published?: CustomCodeSnippetData; }
 
 export interface OrderedSnippetData {
     id: string;
@@ -43,7 +47,7 @@ export function getApplicableCustomCode(
         } else {
             let isExcluded = false;
             if (conditions.excludes && conditions.excludes.length > 0) {
-                isExcluded = conditions.excludes.some((rule: any) => {
+                isExcluded = conditions.excludes.some((rule) => {
                     if (rule.type === "page") {
                         return rule.operator === "is" ? currentPageId === rule.value : currentPageId !== rule.value;
                     }
@@ -55,7 +59,7 @@ export function getApplicableCustomCode(
             else if (conditions.applyTo === "specific") {
                 if (!conditions.includes || conditions.includes.length === 0) applies = false;
                 else {
-                    applies = conditions.includes.some((rule: any) => {
+                    applies = conditions.includes.some((rule) => {
                         if (rule.type === "page") {
                             return rule.operator === "is" ? currentPageId === rule.value : currentPageId !== rule.value;
                         }
