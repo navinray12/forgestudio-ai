@@ -16,18 +16,18 @@ export function useAtomicLoop() {
     try {
       const list = AtomicLoopService.getLoops();
       setLoops(list);
-      if (list.length > 0 && !activeLoop) {
-        setActiveLoop(list[0]);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load Atomic Loops.");
+      setActiveLoop((previous) => list.find((item) => item.id === previous?.id) ?? list[0] ?? null);
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load Atomic Loops.");
     } finally {
       setIsLoading(false);
     }
-  }, [activeLoop]);
+  }, []);
 
   useEffect(() => {
-    fetchLoops();
+    // Cancel stale initial loads on StrictMode remount or cleanup.
+    const timer = window.setTimeout(fetchLoops, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchLoops]);
 
   const filteredLoops = useMemo(() => {
@@ -49,8 +49,8 @@ export function useAtomicLoop() {
       setLoops((prev) => [...prev, created]);
       setActiveLoop(created);
       return created;
-    } catch (err: any) {
-      setError(err?.message || "Failed to create Atomic Loop.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create Atomic Loop.");
       throw err;
     }
   };
@@ -61,8 +61,8 @@ export function useAtomicLoop() {
       const updated = AtomicLoopService.updateLoop(activeLoop.id, payload);
       setLoops((prev) => prev.map((l) => (l.id === activeLoop.id ? updated : l)));
       setActiveLoop(updated);
-    } catch (err: any) {
-      setError(err?.message || "Failed to update Atomic Loop.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to update Atomic Loop.");
     }
   };
 
@@ -74,8 +74,8 @@ export function useAtomicLoop() {
       if (activeLoop?.id === id) {
         setActiveLoop(remaining[0] || null);
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete Atomic Loop.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to delete Atomic Loop.");
     }
   };
 
