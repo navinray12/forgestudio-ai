@@ -1,6 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { downloadAuthenticatedFile, API_ORIGIN } from "../../../utils/downloadFile";
 
+type ExportTab = "html" | "css" | "js" | "optimized" | "semantic" | "react" | "tailwind" | "nextjs";
+
+interface CodePreview {
+  html?: string;
+  css?: string;
+  js?: string;
+  optimizedDomHtml?: string;
+  semanticHtml?: string;
+  reactCode?: { appTsx?: string };
+  tailwindCode?: { html?: string };
+  nextJsCode?: { pageTsx?: string };
+  stats?: { totalNodes?: number; estimatedSizeKb?: number };
+}
+
+const exportTabs: Array<{ id: ExportTab; label: string }> = [
+  { id: "html", label: "HTML5" },
+  { id: "css", label: "CSS3" },
+  { id: "js", label: "JavaScript" },
+  { id: "optimized", label: "Optimized DOM" },
+  { id: "semantic", label: "Semantic HTML" },
+  { id: "react", label: "React TSX" },
+  { id: "tailwind", label: "Tailwind CSS" },
+  { id: "nextjs", label: "Next.js App Router" },
+];
+
 interface CodeExportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,37 +39,47 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
   websiteId,
   websiteName = "ForgeStudio Site",
 }) => {
-  const [activeTab, setActiveTab] = useState<"html" | "css" | "js" | "optimized" | "semantic" | "react" | "tailwind" | "nextjs">("html");
-  const [codeData, setCodeData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<ExportTab>("html");
+  const [codeData, setCodeData] = useState<CodePreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !websiteId) return;
+    const controller = new AbortController();
 
-    setLoading(true);
-    setError(null);
-
-    const token = localStorage.getItem("token");
-    fetch(`${API_ORIGIN}/api/v1/websites/${websiteId}/export/preview`, {
-      credentials: "include",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    })
-      .then((res) => res.json())
-      .then((data) => {
+    const loadPreview = async () => {
+      if (controller.signal.aborted) return;
+      setLoading(true);
+      setError(null);
+      setCodeData(null);
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_ORIGIN}/api/v1/websites/${encodeURIComponent(websiteId)}/export/preview`, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Code preview request failed (HTTP ${response.status})`);
+        const data: { success?: boolean; code?: CodePreview; message?: string } = await response.json();
+        if (controller.signal.aborted) return;
         if (data.success && data.code) {
           setCodeData(data.code);
         } else {
           setError(data.message || "Failed to generate code preview.");
         }
-      })
-      .catch((err) => {
-        setError(err.message || "Network error loading code preview.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      } catch (err: unknown) {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Network error loading code preview.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+
+    void Promise.resolve().then(loadPreview);
+    return () => controller.abort();
   }, [isOpen, websiteId]);
 
   if (!isOpen) return null;
@@ -90,7 +125,7 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
+    } catch {
       alert("Failed to copy code to clipboard");
     }
   };
@@ -179,19 +214,10 @@ export const CodeExportModal: React.FC<CodeExportModalProps> = ({
           borderBottom: "1px solid #374151",
           overflowX: "auto",
         }}>
-          {[
-            { id: "html", label: "HTML5" },
-            { id: "css", label: "CSS3" },
-            { id: "js", label: "JavaScript" },
-            { id: "optimized", label: "Optimized DOM" },
-            { id: "semantic", label: "Semantic HTML" },
-            { id: "react", label: "React TSX" },
-            { id: "tailwind", label: "Tailwind CSS" },
-            { id: "nextjs", label: "Next.js App Router" },
-          ].map((tab) => (
+          {exportTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               style={{
                 padding: "6px 14px",
                 borderRadius: "6px",
