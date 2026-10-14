@@ -413,7 +413,7 @@ export function initMotionRuntime(root: HTMLElement | Document = document): Moti
     const rawInteractions = el.getAttribute("data-interactions");
     if (!rawInteractions) return;
 
-    let rules: InteractionRule[] = [];
+    let rules: InteractionRule[];
     try {
       rules = JSON.parse(rawInteractions);
     } catch {
