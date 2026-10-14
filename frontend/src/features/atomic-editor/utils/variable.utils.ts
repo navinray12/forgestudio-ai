@@ -52,7 +52,7 @@ export async function copyVariableReference(key: string): Promise<boolean> {
       await navigator.clipboard.writeText(ref);
       return true;
     }
-  } catch (e) {
+  } catch {
     // Fallback if clipboard API is restricted
   }
   return false;
