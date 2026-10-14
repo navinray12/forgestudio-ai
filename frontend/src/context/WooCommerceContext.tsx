@@ -300,7 +300,7 @@ export const WooCommerceProvider: React.FC<{
     // Dispatch POST to commerce orders endpoint
     if (websiteId) {
       try {
-        await fetch(`/api/websites/${websiteId}/commerce/orders`, {
+        const response = await fetch(`/api/websites/${websiteId}/commerce/orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -318,8 +318,14 @@ export const WooCommerceProvider: React.FC<{
             })),
           }),
         });
+        if (!response.ok) {
+          throw new Error(`Commerce order was not accepted (HTTP ${response.status}).`);
+        }
       } catch (err) {
-        console.warn("Could not dispatch order to commerce backend endpoint", err);
+        // Keep the cart intact; an unconfirmed server order must not be reported
+        // as successfully placed or cause the buyer to lose their selections.
+        console.error("Could not submit commerce order", err);
+        throw err instanceof Error ? err : new Error("Commerce order submission failed.");
       }
     }
 
