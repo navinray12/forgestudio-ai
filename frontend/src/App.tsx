@@ -150,6 +150,9 @@ function SignupRoute() {
 
   if (user) {
     switch (user.role) {
+      case "PLATFORM_ADMIN":
+        return <Navigate to="/platform-control" replace />;
+
       case "SUPER_ADMIN":
         return (
           <Navigate
