@@ -1,4 +1,4 @@
-import type { FontMetadata, FontCategory, FontSearchFilter } from './types';
+import type { FontMetadata, FontSearchFilter } from './types';
 import { FontRegistry } from './FontRegistry';
 import { loadFontFamily } from './FontLoader';
 
@@ -31,7 +31,11 @@ class FontServiceClass {
   private saveFavorites() {
     try {
       localStorage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(this.favorites)));
-    } catch (e) {}
+    } catch (error) {
+      // Private browsing and storage quotas can block persistence.
+      // Keep the in-memory font selection usable and report the failure.
+      console.warn('Unable to save font preferences:', error);
+    }
   }
 
   private saveRecentlyUsed() {
