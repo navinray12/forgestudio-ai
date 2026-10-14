@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -79,4 +79,18 @@ test("Schema Studio pagination keeps SQL and response bounds consistent", () => 
   for (const [page, limit] of [["-1", "20"], ["1.5", "10"], ["NaN", "10"], ["1", "501"], ["1", "0"], ["1000001", "1"], [["2"], "20"], [1, Infinity]]) {
     assert.throws(() => normalizeStudioPagination(page, limit), /Invalid (page|limit)/);
   }
+});
+
+test("Schema Studio validates requested sort instead of silently falling back", () => {
+  const details = { columns: [
+    { name: "id", isPrimaryKey: true },
+    { name: "display_name", isPrimaryKey: false },
+  ] };
+  assert.equal(buildStudioOrderClause(details, "display_name", "DESC"), 'ORDER BY "display_name" DESC, "id" ASC');
+  assert.equal(buildStudioOrderClause(details, "id", "DESC"), 'ORDER BY "id" DESC');
+  assert.equal(buildStudioOrderClause(details), 'ORDER BY "id" ASC');
+  assert.throws(() => buildStudioOrderClause(details, "missing"), /Unknown table sort column/);
+  assert.throws(() => buildStudioOrderClause(details, "display_name", "SIDEWAYS"), /Invalid sort order/);
+  assert.throws(() => buildStudioOrderClause(details, 'id"; DROP TABLE users', "ASC"), /Invalid SQL identifier/);
+  assert.equal(buildStudioOrderClause({ columns: [{ name: "label", isPrimaryKey: false }] }, "label"), 'ORDER BY "label" ASC');
 });

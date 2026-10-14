@@ -440,6 +440,32 @@ export function normalizeStudioPagination(
 }
 
 /**
+ * Validate sort keys against observed columns; never silently report one sort
+ * while executing another. A single primary key breaks ties for stable paging.
+ */
+export function buildStudioOrderClause(
+  details: Pick<TableDetails, "columns">,
+  sortBy?: string,
+  sortOrder?: string
+): string {
+  if (sortOrder !== undefined && sortOrder !== "ASC" && sortOrder !== "DESC") {
+    throw new AppError("Invalid sort order", 400, "INVALID_SORT_ORDER");
+  }
+  const primaryKeys = details.columns.filter((col) => col.isPrimaryKey);
+  const singleKey = primaryKeys.length === 1 ? validateIdentifier(primaryKeys[0].name) : null;
+  if (sortBy !== undefined && sortBy !== "") {
+    const safeSortBy = validateIdentifier(sortBy);
+    if (!details.columns.some((col) => col.name === safeSortBy)) {
+      throw new AppError(`Unknown table sort column "${safeSortBy}"`, 400, "INVALID_SORT_COLUMN");
+    }
+    const direction = sortOrder || "ASC";
+    const tieBreak = singleKey && singleKey !== safeSortBy ? `, "${singleKey}" ASC` : "";
+    return `ORDER BY "${safeSortBy}" ${direction}${tieBreak}`;
+  }
+  return singleKey ? `ORDER BY "${singleKey}" ASC` : "";
+}
+
+/**
  * Returns paginated table rows with sorting.
  */
 export async function getTableRows(
@@ -449,7 +475,7 @@ export async function getTableRows(
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: "ASC" | "DESC";
+    sortOrder?: string;
   },
   environment: DatabaseEnvironment
 ): Promise<{ rows: any[]; total: number }> {
@@ -457,17 +483,7 @@ export async function getTableRows(
   const { limit, offset } = normalizeStudioPagination(params.page, params.limit);
 
   const details = await getTableDetails(projectId, safeTable, environment);
-  const validColumns = new Set(details.columns.map((c) => c.name));
-
-  let orderClause = "";
-  if (params.sortBy && validColumns.has(params.sortBy)) {
-    const safeSortBy = validateIdentifier(params.sortBy);
-    const order = params.sortOrder === "DESC" ? "DESC" : "ASC";
-    orderClause = `ORDER BY "${safeSortBy}" ${order}`;
-  } else if (details.columns.some((c) => c.isPrimaryKey)) {
-    const pk = details.columns.find((c) => c.isPrimaryKey)!.name;
-    orderClause = `ORDER BY "${pk}" ASC`;
-  }
+  const orderClause = buildStudioOrderClause(details, params.sortBy, params.sortOrder);
 
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const client = await pool.connect();

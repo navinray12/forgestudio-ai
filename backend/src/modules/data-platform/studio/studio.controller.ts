@@ -139,7 +139,7 @@ export async function getTableRowsHandler(req: Request, res: Response, next: Nex
 
     const { page, limit } = normalizeStudioPagination(req.query.page, req.query.limit);
     const sortBy = req.query.sortBy as string | undefined;
-    const sortOrder = (req.query.sortOrder as "ASC" | "DESC") || "ASC";
+    const sortOrder = req.query.sortOrder === undefined ? undefined : String(req.query.sortOrder);
 
     const result = await getTableRows(projectId, tableName, { page, limit, sortBy, sortOrder }, env);
 
