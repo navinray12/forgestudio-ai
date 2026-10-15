@@ -18,6 +18,9 @@ export default function CustomPostTypeBuilder() {
     const [fields, setFields] = useState<any[]>([]);
 
     const [saving, setSaving] = useState(false);
+    // A successful type creation must survive a later field-save failure.
+    // Retrying against the same ID prevents duplicate post types.
+    const [createdCptId, setCreatedCptId] = useState<string | null>(null);
     const [loading, setLoading] = useState(Boolean(cptId));
     const [loadError, setLoadError] = useState<string | null>(null);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -78,7 +81,7 @@ export default function CustomPostTypeBuilder() {
         try {
 
             // 1. Create CPT
-            let currentCptId = cptId;
+            let currentCptId = cptId || createdCptId;
             if (!currentCptId) {
                 const res = await fetch(`${apiUrl}/api/cpt/websites/${websiteId}/types`, {
                     method: "POST",
@@ -86,9 +89,12 @@ export default function CustomPostTypeBuilder() {
                     credentials: "include",
                     body: JSON.stringify({ name, singular, plural, slug, description, hasArchive: true })
                 });
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error?.message || "Failed");
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data?.success || !data?.data?.id) {
+                    throw new Error(data?.error?.message || "Could not create this content type");
+                }
                 currentCptId = data.data.id;
+                setCreatedCptId(currentCptId);
             }
 
             // 2. Save Fields Sync
@@ -115,7 +121,7 @@ export default function CustomPostTypeBuilder() {
         }
     };
 
-    const isNew = !cptId;
+    const isNew = !cptId && !createdCptId;
 
     return (
         <div className="p-8 max-w-5xl mx-auto flex flex-col lg:flex-row gap-8">
@@ -148,6 +154,11 @@ export default function CustomPostTypeBuilder() {
                         {loading && <p role="status" className="text-sm text-slate-600">Loading saved fields…</p>}
                         {loadError && <p role="alert" className="text-sm text-red-600">{loadError}</p>}
                         {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
+                        {createdCptId && (
+                            <p role="status" className="text-sm text-amber-700">
+                                Content type created; field configuration still needs saving. Retry will update this content type, not create another.
+                            </p>
+                        )}}
                         {savedNotice && <p role="status" className="text-sm text-amber-700">{savedNotice}</p>}
                         <button disabled={saving || loading || Boolean(loadError)} type="submit" className="mt-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
                             {saving ? "Committing..." : "Save Configuration"}
