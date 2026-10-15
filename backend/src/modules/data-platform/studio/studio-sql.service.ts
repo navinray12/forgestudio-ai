@@ -59,6 +59,26 @@ function normalizePostgreSqlError(err: any): { message: string; code: string; po
 }
 
 /**
+ * Production writes are an expressly confirmed operation, not just a boolean
+ * toggled by a browser or supplied to the API. Called before opening a DB pool.
+ * The project role and environment are checked separately by the controller.
+ */
+export function assertProductionSqlWriteConfirmation(
+  environment: DatabaseEnvironment,
+  allowWrite: boolean,
+  confirmation: unknown
+): void {
+  if (environment !== "PRODUCTION" || !allowWrite) return;
+  if (confirmation !== "PRODUCTION") {
+    throw new AppError(
+      'To execute production SQL with write access, enter "PRODUCTION" to confirm the target.',
+      409,
+      "PRODUCTION_SQL_CONFIRMATION_REQUIRED"
+    );
+  }
+}
+
+/**
  * Executes an arbitrary user SQL query in a sandboxed, timeout-guarded tenant transaction.
  */
 export async function executeUserQuery(

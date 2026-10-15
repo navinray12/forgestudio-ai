@@ -12,7 +12,7 @@ import {
   normalizeStudioPagination,
   mutateTableRow,
 } from "./studio-schema.service.js";
-import { executeUserQuery } from "./studio-sql.service.js";
+import { executeUserQuery, assertProductionSqlWriteConfirmation } from "./studio-sql.service.js";
 import {
   verifyProjectAccess,
   resolveExplicitEnvironment as resolveEnvironment,
@@ -233,6 +233,7 @@ export async function executeQueryHandler(req: Request, res: Response, next: Nex
     // owner/admin explicitly opts in to writes.
     const allowWrite = req.body?.allowWrite === true;
     if (allowWrite) assertCanModify(env, access, "run write queries");
+    assertProductionSqlWriteConfirmation(env, allowWrite, req.body?.confirmEnvironment);
     const readOnly = env === "PRODUCTION" && !allowWrite;
 
     const { sql } = req.body;
