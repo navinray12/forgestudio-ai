@@ -241,6 +241,13 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
                   Retry
                 </button>
               </div>
+              {run.errorCode === "WRITE_FAILED" && (
+                <p role="status" className="text-amber-300">
+                  {run.files.filter((file) => file.written).length} of {run.files.length} generated files
+                  were verified before the interruption. Retry checks those exact saved hashes and
+                  resumes only if they remain unchanged; user edits will not be overwritten.
+                </p>
+              )}
               {run.errorCode === "SOURCE_CONFLICT" && (
                 <p role="alert" className="text-amber-300">
                   Existing source was preserved. Review the affected files in Code Workspace and resolve
