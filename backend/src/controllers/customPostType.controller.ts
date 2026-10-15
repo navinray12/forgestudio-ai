@@ -231,6 +231,32 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
             if (matchedIds.size !== matches.filter((entry) => entry.match).length) {
                 throw new AppError("A saved field was referenced more than once", 400, "DUPLICATE_FIELD_ID");
             }
+            // Existing entries include drafts and trash: neither may lose a historical binding.
+            // A field's storage key/type and newly imposed required constraints need an
+            // explicit, previewable data migration once the post type has content.
+            const entryCount = await tx.customEntry.count({ where: { postTypeId: postType.id } });
+            if (entryCount > 0) {
+                for (const { f, match } of matches) {
+                    if (match && (match.slug !== f.key || match.type !== f.type)) {
+                        throw new AppError(
+                            `Field "${match.slug}" has saved entries; renaming its key or changing its type requires an approved migration`,
+                            409,
+                            "FIELD_MIGRATION_REQUIRED"
+                        );
+                    }
+                    const wasRequired = match
+                        ? Boolean((match.config as Record<string, any> | null)?.required)
+                        : false;
+                    if (f.required && !wasRequired) {
+                        throw new AppError(
+                            `Field "${f.key}" cannot become required while existing entries may lack values; plan a backfill first`,
+                            409,
+                            "FIELD_BACKFILL_REQUIRED"
+                        );
+                    }
+                }
+            }
+
             const retained = existing.filter((f) => !matchedIds.has(f.id));
             const retainedSlugs = new Set(retained.map((f) => f.slug));
             for (const { f } of matches) {
