@@ -97,8 +97,13 @@ export async function createCustomPostTypeHandler(req: Request, res: Response, n
         const { name, singular, plural, slug, description, hasArchive } = req.body ?? {};
 
         const normalizedSlug = String(slug || "").toLowerCase().trim();
-        if (!name || !normalizedSlug) {
+        if (typeof name !== "string" || !name.trim() || !normalizedSlug) {
             throw new AppError("name and slug are required", 400, "INVALID_INPUT");
+        }
+        // URLs cannot contain path separators, query fragments or whitespace.
+        // Keep server and CMS builder slug rules aligned.
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+            throw new AppError("Slug must contain lowercase letters, numbers or single hyphens between words", 400, "INVALID_SLUG");
         }
 
         const existing = await prisma.customPostType.findFirst({ where: { websiteId, slug: normalizedSlug } });
