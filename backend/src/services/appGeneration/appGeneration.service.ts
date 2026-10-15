@@ -326,6 +326,7 @@ export class AppGenerationService {
           encoding: "utf-8",
           isGenerated: true,
           expectedVersion: expectedVersions.get(file.path),
+          requireAbsent: !expectedVersions.has(file.path),
           authorId: run.requestedById,
           reason: `Application generation run ${run.id}`,
         });
