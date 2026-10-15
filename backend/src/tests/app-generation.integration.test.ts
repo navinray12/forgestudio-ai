@@ -365,6 +365,41 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(run.files.some((item) => item.written)).toBe(false);
   });
 
+  it("checks persisted source without overwriting edits or mislabelling an old manifest", async () => {
+    const project = await newProject();
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Approved template does not use AI"); },
+      filesystem: fs,
+    });
+    const run = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(run.status).toBe("SOURCE_WRITTEN");
+    const initial = await service.verifySource(project.id, run.id);
+    expect(initial.allMatch).toBe(true);
+    expect(initial.files.every((file) => file.result === "MATCH")).toBe(true);
+
+    const changedPath = initial.files[0].path;
+    const original = await fs.readFile(project.id, changedPath);
+    await fs.writeFile(project.id, changedPath, {
+      content: original.content + "\\n// owner correction\\n",
+      expectedVersion: original.version,
+      authorId: users.owner.id,
+    });
+    const afterEdit = await service.verifySource(project.id, run.id);
+    expect(afterEdit.allMatch).toBe(false);
+    expect(afterEdit.files.find((file) => file.path === changedPath)?.result).toBe("CHANGED");
+    expect((await fs.readFile(project.id, changedPath)).content).toContain("owner correction");
+    expect((await service.getRun(project.id, run.id)).status).toBe("SOURCE_WRITTEN");
+
+    const removedPath = initial.files[1].path;
+    await fs.deleteFile(project.id, removedPath, users.owner.id);
+    const afterRemoval = await service.verifySource(project.id, run.id);
+    expect(afterRemoval.files.find((file) => file.path === removedPath)?.result).toBe("MISSING");
+    await expect(service.verifySource(project.id, randomUUID())).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("does not overwrite a new source file created after generation preflight", async () => {
     const project = await newProject();
     const protectedPath = "forge-app/server/task.routes.ts";

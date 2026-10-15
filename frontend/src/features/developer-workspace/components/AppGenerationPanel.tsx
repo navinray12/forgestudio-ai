@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Sparkles, LayoutTemplate, RefreshCw, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
-import { developerPlatformService, type AppGenerationRun } from "../services/developerPlatformService";
+import { developerPlatformService, type AppGenerationRun, type GenerationSourceVerification } from "../services/developerPlatformService";
 
 interface AppGenerationPanelProps {
   projectId: string;
@@ -31,6 +31,9 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
   const [runs, setRuns] = useState<AppGenerationRun[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verifications, setVerifications] = useState<Record<string, GenerationSourceVerification>>({});
+  const [verificationErrors, setVerificationErrors] = useState<Record<string, string>>({});
+  const [verifying, setVerifying] = useState<string | null>(null);
   const pollTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
@@ -45,6 +48,8 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
   }, [projectId]);
 
   useEffect(() => {
+    setVerifications({});
+    setVerificationErrors({});
     void refresh();
     developerPlatformService
       .listAppGenerationTemplates(projectId)
@@ -87,6 +92,19 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
       await refresh();
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  const verifySource = async (runId: string) => {
+    setVerifying(runId);
+    setVerificationErrors((previous) => ({ ...previous, [runId]: "" }));
+    try {
+      const { verification } = await developerPlatformService.verifyAppGenerationSource(projectId, runId);
+      setVerifications((previous) => ({ ...previous, [runId]: verification }));
+    } catch (err: any) {
+      setVerificationErrors((previous) => ({ ...previous, [runId]: err?.message || "Source verification failed" }));
+    } finally {
+      setVerifying(null);
     }
   };
 
@@ -181,7 +199,37 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
             </div>
           )}
           {run.status === "SOURCE_WRITTEN" && (
-            <div className="text-slate-400">{run.files.filter((f) => f.written).length} files written.</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 text-slate-400">
+                <span>{run.files.filter((f) => f.written).length} files written; build and deployment not verified.</span>
+                <button
+                  type="button"
+                  onClick={() => void verifySource(run.id)}
+                  disabled={verifying !== null}
+                  className="shrink-0 px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-200 disabled:opacity-50"
+                >
+                  {verifying === run.id ? "Checking…" : "Verify saved source"}
+                </button>
+              </div>
+              {verificationErrors[run.id] && <p role="alert" className="text-rose-400">{verificationErrors[run.id]}</p>}
+              {verifications[run.id] && (
+                <div className={verifications[run.id].allMatch ? "text-emerald-400" : "text-amber-400"}>
+                  <p role="status">
+                    {verifications[run.id].allMatch
+                      ? "Saved files match this generation manifest. Build and deployment remain unverified."
+                      : "Saved source no longer fully matches this generation manifest; no files were overwritten."}
+                  </p>
+                  <details className="mt-1 text-slate-300">
+                    <summary className="cursor-pointer">File verification ({verifications[run.id].files.length})</summary>
+                    <ul className="mt-1 space-y-1 font-mono">
+                      {verifications[run.id].files.map((file) => (
+                        <li key={file.path}>{file.result}: {file.path}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </div>
+              )}
+            </div>
           )}
           {run.status === "FAILED" && (
             <div className="flex items-start justify-between gap-2">

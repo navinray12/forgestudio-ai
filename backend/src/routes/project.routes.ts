@@ -4,6 +4,7 @@ import {
   createAppGenerationHandler,
   listAppGenerationsHandler,
   getAppGenerationHandler,
+  verifyAppGenerationSourceHandler,
   retryAppGenerationHandler,
   listAppGenerationTemplatesHandler,
 } from "../controllers/appGeneration.controller.js";
@@ -334,6 +335,7 @@ router.get("/:id/app-generation-templates", listAppGenerationTemplatesHandler);
 router.get("/:id/app-generations", listAppGenerationsHandler);
 router.post("/:id/app-generations", createAppGenerationHandler);
 router.get("/:id/app-generations/:runId", getAppGenerationHandler);
+router.get("/:id/app-generations/:runId/source-verification", verifyAppGenerationSourceHandler);
 router.post("/:id/app-generations/:runId/retry", retryAppGenerationHandler);
 
 // Blueprint Point 39: General-Purpose Application Data-Model & Introspection
