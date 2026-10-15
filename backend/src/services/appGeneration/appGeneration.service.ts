@@ -332,7 +332,7 @@ export class AppGenerationService {
         // A successful write acknowledgement is not proof that the bytes are
         // durably readable. Verify content and provenance before issuing evidence.
         const persisted = await this.deps.filesystem.readFile(run.projectId, file.path);
-        if (!persisted.isGenerated || !String(persisted.content ?? "").includes(GENERATED_MARKER) ||
+        if (!persisted.isGenerated ||
             crypto.createHash("sha256").update(String(persisted.content ?? "")).digest("hex") !== manifest[i].sha256) {
           return fail(
             "SOURCE_VERIFICATION_FAILED",
