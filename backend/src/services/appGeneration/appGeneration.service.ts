@@ -345,7 +345,7 @@ export class AppGenerationService {
         const written = manifest.filter((m) => m.written).length;
         return fail(
           "WRITE_FAILED",
-          `Writing ${file.path} failed (${err?.code || "ERROR"}: ${err?.message || err}); ${written} of ${files.length} files were written.`,
+          `Writing generated file failed; ${written} of ${files.length} files were verified. Review restricted server diagnostics before retrying.`,
           { files: manifest }
         );
       }
@@ -364,7 +364,7 @@ export class AppGenerationService {
       provider = this.deps.providerFactory();
     } catch (err: any) {
       const failure = await updateRun(run.id, {
-        status: "FAILED", errorCode: err?.code || "AI_NOT_CONFIGURED", errorMessage: err?.message || "AI provider unavailable",
+        status: "FAILED", errorCode: "AI_NOT_CONFIGURED", errorMessage: "AI generation provider is unavailable or not configured.",
         completedAt: new Date().toISOString(),
       });
       return { run, model: null, failure };
@@ -394,12 +394,12 @@ export class AppGenerationService {
       } catch (err: any) {
         const failure = await updateRun(run.id, {
           status: "FAILED",
-          errorCode: err?.code || "AI_PROVIDER_UNAVAILABLE",
-          errorMessage: err?.message || "AI provider request failed",
+          errorCode: "AI_PROVIDER_UNAVAILABLE",
+          errorMessage: "AI provider request failed. Check the provider configuration and retry.",
           providerCalls: attempt + 1,
           repairAttempts: attempt,
           inputTokens, outputTokens, providerRequestIds: requestIds,
-          diagnostics: [...diagnostics, { severity: "error", message: `Provider request ${attempt + 1} failed: ${err?.message || err}` }],
+          diagnostics: [...diagnostics, { severity: "error", message: `Provider request ${attempt + 1} failed; provider error details were withheld from the run record.` }],
           completedAt: new Date().toISOString(),
         });
         return { run, model: null, failure };
