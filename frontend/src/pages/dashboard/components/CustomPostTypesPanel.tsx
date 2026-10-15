@@ -44,6 +44,9 @@ export default function CustomPostTypesPanel() {
     const [activeCpt, setActiveCpt] = useState<CPT | null>(null);
     const [fields, setFields] = useState<CustomField[]>([]);
     const [fieldsLoading, setFieldsLoading] = useState(false);
+    const [fieldsRevision, setFieldsRevision] = useState<string | null>(null);
+    const [fieldError, setFieldError] = useState<string | null>(null);
+    const [fieldNotice, setFieldNotice] = useState<string | null>(null);
     const [globalError, setGlobalError] = useState<string | null>(null);
 
     // Create form
@@ -108,12 +111,17 @@ export default function CustomPostTypesPanel() {
 
     const loadFields = async (cpt: CPT) => {
         setActiveCpt(cpt); setFieldsLoading(true); setView("fields");
+        setFieldError(null); setFieldNotice(null); setFieldsRevision(null); setFields([]);
         try {
             // Route: GET /api/cpt/types/:cptId/fields
             const r = await fetch(`${apiUrl}/api/cpt/types/${cpt.id}/fields`, { credentials: "include" });
             const d = await r.json();
-            if (r.ok) setFields(d.data ?? []);
-        } catch { /* show empty */ }
+            if (!r.ok || !d.success || !Array.isArray(d.data) || typeof d.fieldsRevision !== "string") {
+                throw new Error(d.error?.message || "Could not load saved fields safely.");
+            }
+            setFields(d.data);
+            setFieldsRevision(d.fieldsRevision);
+        } catch (error: any) { setFieldError(error?.message || "Could not load saved fields."); }
         finally { setFieldsLoading(false); }
     };
 
@@ -123,30 +131,36 @@ export default function CustomPostTypesPanel() {
         setFields(prev => prev.map((f, idx) => idx === i ? { ...f, ...patch } : f));
 
     const removeField = (i: number) =>
-        setFields(prev => prev.filter((_, idx) => idx !== i).map((f, idx) => ({ ...f, order: idx })));
+        setFields(prev => prev[i]?.id ? prev : prev.filter((_, idx) => idx !== i).map((f, idx) => ({ ...f, order: idx })));
 
     const saveFields = async () => {
-        if (!activeCpt) return;
+        if (!activeCpt || !fieldsRevision || fieldsLoading) return;
+        setFieldError(null);
+        setFieldNotice(null);
         setSavingFields(true);
         try {
             // Route: POST /api/cpt/types/:cptId/fields
             const r = await fetch(`${apiUrl}/api/cpt/types/${activeCpt.id}/fields`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ fields: fields.map((f, i) => ({ ...f, order: i })) }),
+                body: JSON.stringify({
+                    fields: fields.map((f, i) => ({ ...f, order: i })),
+                    expectedFieldsRevision: fieldsRevision,
+                }),
             });
             const d = await r.json().catch(() => ({}));
-            if (r.ok) {
-                if (Array.isArray(d.data)) setFields(d.data);
+            if (r.ok && d.success && Array.isArray(d.data) && typeof d.fieldsRevision === "string") {
+                setFields(d.data);
+                setFieldsRevision(d.fieldsRevision);
                 const retained: string[] = d.migrationPlan?.retained ?? [];
-                alert(retained.length > 0
-                    ? `Fields saved. Removing fields is not applied automatically, so these were kept: ${retained.join(", ")}.`
-                    : "Fields saved!");
-                loadCpts(); // refresh counts
+                setFieldNotice(retained.length > 0
+                    ? `Fields saved. Existing protected fields retained: ${retained.join(", ")}.`
+                    : "Fields saved successfully.");
+                void loadCpts(); // refresh counts
             } else {
-                alert(d.error?.message || "Save failed.");
+                setFieldError(d.error?.message || "Save failed. Your field edits remain on this screen.");
             }
-        } catch { alert("Network error."); }
+        } catch { setFieldError("Network error; your edits were not discarded."); }
         finally { setSavingFields(false); }
     };
 
@@ -178,6 +192,11 @@ export default function CustomPostTypesPanel() {
                 </div>
             </div>
 
+            {fieldError && <p role="alert" className="text-sm text-red-700">{fieldError}</p>}
+            {fieldNotice && <p role="status" className="text-sm text-emerald-700">{fieldNotice}</p>}
+            {fieldError?.includes("changed since this editor") && (
+                <p className="text-xs text-amber-700">A newer schema was saved elsewhere. Copy any unsaved edits before re-opening the field editor to compare.</p>
+            )}
             {fieldsLoading ? (
                 <div className="text-xs text-slate-400 text-center py-8">Loading fields…</div>
             ) : (
@@ -187,11 +206,11 @@ export default function CustomPostTypesPanel() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Field Name</label>
-                                    <input type="text" value={f.name} onChange={e => updateField(i, { name: e.target.value, key: autoSlug(e.target.value) })} placeholder="Field Name" className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                                    <input type="text" value={f.name} onChange={e => updateField(i, { name: e.target.value, ...(!f.id ? { key: autoSlug(e.target.value).replace(/-/g, "_") } : {}) })} placeholder="Field Name" className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-300" />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Key</label>
-                                    <input type="text" value={f.key} onChange={e => updateField(i, { key: autoSlug(e.target.value) })} placeholder="field_key" className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                                    <input type="text" value={f.key} onChange={e => updateField(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })} placeholder="field_key" className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Type</label>
@@ -204,15 +223,20 @@ export default function CustomPostTypesPanel() {
                                         <input type="checkbox" checked={f.required} onChange={e => updateField(i, { required: e.target.checked })} className="w-3.5 h-3.5" />
                                         <span className="text-[11px] font-semibold text-slate-600">Required</span>
                                     </label>
-                                    <button onClick={() => removeField(i)} className="ml-auto h-8 px-3 rounded-lg border border-red-200 text-[11px] font-bold text-red-500 hover:bg-red-50 transition">Remove</button>
+                                    {f.id ? (
+                                        <span className="ml-auto text-[11px] text-slate-500" title="Existing fields are protected and require an approved migration to remove.">Preserved</span>
+                                    ) : (
+                                        <button onClick={() => removeField(i)} className="ml-auto h-8 px-3 rounded-lg border border-red-200 text-[11px] font-bold text-red-500 hover:bg-red-50 transition">Remove draft</button>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     ))}
 
+                    <p className="text-xs text-amber-700">Saved field identities are preserved. Once entries exist, key/type changes and newly required fields need a reviewed migration or backfill.</p>
                     <div className="flex gap-3">
                         <button onClick={addField} className="h-9 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">+ Add Field</button>
-                        <button onClick={saveFields} disabled={savingFields} className="h-9 px-5 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-700 transition disabled:opacity-50">{savingFields ? "Saving…" : "Save Fields"}</button>
+                        <button onClick={saveFields} disabled={savingFields || fieldsLoading || !fieldsRevision} className="h-9 px-5 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-700 transition disabled:opacity-50">{savingFields ? "Saving…" : "Save Fields"}</button>
                     </div>
                 </div>
             )}
