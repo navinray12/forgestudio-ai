@@ -212,6 +212,47 @@ export class AppGenerationService {
     return rowToRun(rows[0]);
   }
 
+  /**
+   * Read-only evidence check against the exact persisted generation manifest.
+   * This does not build or certify generated code and never changes historical run status.
+   * An edited or removed file is reported as drift, not silently overwritten.
+   */
+  async verifySource(projectId: string, runId: string): Promise<{
+    runId: string;
+    checkedAt: string;
+    allMatch: boolean;
+    files: Array<{ path: string; result: "MATCH" | "CHANGED" | "MISSING" | "NOT_WRITTEN" }>;
+  }> {
+    const run = await this.getRun(projectId, runId);
+    if (run.status !== "SOURCE_WRITTEN") {
+      throw new AppError("Only completed source generation runs can be verified", 409, "SOURCE_NOT_READY");
+    }
+    const files: Array<{ path: string; result: "MATCH" | "CHANGED" | "MISSING" | "NOT_WRITTEN" }> = [];
+    for (const entry of run.files) {
+      if (!entry.written) {
+        files.push({ path: entry.path, result: "NOT_WRITTEN" });
+        continue;
+      }
+      try {
+        const actual = await this.deps.filesystem.readFile(projectId, entry.path);
+        const hash = crypto.createHash("sha256").update(String(actual.content ?? "")).digest("hex");
+        files.push({
+          path: entry.path,
+          result: actual.isGenerated && hash === entry.sha256 ? "MATCH" : "CHANGED",
+        });
+      } catch (err: any) {
+        if (err?.code !== "FILE_NOT_FOUND") throw err;
+        files.push({ path: entry.path, result: "MISSING" });
+      }
+    }
+    return {
+      runId: run.id,
+      checkedAt: new Date().toISOString(),
+      allMatch: files.length > 0 && files.every((entry) => entry.result === "MATCH"),
+      files,
+    };
+  }
+
   async listRuns(projectId: string, limit = 20): Promise<AppGenerationRun[]> {
     const { rows } = await pgPool.query(
       `SELECT * FROM forge_app_generation_runs WHERE "projectId" = $1 ORDER BY "createdAt" DESC LIMIT $2`,
