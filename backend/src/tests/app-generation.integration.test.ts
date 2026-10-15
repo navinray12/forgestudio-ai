@@ -226,6 +226,46 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     throw new Error("retry never reached terminal state");
   });
 
+  it("does not persist provider or filesystem exception secrets in generation run records", async () => {
+    const secret = "private-api-token-test-fixture-123";
+    const project = await newProject();
+    const { provider } = scriptedProvider([{ error: new Error(`provider Authorization: Bearer ${secret}`) }]);
+    const service = new AppGenerationService({ providerFactory: () => provider, filesystem: fs });
+    const failed = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Create a simple appointment management application",
+    });
+    expect(failed.errorCode).toBe("AI_PROVIDER_UNAVAILABLE");
+    expect(JSON.stringify(failed)).not.toContain(secret);
+
+    const otherProject = await newProject();
+    const missingProvider = new AppGenerationService({
+      providerFactory: () => { throw new Error(`connection failed with token ${secret}`); },
+      filesystem: fs,
+    });
+    const noProvider = await runToCompletion(missingProvider, {
+      projectId: otherProject.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Create a simple appointment management application",
+    });
+    expect(noProvider.errorCode).toBe("AI_NOT_CONFIGURED");
+    expect(JSON.stringify(noProvider)).not.toContain(secret);
+
+    const thirdProject = await newProject();
+    const brokenWrite = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template must not invoke provider"); },
+      filesystem: {
+        readFile: fs.readFile,
+        writeFile: async () => { throw new Error(`storage URL included credential ${secret}`); },
+      },
+    });
+    const writeFailed = await runToCompletion(brokenWrite, {
+      projectId: thirdProject.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(writeFailed.errorCode).toBe("WRITE_FAILED");
+    expect(JSON.stringify(writeFailed)).not.toContain(secret);
+  });
+
   it("reports provider failures truthfully", async () => {
     const project = await newProject();
     const { provider } = scriptedProvider([{ error: new AppError("AI provider request timed out or failed", 503, "AI_PROVIDER_UNAVAILABLE") }]);
