@@ -28,6 +28,14 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
 
   const handleRunQuery = async () => {
     if (!sql.trim()) return;
+    let confirmEnvironment: string | undefined;
+    if (isProduction && allowWrite) {
+      const typed = window.prompt(
+        'This query can change LIVE PRODUCTION data. Type PRODUCTION to authorize this execution:'
+      );
+      if (typed !== "PRODUCTION") return;
+      confirmEnvironment = typed;
+    }
     setRunning(true);
     setError(null);
     try {
@@ -35,7 +43,7 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ sql, environment, allowWrite: isProduction ? allowWrite : undefined }),
+        body: JSON.stringify({ sql, environment, allowWrite: isProduction ? allowWrite : undefined, confirmEnvironment }),
       });
 
       const json = await res.json();
@@ -86,7 +94,7 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
                 checked={allowWrite}
                 onChange={(e) => setAllowWrite(e.target.checked)}
               />
-              Allow writes to PRODUCTION
+              Allow writes to PRODUCTION (confirmation required per execution)
             </label>
           )}
           {result && (
