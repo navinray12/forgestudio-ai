@@ -7,11 +7,12 @@ import {
   getSchemaDiagram,
   createTable,
   dropTable,
+  assertStudioDropConfirmation,
   getTableRows,
   normalizeStudioPagination,
   mutateTableRow,
 } from "./studio-schema.service.js";
-import { executeUserQuery } from "./studio-sql.service.js";
+import { executeUserQuery, assertProductionSqlWriteConfirmation } from "./studio-sql.service.js";
 import {
   verifyProjectAccess,
   resolveExplicitEnvironment as resolveEnvironment,
@@ -112,6 +113,7 @@ export async function dropTableHandler(req: Request, res: Response, next: NextFu
     const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
     assertCanModify(env, access, "drop tables");
+    assertStudioDropConfirmation(env, tableName, req.body?.confirmTableName);
 
     await dropTable(projectId, tableName, env);
 
@@ -231,6 +233,7 @@ export async function executeQueryHandler(req: Request, res: Response, next: Nex
     // owner/admin explicitly opts in to writes.
     const allowWrite = req.body?.allowWrite === true;
     if (allowWrite) assertCanModify(env, access, "run write queries");
+    assertProductionSqlWriteConfirmation(env, allowWrite, req.body?.confirmEnvironment);
     const readOnly = env === "PRODUCTION" && !allowWrite;
 
     const { sql } = req.body;

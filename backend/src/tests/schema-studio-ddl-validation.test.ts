@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause, requireMutatedRow } from "../modules/data-platform/studio/studio-schema.service.js";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertStudioDropConfirmation, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause, requireMutatedRow } from "../modules/data-platform/studio/studio-schema.service.js";
 
 test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
   assert.equal(validateIdentifier("my_table_01"), "my_table_01");
@@ -64,6 +64,18 @@ test("Schema Studio never records a missing-table DROP as a successful no-op", (
   assert.equal(buildDropTableStatement("customer_orders"), 'DROP TABLE "public"."customer_orders" RESTRICT;');
   assert.doesNotMatch(buildDropTableStatement("customer_orders"), /IF EXISTS|CASCADE/i);
   assert.throws(() => buildDropTableStatement("orders; DROP TABLE users"), /Invalid SQL identifier/);
+});
+
+test("Schema Studio refuses unconfirmed production table drops before DDL", () => {
+  assert.doesNotThrow(() => assertStudioDropConfirmation("DEVELOPMENT", "customer_orders", undefined));
+  assert.doesNotThrow(() => assertStudioDropConfirmation("PREVIEW", "customer_orders", undefined));
+  assert.throws(() => assertStudioDropConfirmation("PRODUCTION", "customer_orders", undefined), (error: any) =>
+    error.code === "PRODUCTION_DROP_CONFIRMATION_REQUIRED" && error.statusCode === 409);
+  assert.throws(() => assertStudioDropConfirmation("PRODUCTION", "customer_orders", "other_table"), (error: any) =>
+    error.code === "PRODUCTION_DROP_CONFIRMATION_REQUIRED");
+  assert.throws(() => assertStudioDropConfirmation("PRODUCTION", "customer_orders", ["customer_orders"]), (error: any) =>
+    error.code === "PRODUCTION_DROP_CONFIRMATION_REQUIRED");
+  assert.doesNotThrow(() => assertStudioDropConfirmation("PRODUCTION", "customer_orders", "customer_orders"));
 });
 
 test("Schema Studio blocks unregistered databases before migration DDL", () => {

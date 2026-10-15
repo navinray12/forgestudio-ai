@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { createHash } from "node:crypto";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
 import { verifyProjectAccess, type ProjectAccess } from "../modules/data-platform/common/project-access.js";
@@ -75,6 +76,21 @@ function toApiEntry<T extends { data: unknown }>(entry: T) {
     return { ...rest, values: data ?? {} };
 }
 
+// A content-addressed editor revision prevents a stale tab from silently
+// replacing schema edits made by another owner. The stable order and mapped
+// field content are the same for GET and POST responses.
+function customFieldsRevision(fields: Array<{
+    id: string; name: string; slug: string; type: string; order: number; config: unknown;
+}>): string {
+    const content = fields
+        .map((field) => ({
+            id: field.id, name: field.name, key: field.slug, type: field.type,
+            order: field.order, config: field.config,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    return createHash("sha256").update(JSON.stringify(content)).digest("hex");
+}
+
 // ====== CPT Management ======
 export async function getCustomPostTypesHandler(req: Request, res: Response, next: NextFunction) {
     try {
@@ -97,8 +113,13 @@ export async function createCustomPostTypeHandler(req: Request, res: Response, n
         const { name, singular, plural, slug, description, hasArchive } = req.body ?? {};
 
         const normalizedSlug = String(slug || "").toLowerCase().trim();
-        if (!name || !normalizedSlug) {
+        if (typeof name !== "string" || !name.trim() || !normalizedSlug) {
             throw new AppError("name and slug are required", 400, "INVALID_INPUT");
+        }
+        // URLs cannot contain path separators, query fragments or whitespace.
+        // Keep server and CMS builder slug rules aligned.
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+            throw new AppError("Slug must contain lowercase letters, numbers or single hyphens between words", 400, "INVALID_SLUG");
         }
 
         const existing = await prisma.customPostType.findFirst({ where: { websiteId, slug: normalizedSlug } });
@@ -151,7 +172,10 @@ export async function getCustomFieldsHandler(req: Request, res: Response, next: 
             where: { postTypeId: postType.id },
             orderBy: { order: 'asc' }
         });
-        res.status(200).json({ success: true, data: fields.map(toApiField) });
+        res.status(200).json({
+            success: true, data: fields.map(toApiField),
+            fieldsRevision: customFieldsRevision(fields),
+        });
     } catch (e) { next(e); }
 }
 
@@ -167,6 +191,7 @@ interface IncomingField {
 function parseIncomingFields(raw: unknown): IncomingField[] {
     if (!Array.isArray(raw)) throw new AppError("fields must be an array", 400, "INVALID_INPUT");
     const seen = new Set<string>();
+    const seenIds = new Set<string>();
     return raw.map((f: any, i: number) => {
         const name = typeof f?.name === "string" ? f.name.trim() : "";
         const key = typeof f?.key === "string" ? f.key.trim() : "";
@@ -176,6 +201,15 @@ function parseIncomingFields(raw: unknown): IncomingField[] {
         }
         if (seen.has(key)) throw new AppError(`Field key "${key}" is used more than once`, 400, "DUPLICATE_FIELD_KEY");
         seen.add(key);
+        if (f.id !== undefined) {
+            if (typeof f.id !== "string" || !UUID_PATTERN.test(f.id)) {
+                throw new AppError("Invalid field identity", 400, "INVALID_FIELD_ID");
+            }
+            if (seenIds.has(f.id)) {
+                throw new AppError("Repeated field identity", 400, "DUPLICATE_FIELD_ID");
+            }
+            seenIds.add(f.id);
+        }
         return {
             id: typeof f.id === "string" ? f.id : undefined,
             name,
@@ -196,19 +230,67 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
     try {
         const { postType } = await authorizePostType(req, res, req.params.cptId);
         const incoming = parseIncomingFields(req.body?.fields);
+        const expectedFieldsRevision = req.body?.expectedFieldsRevision;
+        if (expectedFieldsRevision !== undefined &&
+            (typeof expectedFieldsRevision !== "string" || !/^[a-f0-9]{64}$/.test(expectedFieldsRevision))) {
+            throw new AppError("Invalid field revision", 400, "INVALID_FIELD_REVISION");
+        }
 
         const result = await prisma.$transaction(async (tx) => {
+            // Serialize edits to this content type even when different fields are
+            // being added. The revision comparison then occurs under the lock.
+            await tx.$queryRaw`SELECT id FROM custom_post_types WHERE id = ${postType.id}::uuid FOR UPDATE`;
             const existing = await tx.customField.findMany({ where: { postTypeId: postType.id } });
+            if (expectedFieldsRevision !== undefined &&
+                customFieldsRevision(existing) !== expectedFieldsRevision) {
+                throw new AppError(
+                    "Fields changed since this editor loaded them. Reload the field definitions and review changes before saving.",
+                    409,
+                    "FIELD_REVISION_CONFLICT"
+                );
+            }
             const byId = new Map(existing.map((f) => [f.id, f]));
             const bySlug = new Map(existing.map((f) => [f.slug, f]));
             const matchedIds = new Set<string>();
             const plan = { added: [] as string[], modified: [] as string[], retained: [] as string[] };
 
             const matches = incoming.map((f) => {
+                if (f.id && !byId.has(f.id)) {
+                    throw new AppError("Field identity does not belong to this post type", 409, "FIELD_ID_MISMATCH");
+                }
                 const match = (f.id && byId.get(f.id)) || bySlug.get(f.key);
                 if (match) matchedIds.add(match.id);
                 return { f, match };
             });
+
+            if (matchedIds.size !== matches.filter((entry) => entry.match).length) {
+                throw new AppError("A saved field was referenced more than once", 400, "DUPLICATE_FIELD_ID");
+            }
+            // Existing entries include drafts and trash: neither may lose a historical binding.
+            // A field's storage key/type and newly imposed required constraints need an
+            // explicit, previewable data migration once the post type has content.
+            const entryCount = await tx.customEntry.count({ where: { postTypeId: postType.id } });
+            if (entryCount > 0) {
+                for (const { f, match } of matches) {
+                    if (match && (match.slug !== f.key || match.type !== f.type)) {
+                        throw new AppError(
+                            `Field "${match.slug}" has saved entries; renaming its key or changing its type requires an approved migration`,
+                            409,
+                            "FIELD_MIGRATION_REQUIRED"
+                        );
+                    }
+                    const wasRequired = match
+                        ? Boolean((match.config as Record<string, any> | null)?.required)
+                        : false;
+                    if (f.required && !wasRequired) {
+                        throw new AppError(
+                            `Field "${f.key}" cannot become required while existing entries may lack values; plan a backfill first`,
+                            409,
+                            "FIELD_BACKFILL_REQUIRED"
+                        );
+                    }
+                }
+            }
 
             const retained = existing.filter((f) => !matchedIds.has(f.id));
             const retainedSlugs = new Set(retained.map((f) => f.slug));
@@ -241,7 +323,11 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
             return { plan, fields };
         });
 
-        res.status(200).json({ success: true, data: result.fields.map(toApiField), migrationPlan: result.plan });
+        res.status(200).json({
+            success: true, data: result.fields.map(toApiField),
+            fieldsRevision: customFieldsRevision(result.fields),
+            migrationPlan: result.plan,
+        });
     } catch (e) { next(e); }
 }
 

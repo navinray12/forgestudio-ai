@@ -56,6 +56,17 @@ export async function getAppGenerationHandler(req: Request, res: Response, next:
   }
 }
 
+/** GET /api/v1/projects/:id/app-generations/:runId/source-verification */
+export async function verifyAppGenerationSourceHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { project } = await authorizeProject(req, res);
+    const verification = await appGenerationService.verifySource(project.id, String(req.params.runId));
+    res.json({ success: true, verification });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** POST /api/v1/projects/:id/app-generations/:runId/retry */
 export async function retryAppGenerationHandler(req: Request, res: Response, next: NextFunction) {
   try {

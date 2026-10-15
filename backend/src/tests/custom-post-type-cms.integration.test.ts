@@ -88,6 +88,19 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
     expect(await prisma.customPostType.count({ where: { websiteId } })).toBe(1);
   });
 
+  it("rejects unsafe CMS route slugs without creating another content type", async () => {
+    const originalCount = await prisma.customPostType.count({ where: { websiteId } });
+    for (const slug of ["bad/path", "bad?query", "../projects", "invalid name", "a--b"]) {
+      const response = await call(cpt.createCustomPostTypeHandler, users.owner.id, {
+        params: { websiteId },
+        body: { name: "Unsafe route", slug },
+      });
+      expect(response.status).toBe(400);
+      expect(response.error?.code).toBe("INVALID_SLUG");
+    }
+    expect(await prisma.customPostType.count({ where: { websiteId } })).toBe(originalCount);
+  });
+
   it("returns 404, not a database error, for malformed ids", async () => {
     const res = await call(cpt.getCustomFieldsHandler, users.owner.id, { params: { cptId: "not-a-uuid" } });
     expect(res.status).toBe(404);
@@ -124,6 +137,75 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
     const rows = await prisma.customField.findMany({ where: { postTypeId } });
     expect(rows).toHaveLength(2);
     expect(rows.find((r) => r.id === titleFieldId)?.slug).toBe("headline");
+  });
+
+  it("rejects repeated, foreign and malformed field IDs without altering definitions", async () => {
+    const before = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    const duplicate = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [
+        { id: titleFieldId, name: "A", key: "alias_a", type: "text" },
+        { id: titleFieldId, name: "B", key: "alias_b", type: "text" },
+      ] },
+    });
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.error?.code).toBe("DUPLICATE_FIELD_ID");
+    const foreign = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [{ id: randomUUID(), name: "Injected", key: "injected", type: "text" }] },
+    });
+    expect(foreign.status).toBe(409);
+    expect(foreign.error?.code).toBe("FIELD_ID_MISMATCH");
+    const malformed = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [{ id: "not-an-id", name: "Injected", key: "injected", type: "text" }] },
+    });
+    expect(malformed.status).toBe(400);
+    expect(malformed.error?.code).toBe("INVALID_FIELD_ID");
+    const after = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    expect(after.map((f) => ({ id: f.id, name: f.name, slug: f.slug })))
+      .toEqual(before.map((f) => ({ id: f.id, name: f.name, slug: f.slug })));
+  });
+
+  it("rejects stale editor revisions and preserves the newer schema", async () => {
+    const opened = await call(cpt.getCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+    });
+    expect(opened.status).toBe(200);
+    expect(opened.payload.fieldsRevision).toMatch(/^[0-9a-f]{64}$/);
+    const originalRevision = opened.payload.fieldsRevision as string;
+    const saveFields = async (fields: any[], revision: string) => call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields, expectedFieldsRevision: revision },
+    });
+    const first = await saveFields([
+      { id: titleFieldId, name: "Updated by first editor", key: "headline", type: "text", required: true },
+    ], originalRevision);
+    expect(first.status).toBe(200);
+    expect(first.payload.fieldsRevision).not.toBe(originalRevision);
+
+    const stale = await saveFields([
+      { id: titleFieldId, name: "Second editor stale value", key: "headline", type: "text", required: true },
+    ], originalRevision);
+    expect(stale.status).toBe(409);
+    expect(stale.error?.code).toBe("FIELD_REVISION_CONFLICT");
+    expect((await prisma.customField.findUnique({ where: { id: titleFieldId } }))?.name).toBe("Updated by first editor");
+
+    const refreshed = await call(cpt.getCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+    });
+    expect(refreshed.payload.fieldsRevision).toBe(first.payload.fieldsRevision);
+    const safe = await saveFields([
+      { id: titleFieldId, name: "Updated by first editor", key: "headline", type: "text", required: true },
+    ], refreshed.payload.fieldsRevision);
+    expect(safe.status).toBe(200);
+    expect(safe.payload.fieldsRevision).toBe(refreshed.payload.fieldsRevision);
+    const invalid = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [], expectedFieldsRevision: "not-a-digest" },
+    });
+    expect(invalid.status).toBe(400);
+    expect(invalid.error?.code).toBe("INVALID_FIELD_REVISION");
   });
 
   it("rejects duplicate and invalid field keys without writing", async () => {
@@ -171,6 +253,42 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
       body: { values: { headline: "Updated" } },
     });
     expect(updated.payload.data).toMatchObject({ title: "First project", values: { headline: "Updated" } });
+  });
+
+  it("blocks destructive schema changes when content exists but permits safe labels and optional additions", async () => {
+    const before = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    const headline = before.find((field) => field.id === titleFieldId)!;
+    const previousEntry = await prisma.customEntry.findUnique({ where: { id: entryId } });
+    const attempt = async (fields: any[]) => call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields },
+    });
+    const originalField = { id: headline.id, name: headline.name, key: headline.slug, type: headline.type, required: true };
+    for (const change of [
+      { ...originalField, key: "rewritten_key" },
+      { ...originalField, type: "number" },
+    ]) {
+      const blocked = await attempt([change]);
+      expect(blocked.status).toBe(409);
+      expect(blocked.error?.code).toBe("FIELD_MIGRATION_REQUIRED");
+    }
+    const required = await attempt([originalField, { name: "Required later", key: "required_later", type: "text", required: true }]);
+    expect(required.status).toBe(409);
+    expect(required.error?.code).toBe("FIELD_BACKFILL_REQUIRED");
+
+    const unchanged = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    expect(unchanged.map(({ id, slug, type, name }) => ({ id, slug, type, name })))
+      .toEqual(before.map(({ id, slug, type, name }) => ({ id, slug, type, name })));
+    expect(await prisma.customEntry.findUnique({ where: { id: entryId } })).toEqual(previousEntry);
+
+    const safe = await attempt([
+      { ...originalField, name: "Display headline" },
+      { name: "Optional later", key: "optional_later", type: "text", required: false },
+    ]);
+    expect(safe.status).toBe(200);
+    expect(safe.payload.migrationPlan.retained).toContain("body");
+    expect((await prisma.customField.findUnique({ where: { id: titleFieldId } }))?.slug).toBe("headline");
+    expect(await prisma.customEntry.findUnique({ where: { id: entryId } })).toEqual(previousEntry);
   });
 
   it("moves entries to trash with a reason, hides them, and keeps the row", async () => {

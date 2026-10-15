@@ -241,7 +241,8 @@ export async function executeInSandbox(params: {
 
   // SEC-02: Prevent tenant commands from executing unsafely on the application host
   const hasIsolation = isVerifiedIsolationAvailable();
-  const allowUnsafeDev = process.env.NODE_ENV !== "production" && process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "true";
+  const allowUnsafeDev = process.env.NODE_ENV !== "production" &&
+    (process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "true" || process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "1");
 
   if (!hasIsolation && !allowUnsafeDev) {
     throw new AppError(

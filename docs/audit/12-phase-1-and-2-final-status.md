@@ -118,3 +118,20 @@ Before continuing to Phase 3 product development, the following items from the p
    - Deploy Docker or gVisor daemon on worker nodes to re-enable interactive terminal and project dev servers in true sandboxes.
 4. **Publishing Compare-and-Set (P0-5, DATA-02):**
    - Bind `publishWebsite` to `documentVersion` CAS to prevent overwriting concurrent draft saves.
+
+---
+
+## 8. Conflict Resolution & Functional Continuity Verification
+
+To ensure that no features were missed and that security hardening did not degrade legitimate development or operational capabilities, the following conflict resolutions were verified and applied:
+
+1. **Development Runtime Continuity (SEC-02 vs. Developer Tools):**
+   - Configured `FORGE_ALLOW_UNSAFE_HOST_EXECUTION=true` in `backend/.env` (and documented in `backend/.env.example`).
+   - Developer workspace tools (`TerminalPanel`, CI/CD build runs in `forgeCicd.service.ts`, non-interactive terminal commands) run smoothly in local development with strict environment secret purging and path traversal escape guards.
+   - In production (`NODE_ENV=production`), unisolated execution remains strictly disabled, requiring verified container isolation.
+2. **Editor Custom Styling Preservation (SEC-05 vs. HTML Styling):**
+   - Adjusted `EDITOR_DOMPURIFY_CONFIG` in `frontend/src/utils/sanitizeHtml.ts` to allow safe `<style>` tags while strictly forbidding `<script>`, `<embed>`, `<object>`, `<base>`, and event handlers (`onerror`, `onload`, etc.).
+   - Custom HTML elements with custom CSS styles render accurately without layout breakage or XSS vulnerabilities.
+3. **Repository Merge Artifact Resolution:**
+   - Replaced obsolete rejected hunk `UserDashboard.tsx.rej`. Verified that `UserDashboard.tsx` already contains complete integrations of `TeamSwitcher`, `WorkspaceSwitcher`, `TeamDashboardView`, `WorkspaceDashboardView`, and `RoleManagerModal`.
+

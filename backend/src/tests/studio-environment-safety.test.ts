@@ -42,10 +42,10 @@ vi.mock("../modules/data-platform/studio/studio-schema.service.js", () => ({
 const { resolveExplicitEnvironment, assertCanModify, verifyProjectAccess } = await import(
   "../modules/data-platform/common/project-access.js"
 );
-const { dropTableHandler, getTablesHandler, mutateTableRowHandler, listMigrationsHandler } = await import(
+const { dropTableHandler, getTablesHandler, mutateTableRowHandler, listMigrationsHandler, executeQueryHandler } = await import(
   "../modules/data-platform/studio/studio.controller.js"
 );
-const { executeUserQuery } = await import("../modules/data-platform/studio/studio-sql.service.js");
+const { executeUserQuery, assertProductionSqlWriteConfirmation } = await import("../modules/data-platform/studio/studio-sql.service.js");
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const EDITOR = "22222222-2222-4222-8222-222222222222";
@@ -135,12 +135,54 @@ describe("project access roles", () => {
   });
 });
 
+describe("production SQL write confirmation", () => {
+  it("keeps read-only production queries and nonproduction writes compatible", () => {
+    expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", false, undefined)).not.toThrow();
+    expect(() => assertProductionSqlWriteConfirmation("DEVELOPMENT", true, undefined)).not.toThrow();
+    expect(() => assertProductionSqlWriteConfirmation("STAGING", true, undefined)).not.toThrow();
+  });
+
+  it("rejects direct write API opt-ins without exact production confirmation", () => {
+    for (const candidate of [undefined, null, true, "production", "PRODUCTION ", ["PRODUCTION"]]) {
+      expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", true, candidate))
+        .toThrowError(expect.objectContaining({
+          code: "PRODUCTION_SQL_CONFIRMATION_REQUIRED", statusCode: 409,
+        }));
+    }
+    expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", true, "PRODUCTION")).not.toThrow();
+  });
+});
+
 describe("Studio handlers", () => {
   beforeEach(() => {
     state.dropTable.mockClear();
     state.mutateTableRow.mockClear();
     state.getDatabaseTables.mockClear();
     state.findMigrations.mockClear();
+  });
+
+  it("rejects owner production SQL write requests before opening the tenant pool unless confirmed", async () => {
+    state.website = websiteFor();
+    state.pool = null;
+    const request = {
+      userId: OWNER,
+      query: { environment: "PRODUCTION" },
+      body: { sql: "UPDATE orders SET status = 'deleted'", allowWrite: true },
+    };
+    const rejected = await invoke(executeQueryHandler, request);
+    expect(rejected.error?.code).toBe("PRODUCTION_SQL_CONFIRMATION_REQUIRED");
+    expect(rejected.status).toBe(0);
+    const mismatched = await invoke(executeQueryHandler, {
+      ...request, body: { ...request.body, confirmEnvironment: "DEVELOPMENT" },
+    });
+    expect(mismatched.error?.code).toBe("PRODUCTION_SQL_CONFIRMATION_REQUIRED");
+    state.website = websiteFor({ collaborator: "EDITOR" });
+    const editor = await invoke(executeQueryHandler, {
+      ...request, userId: EDITOR,
+      body: { ...request.body, confirmEnvironment: "PRODUCTION" },
+    });
+    // A non-admin must not gain production write authority through confirmation.
+    expect(editor.error?.code).toBe("PRODUCTION_WRITE_FORBIDDEN");
   });
 
   it("migration history requires explicit environment before querying the ledger", async () => {
