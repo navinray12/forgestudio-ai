@@ -348,16 +348,37 @@ export class AppGenerationService {
         .filter((item: any) => item.written === true && typeof item.path === "string" && typeof item.sha256 === "string")
         .map((item: any) => [item.path, item.sha256])
     );
+    // A failed run may have verified some files before another write failed.
+    // Retrying that *specific* run may safely replace only those byte-identical
+    // generated files. Never trust unverified files or a manifest from another project.
+    const retryManifest = new Map<string, string>();
+    if (run.retryOfRunId) {
+      const { rows: failedRows } = await pgPool.query(
+        `SELECT files FROM forge_app_generation_runs
+         WHERE id = $1 AND "projectId" = $2 AND status = 'FAILED'`,
+        [run.retryOfRunId, run.projectId]
+      );
+      for (const item of Array.isArray(failedRows[0]?.files) ? failedRows[0].files : []) {
+        if (item.written === true && typeof item.path === "string" &&
+            typeof item.sha256 === "string" && /^[a-f0-9]{64}$/.test(item.sha256)) {
+          retryManifest.set(item.path, item.sha256);
+        }
+      }
+    }
     const expectedVersions = new Map<string, number>();
     const conflicts: string[] = [];
+    let verifiedPartialFiles = 0;
     for (const file of files) {
       try {
         const existing = await this.deps.filesystem.readFile(run.projectId, file.path);
         const existingHash = crypto.createHash("sha256").update(String(existing.content ?? "")).digest("hex");
-        if (!existing.isGenerated || previousManifest.get(file.path) !== existingHash) {
+        const matchesCompletedRun = previousManifest.get(file.path) === existingHash;
+        const matchesFailedRun = retryManifest.get(file.path) === existingHash;
+        if (!existing.isGenerated || (!matchesCompletedRun && !matchesFailedRun)) {
           conflicts.push(file.path);
         } else {
           expectedVersions.set(file.path, existing.version);
+          if (matchesFailedRun && !matchesCompletedRun) verifiedPartialFiles++;
         }
       } catch (err: any) {
         if (err?.code !== "FILE_NOT_FOUND") throw err;
@@ -365,6 +386,12 @@ export class AppGenerationService {
     }
     if (conflicts.length > 0) {
       return fail("SOURCE_CONFLICT", `Existing files have user edits or unverified generation provenance; source was preserved: ${conflicts.join(", ")}`);
+    }
+    if (verifiedPartialFiles > 0) {
+      diagnostics.push({
+        severity: "info",
+        message: `Resuming after an interrupted write: ${verifiedPartialFiles} previously verified generated file(s) match the failed run manifest; user changes remain protected.`,
+      });
     }
 
     // 5. Write files. A partial failure is reported with exactly which files were written.
