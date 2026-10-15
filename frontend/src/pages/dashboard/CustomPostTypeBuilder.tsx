@@ -18,6 +18,7 @@ export default function CustomPostTypeBuilder() {
     const [fields, setFields] = useState<any[]>([]);
 
     const [saving, setSaving] = useState(false);
+    const [fieldsRevision, setFieldsRevision] = useState<string | null>(null);
     // A successful type creation must survive a later field-save failure.
     // Retrying against the same ID prevents duplicate post types.
     const [createdCptId, setCreatedCptId] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export default function CustomPostTypeBuilder() {
                 setSlug(matchingType.slug ?? "");
                 setDescription(matchingType.description ?? "");
                 setFields(fieldsResult.data);
+                setFieldsRevision(fieldsResult.fieldsRevision);
             } catch (error: any) {
                 if (!cancelled) setLoadError(error?.message || "Unable to load saved fields.");
             } finally {
@@ -102,13 +104,14 @@ export default function CustomPostTypeBuilder() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ fields })
+                body: JSON.stringify({ fields, ...(fieldsRevision ? { expectedFieldsRevision: fieldsRevision } : {}) })
             });
             const fieldsResult = await fieldsResponse.json().catch(() => null);
             if (!fieldsResponse.ok || !fieldsResult?.success) {
                 throw new Error(fieldsResult?.error?.message || fieldsResult?.message || "Fields were not saved. Please review and retry.");
             }
             setFields(fieldsResult.data);
+            setFieldsRevision(fieldsResult.fieldsRevision);
             if (fieldsResult.migrationPlan?.retained?.length) {
                 setSavedNotice(`Saved. Protected existing fields retained: ${fieldsResult.migrationPlan.retained.join(", ")}.`);
             } else {
@@ -154,6 +157,12 @@ export default function CustomPostTypeBuilder() {
                         {loading && <p role="status" className="text-sm text-slate-600">Loading saved fields…</p>}
                         {loadError && <p role="alert" className="text-sm text-red-600">{loadError}</p>}
                         {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
+                        {saveError && saveError.toLowerCase().includes("changed since this editor") && (
+                            <p className="text-xs text-amber-700">
+                                Another editor saved newer fields. Your draft remains on this screen;
+                                copy any unsaved changes before reloading to compare.
+                            </p>
+                        )}
                         {createdCptId && (
                             <p role="status" className="text-sm text-amber-700">
                                 Content type created; field configuration still needs saving. Retry will update this content type, not create another.
