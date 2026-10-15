@@ -226,6 +226,11 @@ export default function CustomPostTypeBuilder() {
                             </div>
                         ))}
                         <p className="text-xs text-slate-500">Saved fields keep their stable IDs. Existing fields are preserved; deleting a stored field requires an approved migration.</p>
+                        {!isNew && (
+                            <p className="text-xs text-amber-700" role="note">
+                                Once entries exist (including drafts or trash), changing a saved field key or type, or making a field newly required, needs a reviewed schema migration/backfill. Other field edits remain available.
+                            </p>
+                        )}
                         {fields.length === 0 && (
                             <div className="text-center py-20 text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-2xl">
                                 Inject your architectural fields natively above.

@@ -214,6 +214,42 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
     expect(updated.payload.data).toMatchObject({ title: "First project", values: { headline: "Updated" } });
   });
 
+  it("blocks destructive schema changes when content exists but permits safe labels and optional additions", async () => {
+    const before = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    const headline = before.find((field) => field.id === titleFieldId)!;
+    const previousEntry = await prisma.customEntry.findUnique({ where: { id: entryId } });
+    const attempt = async (fields: any[]) => call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields },
+    });
+    const originalField = { id: headline.id, name: headline.name, key: headline.slug, type: headline.type, required: true };
+    for (const change of [
+      { ...originalField, key: "rewritten_key" },
+      { ...originalField, type: "number" },
+    ]) {
+      const blocked = await attempt([change]);
+      expect(blocked.status).toBe(409);
+      expect(blocked.error?.code).toBe("FIELD_MIGRATION_REQUIRED");
+    }
+    const required = await attempt([originalField, { name: "Required later", key: "required_later", type: "text", required: true }]);
+    expect(required.status).toBe(409);
+    expect(required.error?.code).toBe("FIELD_BACKFILL_REQUIRED");
+
+    const unchanged = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    expect(unchanged.map(({ id, slug, type, name }) => ({ id, slug, type, name })))
+      .toEqual(before.map(({ id, slug, type, name }) => ({ id, slug, type, name })));
+    expect(await prisma.customEntry.findUnique({ where: { id: entryId } })).toEqual(previousEntry);
+
+    const safe = await attempt([
+      { ...originalField, name: "Display headline" },
+      { name: "Optional later", key: "optional_later", type: "text", required: false },
+    ]);
+    expect(safe.status).toBe(200);
+    expect(safe.payload.migrationPlan.retained).toContain("body");
+    expect((await prisma.customField.findUnique({ where: { id: titleFieldId } }))?.slug).toBe("headline");
+    expect(await prisma.customEntry.findUnique({ where: { id: entryId } })).toEqual(previousEntry);
+  });
+
   it("moves entries to trash with a reason, hides them, and keeps the row", async () => {
     expect((await call(cpt.deleteCustomEntryHandler, users.editor.id, { params: { entryId } })).status).toBe(400);
     expect((await call(cpt.deleteCustomEntryHandler, users.outsider.id, { params: { entryId }, body: { reason: "x" } })).status).toBe(404);
