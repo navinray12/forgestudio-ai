@@ -365,6 +365,38 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(run.files.some((item) => item.written)).toBe(false);
   });
 
+  it("does not overwrite a new source file created after generation preflight", async () => {
+    const project = await newProject();
+    const protectedPath = "forge-app/server/task.routes.ts";
+    const editorSource = "// a real edit added while the generator was working\nexport const protectedWork = true;\n";
+    let injected = false;
+    const racingFilesystem = {
+      readFile: fs.readFile,
+      writeFile: async (projectId: string, filePath: string, opts: Parameters<typeof fs.writeFile>[2]) => {
+        if (filePath === protectedPath && !injected) {
+          injected = true;
+          await fs.writeFile(projectId, filePath, { content: editorSource, authorId: users.owner.id });
+        }
+        return fs.writeFile(projectId, filePath, opts);
+      },
+    };
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template must not invoke provider"); },
+      filesystem: racingFilesystem,
+    });
+    const run = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(injected).toBe(true);
+    expect(run.status).toBe("FAILED");
+    expect(run.errorCode).toBe("WRITE_FAILED");
+    const saved = await fs.readFile(project.id, protectedPath);
+    expect(saved.content).toBe(editorSource);
+    expect(saved.isGenerated).toBe(false);
+    expect(saved.version).toBe(1);
+  });
+
   it("never overwrites source that ForgeStudio did not generate", async () => {
     const project = await newProject();
     await fs.writeFile(project.id, "forge-app/server/app.ts", { content: "// hand-written\nexport const mine = 1;\n", authorId: users.owner.id });
