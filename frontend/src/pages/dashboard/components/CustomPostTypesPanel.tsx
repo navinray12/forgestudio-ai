@@ -134,7 +134,7 @@ export default function CustomPostTypesPanel() {
         setFields(prev => prev[i]?.id ? prev : prev.filter((_, idx) => idx !== i).map((f, idx) => ({ ...f, order: idx })));
 
     const saveFields = async () => {
-        if (!activeCpt || !fieldsRevision || fieldsLoading || fieldError) return;
+        if (!activeCpt || !fieldsRevision || fieldsLoading) return;
         setFieldError(null);
         setFieldNotice(null);
         setSavingFields(true);
@@ -236,7 +236,7 @@ export default function CustomPostTypesPanel() {
                     <p className="text-xs text-amber-700">Saved field identities are preserved. Once entries exist, key/type changes and newly required fields need a reviewed migration or backfill.</p>
                     <div className="flex gap-3">
                         <button onClick={addField} className="h-9 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">+ Add Field</button>
-                        <button onClick={saveFields} disabled={savingFields || fieldsLoading || !fieldsRevision || Boolean(fieldError)} className="h-9 px-5 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-700 transition disabled:opacity-50">{savingFields ? "Saving…" : "Save Fields"}</button>
+                        <button onClick={saveFields} disabled={savingFields || fieldsLoading || !fieldsRevision} className="h-9 px-5 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-700 transition disabled:opacity-50">{savingFields ? "Saving…" : "Save Fields"}</button>
                     </div>
                 </div>
             )}
