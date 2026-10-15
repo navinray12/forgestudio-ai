@@ -329,6 +329,17 @@ export class AppGenerationService {
           authorId: run.requestedById,
           reason: `Application generation run ${run.id}`,
         });
+        // A successful write acknowledgement is not proof that the bytes are
+        // durably readable. Verify content and provenance before issuing evidence.
+        const persisted = await this.deps.filesystem.readFile(run.projectId, file.path);
+        if (!persisted.isGenerated || !String(persisted.content ?? "").includes(GENERATED_MARKER) ||
+            crypto.createHash("sha256").update(String(persisted.content ?? "")).digest("hex") !== manifest[i].sha256) {
+          return fail(
+            "SOURCE_VERIFICATION_FAILED",
+            `The generated file ${file.path} did not match its persisted source manifest; build and deployment are blocked.`,
+            { files: manifest }
+          );
+        }
         manifest[i].written = true;
       } catch (err: any) {
         const written = manifest.filter((m) => m.written).length;
