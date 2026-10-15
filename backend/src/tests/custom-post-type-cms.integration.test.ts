@@ -88,6 +88,19 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
     expect(await prisma.customPostType.count({ where: { websiteId } })).toBe(1);
   });
 
+  it("rejects unsafe CMS route slugs without creating another content type", async () => {
+    const originalCount = await prisma.customPostType.count({ where: { websiteId } });
+    for (const slug of ["bad/path", "bad?query", "../projects", "invalid name", "a--b"]) {
+      const response = await call(cpt.createCustomPostTypeHandler, users.owner.id, {
+        params: { websiteId },
+        body: { name: "Unsafe route", slug },
+      });
+      expect(response.status).toBe(400);
+      expect(response.error?.code).toBe("INVALID_SLUG");
+    }
+    expect(await prisma.customPostType.count({ where: { websiteId } })).toBe(originalCount);
+  });
+
   it("returns 404, not a database error, for malformed ids", async () => {
     const res = await call(cpt.getCustomFieldsHandler, users.owner.id, { params: { cptId: "not-a-uuid" } });
     expect(res.status).toBe(404);
