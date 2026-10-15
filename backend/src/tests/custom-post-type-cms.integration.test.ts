@@ -126,6 +126,34 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
     expect(rows.find((r) => r.id === titleFieldId)?.slug).toBe("headline");
   });
 
+  it("rejects repeated, foreign and malformed field IDs without altering definitions", async () => {
+    const before = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    const duplicate = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [
+        { id: titleFieldId, name: "A", key: "alias_a", type: "text" },
+        { id: titleFieldId, name: "B", key: "alias_b", type: "text" },
+      ] },
+    });
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.error?.code).toBe("DUPLICATE_FIELD_ID");
+    const foreign = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [{ id: randomUUID(), name: "Injected", key: "injected", type: "text" }] },
+    });
+    expect(foreign.status).toBe(409);
+    expect(foreign.error?.code).toBe("FIELD_ID_MISMATCH");
+    const malformed = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [{ id: "not-an-id", name: "Injected", key: "injected", type: "text" }] },
+    });
+    expect(malformed.status).toBe(400);
+    expect(malformed.error?.code).toBe("INVALID_FIELD_ID");
+    const after = await prisma.customField.findMany({ where: { postTypeId }, orderBy: { order: "asc" } });
+    expect(after.map((f) => ({ id: f.id, name: f.name, slug: f.slug })))
+      .toEqual(before.map((f) => ({ id: f.id, name: f.name, slug: f.slug })));
+  });
+
   it("rejects duplicate and invalid field keys without writing", async () => {
     const dup = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
       params: { cptId: postTypeId },
