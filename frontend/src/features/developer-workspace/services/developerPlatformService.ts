@@ -71,6 +71,13 @@ export interface AppGenerationRun {
   completedAt: string | null;
 }
 
+export interface GenerationSourceVerification {
+  runId: string;
+  checkedAt: string;
+  allMatch: boolean;
+  files: Array<{ path: string; result: "MATCH" | "CHANGED" | "MISSING" | "NOT_WRITTEN" }>;
+}
+
 export const developerPlatformService = {
   // =========================================================================
   // Module 57: Collaborative Development
@@ -240,6 +247,10 @@ export const developerPlatformService = {
 
   async listAppGenerations(projectId: string): Promise<{ runs: AppGenerationRun[] }> {
     return request(`/${projectId}/app-generations`);
+  },
+
+  async verifyAppGenerationSource(projectId: string, runId: string): Promise<{ verification: GenerationSourceVerification }> {
+    return request(`/${projectId}/app-generations/${encodeURIComponent(runId)}/source-verification`);
   },
 
   async retryAppGeneration(projectId: string, runId: string): Promise<{ run: AppGenerationRun }> {
