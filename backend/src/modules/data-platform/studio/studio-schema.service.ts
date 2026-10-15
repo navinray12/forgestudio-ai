@@ -379,6 +379,26 @@ export async function createTable(
 }
 
 /**
+ * A production DDL confirmation is enforced by the server, not merely a
+ * browser dialog. Name matching binds consent to the exact table being dropped.
+ */
+export function assertStudioDropConfirmation(
+  environment: DatabaseEnvironment,
+  tableName: string,
+  confirmation: unknown
+): void {
+  if (environment !== "PRODUCTION") return;
+  const safeTable = validateIdentifier(tableName);
+  if (typeof confirmation !== "string" || confirmation !== safeTable) {
+    throw new AppError(
+      `To drop a production table, confirm the exact table name "${safeTable}"`,
+      409,
+      "PRODUCTION_DROP_CONFIRMATION_REQUIRED"
+    );
+  }
+}
+
+/**
  * Do not hide a missing table with IF EXISTS: a no-op must not be recorded
  * as a successful destructive migration.
  */
