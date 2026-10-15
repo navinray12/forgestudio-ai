@@ -1,0 +1,106 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { validateIdentifier, validateColumnType, validateColumnDefault, assertSafeRowMutation, assertUniqueColumnNames, buildDropTableStatement, assertMigrationLedgerRegistered, normalizeStudioPagination, buildStudioOrderClause, requireMutatedRow } from "../modules/data-platform/studio/studio-schema.service.js";
+
+test("Schema Studio preserves valid PostgreSQL identifiers without truncation", () => {
+  assert.equal(validateIdentifier("my_table_01"), "my_table_01");
+  assert.equal(validateIdentifier("a".repeat(63)), "a".repeat(63));
+  assert.throws(() => validateIdentifier("a".repeat(64)), /Invalid SQL identifier/);
+  assert.throws(() => validateIdentifier("1table"), /Invalid SQL identifier/);
+  assert.throws(() => validateIdentifier('accounts"; DROP TABLE users;--'), /Invalid SQL identifier/);
+});
+
+test("Schema Studio validates complete SQL data type declarations", () => {
+  assert.equal(validateColumnType("varchar(255)"), "VARCHAR(255)");
+  assert.equal(validateColumnType("decimal(12,2)"), "DECIMAL(12,2)");
+  assert.equal(validateColumnType("jsonb"), "JSONB");
+  for (const type of ["TEXT); DROP TABLE users; --", "VARCHAR(20) NOT NULL", "DECIMAL(4,7)", "VARCHAR(-1)"]) {
+    assert.throws(() => validateColumnType(type), /Unsupported column type/);
+  }
+});
+
+test("Schema Studio accepts only explicitly permitted safe SQL defaults", () => {
+  for (const value of ["NULL", "true", "0", "-4.25", "'O''Reilly'", "now()", "gen_random_uuid()", "CURRENT_DATE"]) {
+    assert.equal(validateColumnDefault(value), value);
+  }
+  for (const unsafe of ["0); DROP TABLE users;--", "now(); SELECT pg_sleep(30)", "'hello' || secret", "nextval('seq')"]) {
+    assert.throws(() => validateColumnDefault(unsafe), /Unsupported column default/);
+  }
+});
+
+test("Schema Studio row changes reject non-primary and composite key selectors", () => {
+  const singleKey = {
+    columns: [
+      { name: "id", isPrimaryKey: true },
+      { name: "email", isPrimaryKey: false },
+      { name: "label", isPrimaryKey: false },
+    ],
+  };
+  assert.doesNotThrow(() => assertSafeRowMutation(singleKey, "UPDATE", "id", { label: "updated" }));
+  assert.doesNotThrow(() => assertSafeRowMutation(singleKey, "DELETE", "id"));
+  assert.throws(() => assertSafeRowMutation(singleKey, "DELETE", "email"), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation(singleKey, "UPDATE", "email", { label: "updated" }), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation(singleKey, "UPDATE", "id", { missing: "value" }), /Unknown table column/);
+  assert.throws(() => assertSafeRowMutation({ columns: [
+    { name: "workspaceId", isPrimaryKey: true },
+    { name: "itemId", isPrimaryKey: true },
+  ] }, "DELETE", "workspaceId"), /single-column primary key/);
+  assert.throws(() => assertSafeRowMutation({ columns: [
+    { name: "label", isPrimaryKey: false },
+  ] }, "DELETE", "label"), /single-column primary key/);
+});
+
+
+test("Schema Studio rejects duplicate column identities before issuing DDL", () => {
+  const column = (name: string) => ({ name, type: "TEXT" });
+  assert.doesNotThrow(() => assertUniqueColumnNames([column("id"), column("ID"), column("label")]));
+  assert.throws(() => assertUniqueColumnNames([column("id"), column("id")]), /Duplicate table column/);
+  assert.throws(() => assertUniqueColumnNames([column("id"), column("bad-name")]), /Invalid SQL identifier/);
+  assert.throws(() => assertUniqueColumnNames([]), /Table must contain at least one column/);
+});
+
+
+test("Schema Studio never records a missing-table DROP as a successful no-op", () => {
+  assert.equal(buildDropTableStatement("customer_orders"), 'DROP TABLE "public"."customer_orders" RESTRICT;');
+  assert.doesNotMatch(buildDropTableStatement("customer_orders"), /IF EXISTS|CASCADE/i);
+  assert.throws(() => buildDropTableStatement("orders; DROP TABLE users"), /Invalid SQL identifier/);
+});
+
+test("Schema Studio blocks unregistered databases before migration DDL", () => {
+  assert.throws(() => assertMigrationLedgerRegistered(null), /not registered for migration tracking/);
+  assert.throws(() => assertMigrationLedgerRegistered({ id: "" }), /not registered for migration tracking/);
+  assert.deepEqual(assertMigrationLedgerRegistered({ id: "db_valid" }), { id: "db_valid" });
+});
+
+test("Schema Studio pagination keeps SQL and response bounds consistent", () => {
+  assert.deepEqual(normalizeStudioPagination(undefined, undefined), { page: 1, limit: 50, offset: 0 });
+  assert.deepEqual(normalizeStudioPagination("3", "500"), { page: 3, limit: 500, offset: 1000 });
+  assert.deepEqual(normalizeStudioPagination(2, 20), { page: 2, limit: 20, offset: 20 });
+  for (const [page, limit] of [["-1", "20"], ["1.5", "10"], ["NaN", "10"], ["1", "501"], ["1", "0"], ["1000001", "1"], [["2"], "20"], [1, Infinity]]) {
+    assert.throws(() => normalizeStudioPagination(page, limit), /Invalid (page|limit)/);
+  }
+});
+
+test("Schema Studio validates requested sort instead of silently falling back", () => {
+  const details = { columns: [
+    { name: "id", isPrimaryKey: true },
+    { name: "display_name", isPrimaryKey: false },
+  ] };
+  assert.equal(buildStudioOrderClause(details, "display_name", "DESC"), 'ORDER BY "display_name" DESC, "id" ASC');
+  assert.equal(buildStudioOrderClause(details, "id", "DESC"), 'ORDER BY "id" DESC');
+  assert.equal(buildStudioOrderClause(details), 'ORDER BY "id" ASC');
+  assert.throws(() => buildStudioOrderClause(details, "missing"), /Unknown table sort column/);
+  assert.throws(() => buildStudioOrderClause(details, "display_name", "SIDEWAYS"), /Invalid sort order/);
+  assert.throws(() => buildStudioOrderClause(details, 'id"; DROP TABLE users', "ASC"), /Invalid SQL identifier/);
+  assert.equal(buildStudioOrderClause({ columns: [{ name: "label", isPrimaryKey: false }] }, "label"), 'ORDER BY "label" ASC');
+});
+
+test("Schema Studio does not acknowledge an UPDATE or DELETE that matched no row", () => {
+  const row = { id: 0, label: "" };
+  assert.equal(requireMutatedRow(row, "UPDATE"), row);
+  assert.equal(requireMutatedRow(row, "DELETE"), row);
+  assert.throws(() => requireMutatedRow(undefined, "UPDATE"), (error: any) =>
+    error.code === "ROW_NOT_FOUND" && error.statusCode === 404);
+  assert.throws(() => requireMutatedRow(null, "DELETE"), (error: any) =>
+    error.code === "ROW_NOT_FOUND" && error.statusCode === 404);
+});

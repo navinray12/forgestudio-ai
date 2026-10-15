@@ -30,6 +30,9 @@ export interface FullStackGenerationResult {
   projectId: string;
   framework: string;
   strategy: "AI_ENHANCED" | "DETERMINISTIC_LOCAL_FALLBACK";
+  /** Scaffolding is not verified application generation. */
+  generationMode: "approved-template";
+  verificationStatus: "NOT_EXECUTED";
   filesCreated: number;
   manifestUpdated: boolean;
   diagnostics: Array<{ severity: "info" | "warn" | "error"; message: string }>;
@@ -47,22 +50,19 @@ export class FullStackGeneratorService {
     const projectName = options.name || project.name;
     const diagnostics: Array<{ severity: "info" | "warn" | "error"; message: string }> = [];
 
-    let strategy: "AI_ENHANCED" | "DETERMINISTIC_LOCAL_FALLBACK" = "DETERMINISTIC_LOCAL_FALLBACK";
+    const strategy: "DETERMINISTIC_LOCAL_FALLBACK" = "DETERMINISTIC_LOCAL_FALLBACK";
     let aiAttemptFailed = false;
 
     // 1. Optional External AI enhancement check
     if (useAiIfAvailable && (process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.STITCH_API_KEY)) {
-      try {
-        // AI generation attempt
-        diagnostics.push({ severity: "info", message: "Attempting AI-guided project schema generation..." });
-        // If AI is configured, let it plan; if provider error / timeout occurs, catch and fall back
-      } catch (err: any) {
-        aiAttemptFailed = true;
-        diagnostics.push({
-          severity: "warn",
-          message: `External AI provider unavailable (${err.message}). Engaging deterministic local template fallback.`,
-        });
-      }
+      // A configured key is not evidence that a provider call occurred.
+      // Keep the existing template path available until a validated provider-backed
+      // ApplicationSpec generation pipeline is integrated.
+      aiAttemptFailed = false;
+      diagnostics.push({
+        severity: "warn",
+        message: "Provider-backed application generation is not implemented in this entrypoint. Creating an unverified template scaffold instead.",
+      });
     } else {
       diagnostics.push({
         severity: "info",
@@ -96,12 +96,10 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.get("/api/items", (req, res) => {
-  res.json({
-    items: [
-      { id: "1", title: "Production Architecture", status: "active" },
-      { id: "2", title: "Modular Service Mesh", status: "active" },
-    ],
+app.get("/api/items", (_req, res) => {
+  res.status(501).json({
+    error: "APPLICATION_DATA_NOT_CONFIGURED",
+    message: "Connect a verified application data model and repository before using this endpoint.",
   });
 });
 
@@ -118,6 +116,11 @@ app.listen(PORT, () => {
       scaffoldRes.filesCreated.push("server/index.ts");
     }
 
+    diagnostics.push({
+      severity: "warn",
+      message: "Template files were created but application behavior, database persistence, permissions, and production readiness have not been verified.",
+    });
+
     await recordAuditLog({
       userId: authorId || "system",
       action: "project.fullstack_generated",
@@ -127,6 +130,8 @@ app.listen(PORT, () => {
         strategy,
         filesCreated: scaffoldRes.filesCreated.length,
         aiAttemptFailed,
+        generationMode: "approved-template",
+        verificationStatus: "NOT_EXECUTED",
       },
     });
 
@@ -135,6 +140,8 @@ app.listen(PORT, () => {
       projectId,
       framework,
       strategy,
+      generationMode: "approved-template",
+      verificationStatus: "NOT_EXECUTED",
       filesCreated: scaffoldRes.filesCreated.length,
       manifestUpdated: true,
       diagnostics,

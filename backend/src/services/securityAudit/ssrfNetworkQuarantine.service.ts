@@ -12,6 +12,7 @@
  */
 
 import { AppError } from "../../utils/app-error.js";
+import { DurableAuditDenialLedgerService } from "./durableAuditDenialLedger.service.js";
 
 export interface OutboundValidationResult {
   allowed: boolean;
@@ -42,11 +43,13 @@ export class SsrfNetworkQuarantineService {
     try {
       parsed = new URL(rawUrl);
     } catch {
+      DurableAuditDenialLedgerService.logDurableDenial("network_guard", "OUTBOUND_URL", "SSRF_MALFORMED_URL", "Malformed outbound URL rejected.", "internal");
       return { allowed: false, normalizedUrl: rawUrl, blockedReason: "Malformed URL syntax" };
     }
 
     // Scheme check
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      DurableAuditDenialLedgerService.logDurableDenial("network_guard", "OUTBOUND_URL", "SSRF_FORBIDDEN_SCHEME", `Forbidden outbound scheme ${parsed.protocol}.`, "internal");
       return { allowed: false, normalizedUrl: rawUrl, blockedReason: `Forbidden protocol scheme: ${parsed.protocol}` };
     }
 
@@ -54,6 +57,7 @@ export class SsrfNetworkQuarantineService {
     const hostname = parsed.hostname.toLowerCase();
     for (const pattern of this.BLOCKED_HOST_PATTERNS) {
       if (pattern.test(hostname)) {
+        DurableAuditDenialLedgerService.logDurableDenial("network_guard", "OUTBOUND_URL", "SSRF_PROHIBITED", `Blocked outbound host ${hostname}.`, "internal");
         return {
           allowed: false,
           normalizedUrl: parsed.toString(),

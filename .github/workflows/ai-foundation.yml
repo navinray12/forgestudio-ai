@@ -49,6 +49,21 @@ jobs:
         run: |
           node --import tsx --test src/tests/assistant-intent-routing.test.ts
           node --import tsx --test src/tests/ai-gateway-provider-fallback.test.ts
+      - name: Durable ApplicationSpec PostgreSQL contract
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/application-spec-persistence.integration.test.ts
+      - name: Full-stack generation failure and retry regression (disposable PostgreSQL)
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/app-generation.integration.test.ts
+      - name: ApplicationSpec full-contract digest and revision integrity
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point32-fullstack-application-spec.test.ts
+      - name: Page registry stable-identity and lifecycle contract tests
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point36-page-lifecycle.test.ts
+      - name: Schema Studio SQL safety regression tests
+        working-directory: backend
+        run: node --import tsx --test src/tests/schema-studio-ddl-validation.test.ts
       - name: Changed AI UI lint
         working-directory: frontend
         run: npx --no-install eslint src/features/ai/AiSiteAssistant.tsx src/features/ai/DesignAssistant.tsx src/features/ai/DesignProposalPreview.tsx src/features/editor-access/document-save-coordinator.ts

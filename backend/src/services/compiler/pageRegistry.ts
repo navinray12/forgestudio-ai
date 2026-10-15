@@ -17,6 +17,12 @@ import crypto from "node:crypto";
 import { AppError } from "../../utils/app-error.js";
 import { visualDocumentToIR, pageComponentName } from "./unifiedCompiler.service.js";
 
+export {
+  normalizePageSourcePath,
+  pageRouteIdentity,
+  resolvePageSourceTarget,
+} from "./pageRecognition.js";
+
 export type ProjectFramework = "react" | "nextjs";
 export type RouterProfile = "nextjs-app-router" | "nextjs-pages-router" | "react-vite";
 
@@ -104,16 +110,25 @@ export function buildPageRegistry(editorData: any, framework: ProjectFramework):
     .map((c) => {
       const page = c.pageId ? pages.find((p) => String(p.id) === c.pageId) : undefined;
       const route = ir.routes.find((r) => r.componentId === c.id);
-      const stablePageId = `page_${crypto
+      // Prefer already-persisted identities when the page moves or is renamed.
+      // Retain legacy hashes for pages that predate persisted identities, so an
+      // upgrade does not silently rewrite references to existing source files.
+      const legacyStablePageId = `page_${crypto
         .createHash("sha256")
         .update(String(c.pageId || SINGLE_PAGE_KEY) + (c.routePath || "/"))
         .digest("hex")
         .slice(0, 16)}`;
-      const fileId = `file_${crypto
+      const legacyFileId = `file_${crypto
         .createHash("sha256")
         .update(c.filePath)
         .digest("hex")
         .slice(0, 16)}`;
+      const stablePageId = typeof page?.stablePageId === "string" && /^page_[a-zA-Z0-9_-]+$/.test(page.stablePageId)
+        ? page.stablePageId
+        : legacyStablePageId;
+      const fileId = typeof page?.fileId === "string" && /^file_[a-zA-Z0-9_-]+$/.test(page.fileId)
+        ? page.fileId
+        : legacyFileId;
 
       const routeSegments = (c.routePath || "/").split("/").filter(Boolean);
       const routeParameters: RouteParameter[] = routeSegments.map((seg) => {
@@ -766,10 +781,6 @@ export function reconcilePersistedCheckpoint(pages: RegisteredPage[], existingFi
 }
 
 // Keep the existing import surface; pure recognition/preflight is independently testable.
-export {
-  classifyPageEntry,
-  normalizePageSourcePath,
-  pageRouteIdentity,
-  resolvePageSourceTarget,
-} from "./pageRecognition.js";
+// (normalizePageSourcePath, pageRouteIdentity and resolvePageSourceTarget are re-exported above.)
+export { classifyPageEntry } from "./pageRecognition.js";
 export type { PageEntryClassification, PageSourceTarget, PageSourceIdentity } from "./pageRecognition.js";

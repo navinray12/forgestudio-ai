@@ -32,6 +32,7 @@ import { ContentOnlyInspector } from "./components/ContentOnlyInspector";
 import { ExperimentManagerModal } from "./components/experiments/ExperimentManagerModal";
 import { useCanvasPresence } from "../../features/collaboration/hooks/useCanvasPresence";
 import { WooCommerceProvider } from "../../context/WooCommerceContext";
+import { sanitizeHtml } from "../../utils/sanitizeHtml";
 
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { forgeProjectService } from "../../features/developer-workspace/services/forgeProjectService";
@@ -7223,7 +7224,14 @@ export default function WebsiteEditor() {
         )}
 
         {el.type === "html" && (
-          <div dangerouslySetInnerHTML={{ __html: el.content || "<p class='p-4 border border-dashed rounded text-xs text-slate-400 text-center font-mono'>Custom HTML Block</p>" }} className="w-full h-full" />
+          <div
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHtml(
+                el.content || "<p class='p-4 border border-dashed rounded text-xs text-slate-400 text-center font-mono'>Custom HTML Block</p>"
+              ),
+            }}
+            className="w-full h-full"
+          />
         )}
 
         {el.type === "shortcode" && (

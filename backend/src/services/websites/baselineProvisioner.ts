@@ -169,6 +169,7 @@ function createFooter(siteName: string, legalLinks: Array<{ label: string; href:
 export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
   editorData: JsonObject;
   operatingContract: WebsiteOperatingContract;
+  contract: WebsiteOperatingContract;
 } {
   const {
     websiteId,
@@ -188,7 +189,7 @@ export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
 
   if (requireOfferingsDetail) navLinks.push({ label: "Offerings", href: "/offerings" });
   navLinks.push({ label: "About", href: "/about" });
-  if (requireBlog) navLinks.push({ label: "Resources", href: "/resources" });
+  if (requireBlog) navLinks.push({ label: "Blog", href: "/blog" });
   navLinks.push({ label: "Contact", href: "/contact" });
 
   const legalLinks: Array<{ label: string; href: string }> = [
@@ -405,8 +406,8 @@ export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
 
     pages.push({
       id: "page-resources",
-      name: "Resources",
-      slug: "/resources",
+      name: "Blog",
+      slug: "/blog",
       isHome: false,
       purpose: "BLOG_INDEX",
       elements: blogElements,
@@ -418,6 +419,16 @@ export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
           status: "APPROVED_FACT",
         },
       ],
+    });
+    pages.push({
+      id: "page-getting-started",
+      name: "Getting Started",
+      slug: "/blog/getting-started",
+      isHome: false,
+      purpose: "BLOG_ARTICLE",
+      elements: [createHeader(websiteName, navLinks), createHeading("Getting Started", "h1"), createParagraph("A practical starting point for understanding the services and next steps."), createFooter(websiteName, legalLinks)],
+      pageSettings: { title: `Getting Started | ${websiteName}`, path: "/blog/getting-started" },
+      claims: [],
     });
   }
 
@@ -550,5 +561,6 @@ export function provisionNormalSiteBaseline(input: BaselineProvisioningInput): {
   return {
     editorData,
     operatingContract: contract,
+    contract,
   };
 }

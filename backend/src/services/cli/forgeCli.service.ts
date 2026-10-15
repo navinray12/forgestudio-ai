@@ -237,17 +237,6 @@ Flags:
         break;
       }
 
-      // 18.9 forge preview
-      case "preview": {
-        const projId = options.projectId || (await getFirstProjectId());
-        resultData = {
-          previewUrl: `https://${projId}.preview.forge.live`,
-          status: "ACTIVE",
-        };
-        stdout = `Preview active at https://${projId}.preview.forge.live`;
-        break;
-      }
-
       // 18.10 forge deploy
       case "deploy": {
         const projId = options.projectId || (await getFirstProjectId());
@@ -864,7 +853,7 @@ Flags:
           const runs = await dockerfileGeneratorService.listContainers(projId);
           resultData = { runs };
           stdout = `Running Containers (${runs.length}):\n` +
-            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port bindings: ${JSON.stringify(r.portBindings)} [status: ${r.status}]`).join("\n");
+            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
         } else if (subCommand === "stop") {
           const runId = subArgs[0];
           if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");

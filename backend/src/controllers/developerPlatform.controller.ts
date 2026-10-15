@@ -326,6 +326,7 @@ export class DeveloperPlatformController {
 
   static async getImportStatus(req: Request, res: Response, next: NextFunction) {
     try {
+      const jobId = paramStr(req.params.jobId);
       const user = (req as any).user || res.locals?.user;
       const job = await repositoryAcquisitionService.getImportJob(jobId, user?.id);
       res.json({ success: true, job });

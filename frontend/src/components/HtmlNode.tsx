@@ -1,5 +1,5 @@
 import React from "react";
-import DOMPurify from "dompurify";
+import { sanitizeHtml } from "../utils/sanitizeHtml";
 
 interface HtmlNodeProps {
     el: { id?: React.Key; type: string; content?: string };
@@ -17,12 +17,7 @@ export default function HtmlNode({ el, mergedProps, optInnerClass = "", finalInn
         markup = "<div class='text-center text-slate-400 p-4 border-2 border-dashed border-slate-200'>Add custom HTML markup in the sidebar.</div>";
     }
 
-    const safeHtml = DOMPurify.sanitize(markup, {
-        FORBID_TAGS: ['style', 'script', 'embed', 'object', 'base'],
-        FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'oninput', 'onchange'],
-        ADD_TAGS: ['iframe'],
-        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling']
-    });
+    const safeHtml = sanitizeHtml(markup);
 
     return (
         <React.Fragment key={el.id}>

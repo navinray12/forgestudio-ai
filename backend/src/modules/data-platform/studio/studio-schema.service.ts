@@ -5,14 +5,50 @@ import { AppError } from "../../../utils/app-error.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
 export function validateIdentifier(identifier: string): string {
-  if (!identifier || !/^[a-zA-Z0-9_]+$/.test(identifier)) {
+  // PostgreSQL truncates identifiers after 63 bytes. Refuse collisions rather
+  // than silently applying a migration to a different table or column.
+  if (typeof identifier !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier) || Buffer.byteLength(identifier, "utf8") > 63) {
     throw new AppError(
-      `Invalid SQL identifier "${identifier}". Only alphanumeric characters and underscores are allowed.`,
+      `Invalid SQL identifier "${identifier}". Use 1–63 bytes, starting with a letter or underscore, followed by letters, numbers or underscores.`,
       400,
       "INVALID_IDENTIFIER"
     );
   }
-  return identifier.slice(0, 63);
+  return identifier;
+}
+
+/** Only documented PostgreSQL scalar types and bounded type parameters. */
+export function validateColumnType(type: string): string {
+  if (typeof type !== "string") {
+    throw new AppError("Invalid column type", 400, "INVALID_TYPE");
+  }
+  const value = type.trim().toUpperCase();
+  if (/^(TEXT|INTEGER|INT|BIGINT|SMALLINT|BOOLEAN|BOOL|TIMESTAMP|TIMESTAMPTZ|DATE|JSONB|JSON|UUID|REAL|FLOAT8)$/.test(value)) {
+    return value;
+  }
+  const varchar = /^(VARCHAR)\(([1-9][0-9]{0,4})\)$/.exec(value);
+  if (varchar && Number(varchar[2]) <= 10485760) return value;
+  const numeric = /^(NUMERIC|DECIMAL)\(([1-9][0-9]?),([0-9]{1,2})\)$/.exec(value);
+  if (numeric && Number(numeric[2]) <= 1000 && Number(numeric[3]) <= Number(numeric[2])) return value;
+  if (value === "VARCHAR" || value === "NUMERIC" || value === "DECIMAL") return value;
+  throw new AppError(`Unsupported column type "${type}"`, 400, "INVALID_TYPE");
+}
+
+/**
+ * DDL expressions cannot be parameterized; reject arbitrary SQL in UI defaults.
+ * Keep common scalar literals and well-known database-generated values.
+ */
+export function validateColumnDefault(value: string): string {
+  if (typeof value !== "string") {
+    throw new AppError("Invalid column default", 400, "INVALID_DEFAULT");
+  }
+  const candidate = value.trim();
+  if (
+    /^(NULL|TRUE|FALSE|CURRENT_DATE|CURRENT_TIMESTAMP|NOW\(\)|GEN_RANDOM_UUID\(\))$/i.test(candidate) ||
+    /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(candidate) ||
+    /^'(?:[^']|'')*'$/.test(candidate)
+  ) return candidate;
+  throw new AppError("Unsupported column default expression; use a scalar literal or an approved database function.", 400, "INVALID_DEFAULT");
 }
 
 export interface ColumnDefinition {
@@ -21,6 +57,21 @@ export interface ColumnDefinition {
   isNullable?: boolean;
   defaultValue?: string | null;
   isPrimaryKey?: boolean;
+}
+
+/** Validate all column identities before any connection or DDL is attempted. */
+export function assertUniqueColumnNames(columns: ColumnDefinition[]): void {
+  if (!Array.isArray(columns) || columns.length === 0) {
+    throw new AppError("Table must contain at least one column", 400, "INVALID_COLUMNS");
+  }
+  const seen = new Set<string>();
+  for (const column of columns) {
+    const name = validateIdentifier(column.name);
+    if (seen.has(name)) {
+      throw new AppError(`Duplicate table column "${name}"`, 400, "DUPLICATE_COLUMN");
+    }
+    seen.add(name);
+  }
 }
 
 export interface TableSummary {
@@ -252,6 +303,21 @@ export async function getSchemaDiagram(
   return { tables: nodes, relationships: edges };
 }
 
+/** Fail closed before tenant DDL if its migration ledger is not registered. */
+export function assertMigrationLedgerRegistered<T extends { id: string }>(record: T | null): T {
+  if (!record?.id) {
+    throw new AppError("Project database is not registered for migration tracking", 409, "MIGRATION_LEDGER_MISSING");
+  }
+  return record;
+}
+
+async function requireMigrationLedger(projectId: string, environment: DatabaseEnvironment) {
+  const record = await prisma.projectDatabase.findUnique({
+    where: { websiteId_environment: { websiteId: projectId, environment } },
+  });
+  return assertMigrationLedgerRegistered(record);
+}
+
 /**
  * Creates a new table via visual DDL and records the migration in Prisma.
  */
@@ -261,33 +327,19 @@ export async function createTable(
   environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(payload.name);
-  if (!payload.columns || payload.columns.length === 0) {
-    throw new AppError("Table must contain at least one column", 400, "INVALID_COLUMNS");
-  }
-
-  const allowedTypes = new Set([
-    "VARCHAR", "TEXT", "INTEGER", "INT", "BIGINT", "SMALLINT",
-    "BOOLEAN", "BOOL", "TIMESTAMP", "TIMESTAMPTZ", "DATE",
-    "JSONB", "JSON", "UUID", "NUMERIC", "DECIMAL", "REAL", "FLOAT8",
-  ]);
+  assertUniqueColumnNames(payload.columns);
 
   const primaryKeys: string[] = [];
   const columnClauses: string[] = [];
 
   for (const col of payload.columns) {
     const safeColName = validateIdentifier(col.name);
-    const upperType = col.type.toUpperCase().trim();
-
-    // Support VARCHAR(n)
-    const baseType = upperType.split("(")[0];
-    if (!allowedTypes.has(baseType)) {
-      throw new AppError(`Unsupported column type "${col.type}"`, 400, "INVALID_TYPE");
-    }
+    const upperType = validateColumnType(col.type);
 
     let clause = `"${safeColName}" ${upperType}`;
 
-    if (col.defaultValue && col.defaultValue.trim() !== "") {
-      clause += ` DEFAULT ${col.defaultValue}`;
+    if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue.trim() !== "") {
+      clause += ` DEFAULT ${validateColumnDefault(col.defaultValue)}`;
     }
 
     if (col.isNullable === false || col.isPrimaryKey) {
@@ -307,33 +359,32 @@ export async function createTable(
 
   const ddl = `CREATE TABLE "public"."${safeName}" (\n  ${columnClauses.join(",\n  ")}\n);`;
 
+  const dbRecord = await requireMigrationLedger(projectId, environment);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
-  // Record migration in Prisma
-  const dbRecord = await prisma.projectDatabase.findUnique({
-    where: {
-      websiteId_environment: {
-        websiteId: projectId,
-        environment,
-      },
+  // Record migration in Prisma after tenant DDL succeeds.
+  const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
+  await prisma.databaseMigrationRecord.create({
+    data: {
+      databaseId: dbRecord.id,
+      migrationName: `create_table_${safeName}_${Date.now()}`,
+      checksum,
+      sqlScript: ddl,
+      executionTimeMs: durationMs,
     },
   });
+}
 
-  if (dbRecord) {
-    const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
-    await prisma.databaseMigrationRecord.create({
-      data: {
-        databaseId: dbRecord.id,
-        migrationName: `create_table_${safeName}_${Date.now()}`,
-        checksum,
-        sqlScript: ddl,
-        executionTimeMs: durationMs,
-      },
-    });
-  }
+/**
+ * Do not hide a missing table with IF EXISTS: a no-op must not be recorded
+ * as a successful destructive migration.
+ */
+export function buildDropTableStatement(tableName: string): string {
+  const safeName = validateIdentifier(tableName);
+  return `DROP TABLE "public"."${safeName}" RESTRICT;`;
 }
 
 /**
@@ -345,34 +396,73 @@ export async function dropTable(
   environment: DatabaseEnvironment
 ): Promise<void> {
   const safeName = validateIdentifier(tableName);
-  const ddl = `DROP TABLE IF EXISTS "public"."${safeName}" CASCADE;`;
+  // RESTRICT is PostgreSQL's default: dependent objects must be reviewed and handled explicitly.
+  const ddl = buildDropTableStatement(safeName);
 
+  const dbRecord = await requireMigrationLedger(projectId, environment);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const startTime = Date.now();
   await pool.query(ddl);
   const durationMs = Date.now() - startTime;
 
-  const dbRecord = await prisma.projectDatabase.findUnique({
-    where: {
-      websiteId_environment: {
-        websiteId: projectId,
-        environment,
-      },
+  const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
+  await prisma.databaseMigrationRecord.create({
+    data: {
+      databaseId: dbRecord.id,
+      migrationName: `drop_table_${safeName}_${Date.now()}`,
+      checksum,
+      sqlScript: ddl,
+      executionTimeMs: durationMs,
     },
   });
+}
 
-  if (dbRecord) {
-    const checksum = crypto.createHash("sha256").update(ddl).digest("hex");
-    await prisma.databaseMigrationRecord.create({
-      data: {
-        databaseId: dbRecord.id,
-        migrationName: `drop_table_${safeName}_${Date.now()}`,
-        checksum,
-        sqlScript: ddl,
-        executionTimeMs: durationMs,
-      },
-    });
+/** One pagination contract for both the API response and the SQL LIMIT/OFFSET. */
+export function normalizeStudioPagination(
+  pageInput: unknown,
+  limitInput: unknown
+): { page: number; limit: number; offset: number } {
+  function parse(value: unknown, fallback: number, field: string, max: number): number {
+    if (value === undefined || value === null || value === "") return fallback;
+    if ((typeof value !== "number" && typeof value !== "string") ||
+        (typeof value === "string" && !/^[0-9]+$/.test(value))) {
+      throw new AppError(`Invalid ${field}: expected a positive integer`, 400, "INVALID_PAGINATION");
+    }
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 1 || number > max) {
+      throw new AppError(`Invalid ${field}: expected a positive integer up to ${max}`, 400, "INVALID_PAGINATION");
+    }
+    return number;
   }
+  const page = parse(pageInput, 1, "page", 1_000_000);
+  const limit = parse(limitInput, 50, "limit", 500);
+  return { page, limit, offset: (page - 1) * limit };
+}
+
+/**
+ * Validate sort keys against observed columns; never silently report one sort
+ * while executing another. A single primary key breaks ties for stable paging.
+ */
+export function buildStudioOrderClause(
+  details: Pick<TableDetails, "columns">,
+  sortBy?: string,
+  sortOrder?: string
+): string {
+  if (sortOrder !== undefined && sortOrder !== "ASC" && sortOrder !== "DESC") {
+    throw new AppError("Invalid sort order", 400, "INVALID_SORT_ORDER");
+  }
+  const primaryKeys = details.columns.filter((col) => col.isPrimaryKey);
+  const singleKey = primaryKeys.length === 1 ? validateIdentifier(primaryKeys[0].name) : null;
+  if (sortBy !== undefined && sortBy !== "") {
+    const safeSortBy = validateIdentifier(sortBy);
+    if (!details.columns.some((col) => col.name === safeSortBy)) {
+      throw new AppError(`Unknown table sort column "${safeSortBy}"`, 400, "INVALID_SORT_COLUMN");
+    }
+    const direction = sortOrder || "ASC";
+    const tieBreak = singleKey && singleKey !== safeSortBy ? `, "${singleKey}" ASC` : "";
+    return `ORDER BY "${safeSortBy}" ${direction}${tieBreak}`;
+  }
+  return singleKey ? `ORDER BY "${singleKey}" ASC` : "";
 }
 
 /**
@@ -385,27 +475,15 @@ export async function getTableRows(
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: "ASC" | "DESC";
+    sortOrder?: string;
   },
   environment: DatabaseEnvironment
 ): Promise<{ rows: any[]; total: number }> {
   const safeTable = validateIdentifier(tableName);
-  const page = Math.max(1, params.page || 1);
-  const limit = Math.min(500, Math.max(1, params.limit || 50));
-  const offset = (page - 1) * limit;
+  const { limit, offset } = normalizeStudioPagination(params.page, params.limit);
 
   const details = await getTableDetails(projectId, safeTable, environment);
-  const validColumns = new Set(details.columns.map((c) => c.name));
-
-  let orderClause = "";
-  if (params.sortBy && validColumns.has(params.sortBy)) {
-    const safeSortBy = validateIdentifier(params.sortBy);
-    const order = params.sortOrder === "DESC" ? "DESC" : "ASC";
-    orderClause = `ORDER BY "${safeSortBy}" ${order}`;
-  } else if (details.columns.some((c) => c.isPrimaryKey)) {
-    const pk = details.columns.find((c) => c.isPrimaryKey)!.name;
-    orderClause = `ORDER BY "${pk}" ASC`;
-  }
+  const orderClause = buildStudioOrderClause(details, params.sortBy, params.sortOrder);
 
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const client = await pool.connect();
@@ -433,6 +511,40 @@ export async function getTableRows(
 /**
  * Performs inline row mutations (INSERT, UPDATE, DELETE).
  */
+/**
+ * A single-column WHERE clause is only safe when it uniquely selects one row.
+ * Compound/no-primary-key tables must use a separate, reviewed row-edit workflow.
+ */
+export function assertSafeRowMutation(
+  details: Pick<TableDetails, "columns">,
+  action: "INSERT" | "UPDATE" | "DELETE",
+  primaryKeyColumn: string,
+  data?: Record<string, unknown>
+): void {
+  const knownColumns = new Set(details.columns.map((column) => column.name));
+  if (action === "UPDATE" || action === "DELETE") {
+    const keys = details.columns.filter((column) => column.isPrimaryKey);
+    if (keys.length !== 1 || keys[0].name !== primaryKeyColumn) {
+      throw new AppError("Row changes require the table's single-column primary key", 400, "UNSAFE_ROW_SELECTOR");
+    }
+  }
+  if (data && (action === "INSERT" || action === "UPDATE")) {
+    for (const key of Object.keys(data)) {
+      if (!knownColumns.has(key)) {
+        throw new AppError(`Unknown table column "${key}"`, 400, "INVALID_COLUMN");
+      }
+    }
+  }
+}
+
+/** An update or deletion with no matching primary key must not report success. */
+export function requireMutatedRow<T>(row: T | null | undefined, action: "UPDATE" | "DELETE"): T {
+  if (row === null || row === undefined) {
+    throw new AppError(`Cannot ${action.toLowerCase()} row: primary key was not found`, 404, "ROW_NOT_FOUND");
+  }
+  return row;
+}
+
 export async function mutateTableRow(
   projectId: string,
   tableName: string,
@@ -446,6 +558,11 @@ export async function mutateTableRow(
 ): Promise<any> {
   const safeTable = validateIdentifier(tableName);
   const safePk = validateIdentifier(payload.primaryKeyColumn);
+  if (!["INSERT", "UPDATE", "DELETE"].includes(payload.action)) {
+    throw new AppError("Unknown mutation action", 400, "INVALID_ACTION");
+  }
+  const details = await getTableDetails(projectId, safeTable, environment);
+  assertSafeRowMutation(details, payload.action, safePk, payload.data);
   const pool = await TenantPoolManager.getTenantPool(projectId, environment);
   const client = await pool.connect();
 
@@ -458,7 +575,7 @@ export async function mutateTableRow(
         `DELETE FROM "public"."${safeTable}" WHERE "${safePk}" = $1 RETURNING *;`,
         [payload.primaryKeyValue]
       );
-      return res.rows[0] || null;
+      return requireMutatedRow(res.rows[0], "DELETE");
     }
 
     if (payload.action === "UPDATE") {
@@ -480,10 +597,13 @@ export async function mutateTableRow(
         values.push(val);
       }
 
+      if (updates.length === 0) {
+        throw new AppError("UPDATE requires at least one non-primary-key column", 400, "MISSING_UPDATABLE_COLUMNS");
+      }
       values.push(payload.primaryKeyValue);
-      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}" = $${idx} RETURNING *;`;
+      const query = `UPDATE "public"."${safeTable}" SET ${updates.join(", ")} WHERE "${safePk}"  = $${idx} RETURNING *;`;
       const res = await client.query(query, values);
-      return res.rows[0] || null;
+      return requireMutatedRow(res.rows[0], "UPDATE");
     }
 
     if (payload.action === "INSERT") {

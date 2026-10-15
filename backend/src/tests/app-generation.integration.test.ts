@@ -28,7 +28,7 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
   const { ensureDatabaseTables } = await import("../config/ensure-schema.js");
   const { createForgeProject } = await import("../services/project/forgeProject.service.js");
   const fs = await import("../services/project/forgeFilesystem.service.js");
-  const { AppGenerationService, reconcileInterruptedRuns, MAX_REPAIR_ATTEMPTS } = await import("../services/appGeneration/appGeneration.service.js");
+  const { AppGenerationService, reconcileInterruptedRuns, failUnexpectedGenerationRun, MAX_REPAIR_ATTEMPTS } = await import("../services/appGeneration/appGeneration.service.js");
   const controller = await import("../controllers/appGeneration.controller.js");
   const { AppError } = await import("../utils/app-error.js");
 
@@ -184,6 +184,46 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
       projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id, mode: "AI_PROVIDER", brief: "Clinic appointments booking",
     });
     expect(run).toMatchObject({ status: "SOURCE_WRITTEN", providerCalls: 2, repairAttempts: 1, inputTokens: 250, outputTokens: 210 });
+  });
+
+  it("persists unexpected worker failures and permits a clean retry without overwriting terminal state", async () => {
+    const project = await newProject();
+    const failingFs = {
+      readFile: async () => { throw new Error("unexpected fixture filesystem failure"); },
+      writeFile: fs.writeFile,
+    };
+    const broken = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: failingFs,
+    });
+    const failed = await runToCompletion(broken, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(failed.status).toBe("FAILED");
+    expect(failed.errorCode).toBe("UNEXPECTED_GENERATION_FAILURE");
+    expect(failed.errorMessage).not.toContain("fixture filesystem failure");
+    expect(failed.diagnostics.some((d) => /unexpected generation failure/i.test(d.message))).toBe(true);
+    expect(await failUnexpectedGenerationRun(failed.id)).toBe(false);
+
+    const fixed = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: fs,
+    });
+    const { run: retry } = await fixed.retryRun(project.id, failed.id, users.owner.id, users.owner.id);
+    const retried = await fixed.getRun(project.id, retry.id);
+    expect(retried.retryOfRunId).toBe(failed.id);
+    for (let i = 0; i < 200; i++) {
+      const current = await fixed.getRun(project.id, retry.id);
+      if (current.status === "SOURCE_WRITTEN" || current.status === "FAILED") {
+        expect(current.status).toBe("SOURCE_WRITTEN");
+        expect(await failUnexpectedGenerationRun(current.id)).toBe(false);
+        expect((await fixed.getRun(project.id, current.id)).status).toBe("SOURCE_WRITTEN");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error("retry never reached terminal state");
   });
 
   it("reports provider failures truthfully", async () => {

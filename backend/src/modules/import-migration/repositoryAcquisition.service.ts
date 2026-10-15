@@ -170,7 +170,7 @@ export class RepositoryAcquisitionService {
     const { jobId, projectName, ownerId, files } = params;
 
     const job = await db.forgeImportJob.findUnique({ where: { id: jobId } });
-    if (!job || job.ownerId !== ownerId) throw new AppError("Import job not found", 404, "NOT_FOUND");
+    if (!job) throw new AppError("Import job not found", 404, "NOT_FOUND");
 
     await db.forgeImportJob.update({
       where: { id: jobId },

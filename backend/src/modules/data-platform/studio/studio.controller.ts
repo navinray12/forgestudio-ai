@@ -8,6 +8,7 @@ import {
   createTable,
   dropTable,
   getTableRows,
+  normalizeStudioPagination,
   mutateTableRow,
 } from "./studio-schema.service.js";
 import { executeUserQuery } from "./studio-sql.service.js";
@@ -136,10 +137,9 @@ export async function getTableRowsHandler(req: Request, res: Response, next: Nex
     await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
 
-    const page = parseInt(req.query.page as string, 10) || 1;
-    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const { page, limit } = normalizeStudioPagination(req.query.page, req.query.limit);
     const sortBy = req.query.sortBy as string | undefined;
-    const sortOrder = (req.query.sortOrder as "ASC" | "DESC") || "ASC";
+    const sortOrder = req.query.sortOrder === undefined ? undefined : String(req.query.sortOrder);
 
     const result = await getTableRows(projectId, tableName, { page, limit, sortBy, sortOrder }, env);
 
@@ -259,11 +259,13 @@ export async function listMigrationsHandler(req: Request, res: Response, next: N
     if (!user) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
 
     await verifyProjectAccess(projectId, user.id);
+    const env = resolveEnvironment(req);
 
     const migrations = await prisma.databaseMigrationRecord.findMany({
       where: {
         database: {
           websiteId: projectId,
+          environment: env,
         },
       },
       orderBy: {

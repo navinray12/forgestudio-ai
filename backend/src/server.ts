@@ -18,7 +18,14 @@ const server = http.createServer(app);
 // Presence, workspace sync (/ws/workspace-sync), data realtime and terminal gateways.
 const gateways = attachWebSocketGateways(server);
 
+import { ensureDefaultPlans } from "./services/subscription.service.js";
+
 void ensureDatabaseTables().then(async () => {
+  // Ensure subscription plans exist for onboarding
+  await ensureDefaultPlans().catch((err) => {
+    console.warn("[subscriptions] could not seed default plans:", err?.message || err);
+  });
+
   const interrupted = await reconcileInterruptedRuns().catch((err) => {
     console.error("[app-generation] could not reconcile interrupted runs:", err?.message || err);
     return 0;
@@ -34,11 +41,8 @@ void ensureDatabaseTables().then(async () => {
     startScheduler();
   });
 }).catch((err) => {
-  console.error("Failed to ensure tables, starting server anyway:", err);
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    startScheduler();
-  });
+  console.error("FATAL: Failed to initialize database schema. Refusing to start server with incomplete schema:", err);
+  process.exit(1);
 });
 
 server.on("error", (error) => {

@@ -3554,12 +3554,38 @@ CREATE INDEX IF NOT EXISTS "content_purge_requests_websiteId_status_idx" ON "con
     EXCEPTION WHEN undefined_function THEN NULL; END $$;
   `);
 
-  if (failedSchemaSteps.length > 0) {
-    console.warn(
-      `⚠️ [DATABASE] Schema self-healing finished with ${failedSchemaSteps.length} failed step(s): ${failedSchemaSteps.join(", ")}`
+  // Ensure forge_application_spec_revisions table exists (WP-17/WP-20)
+  await execSafe("forge_application_spec_revisions table", `
+    CREATE TABLE IF NOT EXISTS forge_application_spec_revisions (
+      "applicationId" VARCHAR(120) NOT NULL,
+      "revision" INTEGER NOT NULL CHECK ("revision" >= 1),
+      "parentRevision" INTEGER NOT NULL CHECK ("parentRevision" >= 0),
+      "projectId" UUID NOT NULL REFERENCES forge_projects(id) ON DELETE RESTRICT,
+      "tenantId" VARCHAR(120) NOT NULL,
+      "digest" CHAR(64) NOT NULL CHECK ("digest" ~ '^[a-f0-9]{64}$'),
+      "spec" JSONB NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT "forge_appspec_revision_pk" PRIMARY KEY ("applicationId", "revision"),
+      CONSTRAINT "forge_appspec_parent_chain" CHECK (
+        ("revision" = 1 AND "parentRevision" = 0)
+        OR ("revision" > 1 AND "parentRevision" = "revision" - 1)
+      ),
+      CONSTRAINT "forge_appspec_nonempty_identity" CHECK (
+        length(trim("applicationId")) > 0 AND length(trim("tenantId")) > 0
+      )
     );
+    CREATE INDEX IF NOT EXISTS "forge_appspec_project_idx"
+      ON forge_application_spec_revisions ("projectId", "applicationId", "revision" DESC);
+  `);
+
+  if (failedSchemaSteps.length > 0) {
+    const errorMsg = `[DATABASE] Schema initialization failed with ${failedSchemaSteps.length} failed step(s): ${failedSchemaSteps.join(", ")}`;
+    console.error(`❌ ${errorMsg}`);
+    const failureList = [...failedSchemaSteps];
+    failedSchemaSteps.length = 0;
+    throw new Error(errorMsg);
   } else {
-    console.log("✅ [DATABASE] Schema self-healing verified all tables & columns successfully.");
+    console.log("✅ [DATABASE] Schema verified all tables & columns successfully.");
   }
   failedSchemaSteps.length = 0;
 }

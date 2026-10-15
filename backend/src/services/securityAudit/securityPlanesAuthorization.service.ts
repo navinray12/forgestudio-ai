@@ -9,6 +9,7 @@
  */
 
 import { AppError } from "../../utils/app-error.js";
+import { DurableAuditDenialLedgerService } from "./durableAuditDenialLedger.service.js";
 
 export type TrustPlane =
   | "PLATFORM_ADMIN"
@@ -39,6 +40,14 @@ export class SecurityPlanesAuthorizationService {
   ): SecurityContext {
     // Defense: If client supplies a header that contradicts server session, reject or ignore
     if (untrustedRequestHeaderTenantId && session.verifiedTenantId && untrustedRequestHeaderTenantId !== session.verifiedTenantId) {
+      DurableAuditDenialLedgerService.logDurableDenial(
+        session.userId,
+        "CROSS_TENANT_CONTEXT",
+        "TENANT_SUBSTITUTION_FORBIDDEN",
+        "Client supplied a tenant context that differs from the verified session tenant.",
+        "unknown",
+        session.verifiedTenantId,
+      );
       throw new AppError("Cross-tenant substitution attempt detected; client header rejected", 403, "TENANT_SUBSTITUTION_FORBIDDEN");
     }
 

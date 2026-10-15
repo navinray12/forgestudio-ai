@@ -51,9 +51,18 @@ export class AnthropicProvider implements AiProvider {
         }),
       });
       if (!response.ok) {
-        // Provider bodies may contain credentials, prompts, and private content.
+        // Provider bodies may contain credentials, prompts, and private content:
+        // never log the raw body; only surface the provider's structured error message.
+        const errorText = await response.text().catch(() => "");
         console.error(`[ANTHROPIC ERROR ${response.status}]`);
-        throw new AppError(`AI provider error: ${response.status}`, 503, "AI_PROVIDER_UNAVAILABLE");
+        let reason = "";
+        try {
+          const parsed = JSON.parse(errorText) as { error?: { message?: unknown } };
+          if (typeof parsed?.error?.message === "string") reason = `: ${parsed.error.message.slice(0, 300)}`;
+        } catch {
+          // Non-JSON error bodies are not surfaced.
+        }
+        throw new AppError(`AI provider error: ${response.status}${reason}`, 503, "AI_PROVIDER_UNAVAILABLE");
       }
       const body = await response.json().catch(() => null) as { stop_reason?: unknown; content?: Array<{ type?: unknown; text?: unknown }>; id?: unknown; model?: unknown; usage?: { input_tokens?: unknown; output_tokens?: unknown } } | null;
       let text = (body?.content?.filter(item => item.type === "text" && typeof item.text === "string").map(item => item.text as string) ?? [])[0] ?? "";
