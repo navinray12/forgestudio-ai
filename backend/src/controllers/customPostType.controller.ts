@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { createHash } from "node:crypto";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
 import { verifyProjectAccess, type ProjectAccess } from "../modules/data-platform/common/project-access.js";
@@ -73,6 +74,21 @@ function toApiField(field: { id: string; postTypeId: string; name: string; slug:
 function toApiEntry<T extends { data: unknown }>(entry: T) {
     const { data, ...rest } = entry;
     return { ...rest, values: data ?? {} };
+}
+
+// A content-addressed editor revision prevents a stale tab from silently
+// replacing schema edits made by another owner. The stable order and mapped
+// field content are the same for GET and POST responses.
+function customFieldsRevision(fields: Array<{
+    id: string; name: string; slug: string; type: string; order: number; config: unknown;
+}>): string {
+    const content = fields
+        .map((field) => ({
+            id: field.id, name: field.name, key: field.slug, type: field.type,
+            order: field.order, config: field.config,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    return createHash("sha256").update(JSON.stringify(content)).digest("hex");
 }
 
 // ====== CPT Management ======
@@ -156,7 +172,10 @@ export async function getCustomFieldsHandler(req: Request, res: Response, next: 
             where: { postTypeId: postType.id },
             orderBy: { order: 'asc' }
         });
-        res.status(200).json({ success: true, data: fields.map(toApiField) });
+        res.status(200).json({
+            success: true, data: fields.map(toApiField),
+            fieldsRevision: customFieldsRevision(fields),
+        });
     } catch (e) { next(e); }
 }
 
@@ -211,9 +230,25 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
     try {
         const { postType } = await authorizePostType(req, res, req.params.cptId);
         const incoming = parseIncomingFields(req.body?.fields);
+        const expectedFieldsRevision = req.body?.expectedFieldsRevision;
+        if (expectedFieldsRevision !== undefined &&
+            (typeof expectedFieldsRevision !== "string" || !/^[a-f0-9]{64}$/.test(expectedFieldsRevision))) {
+            throw new AppError("Invalid field revision", 400, "INVALID_FIELD_REVISION");
+        }
 
         const result = await prisma.$transaction(async (tx) => {
+            // Serialize edits to this content type even when different fields are
+            // being added. The revision comparison then occurs under the lock.
+            await tx.$queryRaw`SELECT id FROM custom_post_types WHERE id = ${postType.id}::uuid FOR UPDATE`;
             const existing = await tx.customField.findMany({ where: { postTypeId: postType.id } });
+            if (expectedFieldsRevision !== undefined &&
+                customFieldsRevision(existing) !== expectedFieldsRevision) {
+                throw new AppError(
+                    "Fields changed since this editor loaded them. Reload the field definitions and review changes before saving.",
+                    409,
+                    "FIELD_REVISION_CONFLICT"
+                );
+            }
             const byId = new Map(existing.map((f) => [f.id, f]));
             const bySlug = new Map(existing.map((f) => [f.slug, f]));
             const matchedIds = new Set<string>();
@@ -288,7 +323,11 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
             return { plan, fields };
         });
 
-        res.status(200).json({ success: true, data: result.fields.map(toApiField), migrationPlan: result.plan });
+        res.status(200).json({
+            success: true, data: result.fields.map(toApiField),
+            fieldsRevision: customFieldsRevision(result.fields),
+            migrationPlan: result.plan,
+        });
     } catch (e) { next(e); }
 }
 
