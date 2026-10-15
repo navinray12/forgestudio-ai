@@ -167,6 +167,47 @@ describe.skipIf(!optedIn)("Custom Post Type CMS (disposable PostgreSQL)", async 
       .toEqual(before.map((f) => ({ id: f.id, name: f.name, slug: f.slug })));
   });
 
+  it("rejects stale editor revisions and preserves the newer schema", async () => {
+    const opened = await call(cpt.getCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+    });
+    expect(opened.status).toBe(200);
+    expect(opened.payload.fieldsRevision).toMatch(/^[0-9a-f]{64}$/);
+    const originalRevision = opened.payload.fieldsRevision as string;
+    const saveFields = async (fields: any[], revision: string) => call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields, expectedFieldsRevision: revision },
+    });
+    const first = await saveFields([
+      { id: titleFieldId, name: "Updated by first editor", key: "headline", type: "text", required: true },
+    ], originalRevision);
+    expect(first.status).toBe(200);
+    expect(first.payload.fieldsRevision).not.toBe(originalRevision);
+
+    const stale = await saveFields([
+      { id: titleFieldId, name: "Second editor stale value", key: "headline", type: "text", required: true },
+    ], originalRevision);
+    expect(stale.status).toBe(409);
+    expect(stale.error?.code).toBe("FIELD_REVISION_CONFLICT");
+    expect((await prisma.customField.findUnique({ where: { id: titleFieldId } }))?.name).toBe("Updated by first editor");
+
+    const refreshed = await call(cpt.getCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+    });
+    expect(refreshed.payload.fieldsRevision).toBe(first.payload.fieldsRevision);
+    const safe = await saveFields([
+      { id: titleFieldId, name: "Updated by first editor", key: "headline", type: "text", required: true },
+    ], refreshed.payload.fieldsRevision);
+    expect(safe.status).toBe(200);
+    expect(safe.payload.fieldsRevision).toBe(refreshed.payload.fieldsRevision);
+    const invalid = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
+      params: { cptId: postTypeId },
+      body: { fields: [], expectedFieldsRevision: "not-a-digest" },
+    });
+    expect(invalid.status).toBe(400);
+    expect(invalid.error?.code).toBe("INVALID_FIELD_REVISION");
+  });
+
   it("rejects duplicate and invalid field keys without writing", async () => {
     const dup = await call(cpt.saveCustomFieldsHandler, users.owner.id, {
       params: { cptId: postTypeId },
