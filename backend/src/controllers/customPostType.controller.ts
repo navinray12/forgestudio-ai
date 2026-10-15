@@ -167,6 +167,7 @@ interface IncomingField {
 function parseIncomingFields(raw: unknown): IncomingField[] {
     if (!Array.isArray(raw)) throw new AppError("fields must be an array", 400, "INVALID_INPUT");
     const seen = new Set<string>();
+    const seenIds = new Set<string>();
     return raw.map((f: any, i: number) => {
         const name = typeof f?.name === "string" ? f.name.trim() : "";
         const key = typeof f?.key === "string" ? f.key.trim() : "";
@@ -176,6 +177,15 @@ function parseIncomingFields(raw: unknown): IncomingField[] {
         }
         if (seen.has(key)) throw new AppError(`Field key "${key}" is used more than once`, 400, "DUPLICATE_FIELD_KEY");
         seen.add(key);
+        if (f.id !== undefined) {
+            if (typeof f.id !== "string" || !UUID_PATTERN.test(f.id)) {
+                throw new AppError("Invalid field identity", 400, "INVALID_FIELD_ID");
+            }
+            if (seenIds.has(f.id)) {
+                throw new AppError("Repeated field identity", 400, "DUPLICATE_FIELD_ID");
+            }
+            seenIds.add(f.id);
+        }
         return {
             id: typeof f.id === "string" ? f.id : undefined,
             name,
@@ -205,11 +215,17 @@ export async function saveCustomFieldsHandler(req: Request, res: Response, next:
             const plan = { added: [] as string[], modified: [] as string[], retained: [] as string[] };
 
             const matches = incoming.map((f) => {
+                if (f.id && !byId.has(f.id)) {
+                    throw new AppError("Field identity does not belong to this post type", 409, "FIELD_ID_MISMATCH");
+                }
                 const match = (f.id && byId.get(f.id)) || bySlug.get(f.key);
                 if (match) matchedIds.add(match.id);
                 return { f, match };
             });
 
+            if (matchedIds.size !== matches.filter((entry) => entry.match).length) {
+                throw new AppError("A saved field was referenced more than once", 400, "DUPLICATE_FIELD_ID");
+            }
             const retained = existing.filter((f) => !matchedIds.has(f.id));
             const retainedSlugs = new Set(retained.map((f) => f.slug));
             for (const { f } of matches) {

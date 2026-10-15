@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -18,6 +18,46 @@ export default function CustomPostTypeBuilder() {
     const [fields, setFields] = useState<any[]>([]);
 
     const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(Boolean(cptId));
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!cptId || !websiteId) {
+            setLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setLoading(true);
+        setLoadError(null);
+        const load = async () => {
+            try {
+                const [typesResponse, fieldsResponse] = await Promise.all([
+                    fetch(`${apiUrl}/api/cpt/websites/${websiteId}/types`, { credentials: "include" }),
+                    fetch(`${apiUrl}/api/cpt/types/${cptId}/fields`, { credentials: "include" }),
+                ]);
+                if (!typesResponse.ok || !fieldsResponse.ok) throw new Error("Could not load the existing content type.");
+                const [typesResult, fieldsResult] = await Promise.all([typesResponse.json(), fieldsResponse.json()]);
+                if (!typesResult.success || !fieldsResult.success) throw new Error("The existing content type could not be loaded.");
+                const matchingType = (typesResult.data as any[]).find((item) => item.id === cptId);
+                if (!matchingType) throw new Error("Content type not found or access denied.");
+                if (cancelled) return;
+                setName(matchingType.name ?? "");
+                setSingular(matchingType.singular ?? "");
+                setPlural(matchingType.plural ?? "");
+                setSlug(matchingType.slug ?? "");
+                setDescription(matchingType.description ?? "");
+                setFields(fieldsResult.data);
+            } catch (error: any) {
+                if (!cancelled) setLoadError(error?.message || "Unable to load saved fields.");
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+        void load();
+        return () => { cancelled = true; };
+    }, [cptId, websiteId]);
 
     const handleAddField = () => {
         setFields(prev => [...prev, {
@@ -31,6 +71,9 @@ export default function CustomPostTypeBuilder() {
 
     const handleSave = async (e: any) => {
         e.preventDefault();
+        if (loading || loadError) return;
+        setSaveError(null);
+        setSavedNotice(null);
         setSaving(true);
         try {
 
@@ -49,16 +92,24 @@ export default function CustomPostTypeBuilder() {
             }
 
             // 2. Save Fields Sync
-            await fetch(`${apiUrl}/api/cpt/types/${currentCptId}/fields`, {
+            const fieldsResponse = await fetch(`${apiUrl}/api/cpt/types/${currentCptId}/fields`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
                 body: JSON.stringify({ fields })
             });
-
-            navigate(`/dashboard/cpts/${websiteId}`);
+            const fieldsResult = await fieldsResponse.json().catch(() => null);
+            if (!fieldsResponse.ok || !fieldsResult?.success) {
+                throw new Error(fieldsResult?.error?.message || fieldsResult?.message || "Fields were not saved. Please review and retry.");
+            }
+            setFields(fieldsResult.data);
+            if (fieldsResult.migrationPlan?.retained?.length) {
+                setSavedNotice(`Saved. Protected existing fields retained: ${fieldsResult.migrationPlan.retained.join(", ")}.`);
+            } else {
+                navigate(`/dashboard/cpts/${websiteId}`);
+            }
         } catch (e: any) {
-            alert(e.message || "Failed to commit changes");
+            setSaveError(e.message || "Failed to commit changes");
         } finally {
             setSaving(false);
         }
@@ -94,7 +145,11 @@ export default function CustomPostTypeBuilder() {
                             <textarea disabled={!isNew} value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full rounded-xl border-slate-200 p-3 text-sm focus:border-blue-500" placeholder="Internal context for this content type..." />
                         </label>
 
-                        <button disabled={saving} type="submit" className="mt-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
+                        {loading && <p role="status" className="text-sm text-slate-600">Loading saved fields…</p>}
+                        {loadError && <p role="alert" className="text-sm text-red-600">{loadError}</p>}
+                        {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
+                        {savedNotice && <p role="status" className="text-sm text-amber-700">{savedNotice}</p>}
+                        <button disabled={saving || loading || Boolean(loadError)} type="submit" className="mt-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
                             {saving ? "Committing..." : "Save Configuration"}
                         </button>
                     </form>
@@ -108,7 +163,7 @@ export default function CustomPostTypeBuilder() {
                             <h2 className="text-2xl font-bold text-slate-800">Fields Builder</h2>
                             <p className="text-sm text-slate-500 mt-1">Design the architectural data model. This structures Editor dynamic bindings.</p>
                         </div>
-                        <button onClick={handleAddField} className="bg-slate-800 text-white px-4 py-2 text-xs font-bold rounded-xl hover:bg-slate-900 transition">+ Add Native Field</button>
+                        <button onClick={handleAddField} disabled={loading || Boolean(loadError)} className="bg-slate-800 text-white px-4 py-2 text-xs font-bold rounded-xl hover:bg-slate-900 transition">+ Add Native Field</button>
                     </div>
 
                     <div className="space-y-4">
@@ -152,9 +207,14 @@ export default function CustomPostTypeBuilder() {
                                         <option value="boolean">Boolean</option>
                                     </select>
                                 </div>
-                                <button onClick={() => setFields(fields.filter((_, i) => i !== index))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg font-bold text-xs transition">Remove</button>
+                                {field.id ? (
+                                    <span className="text-xs text-slate-500" title="Saved fields cannot be removed by an ordinary schema save.">Preserved</span>
+                                ) : (
+                                    <button type="button" onClick={() => setFields(fields.filter((_, i) => i !== index))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg font-bold text-xs transition">Remove draft</button>
+                                )}
                             </div>
                         ))}
+                        <p className="text-xs text-slate-500">Saved fields keep their stable IDs. Existing fields are preserved; deleting a stored field requires an approved migration.</p>
                         {fields.length === 0 && (
                             <div className="text-center py-20 text-slate-400 text-sm font-medium border-2 border-dashed border-slate-100 rounded-2xl">
                                 Inject your architectural fields natively above.
