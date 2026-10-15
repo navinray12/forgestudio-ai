@@ -152,6 +152,7 @@ export const DatabaseStudioPage: React.FC = () => {
   };
 
   const handleDropTable = async (tableName: string) => {
+    let confirmTableName: string | undefined;
     if (isProduction) {
       const typed = prompt(
         `You are about to drop "${tableName}" from the PRODUCTION database. This cannot be undone.
@@ -159,6 +160,7 @@ export const DatabaseStudioPage: React.FC = () => {
 Type the table name to confirm:`
       );
       if (typed !== tableName) return;
+      confirmTableName = typed;
     } else if (!confirm(`Drop table "${tableName}" from ${environment}? This action is irreversible.`)) {
       return;
     }
@@ -168,6 +170,10 @@ Type the table name to confirm:`
         {
           method: "DELETE",
           credentials: "include",
+          ...(confirmTableName ? {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirmTableName }),
+          } : {}),
         }
       );
       if (!res.ok) {

@@ -7,6 +7,7 @@ import {
   getSchemaDiagram,
   createTable,
   dropTable,
+  assertStudioDropConfirmation,
   getTableRows,
   normalizeStudioPagination,
   mutateTableRow,
@@ -112,6 +113,7 @@ export async function dropTableHandler(req: Request, res: Response, next: NextFu
     const access = await verifyProjectAccess(projectId, user.id);
     const env = resolveEnvironment(req);
     assertCanModify(env, access, "drop tables");
+    assertStudioDropConfirmation(env, tableName, req.body?.confirmTableName);
 
     await dropTable(projectId, tableName, env);
 
