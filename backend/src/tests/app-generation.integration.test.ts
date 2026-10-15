@@ -432,6 +432,35 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(saved.version).toBe(1);
   });
 
+  it("preserves edits to previously generated source even when the marker remains", async () => {
+    const project = await newProject();
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template mode must not call the AI provider"); },
+      filesystem: fs,
+    });
+    const input = {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    };
+    const initial = await runToCompletion(service, input);
+    expect(initial.status).toBe("SOURCE_WRITTEN");
+    const untouched = await runToCompletion(service, input);
+    expect(untouched.status).toBe("SOURCE_WRITTEN");
+
+    const path = "forge-app/server/task.routes.ts";
+    const saved = await fs.readFile(project.id, path);
+    const userEdit = saved.content + "\n// user-maintained validation must survive\n";
+    await fs.writeFile(project.id, path, {
+      content: userEdit, expectedVersion: saved.version, authorId: users.owner.id,
+    });
+    const refused = await runToCompletion(service, input);
+    expect(refused).toMatchObject({ status: "FAILED", errorCode: "SOURCE_CONFLICT" });
+    expect(refused.errorMessage).toContain(path);
+    expect(await fs.readFile(project.id, path)).toMatchObject({ content: userEdit });
+    expect(refused.files).toEqual([]);
+    expect((await service.verifySource(project.id, untouched.id)).allMatch).toBe(false);
+  });
+
   it("never overwrites source that ForgeStudio did not generate", async () => {
     const project = await newProject();
     await fs.writeFile(project.id, "forge-app/server/app.ts", { content: "// hand-written\nexport const mine = 1;\n", authorId: users.owner.id });
