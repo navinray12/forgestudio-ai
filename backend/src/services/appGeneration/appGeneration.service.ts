@@ -22,7 +22,7 @@ import {
   validateAppModel,
   type AppModel,
 } from "./appModel.js";
-import { emitApplicationSource, validateEmittedSource, GENERATED_MARKER, type EmittedFile } from "./appSourceEmitter.js";
+import { emitApplicationSource, validateEmittedSource, type EmittedFile } from "./appSourceEmitter.js";
 
 export type AppGenerationMode = "AI_PROVIDER" | "APPROVED_TEMPLATE";
 export type AppGenerationStatus =
@@ -354,9 +354,7 @@ export class AppGenerationService {
       try {
         const existing = await this.deps.filesystem.readFile(run.projectId, file.path);
         const existingHash = crypto.createHash("sha256").update(String(existing.content ?? "")).digest("hex");
-        if (!existing.isGenerated ||
-            !String(existing.content ?? "").includes(GENERATED_MARKER) ||
-            previousManifest.get(file.path) !== existingHash) {
+        if (!existing.isGenerated || previousManifest.get(file.path) !== existingHash) {
           conflicts.push(file.path);
         } else {
           expectedVersions.set(file.path, existing.version);
