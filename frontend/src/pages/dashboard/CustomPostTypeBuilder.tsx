@@ -158,7 +158,7 @@ export default function CustomPostTypeBuilder() {
                             <p role="status" className="text-sm text-amber-700">
                                 Content type created; field configuration still needs saving. Retry will update this content type, not create another.
                             </p>
-                        )}}
+                        )}
                         {savedNotice && <p role="status" className="text-sm text-amber-700">{savedNotice}</p>}
                         <button disabled={saving || loading || Boolean(loadError)} type="submit" className="mt-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
                             {saving ? "Committing..." : "Save Configuration"}
