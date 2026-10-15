@@ -232,13 +232,21 @@ export const AppGenerationPanel: React.FC<AppGenerationPanelProps> = ({ projectI
             </div>
           )}
           {run.status === "FAILED" && (
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-rose-300">
-                {run.errorCode}: {run.errorMessage}
-              </span>
-              <button onClick={() => void retry(run.id)} disabled={busy} className="shrink-0 px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-200 disabled:opacity-50">
-                Retry
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-rose-300">
+                  {run.errorCode}: {run.errorMessage}
+                </span>
+                <button onClick={() => void retry(run.id)} disabled={busy} className="shrink-0 px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-200 disabled:opacity-50">
+                  Retry
+                </button>
+              </div>
+              {run.errorCode === "SOURCE_CONFLICT" && (
+                <p role="alert" className="text-amber-300">
+                  Existing source was preserved. Review the affected files in Code Workspace and resolve
+                  user-owned changes before generating again. Retrying without resolving the conflict will fail.
+                </p>
+              )}
             </div>
           )}
           {run.diagnostics.length > 0 && (
