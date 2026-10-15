@@ -45,7 +45,7 @@ const { resolveExplicitEnvironment, assertCanModify, verifyProjectAccess } = awa
 const { dropTableHandler, getTablesHandler, mutateTableRowHandler, listMigrationsHandler } = await import(
   "../modules/data-platform/studio/studio.controller.js"
 );
-const { executeUserQuery } = await import("../modules/data-platform/studio/studio-sql.service.js");
+const { executeUserQuery, assertProductionSqlWriteConfirmation } = await import("../modules/data-platform/studio/studio-sql.service.js");
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const EDITOR = "22222222-2222-4222-8222-222222222222";
@@ -132,6 +132,24 @@ describe("project access roles", () => {
     expect(() => assertCanModify("PRODUCTION", editor, "drop tables")).toThrowError(
       expect.objectContaining({ code: "PRODUCTION_WRITE_FORBIDDEN", statusCode: 403 })
     );
+  });
+});
+
+describe("production SQL write confirmation", () => {
+  it("keeps read-only production queries and nonproduction writes compatible", () => {
+    expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", false, undefined)).not.toThrow();
+    expect(() => assertProductionSqlWriteConfirmation("DEVELOPMENT", true, undefined)).not.toThrow();
+    expect(() => assertProductionSqlWriteConfirmation("STAGING", true, undefined)).not.toThrow();
+  });
+
+  it("rejects direct write API opt-ins without exact production confirmation", () => {
+    for (const candidate of [undefined, null, true, "production", "PRODUCTION ", ["PRODUCTION"]]) {
+      expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", true, candidate))
+        .toThrowError(expect.objectContaining({
+          code: "PRODUCTION_SQL_CONFIRMATION_REQUIRED", statusCode: 409,
+        }));
+    }
+    expect(() => assertProductionSqlWriteConfirmation("PRODUCTION", true, "PRODUCTION")).not.toThrow();
   });
 });
 
