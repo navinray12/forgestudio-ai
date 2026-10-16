@@ -302,17 +302,24 @@ export async function runPhase2AiPlatformTestSuite(): Promise<{
   logPass("24.3 Native MCP server executed tool call (tools/call: forge_read_file)");
 
   // 24.4 MCP Server Registration & Scaffolding
+  // F-41: only public HTTPS:443 endpoints are accepted, and new servers always start UNTRUSTED
+  // whatever trust level the caller asks for. 203.0.113.0/24 is a documentation range, so the
+  // endpoint passes validation without a DNS lookup and is never dialled here.
   const registeredServer = await mcpRegistryService.registerServer({
     name: "AnalyticsMCP",
-    endpoint: "http://localhost:8080/mcp",
+    endpoint: "https://203.0.113.10/mcp",
     transport: "HTTP",
     trustLevel: "VERIFIED",
     projectId: projId,
     userId: testOwnerId,
   });
   assert.equal(registeredServer.name, "AnalyticsMCP");
-  assert.equal(registeredServer.trustLevel, "VERIFIED");
-  logPass("24.4 Registered external MCP server with verified trust level");
+  assert.equal(registeredServer.trustLevel, "UNTRUSTED");
+  await assert.rejects(
+    mcpRegistryService.registerServer({ name: "LocalMCP", endpoint: "http://localhost:8080/mcp", projectId: projId, userId: testOwnerId }),
+    { code: "EGRESS_SCHEME_BLOCKED" }
+  );
+  logPass("24.4 Registered external MCP server as UNTRUSTED (requested trust ignored); local HTTP endpoint rejected");
 
   const scaffold = mcpRegistryService.generateServerScaffolding("CustomDatabaseMCP");
   assert.ok(scaffold.packageJson.includes("@modelcontextprotocol/sdk"));

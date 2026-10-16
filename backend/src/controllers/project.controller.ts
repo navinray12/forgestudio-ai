@@ -3081,7 +3081,10 @@ export async function aiWebsiteFixHandler(req: Request, res: Response, next: Nex
 
 export async function listMcpServersHandler(req: Request, res: Response, next: NextFunction) {
   try {
+    const user = getAuthUser(res, req);
     const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
     const { mcpRegistryService } = await import("../modules/ai/mcp/mcpRegistry.service.js");
     const servers = await mcpRegistryService.listServers(projectId);
     res.status(200).json({ success: true, servers });
@@ -3110,7 +3113,10 @@ export async function registerMcpServerHandler(req: Request, res: Response, next
 
 export async function mcpJsonRpcHandler(req: Request, res: Response, next: NextFunction) {
   try {
+    const user = getAuthUser(res, req);
     const projectId = String(req.params.id);
+    await getForgeProjectById(projectId, user);
+
     const { forgeMcpServerService } = await import("../modules/ai/mcp/mcpServer.service.js");
     const result = await forgeMcpServerService.handleJsonRpc(req.body, projectId);
     res.status(200).json(result);
