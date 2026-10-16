@@ -144,14 +144,41 @@ function importsOf(file: string): { specifiers: string[]; nonLiteralDynamic: num
 }
 
 /** Problems that make loading the real modules unsafe; empty when isolation holds. */
+/**
+ * Reviewed module-level declaration allowed in extracted controller modules: a `const` whose value
+ * is another binding (`const db = prisma as any;`, `const X = IMPORTED;`). Evaluating it has no side
+ * effects; calls, `new`, object literals and `let`/`var` are still rejected.
+ */
+const isBindingAlias = (s: any): boolean => s.type === "VariableDeclaration" && s.kind === "const" &&
+  s.declarations.every((d: any) => d.id.type === "Identifier" && (d.init?.type === "Identifier" ||
+    (d.init?.type === "TSAsExpression" && d.init.expression.type === "Identifier" && d.init.typeAnnotation.type === "TSAnyKeyword")));
+
+/** Modules split out of project.controller.ts; loaded for real, so their imports are checked too. */
+const PROJECT_CONTROLLER_DIR = resolve(SRC, "controllers/project");
+
+/** Top-level statements other than imports, exports and function declarations (i.e. side effects). */
+function topLevelSideEffects(file: string): number {
+  const ast = parseAst(readFileSync(file, "utf8"), { lang: "ts", sourceType: "module" }, file) as any;
+  return ast.body.filter((s: any) => !(s.type === "ImportDeclaration" || s.type === "FunctionDeclaration" || isBindingAlias(s) ||
+    (s.type === "ExportNamedDeclaration" && (s.source || s.declaration?.type === "FunctionDeclaration")))).length;
+}
+
 function isolationProblems(): string[] {
   const mocked = viMockedModules();
   const problems: string[] = [];
-  for (const file of REAL_MODULES) {
+  const queue = [...REAL_MODULES];
+  const seen = new Set<string>();
+  while (queue.length) {
+    const file = queue.shift()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
     const { specifiers, nonLiteralDynamic } = importsOf(file);
-    const unmocked = [...new Set(specifiers.map((s) => toKey(file, s)))]
-      .filter((k) => !mocked.has(k) && !SIDE_EFFECT_FREE.has(k));
+    const keys = [...new Set(specifiers.map((s) => toKey(file, s)))];
+    const local = keys.filter((k) => dirname(k) === PROJECT_CONTROLLER_DIR);
+    queue.push(...local.map((k) => k.replace(/.js$/, ".ts")));
+    const unmocked = keys.filter((k) => !local.includes(k) && !mocked.has(k) && !SIDE_EFFECT_FREE.has(k));
     const name = file.slice(SRC.length + 1);
+    if (dirname(file) === PROJECT_CONTROLLER_DIR && topLevelSideEffects(file)) problems.push(`${name}: top-level statements with side effects`);
     if (unmocked.length) problems.push(`${name}: unmocked imports ${unmocked.map((k) => k.replace(SRC, "src")).join(", ")}`);
     if (nonLiteralDynamic) problems.push(`${name}: ${nonLiteralDynamic} non-literal dynamic import(s)`);
   }

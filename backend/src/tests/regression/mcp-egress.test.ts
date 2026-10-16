@@ -440,8 +440,21 @@ describe("registerServer: trust-level spoofing and endpoint policy", () => {
   });
 
   it("controller passes the authenticated user and URL project after the request body, so they cannot be spoofed", () => {
-    const ast = parseAst(readFileSync(CONTROLLER_FILE, "utf8"), { lang: "ts", sourceType: "module" }, CONTROLLER_FILE) as any;
-    const fn = ast.body.find((s: any) => s.type === "ExportNamedDeclaration" && s.declaration?.id?.name === "registerMcpServerHandler").declaration;
+    // Locate the declaration: in the controller itself, or behind an explicit relative re-export
+    // (`export { registerMcpServerHandler } from "./project/x.js"`) in the module that defines it.
+    const findExportedFunction = (file: string, name: string, depth = 0): any => {
+      const ast = parseAst(readFileSync(file, "utf8"), { lang: "ts", sourceType: "module" }, file) as any;
+      for (const s of ast.body) {
+        if (s.type === "ExportNamedDeclaration" && s.declaration?.type === "FunctionDeclaration" && s.declaration.id.name === name) return s.declaration;
+        if (depth < 3 && s.type === "ExportNamedDeclaration" && s.source && s.source.value.startsWith("./")) {
+          const spec = s.specifiers.find((sp: any) => (sp.exported.name ?? sp.exported.value) === name);
+          if (spec) return findExportedFunction(resolve(dirname(file), s.source.value.replace(/\.js$/, ".ts")), spec.local.name ?? spec.local.value, depth + 1);
+        }
+      }
+      return undefined;
+    };
+    const fn = findExportedFunction(CONTROLLER_FILE, "registerMcpServerHandler");
+    expect(fn, "registerMcpServerHandler must be declared in, or explicitly re-exported by, project.controller.ts").toBeDefined();
     let arg: any;
     const walk = (n: any): void => {
       if (!n || typeof n !== "object") return;

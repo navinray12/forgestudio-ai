@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseAst } from "rolldown/parseAst";
 
@@ -212,12 +213,29 @@ function collectExportNames(): string[] {
   return names;
 }
 
-/** Exported function declarations keyed by name. */
+/**
+ * Exported function declarations keyed by public name. Explicit re-exports
+ * (`export { a } from "./project/x.js"`) are followed into the module that declares the function, so
+ * the controller can act as a compatibility barrel without weakening the signature checks. Only
+ * modules under controllers/project/ are followed; anything else stays unresolved and fails.
+ */
 function exportedFunctions(): Map<string, any> {
   const fns = new Map<string, any>();
   for (const node of ast.body as any[]) {
     if (node.type === "ExportNamedDeclaration" && node.declaration?.type === "FunctionDeclaration") {
       fns.set(node.declaration.id.name, node.declaration);
+    }
+    if (node.type === "ExportNamedDeclaration" && node.source && /^\.\/project\/[\w.-]+\.js$/.test(node.source.value)) {
+      const target = resolve(dirname(CONTROLLER_PATH), node.source.value.replace(/\.js$/, ".ts"));
+      const targetAst = parseAst(readFileSync(target, "utf8"), { lang: "ts", sourceType: "module" }, target) as any;
+      const declared = new Map<string, any>();
+      for (const t of targetAst.body) {
+        if (t.type === "ExportNamedDeclaration" && t.declaration?.type === "FunctionDeclaration") declared.set(t.declaration.id.name, t.declaration);
+      }
+      for (const spec of node.specifiers) {
+        const fn = declared.get(spec.local.name ?? spec.local.value);
+        if (fn) fns.set(spec.exported.name ?? spec.exported.value, fn);
+      }
     }
   }
   return fns;

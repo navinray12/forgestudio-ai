@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseAst } from "rolldown/parseAst";
 import { AppError } from "../../utils/app-error.js";
@@ -161,43 +162,79 @@ const MOCKED_SPECIFIERS = new Set([
 /** Imports allowed to load for real: no imports of their own and no module-level side effects. */
 const REAL_SPECIFIERS = new Set(["../utils/app-error.js"]);
 
-/** Every import specifier in the controller: static declarations and any `import(...)` expression. */
-function controllerImportSpecifiers(): { all: string[]; nonLiteralDynamic: number } {
-  const src = readFileSync(CONTROLLER_PATH, "utf8");
-  const ast = parseAst(src, { lang: "ts", sourceType: "module" }, "project.controller.ts") as any;
+/** Absolute path for a relative specifier (bare names are returned unchanged). */
+const absolute = (from: string, s: string) => (s.startsWith(".") ? resolve(dirname(from), s) : s);
+
+/**
+ * Reviewed module-level declaration allowed in extracted controller modules: a `const` whose value
+ * is another binding (`const db = prisma as any;`, `const X = IMPORTED;`). Evaluating it has no side
+ * effects; calls, `new`, object literals and `let`/`var` are still rejected.
+ */
+const isBindingAlias = (s: any): boolean => s.type === "VariableDeclaration" && s.kind === "const" &&
+  s.declarations.every((d: any) => d.id.type === "Identifier" && (d.init?.type === "Identifier" ||
+    (d.init?.type === "TSAsExpression" && d.init.expression.type === "Identifier" && d.init.typeAnnotation.type === "TSAnyKeyword")));
+
+/** Modules split out of project.controller.ts; loaded for real, so their imports are checked too. */
+const PROJECT_CONTROLLER_DIR = resolve(dirname(CONTROLLER_PATH), "project");
+
+/**
+ * Every import of the controller (static declarations, re-exports and any `import(...)`), as
+ * absolute paths. Modules under controllers/project/ are followed, and must have no top-level
+ * statements other than imports, exports and function declarations.
+ */
+function controllerImportSpecifiers(): { all: string[]; nonLiteralDynamic: number; sideEffectModules: string[] } {
   const all: string[] = [];
+  const sideEffectModules: string[] = [];
   let nonLiteralDynamic = 0;
-  const walk = (node: any): void => {
-    if (!node || typeof node !== "object") return;
-    if (Array.isArray(node)) { node.forEach(walk); return; }
-    if (node.type === "ImportDeclaration" || node.type === "ExportAllDeclaration" ||
-      (node.type === "ExportNamedDeclaration" && node.source)) all.push(node.source.value);
-    if (node.type === "ImportExpression") {
-      if (node.source.type === "Literal" && typeof node.source.value === "string") all.push(node.source.value);
-      else nonLiteralDynamic++;
-    }
-    for (const key of Object.keys(node)) walk(node[key]);
-  };
-  walk(ast);
-  return { all, nonLiteralDynamic };
+  const queue = [CONTROLLER_PATH];
+  const seen = new Set<string>();
+  while (queue.length) {
+    const file = queue.shift()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const ast = parseAst(readFileSync(file, "utf8"), { lang: "ts", sourceType: "module" }, file) as any;
+    if (file !== CONTROLLER_PATH && ast.body.some((s: any) => !(s.type === "ImportDeclaration" || s.type === "FunctionDeclaration" || isBindingAlias(s) ||
+      (s.type === "ExportNamedDeclaration" && (s.source || s.declaration?.type === "FunctionDeclaration"))))) sideEffectModules.push(file);
+    const add = (specifier: string) => {
+      const key = absolute(file, specifier);
+      if (dirname(key) === PROJECT_CONTROLLER_DIR) queue.push(key.replace(/\.js$/, ".ts"));
+      else all.push(key);
+    };
+    const walk = (node: any): void => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.type === "ImportDeclaration" || node.type === "ExportAllDeclaration" ||
+        (node.type === "ExportNamedDeclaration" && node.source)) add(node.source.value);
+      if (node.type === "ImportExpression") {
+        if (node.source.type === "Literal" && typeof node.source.value === "string") add(node.source.value);
+        else nonLiteralDynamic++;
+      }
+      for (const key of Object.keys(node)) walk(node[key]);
+    };
+    walk(ast);
+  }
+  return { all, nonLiteralDynamic, sideEffectModules };
 }
 
-/** Controller-relative specifiers that this file actually passes to vi.mock. */
+/** Absolute paths (or bare names) that this file actually passes to vi.mock. */
 function viMockedSpecifiers(): Set<string> {
-  const self = readFileSync(fileURLToPath(import.meta.url), "utf8");
-  return new Set([...self.matchAll(/^vi\.mock\("([^"]+)"/gm)].map((m) => (m[1].startsWith("../../") ? `../${m[1].slice(6)}` : m[1])));
+  const self = fileURLToPath(import.meta.url);
+  return new Set([...readFileSync(self, "utf8").matchAll(/^vi\.mock\("([^"]+)"/gm)].map((m) => absolute(self, m[1])));
 }
 
 /** Problems that make importing the controller unsafe; empty when isolation holds. */
 function isolationProblems(): string[] {
-  const { all, nonLiteralDynamic } = controllerImportSpecifiers();
+  const { all, nonLiteralDynamic, sideEffectModules } = controllerImportSpecifiers();
   const mocked = viMockedSpecifiers();
+  const listed = new Set([...MOCKED_SPECIFIERS].map((s) => absolute(CONTROLLER_PATH, s)));
+  const real = new Set([...REAL_SPECIFIERS].map((s) => absolute(CONTROLLER_PATH, s)));
   const problems: string[] = [];
-  const unmocked = [...new Set(all.filter((s) => !MOCKED_SPECIFIERS.has(s) && !REAL_SPECIFIERS.has(s)))];
-  const listedNotMocked = [...MOCKED_SPECIFIERS].filter((s) => !mocked.has(s));
+  const unmocked = [...new Set(all.filter((s) => !listed.has(s) && !real.has(s)))];
+  const listedNotMocked = [...listed].filter((s) => !mocked.has(s));
   if (unmocked.length) problems.push(`unmocked imports: ${unmocked.join(", ")}`);
   if (listedNotMocked.length) problems.push(`listed without a vi.mock call: ${listedNotMocked.join(", ")}`);
   if (nonLiteralDynamic) problems.push(`non-literal dynamic imports: ${nonLiteralDynamic}`);
+  if (sideEffectModules.length) problems.push(`top-level statements with side effects: ${sideEffectModules.join(", ")}`);
   return problems;
 }
 
