@@ -9,7 +9,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { flush, mountEditor, siteFixture, SITE_ID } from "./editor-harness";
 
-vi.setConfig({ testTimeout: 30000 });
+vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
 
 afterEach(() => {

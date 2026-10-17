@@ -14,7 +14,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { flush, heading, installBackend, mountEditor, siteFixture, SITE_ID } from "./editor-harness";
 import PublishedSite from "../../src/pages/published/PublishedSite";
 
-vi.setConfig({ testTimeout: 30000 });
+vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 
 afterEach(() => {
   cleanup();

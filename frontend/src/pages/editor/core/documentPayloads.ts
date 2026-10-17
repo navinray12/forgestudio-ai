@@ -1,5 +1,5 @@
 import type { DeploymentConfig, EditorElement, PageConfig, PublishingState, SitePartsConfig, ThemeBuilderScope } from "../types";
-import { isSitePartEnabled } from "./siteParts";
+import { isSitePartEnabled, sitePartMetadata } from "./siteParts";
 
 /** The editor state the save payload reads (the values WebsiteEditor holds in state and refs). */
 export interface SavePayloadInput {
@@ -51,26 +51,32 @@ export function buildSavePayload({ canvasMode, elements, siteParts, pages, activ
         header: {
           enabled: isSitePartEnabled(siteParts.header),
           elements: canonicalHeaderElements,
+          ...sitePartMetadata(siteParts.header),
         },
         footer: {
           enabled: isSitePartEnabled(siteParts.footer),
           elements: canonicalFooterElements,
+          ...sitePartMetadata(siteParts.footer),
         },
         single: {
           enabled: isSitePartEnabled(siteParts.single),
           elements: canonicalSingleElements,
+          ...sitePartMetadata(siteParts.single),
         },
         archive: {
           enabled: isSitePartEnabled(siteParts.archive),
           elements: canonicalArchiveElements,
+          ...sitePartMetadata(siteParts.archive),
         },
         notFound404: {
           enabled: isSitePartEnabled(siteParts.notFound404),
           elements: canonical404Elements,
+          ...sitePartMetadata(siteParts.notFound404),
         },
         searchResults: {
           enabled: isSitePartEnabled(siteParts.searchResults),
           elements: canonicalSearchResultsElements,
+          ...sitePartMetadata(siteParts.searchResults),
         },
       },
       publishing,
@@ -116,26 +122,32 @@ export function buildPublishDraftSnapshot({ canvasMode, elements, siteParts, pag
       header: {
         isEnabled: isSitePartEnabled(siteParts.header),
         elements: canonicalHeaderElements,
+        ...sitePartMetadata(siteParts.header),
       },
       footer: {
         isEnabled: isSitePartEnabled(siteParts.footer),
         elements: canonicalFooterElements,
+        ...sitePartMetadata(siteParts.footer),
       },
       single: {
         isEnabled: isSitePartEnabled(siteParts.single),
         elements: canonicalSingleElements,
+        ...sitePartMetadata(siteParts.single),
       },
       archive: {
         isEnabled: isSitePartEnabled(siteParts.archive),
         elements: canonicalArchiveElements,
+        ...sitePartMetadata(siteParts.archive),
       },
       notFound404: {
         isEnabled: isSitePartEnabled(siteParts.notFound404),
         elements: canonical404Elements,
+        ...sitePartMetadata(siteParts.notFound404),
       },
       searchResults: {
         isEnabled: isSitePartEnabled(siteParts.searchResults),
         elements: canonicalSearchResultsElements,
+        ...sitePartMetadata(siteParts.searchResults),
       },
     },
     deployment,

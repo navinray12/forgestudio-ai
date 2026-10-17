@@ -1,6 +1,7 @@
 import type { StaticBundle, GeneratedFile } from "./types.js";
 export type CanonicalSite = any;
 import { matchesThemeCondition, resolveTokensInTree } from "../website.service.js";
+import { isSitePartEnabled } from "../../utils/site-part-visibility.js";
 import {
   compileDesignSystemCss,
   validateVariables,
@@ -902,7 +903,7 @@ function generatePageHtml(
   if (pSettings.noindex) robotsDirectives.push("noindex");
   if (pSettings.nofollow) robotsDirectives.push("nofollow");
 
-  // Site Header (supports both isEnabled and enabled, plus theme conditions)
+  // Site Header (enabled unless explicitly disabled, `enabled` wins over `isEnabled`; plus theme conditions)
   const currentWebsiteId = websiteData.id || websiteData.websiteId || "";
   let headerHtml = "";
   const headerPart = websiteData.siteParts?.header;
@@ -911,7 +912,7 @@ function generatePageHtml(
     isHome: page.isHome,
     slug: page.slug,
   });
-  if (headerMatches && (headerPart?.isEnabled || headerPart?.enabled) && Array.isArray(headerPart.elements) && headerPart.elements.length > 0) {
+  if (headerMatches && headerPart && isSitePartEnabled(headerPart) && Array.isArray(headerPart.elements) && headerPart.elements.length > 0) {
     headerHtml = `<header class="site-header">\n${headerPart.elements.map((el: any) => renderElementToHtml(el, allPages, currentWebsiteId)).join("\n")}\n</header>`;
   }
 
@@ -919,7 +920,7 @@ function generatePageHtml(
   const pageElements = Array.isArray(page.elements) ? page.elements : [];
   const mainContent = pageElements.map((el: any) => renderElementToHtml(el, allPages, currentWebsiteId)).join("\n");
 
-  // Site Footer (supports both isEnabled and enabled, plus theme conditions)
+  // Site Footer (enabled unless explicitly disabled, `enabled` wins over `isEnabled`; plus theme conditions)
   let footerHtml = "";
   const footerPart = websiteData.siteParts?.footer;
   const footerMatches = matchesThemeCondition(footerPart?.conditions, {
@@ -927,7 +928,7 @@ function generatePageHtml(
     isHome: page.isHome,
     slug: page.slug,
   });
-  if (footerMatches && (footerPart?.isEnabled || footerPart?.enabled) && Array.isArray(footerPart.elements) && footerPart.elements.length > 0) {
+  if (footerMatches && footerPart && isSitePartEnabled(footerPart) && Array.isArray(footerPart.elements) && footerPart.elements.length > 0) {
     footerHtml = `<footer class="site-footer">\n${footerPart.elements.map((el: any) => renderElementToHtml(el, allPages, currentWebsiteId)).join("\n")}\n</footer>`;
   }
 

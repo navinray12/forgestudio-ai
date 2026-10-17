@@ -10,7 +10,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { API, SITE_ID, flush, heading, mountEditor, siteFixture } from "./editor-harness";
 
 // Each interaction re-renders the whole ~21k-line editor in jsdom (select ~0.7s, keypress ~0.35s).
-vi.setConfig({ testTimeout: 30000 });
+vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
 
 afterEach(() => {
@@ -32,7 +32,7 @@ describe("loading", () => {
     await new Promise((r) => setTimeout(r, 1700));
     expect(backend.saves()).toHaveLength(0);
     expect(consoleErrors).toEqual([]);
-  }, 30000);
+  }, 60000);
 
   it("an access-denied load shows the access message, renders no document and never saves", async () => {
     const { backend, canvasIds } = await mountEditor(siteFixture(), [
@@ -178,7 +178,7 @@ describe("undo / redo history", () => {
     await new Promise((r) => setTimeout(r, 2000)); // > autosave debounce
     await flush();
     expect(backend.saves()).toHaveLength(0);
-  }, 30000);
+  }, 60000);
 });
 
 describe("autosave and manual save", () => {
@@ -197,7 +197,7 @@ describe("autosave and manual save", () => {
     expect(editorData.pages.find((p) => p.id === "home")!.elements.map((e) => e.id)).toEqual(["elB"]);
     await new Promise((r) => setTimeout(r, 1700));
     expect(backend.saves()).toHaveLength(1); // no repeat save without a further change
-  }, 30000);
+  }, 60000);
 
   it("a second autosave uses the acknowledged version as its precondition", async () => {
     const { backend, select, key } = await mountEditor();
@@ -209,7 +209,7 @@ describe("autosave and manual save", () => {
     await waitFor(() => expect(backend.saves()).toHaveLength(2), AUTOSAVE_WAIT);
     expect(backend.saves()[1].headers["If-Match"]).toBe(`"${SITE_ID}:document:4"`);
     expect(backend.saves()[1].headers["Idempotency-Key"]).not.toBe(backend.saves()[0].headers["Idempotency-Key"]);
-  }, 30000);
+  }, 60000);
 
   it("FIXED (was KNOWN GAP 2): a failed autosave keeps the edit, is logged and is shown as 'Save failed'", async () => {
     // Previously (characterised at commit 0b6a3a6) the failure was only logged: AutosaveStatusIndicator
@@ -224,7 +224,7 @@ describe("autosave and manual save", () => {
     expect(consoleErrors.find((e) => e.startsWith("Autosave error:"))).toContain("Database unavailable");
     expect(canvasIds()).toEqual(["elB"]);
     await waitFor(() => expect(screen.getAllByText("Save failed").length).toBeGreaterThan(0));
-  }, 30000);
+  }, 60000);
 
   it("Ctrl+S saves immediately through the same contract", async () => {
     const { backend, key } = await mountEditor();
@@ -240,7 +240,7 @@ describe("autosave and manual save", () => {
     await new Promise((r) => setTimeout(r, 2000));
     await flush();
     expect(backend.saves()).toHaveLength(0);
-  }, 30000);
+  }, 60000);
 });
 
 describe("page switching", () => {

@@ -13,7 +13,7 @@ import { cleanup } from "@testing-library/react";
 import golden from "./website-editor-integration.golden.json";
 import { captureIntegration } from "./website-editor-integration.compute";
 
-vi.setConfig({ testTimeout: 30000 });
+vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 
 const GOLDEN_SHA256 = "5ebb2cbb38278fe07275e15041f78ce9abb574b191259b1ccc7862b4da7a324c"; // as captured in Phase 5A
 

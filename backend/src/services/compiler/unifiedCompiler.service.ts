@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error.js";
+import { isSitePartEnabled } from "../../utils/site-part-visibility.js";
 import { generateAllCodeOutputs } from "../codeGenerator.service.js";
 import { writeFile, readFile, listFiles, deleteFile, ProjectFileEntity } from "../project/forgeFilesystem.service.js";
 
@@ -584,7 +585,7 @@ export function visualDocumentToIR(
   const homePageId = editorData?.homePageId;
 
   const sitePartElements = (part: any): any[] =>
-    part && part.enabled !== false && Array.isArray(part.elements)
+    part && isSitePartEnabled(part) && Array.isArray(part.elements)
       ? part.elements.filter((el: any) => el && typeof el === "object")
       : [];
   const headerElements = sitePartElements(editorData?.siteParts?.header);

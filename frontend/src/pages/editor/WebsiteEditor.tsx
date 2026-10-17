@@ -2181,6 +2181,10 @@ export default function WebsiteEditor() {
       if (currentActive) {
         setActivePageId(currentActive.id);
         setActivePreviewPageId(currentActive.id);
+        // The authoritative document is a history boundary: undo/redo must not restore the
+        // pre-reload document, which autosave would then write over the newer server version.
+        setHistory([]);
+        setHistoryIndex(-1);
         setElements(currentActive.elements || []);
         if (currentActive.pageSettings) {
           setPageSettings((prev) => ({ ...prev, ...currentActive.pageSettings }));

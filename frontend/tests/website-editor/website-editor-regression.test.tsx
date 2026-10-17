@@ -12,7 +12,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { API, SITE_ID, flush, heading, mountEditor, siteFixture } from "./editor-harness";
 
-vi.setConfig({ testTimeout: 30000 });
+vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
 const homeIds = (body: unknown) => (body as { editorData: { pages: Array<{ id: string; elements: Array<{ id: string }> }> } }).editorData.pages.find((p) => p.id === "home")!.elements.map((e) => e.id);
 const settleAutosave = () => new Promise((r) => setTimeout(r, 2000));

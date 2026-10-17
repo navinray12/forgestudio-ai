@@ -6,7 +6,7 @@
  * captured once from the source before the move and is never regenerated here. Imports go through the
  * original public path, so this also proves import compatibility.
  */
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, waitFor } from "@testing-library/react";
 import * as Inspectors from "../../src/pages/editor/inspector/DynamicWidgetInspectors";
 import golden from "./inspector-extracted3.golden.json";
 import { EXTRACTED_GROUP_E, EXTRACTED_GROUP_F, EXTRACTED_GROUP_G, EXTRACTED_GROUP_H, VALIDATOR_INPUTS } from "./inspector-extracted3.fixtures";
@@ -50,9 +50,9 @@ describe("helpers", () => {
     const file = new File(["hi"], "a.txt", { type: "text/plain" });
     await act(async () => {
       Inspectors.handleImageFileUpload({ target: { files: [file] } } as any, callback);
-      await new Promise((r) => setTimeout(r, 20));
     });
-    expect(callback.mock.calls).toEqual([["data:text/plain;base64,aGk="]]);
+    // FileReader is asynchronous; wait for its result instead of a fixed delay (load-sensitive).
+    await waitFor(() => expect(callback.mock.calls).toEqual([["data:text/plain;base64,aGk="]]));
   });
 
   it("handleImageFileUpload ignores an empty selection", async () => {
