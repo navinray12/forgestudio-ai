@@ -24,6 +24,18 @@ export interface ProbeResult {
 
 const CALLBACKS = ["updateProp", "updateStyle", "updateLayout"] as const;
 
+/**
+ * Events and DOM nodes passed to callbacks are recorded as stable markers; plain values are kept as-is.
+ * The markers use parentheses, not square-bracketed colon pairs: Tailwind scans the golden files and
+ * would turn a bracketed colon pair into an arbitrary-property CSS rule in the production stylesheet.
+ */
+function recordable(value: unknown): unknown {
+  if (value instanceof Event) return `(event ${value.type})`;
+  if (value && typeof value === "object" && "nativeEvent" in value && "type" in value) return `(event ${String((value as { type: unknown }).type)})`;
+  if (typeof Node !== "undefined" && value instanceof Node) return `(node ${value.nodeName.toLowerCase()})`;
+  return value;
+}
+
 function withPinnedEnvironment<T>(fn: () => T): T {
   vi.useFakeTimers({ now: PROBE_NOW, toFake: ["Date"] });
   const random = vi.spyOn(Math, "random").mockReturnValue(PROBE_RANDOM);
@@ -35,9 +47,9 @@ function withPinnedEnvironment<T>(fn: () => T): T {
   }
 }
 
-function renderRecorded(Component: ComponentType<any>, props: Record<string, unknown>) {
+function renderRecorded(Component: ComponentType<any>, props: Record<string, unknown>, extraCallbacks: readonly string[] = []) {
   const calls: Call[] = [];
-  const callbacks = Object.fromEntries(CALLBACKS.map((name) => [name, (...args: unknown[]) => { calls.push([name, ...args]); }]));
+  const callbacks = Object.fromEntries([...CALLBACKS, ...extraCallbacks].map((name) => [name, (...args: unknown[]) => { calls.push([name, ...args.map(recordable)]); }]));
   const view = render(<Component {...structuredClone(props)} {...callbacks} />);
   return { view, calls };
 }
@@ -86,16 +98,20 @@ function actOn(el: HTMLElement) {
   }
 }
 
-export function probeInspector(Component: ComponentType<any>, props: Record<string, unknown>): ProbeResult {
+/**
+ * extraCallbacks: additional callback props (e.g. onOpenIconPicker) to record alongside updateProp /
+ * updateStyle / updateLayout. Defaults to none, so existing goldens are unaffected.
+ */
+export function probeInspector(Component: ComponentType<any>, props: Record<string, unknown>, extraCallbacks: readonly string[] = []): ProbeResult {
   return withPinnedEnvironment(() => {
-    const first = renderRecorded(Component, props);
+    const first = renderRecorded(Component, props, extraCallbacks);
     const markup = first.view.container.innerHTML;
     const count = controlsOf(first.view.container).length;
     cleanup();
 
     const trace: Array<[string, Call[]]> = [];
     for (let i = 0; i < count; i++) {
-      const { view, calls } = renderRecorded(Component, props);
+      const { view, calls } = renderRecorded(Component, props, extraCallbacks);
       const control = controlsOf(view.container)[i];
       actOn(control);
       trace.push([describeControl(control, i), calls]);
