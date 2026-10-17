@@ -1,4 +1,5 @@
 import type { DeploymentConfig, EditorElement, PageConfig, PublishingState, SitePartsConfig, ThemeBuilderScope } from "../types";
+import { isSitePartEnabled } from "./siteParts";
 
 /** The editor state the save payload reads (the values WebsiteEditor holds in state and refs). */
 export interface SavePayloadInput {
@@ -24,7 +25,8 @@ export type PublishDraftSnapshotInput = Omit<SavePayloadInput, "publishing" | "g
 
 /**
  * The manual-save document payload, plus the page elements the autosave baseline is updated with.
- * Moved verbatim from WebsiteEditor's handleSave. Site parts use the `enabled` flag.
+ * Moved verbatim from WebsiteEditor's handleSave. Site parts are written with the `enabled` flag,
+ * resolved by isSitePartEnabled.
  */
 export function buildSavePayload({ canvasMode, elements, siteParts, pages, activePageId, pageSettings, homePageId, publishing, deployment, breakpoints, globalSettings, globalVariables, globalClasses, popups, pageCss, publishedDataRef }: SavePayloadInput) {
   const canonicalHeaderElements = canvasMode === "header" ? elements : (siteParts.header?.elements || []);
@@ -47,27 +49,27 @@ export function buildSavePayload({ canvasMode, elements, siteParts, pages, activ
       homePageId,
       siteParts: {
         header: {
-          enabled: siteParts.header?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.header),
           elements: canonicalHeaderElements,
         },
         footer: {
-          enabled: siteParts.footer?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.footer),
           elements: canonicalFooterElements,
         },
         single: {
-          enabled: siteParts.single?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.single),
           elements: canonicalSingleElements,
         },
         archive: {
-          enabled: siteParts.archive?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.archive),
           elements: canonicalArchiveElements,
         },
         notFound404: {
-          enabled: siteParts.notFound404?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.notFound404),
           elements: canonical404Elements,
         },
         searchResults: {
-          enabled: siteParts.searchResults?.enabled ?? true,
+          enabled: isSitePartEnabled(siteParts.searchResults),
           elements: canonicalSearchResultsElements,
         },
       },
@@ -89,7 +91,8 @@ export function buildSavePayload({ canvasMode, elements, siteParts, pages, activ
 
 /**
  * The working-draft snapshot sent as editorData when publishing. Moved verbatim from WebsiteEditor's
- * handlePublishWebsite. Site parts use the `isEnabled` flag, unlike the save payload (known, preserved).
+ * handlePublishWebsite. Site parts are written with the `isEnabled` flag (the published-snapshot
+ * spelling), resolved by isSitePartEnabled so a part disabled in the draft is published disabled.
  */
 export function buildPublishDraftSnapshot({ canvasMode, elements, siteParts, pages, activePageId, pageSettings, homePageId, deployment, breakpoints, globalSettings, popups, pageCss }: PublishDraftSnapshotInput) {
   const canonicalHeaderElements = canvasMode === "header" ? elements : (siteParts.header?.elements || []);
@@ -111,27 +114,27 @@ export function buildPublishDraftSnapshot({ canvasMode, elements, siteParts, pag
     homePageId,
     siteParts: {
       header: {
-        isEnabled: siteParts.header?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.header),
         elements: canonicalHeaderElements,
       },
       footer: {
-        isEnabled: siteParts.footer?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.footer),
         elements: canonicalFooterElements,
       },
       single: {
-        isEnabled: siteParts.single?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.single),
         elements: canonicalSingleElements,
       },
       archive: {
-        isEnabled: siteParts.archive?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.archive),
         elements: canonicalArchiveElements,
       },
       notFound404: {
-        isEnabled: siteParts.notFound404?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.notFound404),
         elements: canonical404Elements,
       },
       searchResults: {
-        isEnabled: siteParts.searchResults?.isEnabled ?? true,
+        isEnabled: isSitePartEnabled(siteParts.searchResults),
         elements: canonicalSearchResultsElements,
       },
     },

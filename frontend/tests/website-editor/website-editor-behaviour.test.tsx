@@ -165,19 +165,20 @@ describe("undo / redo history", () => {
     expect(canvasIds()).toEqual(["elA", "elB"]);
   });
 
-  it("KNOWN DEFECT (characterised): undo straight after load reverts to the empty pre-load document, and autosave persists it", async () => {
-    // History records the initial [] state before the website loads, so the first undo lands on it.
+  it("FIXED (was KNOWN DEFECT 1): undo/redo straight after load keep the loaded document and autosave nothing", async () => {
+    // Previously (characterised at commit 0b6a3a6) history held the pre-load [] state, so the first
+    // undo emptied the canvas and autosave persisted the empty page. The loaded document must be
+    // the start of history.
     const { backend, canvasIds, key } = await mountEditor();
     await key("z", { ctrlKey: true });
-    expect(canvasIds()).toEqual([]);
-    await key("z", { ctrlKey: true }); // nothing earlier than that
-    expect(canvasIds()).toEqual([]);
-    await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
-    const pages = (backend.saves()[0].body as { editorData: { pages: Array<{ id: string; elements: unknown[] }> } }).editorData.pages;
-    expect(pages.find((p) => p.id === "home")!.elements).toEqual([]);
+    expect(canvasIds()).toEqual(["elA", "elB"]);
+    await key("z", { ctrlKey: true });
     await key("y", { ctrlKey: true });
     expect(canvasIds()).toEqual(["elA", "elB"]);
-  });
+    await new Promise((r) => setTimeout(r, 2000)); // > autosave debounce
+    await flush();
+    expect(backend.saves()).toHaveLength(0);
+  }, 30000);
 });
 
 describe("autosave and manual save", () => {
@@ -210,8 +211,9 @@ describe("autosave and manual save", () => {
     expect(backend.saves()[1].headers["Idempotency-Key"]).not.toBe(backend.saves()[0].headers["Idempotency-Key"]);
   }, 30000);
 
-  it("KNOWN GAP (characterised): a failed autosave keeps the edit but is only logged, never shown", async () => {
-    // AutosaveStatusIndicator is imported but not rendered and autosaveStatus/autosaveError are unused.
+  it("FIXED (was KNOWN GAP 2): a failed autosave keeps the edit, is logged and is shown as 'Save failed'", async () => {
+    // Previously (characterised at commit 0b6a3a6) the failure was only logged: AutosaveStatusIndicator
+    // was imported but never rendered. See autosave-status.test.tsx for the full status behaviour.
     const { backend, canvasIds, consoleErrors, select, key } = await mountEditor(siteFixture(), [
       (r) => (r.method === "PUT" ? { status: 500, body: { error: { message: "Database unavailable" } } } : undefined),
     ]);
@@ -221,7 +223,7 @@ describe("autosave and manual save", () => {
     await waitFor(() => expect(consoleErrors.some((e) => e.startsWith("Autosave error:"))).toBe(true), AUTOSAVE_WAIT);
     expect(consoleErrors.find((e) => e.startsWith("Autosave error:"))).toContain("Database unavailable");
     expect(canvasIds()).toEqual(["elB"]);
-    expect(screen.queryAllByText("Save failed")).toHaveLength(0);
+    await waitFor(() => expect(screen.getAllByText("Save failed").length).toBeGreaterThan(0));
   }, 30000);
 
   it("Ctrl+S saves immediately through the same contract", async () => {

@@ -6,7 +6,8 @@
  * document versions, localStorage draft and sync events, and the paths that run the extracted helpers
  * (range selection, navigator search) plus unmount during pending or in-flight saves.
  *
- * KNOWN DEFECT / KNOWN GAP tests pin current behaviour on purpose; fixing one must flip it deliberately.
+ * KNOWN DEFECT tests pin current behaviour on purpose; fixing one must flip it deliberately (FIXED tests
+ * record what each fix superseded).
  */
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { API, SITE_ID, flush, heading, mountEditor, siteFixture } from "./editor-harness";
@@ -24,28 +25,40 @@ afterEach(() => {
 });
 
 describe("known defects: follow-through", () => {
-  it("KNOWN DEFECT 1 (characterised): after undo-on-load is autosaved empty, redo autosaves the restored document on the next version", async () => {
-    const { backend, canvasIds, key } = await mountEditor();
-    await key("z", { ctrlKey: true });
+  it("FIXED (was KNOWN DEFECT 1): edit, undo past the edit and redo after load never autosave an empty document", async () => {
+    // Previously (characterised at commit 0b6a3a6) undo-on-load was autosaved as an empty page.
+    const { backend, canvasIds, select, key } = await mountEditor();
+    await select("elA");
+    await key("Delete");
     await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
-    expect(homeIds(backend.saves()[0].body)).toEqual([]);
-    await key("y", { ctrlKey: true });
+    expect(homeIds(backend.saves()[0].body)).toEqual(["elB"]);
+    await key("z", { ctrlKey: true });
+    await key("z", { ctrlKey: true }); // one step past the edit: must stop at the loaded document
     expect(canvasIds()).toEqual(["elA", "elB"]);
     await waitFor(() => expect(backend.saves()).toHaveLength(2), AUTOSAVE_WAIT);
     expect(backend.saves()[1].headers["If-Match"]).toBe(`"${SITE_ID}:document:4"`);
     expect(homeIds(backend.saves()[1].body)).toEqual(["elA", "elB"]);
+    await key("y", { ctrlKey: true });
+    expect(canvasIds()).toEqual(["elB"]);
+    await waitFor(() => expect(backend.saves()).toHaveLength(3), AUTOSAVE_WAIT);
+    expect(homeIds(backend.saves()[2].body)).toEqual(["elB"]);
+    await key("y", { ctrlKey: true }); // nothing further to redo
+    await settleAutosave();
+    expect(backend.saves()).toHaveLength(3);
+    expect(backend.saves().map((s) => homeIds(s.body).length)).not.toContain(0);
   });
 
-  it("KNOWN GAP 2 (characterised): a failed autosave shows nothing, while a failed manual save is reported", async () => {
+  it("FIXED (was KNOWN GAP 2): a failed autosave shows the 'Save failed' status badge (not an alert); a failed manual save is reported as before", async () => {
+    // Previously (characterised at commit 0b6a3a6) a failed autosave showed nothing at all.
     const { backend, select, key } = await mountEditor(siteFixture(), [
       (r) => (r.method === "PUT" ? { status: 500, body: { error: { message: "Database unavailable" } } } : undefined),
     ]);
     await select("elA");
     await key("Delete");
     await waitFor(() => expect(backend.saves().length).toBeGreaterThan(0), AUTOSAVE_WAIT);
-    await flush(4);
+    await waitFor(() => expect(screen.getAllByRole("status").map((n) => n.textContent?.trim())).toContain("Save failed"));
     expect(screen.queryAllByRole("alert").map((n) => n.textContent)).toEqual([]);
-    expect(screen.queryAllByText(/Save failed/)).toHaveLength(0);
+    expect(screen.queryAllByText("Save failed — changes remain unsaved")).toHaveLength(0);
     await key("s", { ctrlKey: true });
     await waitFor(() => expect(screen.getAllByText("Save failed — changes remain unsaved").length).toBeGreaterThan(0));
     expect(screen.getAllByRole("alert").map((n) => n.textContent)).toContain("Database unavailable");

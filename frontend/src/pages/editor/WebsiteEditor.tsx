@@ -335,6 +335,7 @@ import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./c
 import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
 import { buildSavePayload, buildPublishDraftSnapshot } from "./core/documentPayloads";
+import { loadSiteParts } from "./core/siteParts";
 
 // Monaco includes a substantial language runtime; load it only when a developer
 // opens code editing rather than with every editor session.
@@ -1982,6 +1983,11 @@ export default function WebsiteEditor() {
           setActivePageId(initialHome.id);
           setActivePreviewPageId(initialHome.id);
 
+          // The loaded document starts undo history: drop the pre-load [] entry so the history effect
+          // records the elements set below as entry 0 (undo right after load must not empty the page).
+          setHistory([]);
+          setHistoryIndex(-1);
+
           if (initialHome.elements && Array.isArray(initialHome.elements)) {
             setElements(initialHome.elements);
           } else if (loadedSite?.editorData?.elements && Array.isArray(loadedSite.editorData.elements)) {
@@ -2023,20 +2029,7 @@ export default function WebsiteEditor() {
           }
 
           if (loadedSite?.editorData?.siteParts) {
-            setSiteParts({
-              header: {
-                enabled: loadedSite.editorData.siteParts.header?.enabled ?? true,
-                elements: Array.isArray(loadedSite.editorData.siteParts.header?.elements)
-                  ? loadedSite.editorData.siteParts.header.elements
-                  : [],
-              },
-              footer: {
-                enabled: loadedSite.editorData.siteParts.footer?.enabled ?? true,
-                elements: Array.isArray(loadedSite.editorData.siteParts.footer?.elements)
-                  ? loadedSite.editorData.siteParts.footer.elements
-                  : [],
-              },
-            });
+            setSiteParts(loadSiteParts(loadedSite.editorData.siteParts));
           }
 
           if (loadedSite?.editorData?.publishing) {
@@ -7321,6 +7314,10 @@ export default function WebsiteEditor() {
             {/* Status Messages */}
             {saveMessage && <span role="status" aria-live="polite" className={`text-xs font-medium shrink-0 ${saveMessage.startsWith("Save failed") ? "text-red-400" : "text-emerald-400"}`}>{saveMessage}</span>}
             {errorMessage && <span role="alert" className="text-xs font-medium text-red-400 shrink-0 max-w-sm">{errorMessage}</span>}
+            {/* Autosave status (F-321): shows failures instead of only logging them; hidden for read-only access */}
+            {userAccess.canEditContent && (
+              <AutosaveStatusIndicator status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} errorMessage={autosaveError} />
+            )}
 
             {/* History Controls Group (Undo / Redo / History) */}
             <div className="flex items-center gap-0.5 bg-[#16203a] p-0.5 rounded-lg border border-slate-700/80 shrink-0">
