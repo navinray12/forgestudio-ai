@@ -181,7 +181,6 @@ import {
   getInnerStyles,
   hasStyleOverride,
   generateElementsHoverCSS,
-  findTreeElement,
   getElementBreadcrumbPath,
   updateTreeElement,
   insertTreeElement,
@@ -332,6 +331,10 @@ import {
   createDefault404Elements,
   createDefaultSearchResultsElements,
 } from "./navigation/navigationDefaults";
+import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./core/elementTree";
+import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
+import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
+import { buildSavePayload, buildPublishDraftSnapshot } from "./core/documentPayloads";
 
 // Monaco includes a substantial language runtime; load it only when a developer
 // opens code editing rather than with every editor session.
@@ -458,16 +461,6 @@ export default function WebsiteEditor() {
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const findTreeElement = (tree: EditorElement[], targetId: string): EditorElement | null => {
-    for (const item of tree) {
-      if (item.id === targetId) return item;
-      if (item.children && item.children.length > 0) {
-        const found = findTreeElement(item.children, targetId);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
   const selectedElement = selectedId ? findTreeElement(elements, selectedId) : null;
   const selectedElementAny = selectedElement as any;
   const [allowedComponentIds, setAllowedComponentIds] = useState<Set<string>>(new Set());
@@ -793,16 +786,6 @@ export default function WebsiteEditor() {
     }
   };
 
-  const getAllElementIds = (list: EditorElement[]): string[] => {
-    let ids: string[] = [];
-    for (const item of list) {
-      ids.push(item.id);
-      if (item.children && item.children.length > 0) {
-        ids = ids.concat(getAllElementIds(item.children));
-      }
-    }
-    return ids;
-  };
 
   const handleSelectElement = (id: string | null, e?: React.MouseEvent) => {
     setActiveElementState("normal");
@@ -2579,56 +2562,20 @@ export default function WebsiteEditor() {
 
     const destType = options?.destinationType || "INTERNAL";
 
-    const canonicalHeaderElements = canvasMode === "header" ? elements : (siteParts.header?.elements || []);
-    const canonicalFooterElements = canvasMode === "footer" ? elements : (siteParts.footer?.elements || []);
-    const canonicalSingleElements = canvasMode === "single" ? elements : (siteParts.single?.elements || []);
-    const canonicalArchiveElements = canvasMode === "archive" ? elements : (siteParts.archive?.elements || []);
-    const canonical404Elements = canvasMode === "404" ? elements : (siteParts.notFound404?.elements || []);
-    const canonicalSearchResultsElements = canvasMode === "search-results" ? elements : (siteParts.searchResults?.elements || []);
-    const canonicalPageElements = canvasMode === "page" ? elements : (pages.find(p => p.id === activePageId)?.elements || []);
-
-    const workingDraftSnapshot = {
-      version: 1,
-      elements: canonicalPageElements,
-      pages: pages.map((p) =>
-        p.id === activePageId && canvasMode === "page"
-          ? { ...p, elements: canonicalPageElements, pageSettings }
-          : p
-      ),
+    const workingDraftSnapshot = buildPublishDraftSnapshot({
+      canvasMode,
+      elements,
+      siteParts,
+      pages,
+      activePageId,
+      pageSettings,
       homePageId,
-      siteParts: {
-        header: {
-          isEnabled: siteParts.header?.isEnabled ?? true,
-          elements: canonicalHeaderElements,
-        },
-        footer: {
-          isEnabled: siteParts.footer?.isEnabled ?? true,
-          elements: canonicalFooterElements,
-        },
-        single: {
-          isEnabled: siteParts.single?.isEnabled ?? true,
-          elements: canonicalSingleElements,
-        },
-        archive: {
-          isEnabled: siteParts.archive?.isEnabled ?? true,
-          elements: canonicalArchiveElements,
-        },
-        notFound404: {
-          isEnabled: siteParts.notFound404?.isEnabled ?? true,
-          elements: canonical404Elements,
-        },
-        searchResults: {
-          isEnabled: siteParts.searchResults?.isEnabled ?? true,
-          elements: canonicalSearchResultsElements,
-        },
-      },
       deployment,
       breakpoints,
       globalSettings,
       popups,
       pageCss,
-      pageSettings,
-    };
+    });
 
     const payload = {
       editorData: workingDraftSnapshot,
@@ -2699,63 +2646,24 @@ export default function WebsiteEditor() {
       setSaveMessage("");
       setErrorMessage("");
 
-      const canonicalHeaderElements = canvasMode === "header" ? elements : (siteParts.header?.elements || []);
-      const canonicalFooterElements = canvasMode === "footer" ? elements : (siteParts.footer?.elements || []);
-      const canonicalSingleElements = canvasMode === "single" ? elements : (siteParts.single?.elements || []);
-      const canonicalArchiveElements = canvasMode === "archive" ? elements : (siteParts.archive?.elements || []);
-      const canonical404Elements = canvasMode === "404" ? elements : (siteParts.notFound404?.elements || []);
-      const canonicalSearchResultsElements = canvasMode === "search-results" ? elements : (siteParts.searchResults?.elements || []);
-      const canonicalPageElements = canvasMode === "page" ? elements : (pages.find(p => p.id === activePageId)?.elements || []);
-
-      const payload = {
-        editorData: {
-          version: 1,
-          elements: canonicalPageElements,
-          pages: pages.map((p) =>
-            p.id === activePageId && canvasMode === "page"
-              ? { ...p, elements: canonicalPageElements, pageSettings }
-              : p
-          ),
-          homePageId,
-          siteParts: {
-            header: {
-              enabled: siteParts.header?.enabled ?? true,
-              elements: canonicalHeaderElements,
-            },
-            footer: {
-              enabled: siteParts.footer?.enabled ?? true,
-              elements: canonicalFooterElements,
-            },
-            single: {
-              enabled: siteParts.single?.enabled ?? true,
-              elements: canonicalSingleElements,
-            },
-            archive: {
-              enabled: siteParts.archive?.enabled ?? true,
-              elements: canonicalArchiveElements,
-            },
-            notFound404: {
-              enabled: siteParts.notFound404?.enabled ?? true,
-              elements: canonical404Elements,
-            },
-            searchResults: {
-              enabled: siteParts.searchResults?.enabled ?? true,
-              elements: canonicalSearchResultsElements,
-            },
-          },
-          publishing,
-          deployment,
-          breakpoints,
-          globalSettings,
-          globalStyles: globalSettings?.globalStyles,
-          globalVariables,
-          globalClasses,
-          popups,
-          pageCss,
-          pageSettings,
-          ...(publishedDataRef.current ? { publishedData: publishedDataRef.current } : {}),
-        },
-      };
+      const { payload, canonicalPageElements } = buildSavePayload({
+        canvasMode,
+        elements,
+        siteParts,
+        pages,
+        activePageId,
+        pageSettings,
+        homePageId,
+        publishing,
+        deployment,
+        breakpoints,
+        globalSettings,
+        globalVariables,
+        globalClasses,
+        popups,
+        pageCss,
+        publishedDataRef,
+      });
 
       // Only a confirmed server response advances the saved baseline.
       const acknowledged = await persistDocument(payload);
@@ -3498,36 +3406,6 @@ export default function WebsiteEditor() {
     setElements((prev) => reorderTreeElement(prev, id, direction));
   };
 
-  const flattenAndSearchElements = (
-    nodes: EditorElement[],
-    query: string,
-    parentPath: string[] = []
-  ): { element: EditorElement; path: string }[] => {
-    let results: { element: EditorElement; path: string }[] = [];
-    if (!Array.isArray(nodes)) return results;
-    const q = query.toLowerCase().trim();
-
-    for (const node of nodes) {
-      if (!node || !node.id) continue;
-      const nodeType = node.type || "container";
-      const currentPath = [...parentPath, nodeType];
-      const pathStr = currentPath.join(" › ");
-      const matchesType = nodeType.toLowerCase().includes(q);
-      const matchesContent = node.content?.toLowerCase().includes(q) ?? false;
-      const matchesAlt = node.alt?.toLowerCase().includes(q) ?? false;
-      const matchesId = node.id.toLowerCase().includes(q);
-
-      if (matchesType || matchesContent || matchesAlt || matchesId) {
-        results.push({ element: node, path: pathStr });
-      }
-
-      if (node.children && Array.isArray(node.children) && node.children.length > 0) {
-        results = results.concat(flattenAndSearchElements(node.children, q, currentPath));
-      }
-    }
-
-    return results;
-  };
 
   const renderNavigatorTreeItem = (el: EditorElement, depth: number = 0, isLast: boolean = true): React.ReactNode => {
     if (!el || !el.id) return null;
@@ -3989,19 +3867,7 @@ export default function WebsiteEditor() {
   };
 
   // YouTube & Vimeo Embed Helpers (F-208 Video Widget)
-  const getYouTubeId = (url: string): string | null => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.trim().match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
-  };
 
-  const getVimeoId = (url: string): string | null => {
-    if (!url) return null;
-    const regExp = /(?:vimeo\.com\/|player\.vimeo\.com\/video\/)([0-9]+)/;
-    const match = url.trim().match(regExp);
-    return match ? match[1] : null;
-  };
 
   // Video File Upload Logic (F-208 Video Widget)
   const handleVideoFileSelect = async (file: File) => {
@@ -4239,109 +4105,8 @@ export default function WebsiteEditor() {
     }
   };
 
-  const compileBackgroundAndBorderStyles = (mergedStyles: ElementStyles): React.CSSProperties => {
-    const styles: React.CSSProperties = {};
+  const compileBackgroundAndBorderStyles = createBackgroundAndBorderStylesCompiler(apiUrl);
 
-    if (mergedStyles.backgroundColor) {
-      styles.backgroundColor = mergedStyles.backgroundColor;
-    }
-    if (mergedStyles.backgroundImage) {
-      const bgImg = mergedStyles.backgroundImage.startsWith("url(")
-        ? mergedStyles.backgroundImage
-        : `url('${resolveImageUrl(mergedStyles.backgroundImage, apiUrl)}')`;
-      styles.backgroundImage = bgImg;
-    }
-    if (mergedStyles.backgroundPosition) {
-      styles.backgroundPosition = mergedStyles.backgroundPosition;
-    }
-    if (mergedStyles.backgroundSize) {
-      styles.backgroundSize = mergedStyles.backgroundSize;
-    }
-    if (mergedStyles.backgroundRepeat) {
-      styles.backgroundRepeat = mergedStyles.backgroundRepeat;
-    }
-
-    if (mergedStyles.borderStyle && mergedStyles.borderStyle !== "none") {
-      styles.borderStyle = mergedStyles.borderStyle;
-      styles.borderWidth = mergedStyles.borderWidth || "1px";
-      styles.borderColor = mergedStyles.borderColor || "#cbd5e1";
-    }
-
-    if (
-      mergedStyles.borderTopLeftRadius ||
-      mergedStyles.borderTopRightRadius ||
-      mergedStyles.borderBottomRightRadius ||
-      mergedStyles.borderBottomLeftRadius
-    ) {
-      styles.borderTopLeftRadius = mergedStyles.borderTopLeftRadius || mergedStyles.borderRadius || "0px";
-      styles.borderTopRightRadius = mergedStyles.borderTopRightRadius || mergedStyles.borderRadius || "0px";
-      styles.borderBottomRightRadius = mergedStyles.borderBottomRightRadius || mergedStyles.borderRadius || "0px";
-      styles.borderBottomLeftRadius = mergedStyles.borderBottomLeftRadius || mergedStyles.borderRadius || "0px";
-    } else if (mergedStyles.borderRadius) {
-      styles.borderRadius = mergedStyles.borderRadius;
-    }
-
-    if (mergedStyles.boxShadow) {
-      styles.boxShadow = mergedStyles.boxShadow;
-    }
-
-    for (const property of ["background", "border", "borderTop", "borderRight", "borderBottom", "borderLeft"]) {
-      if (mergedStyles[property] !== undefined) Object.assign(styles, { [property]: mergedStyles[property] });
-    }
-
-    return styles;
-  };
-
-  const compilePositioningStyles = (mergedStyles: ElementStyles): React.CSSProperties => {
-    const styles: React.CSSProperties = {};
-
-    if (mergedStyles.position && mergedStyles.position !== "static") {
-      styles.position = mergedStyles.position;
-    }
-
-    if (mergedStyles.top !== undefined && mergedStyles.top !== "") {
-      styles.top = mergedStyles.top;
-    }
-    if (mergedStyles.right !== undefined && mergedStyles.right !== "") {
-      styles.right = mergedStyles.right;
-    }
-    if (mergedStyles.bottom !== undefined && mergedStyles.bottom !== "") {
-      styles.bottom = mergedStyles.bottom;
-    }
-    if (mergedStyles.left !== undefined && mergedStyles.left !== "") {
-      styles.left = mergedStyles.left;
-    }
-
-    if (mergedStyles.zIndex !== undefined && mergedStyles.zIndex !== null && mergedStyles.zIndex !== "") {
-      styles.zIndex = Number(mergedStyles.zIndex);
-    }
-
-    if (
-      mergedStyles.transformRotate ||
-      mergedStyles.transformScale ||
-      mergedStyles.transformTranslateX ||
-      mergedStyles.transformTranslateY
-    ) {
-      const transforms: string[] = [];
-      if (mergedStyles.transformRotate) transforms.push(`rotate(${mergedStyles.transformRotate})`);
-      if (mergedStyles.transformScale) transforms.push(`scale(${mergedStyles.transformScale})`);
-      if (mergedStyles.transformTranslateX || mergedStyles.transformTranslateY) {
-        const tx = mergedStyles.transformTranslateX || "0px";
-        const ty = mergedStyles.transformTranslateY || "0px";
-        transforms.push(`translate(${tx}, ${ty})`);
-      }
-      styles.transform = transforms.join(" ");
-    }
-
-    if (mergedStyles.opacity !== undefined && mergedStyles.opacity !== null && mergedStyles.opacity !== "") {
-      styles.opacity = Number(mergedStyles.opacity);
-    }
-
-    if (mergedStyles.overflowX) styles.overflowX = mergedStyles.overflowX as any;
-    if (mergedStyles.overflowY) styles.overflowY = mergedStyles.overflowY as any;
-
-    return styles;
-  };
 
   const renderPositioningControls = () => {
     if (!selectedElement) return null;

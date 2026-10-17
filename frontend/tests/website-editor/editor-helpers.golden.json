@@ -1,0 +1,2048 @@
+{
+  "findTreeElement empty \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement empty \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds empty": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"  \"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements empty undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement nested \"root1\"": {
+    "value": {
+      "found": {
+        "id": "root1",
+        "type": "container",
+        "content": "",
+        "children": [
+          {
+            "id": "childA",
+            "type": "heading",
+            "content": "Hello World",
+            "styles": {}
+          },
+          {
+            "id": "childB",
+            "type": "container",
+            "children": [
+              {
+                "id": "deep1",
+                "type": "image",
+                "content": "",
+                "alt": "Mountain view"
+              },
+              {
+                "id": "deep2",
+                "type": "text",
+                "content": "Pricing details"
+              }
+            ]
+          },
+          {
+            "id": "childC",
+            "type": "button",
+            "content": "Buy now",
+            "children": []
+          }
+        ]
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement nested \"childA\"": {
+    "value": {
+      "found": {
+        "id": "childA",
+        "type": "heading",
+        "content": "Hello World",
+        "styles": {}
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement nested \"deep2\"": {
+    "value": {
+      "found": {
+        "id": "deep2",
+        "type": "text",
+        "content": "Pricing details"
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement nested \"childC\"": {
+    "value": {
+      "found": {
+        "id": "childC",
+        "type": "button",
+        "content": "Buy now",
+        "children": []
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement nested \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement nested \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds nested": {
+    "value": [
+      "root1",
+      "childA",
+      "childB",
+      "deep1",
+      "deep2",
+      "childC",
+      "root2",
+      "childA"
+    ]
+  },
+  "flattenAndSearchElements nested \"\"": {
+    "value": [
+      {
+        "id": "root1",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "container › heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childB",
+        "path": "container › container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "deep1",
+        "path": "container › container › image",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "deep2",
+        "path": "container › container › text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childC",
+        "path": "container › button",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "root2",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"  \"": {
+    "value": [
+      {
+        "id": "root1",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "container › heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childB",
+        "path": "container › container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "deep1",
+        "path": "container › container › image",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "deep2",
+        "path": "container › container › text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childC",
+        "path": "container › button",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "root2",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"head\"": {
+    "value": [
+      {
+        "id": "childA",
+        "path": "container › heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"HEAD\"": {
+    "value": [
+      {
+        "id": "childA",
+        "path": "container › heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childA",
+        "path": "heading",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"  Pricing \"": {
+    "value": [
+      {
+        "id": "deep2",
+        "path": "container › container › text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"mountain\"": {
+    "value": [
+      {
+        "id": "deep1",
+        "path": "container › container › image",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"deep\"": {
+    "value": [
+      {
+        "id": "deep1",
+        "path": "container › container › image",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "deep2",
+        "path": "container › container › text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"container\"": {
+    "value": [
+      {
+        "id": "root1",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "childB",
+        "path": "container › container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nested \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nested \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nested \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nested undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement flat \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement flat \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds flat": {
+    "value": [
+      "one",
+      "two"
+    ]
+  },
+  "flattenAndSearchElements flat \"\"": {
+    "value": [
+      {
+        "id": "one",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "two",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements flat \"  \"": {
+    "value": [
+      {
+        "id": "one",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      },
+      {
+        "id": "two",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements flat \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements flat undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement missingType \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"noType\"": {
+    "value": {
+      "found": {
+        "id": "noType",
+        "content": "Typeless"
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement missingType \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingType \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds missingType": {
+    "value": [
+      "noType"
+    ]
+  },
+  "flattenAndSearchElements missingType \"\"": {
+    "value": [
+      {
+        "id": "noType",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingType \"  \"": {
+    "value": [
+      {
+        "id": "noType",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingType \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"container\"": {
+    "value": [
+      {
+        "id": "noType",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingType \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingType \"typeless\"": {
+    "value": [
+      {
+        "id": "noType",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingType undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement missingId \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"after\"": {
+    "value": {
+      "found": {
+        "id": "after",
+        "type": "text"
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement missingId \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement missingId \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds missingId": {
+    "value": [
+      "(undefined)",
+      "after"
+    ]
+  },
+  "flattenAndSearchElements missingId \"\"": {
+    "value": [
+      {
+        "id": "after",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingId \"  \"": {
+    "value": [
+      {
+        "id": "after",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements missingId \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements missingId undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement nullItem \"root1\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"childA\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"deep2\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"childC\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"missing\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"after\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"noType\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"odd\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"num\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "findTreeElement nullItem \"single\"": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "getAllElementIds nullItem": {
+    "throws": "TypeError: Cannot read properties of null (reading 'id')"
+  },
+  "flattenAndSearchElements nullItem \"\"": {
+    "value": [
+      {
+        "id": "after",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nullItem \"  \"": {
+    "value": [
+      {
+        "id": "after",
+        "path": "text",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements nullItem \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements nullItem undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement childrenString \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"odd\"": {
+    "value": {
+      "found": {
+        "id": "odd",
+        "type": "container",
+        "children": "xy"
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement childrenString \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenString \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds childrenString": {
+    "value": [
+      "odd",
+      "(undefined)",
+      "(undefined)"
+    ]
+  },
+  "flattenAndSearchElements childrenString \"\"": {
+    "value": [
+      {
+        "id": "odd",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenString \"  \"": {
+    "value": [
+      {
+        "id": "odd",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenString \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"container\"": {
+    "value": [
+      {
+        "id": "odd",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenString \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenString undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement childrenNull \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"num\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement childrenNull \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds childrenNull": {
+    "value": [
+      "nullKids"
+    ]
+  },
+  "flattenAndSearchElements childrenNull \"\"": {
+    "value": [
+      {
+        "id": "nullKids",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenNull \"  \"": {
+    "value": [
+      {
+        "id": "nullKids",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenNull \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"container\"": {
+    "value": [
+      {
+        "id": "nullKids",
+        "path": "container",
+        "fromInput": true,
+        "keys": [
+          "element",
+          "path"
+        ]
+      }
+    ]
+  },
+  "flattenAndSearchElements childrenNull \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements childrenNull undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement numericContent \"root1\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"childA\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"deep2\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"childC\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"missing\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"after\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"noType\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"odd\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "findTreeElement numericContent \"num\"": {
+    "value": {
+      "found": {
+        "id": "num",
+        "type": "text",
+        "content": 42
+      },
+      "fromInput": true
+    }
+  },
+  "findTreeElement numericContent \"single\"": {
+    "value": {
+      "found": null,
+      "fromInput": null
+    }
+  },
+  "getAllElementIds numericContent": {
+    "value": [
+      "num"
+    ]
+  },
+  "flattenAndSearchElements numericContent \"\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"  \"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"head\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"HEAD\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"  Pricing \"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"mountain\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"deep\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"container\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"zzz\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"›\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent \"typeless\"": {
+    "throws": "TypeError: node.content?.toLowerCase is not a function"
+  },
+  "flattenAndSearchElements numericContent undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'toLowerCase')"
+  },
+  "findTreeElement notArray \"root1\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"childA\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"deep2\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"childC\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"missing\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"after\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"noType\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"odd\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"num\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement notArray \"single\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "getAllElementIds notArray": {
+    "throws": "TypeError: list is not iterable"
+  },
+  "flattenAndSearchElements notArray \"\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"  \"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements notArray undefined": {
+    "value": []
+  },
+  "findTreeElement undefined \"root1\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"childA\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"deep2\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"childC\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"missing\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"after\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"noType\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"odd\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"num\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "findTreeElement undefined \"single\"": {
+    "throws": "TypeError: tree is not iterable"
+  },
+  "getAllElementIds undefined": {
+    "throws": "TypeError: list is not iterable"
+  },
+  "flattenAndSearchElements undefined \"\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"  \"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"head\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"HEAD\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"  Pricing \"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"mountain\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"deep\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"container\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"zzz\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"›\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined \"typeless\"": {
+    "value": []
+  },
+  "flattenAndSearchElements undefined undefined": {
+    "value": []
+  },
+  "flattenAndSearchElements explicit parentPath": {
+    "value": [
+      "page › section › container › container › image",
+      "page › section › container › container › text"
+    ]
+  },
+  "getYouTubeId \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://youtu.be/dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://youtu.be/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://youtu.be/dQw4w9WgXcQ?si=abc\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://youtu.be/dQw4w9WgXcQ?si=abc\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/embed/dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://www.youtube.com/embed/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/v/dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://www.youtube.com/v/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/u/w/dQw4w9WgXcQ\"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"https://www.youtube.com/u/w/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/shorts/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getVimeoId \"https://www.youtube.com/shorts/dQw4w9WgXcQ\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/watch?v=short\"": {
+    "value": null
+  },
+  "getVimeoId \"https://www.youtube.com/watch?v=short\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://www.youtube.com/watch?v=dQw4w9WgXcQX\"": {
+    "value": null
+  },
+  "getVimeoId \"https://www.youtube.com/watch?v=dQw4w9WgXcQX\"": {
+    "value": null
+  },
+  "getYouTubeId \"   https://youtu.be/dQw4w9WgXcQ   \"": {
+    "value": "dQw4w9WgXcQ"
+  },
+  "getVimeoId \"   https://youtu.be/dQw4w9WgXcQ   \"": {
+    "value": null
+  },
+  "getYouTubeId \"https://vimeo.com/76979871\"": {
+    "value": null
+  },
+  "getVimeoId \"https://vimeo.com/76979871\"": {
+    "value": "76979871"
+  },
+  "getYouTubeId \"https://player.vimeo.com/video/76979871?h=abc\"": {
+    "value": null
+  },
+  "getVimeoId \"https://player.vimeo.com/video/76979871?h=abc\"": {
+    "value": "76979871"
+  },
+  "getYouTubeId \"https://vimeo.com/channels/staffpicks/76979871\"": {
+    "value": null
+  },
+  "getVimeoId \"https://vimeo.com/channels/staffpicks/76979871\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://vimeo.com/abc\"": {
+    "value": null
+  },
+  "getVimeoId \"https://vimeo.com/abc\"": {
+    "value": null
+  },
+  "getYouTubeId \"https://example.com/movie.mp4\"": {
+    "value": null
+  },
+  "getVimeoId \"https://example.com/movie.mp4\"": {
+    "value": null
+  },
+  "getYouTubeId \"not a url\"": {
+    "value": null
+  },
+  "getVimeoId \"not a url\"": {
+    "value": null
+  },
+  "getYouTubeId \"\"": {
+    "value": null
+  },
+  "getVimeoId \"\"": {
+    "value": null
+  },
+  "getYouTubeId null": {
+    "value": null
+  },
+  "getVimeoId null": {
+    "value": null
+  },
+  "getYouTubeId undefined": {
+    "value": null
+  },
+  "getVimeoId undefined": {
+    "value": null
+  },
+  "getYouTubeId 0": {
+    "value": null
+  },
+  "getVimeoId 0": {
+    "value": null
+  },
+  "getYouTubeId 123": {
+    "throws": "TypeError: url.trim is not a function"
+  },
+  "getVimeoId 123": {
+    "throws": "TypeError: url.trim is not a function"
+  },
+  "getYouTubeId {\"href\":\"https://youtu.be/dQw4w9WgXcQ\"}": {
+    "throws": "TypeError: url.trim is not a function"
+  },
+  "getVimeoId {\"href\":\"https://youtu.be/dQw4w9WgXcQ\"}": {
+    "throws": "TypeError: url.trim is not a function"
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #0": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #1": {
+    "value": {
+      "backgroundColor": "#112233"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #2": {
+    "value": {
+      "backgroundImage": "url(\"https://cdn.example.test/a.png\")"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #3": {
+    "value": {
+      "backgroundImage": "url('http://localhost:5000/uploads/bg.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #4": {
+    "value": {
+      "backgroundImage": "url('http://localhost:5000/uploads/bg.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #5": {
+    "value": {
+      "backgroundImage": "url('https://cdn.example.test/b.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #6": {
+    "value": {
+      "backgroundImage": "url('data:image/png;base64,AAAA')"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #7": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #8": {
+    "value": {
+      "backgroundPosition": "center",
+      "backgroundSize": "cover",
+      "backgroundRepeat": "no-repeat"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #9": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #10": {
+    "value": {
+      "borderStyle": "solid",
+      "borderWidth": "1px",
+      "borderColor": "#cbd5e1"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #11": {
+    "value": {
+      "borderStyle": "dashed",
+      "borderWidth": "2px",
+      "borderColor": "#000"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #12": {
+    "value": {
+      "borderRadius": "8px"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #13": {
+    "value": {
+      "borderTopLeftRadius": "4px",
+      "borderTopRightRadius": "0px",
+      "borderBottomRightRadius": "0px",
+      "borderBottomLeftRadius": "0px"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #14": {
+    "value": {
+      "borderTopLeftRadius": "4px",
+      "borderTopRightRadius": "9px",
+      "borderBottomRightRadius": "6px",
+      "borderBottomLeftRadius": "9px"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #15": {
+    "value": {
+      "boxShadow": "0 1px 2px rgba(0,0,0,0.2)"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #16": {
+    "value": {
+      "background": "linear-gradient(red, blue)",
+      "border": "1px solid red",
+      "borderTop": "",
+      "borderLeft": null
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #17": {
+    "value": {
+      "borderRight": "2px dotted green",
+      "borderBottom": "0"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 #18": {
+    "value": {
+      "backgroundColor": "#fff",
+      "backgroundImage": "url('http://localhost:5000/x.png')",
+      "borderStyle": "solid",
+      "borderWidth": "1px",
+      "borderColor": "#cbd5e1",
+      "borderRadius": "2px",
+      "boxShadow": "none",
+      "background": "red"
+    }
+  },
+  "compileBackgroundAndBorderStyles http://localhost:5000 null": {
+    "throws": "TypeError: Cannot read properties of null (reading 'backgroundColor')"
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #0": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #1": {
+    "value": {
+      "backgroundColor": "#112233"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #2": {
+    "value": {
+      "backgroundImage": "url(\"https://cdn.example.test/a.png\")"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #3": {
+    "value": {
+      "backgroundImage": "url('https://api.example.test/uploads/bg.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #4": {
+    "value": {
+      "backgroundImage": "url('https://api.example.test/uploads/bg.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #5": {
+    "value": {
+      "backgroundImage": "url('https://cdn.example.test/b.png')"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #6": {
+    "value": {
+      "backgroundImage": "url('data:image/png;base64,AAAA')"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #7": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #8": {
+    "value": {
+      "backgroundPosition": "center",
+      "backgroundSize": "cover",
+      "backgroundRepeat": "no-repeat"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #9": {
+    "value": {}
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #10": {
+    "value": {
+      "borderStyle": "solid",
+      "borderWidth": "1px",
+      "borderColor": "#cbd5e1"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #11": {
+    "value": {
+      "borderStyle": "dashed",
+      "borderWidth": "2px",
+      "borderColor": "#000"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #12": {
+    "value": {
+      "borderRadius": "8px"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #13": {
+    "value": {
+      "borderTopLeftRadius": "4px",
+      "borderTopRightRadius": "0px",
+      "borderBottomRightRadius": "0px",
+      "borderBottomLeftRadius": "0px"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #14": {
+    "value": {
+      "borderTopLeftRadius": "4px",
+      "borderTopRightRadius": "9px",
+      "borderBottomRightRadius": "6px",
+      "borderBottomLeftRadius": "9px"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #15": {
+    "value": {
+      "boxShadow": "0 1px 2px rgba(0,0,0,0.2)"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #16": {
+    "value": {
+      "background": "linear-gradient(red, blue)",
+      "border": "1px solid red",
+      "borderTop": "",
+      "borderLeft": null
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #17": {
+    "value": {
+      "borderRight": "2px dotted green",
+      "borderBottom": "0"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test #18": {
+    "value": {
+      "backgroundColor": "#fff",
+      "backgroundImage": "url('https://api.example.test/x.png')",
+      "borderStyle": "solid",
+      "borderWidth": "1px",
+      "borderColor": "#cbd5e1",
+      "borderRadius": "2px",
+      "boxShadow": "none",
+      "background": "red"
+    }
+  },
+  "compileBackgroundAndBorderStyles https://api.example.test null": {
+    "throws": "TypeError: Cannot read properties of null (reading 'backgroundColor')"
+  },
+  "compilePositioningStyles #0": {
+    "value": {}
+  },
+  "compilePositioningStyles #1": {
+    "value": {
+      "top": "1px"
+    }
+  },
+  "compilePositioningStyles #2": {
+    "value": {
+      "position": "relative",
+      "top": "0",
+      "left": 0
+    }
+  },
+  "compilePositioningStyles #3": {
+    "value": {
+      "position": "absolute",
+      "top": "10px",
+      "bottom": "5%",
+      "left": "auto"
+    }
+  },
+  "compilePositioningStyles #4": {
+    "value": {
+      "position": "fixed",
+      "zIndex": 7
+    }
+  },
+  "compilePositioningStyles #5": {
+    "value": {
+      "position": "sticky",
+      "zIndex": 0
+    }
+  },
+  "compilePositioningStyles #6": {
+    "value": {}
+  },
+  "compilePositioningStyles #7": {
+    "value": {}
+  },
+  "compilePositioningStyles #8": {
+    "value": {
+      "zIndex": "(NaN)"
+    }
+  },
+  "compilePositioningStyles #9": {
+    "value": {
+      "transform": "rotate(45deg)"
+    }
+  },
+  "compilePositioningStyles #10": {
+    "value": {
+      "transform": "scale(1.5)"
+    }
+  },
+  "compilePositioningStyles #11": {
+    "value": {
+      "transform": "translate(10px, 0px)"
+    }
+  },
+  "compilePositioningStyles #12": {
+    "value": {
+      "transform": "translate(0px, -4px)"
+    }
+  },
+  "compilePositioningStyles #13": {
+    "value": {
+      "transform": "rotate(10deg) scale(2) translate(1px, 2px)"
+    }
+  },
+  "compilePositioningStyles #14": {
+    "value": {}
+  },
+  "compilePositioningStyles #15": {
+    "value": {
+      "opacity": 0
+    }
+  },
+  "compilePositioningStyles #16": {
+    "value": {
+      "opacity": 0.5
+    }
+  },
+  "compilePositioningStyles #17": {
+    "value": {}
+  },
+  "compilePositioningStyles #18": {
+    "value": {}
+  },
+  "compilePositioningStyles #19": {
+    "value": {
+      "overflowX": "hidden",
+      "overflowY": "auto"
+    }
+  },
+  "compilePositioningStyles #20": {
+    "value": {}
+  },
+  "compilePositioningStyles undefined": {
+    "throws": "TypeError: Cannot read properties of undefined (reading 'position')"
+  }
+}
