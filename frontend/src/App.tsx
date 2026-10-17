@@ -12,7 +12,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
-import UserDashboard from "./pages/dashboard/UserDashboard";
+import UserDashboard from "./pages/dashboard/DashboardPage";
 
 // Route-based code splitting for optimal initial bundle size and load performance
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
