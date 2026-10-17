@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import MembersView from "../../features/workspaces/MembersView";
 import "./DashboardPage.css";
 
 interface Website {
@@ -37,7 +38,7 @@ interface Website {
 }
 
 type ViewMode = "grid" | "list";
-type DashboardSection = "sites" | "archive";
+type DashboardSection = "sites" | "archive" | "members";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const folderStorageKey = "forgestudio.dashboard.folders";
@@ -48,8 +49,8 @@ const navItems = [
 ];
 
 const secondaryItems = [
-  { label: "Members", icon: Users },
-  { label: "Plans", icon: Sparkles },
+  { label: "Members", icon: Users, section: "members" as DashboardSection },
+  { label: "Plans", icon: Sparkles, section: "plans" as const },
   { label: "Usage", icon: Grid2X2 },
   { label: "Forms", icon: Settings2 },
   { label: "Billing", icon: Folder },
@@ -185,12 +186,13 @@ function DashboardPage() {
               <button key={label} className={`sidebar-link ${section === itemSection ? "is-active" : ""}`} onClick={() => { setSection(itemSection); setActiveFolder("All sites"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span></button>
             ))}
             <div className="sidebar-rule" />
-            {secondaryItems.map(({ label, icon: Icon }) => <button key={label} className="sidebar-link"><Icon size={16} /><span>{label}</span>{(label === "Billing" || label === "Forms") && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
+            {secondaryItems.map(({ label, icon: Icon, section: itemSection }) => <button key={label} className={`sidebar-link ${label === "Members" && section === "members" ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{(label === "Billing" || label === "Forms") && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
           </nav>
           <div className="sidebar-footer"><button className="sidebar-link"><CircleHelp size={16} /><span>Help center</span></button><button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button></div>
         </aside>
 
         <main className="studio-main">
+          {section === "members" ? <MembersView /> : <>
           <div className="main-heading-row">
             <div><p className="eyebrow">{section === "archive" ? "YOUR SITES, STORED" : "YOUR WEB, ORGANIZED"}</p><h1>{section === "archive" ? "Archive" : "All sites"}</h1><p className="subtitle">{section === "archive" ? "Restore and manage sites you have moved out of your workspace." : "Create, design, and manage your websites in one place."}</p></div>
             <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>
@@ -207,10 +209,11 @@ function DashboardPage() {
 
           {error && <div className="dashboard-error">{error}<button onClick={() => void fetchWebsites(true)}>Try again</button></div>}
           {loading && section === "sites" ? <div className="site-grid"><div className="loading-card" /><div className="loading-card" /><div className="loading-card" /></div> : visibleWebsites.length === 0 ? <div className="empty-state"><div className="empty-icon"><Folder size={22} /></div><h3>{section === "archive" ? "Your archive is empty" : search ? "No sites found" : "Create your first site"}</h3><p>{search ? "Try a different search term." : "Start with a blank canvas, a template, or an AI-generated site."}</p>{section === "sites" && !search && <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>}</div> : <div className={`site-grid ${viewMode === "list" ? "is-list" : ""}`}>{visibleWebsites.map((site, index) => <SiteCard key={site.id} site={site} index={index} viewMode={viewMode} menuId={menuId} onMenu={() => setMenuId(menuId === site.id ? null : site.id)} onOpen={() => navigate(`/editor/${site.id}`)} />)}</div>}
+          </>}
         </main>
       </div>
 
-      {createOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateOpen(false); }}><form className="create-modal" onSubmit={handleCreate}><button type="button" className="modal-close" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={18} /></button><div className="modal-icon"><Sparkles size={20} /></div><p className="eyebrow">NEW PROJECT</p><h2>Create a new site</h2><p className="modal-description">Give your project a name. You can customize everything in the visual editor.</p><label className="modal-label" htmlFor="site-name">Site name<input id="site-name" autoFocus value={siteName} onChange={(event) => setSiteName(event.target.value)} placeholder="e.g. Northstar Notes" /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={creating || !siteName.trim()}>{creating ? "Creating..." : "Create site"}</button></div></form></div>}
+          {createOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateOpen(false); }}><form className="create-modal" onSubmit={handleCreate}><button type="button" className="modal-close" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={18} /></button><div className="modal-icon"><Sparkles size={20} /></div><p className="eyebrow">NEW PROJECT</p><h2>Create a new site</h2><p className="modal-description">Give your project a name. You can customize everything in the visual editor.</p><label className="modal-label" htmlFor="site-name">Site name<input id="site-name" autoFocus value={siteName} onChange={(event) => setSiteName(event.target.value)} placeholder="e.g. Northstar Notes" /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={creating || !siteName.trim()}>{creating ? "Creating..." : "Create site"}</button></div></form></div>}
     </div>
   );
 }
