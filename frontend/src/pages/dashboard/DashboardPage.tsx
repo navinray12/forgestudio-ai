@@ -8,7 +8,9 @@ import {
   CircleHelp,
   Folder,
   FolderPlus,
+  FileText,
   Grid2X2,
+  LibraryBig,
   LayoutGrid,
   List,
   LogOut,
@@ -17,15 +19,16 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Settings2,
   Sparkles,
   Star,
+  Plug,
   Undo2,
   Users,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import MembersView from "../../features/workspaces/MembersView";
+import UsageView from "../../features/usage/UsageView";
 import "./DashboardPage.css";
 
 interface Website {
@@ -38,7 +41,7 @@ interface Website {
 }
 
 type ViewMode = "grid" | "list";
-type DashboardSection = "sites" | "archive" | "members";
+type DashboardSection = "sites" | "archive" | "members" | "usage";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const folderStorageKey = "forgestudio.dashboard.folders";
@@ -51,9 +54,11 @@ const navItems = [
 const secondaryItems = [
   { label: "Members", icon: Users, section: "members" as DashboardSection },
   { label: "Plans", icon: Sparkles, section: "plans" as const },
-  { label: "Usage", icon: Grid2X2 },
-  { label: "Forms", icon: Settings2 },
-  { label: "Billing", icon: Folder },
+  { label: "Usage", icon: Grid2X2, section: "usage" as const },
+  { label: "Forms", icon: FileText, section: "forms" as const },
+  { label: "Billing", icon: Folder, section: "billing" as const },
+  { label: "Integrations", icon: Plug, section: "integrations" as const, expandable: true },
+  { label: "Libraries & Templates", icon: LibraryBig, section: "libraries" as const, expandable: true },
 ];
 
 function relativeDate(value: string) {
@@ -186,13 +191,13 @@ function DashboardPage() {
               <button key={label} className={`sidebar-link ${section === itemSection ? "is-active" : ""}`} onClick={() => { setSection(itemSection); setActiveFolder("All sites"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span></button>
             ))}
             <div className="sidebar-rule" />
-            {secondaryItems.map(({ label, icon: Icon, section: itemSection }) => <button key={label} className={`sidebar-link ${label === "Members" && section === "members" ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{(label === "Billing" || label === "Forms") && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
+            {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
           </nav>
           <div className="sidebar-footer"><button className="sidebar-link"><CircleHelp size={16} /><span>Help center</span></button><button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button></div>
         </aside>
 
         <main className="studio-main">
-          {section === "members" ? <MembersView /> : <>
+          {section === "members" ? <MembersView /> : section === "usage" ? <UsageView /> : <>
           <div className="main-heading-row">
             <div><p className="eyebrow">{section === "archive" ? "YOUR SITES, STORED" : "YOUR WEB, ORGANIZED"}</p><h1>{section === "archive" ? "Archive" : "All sites"}</h1><p className="subtitle">{section === "archive" ? "Restore and manage sites you have moved out of your workspace." : "Create, design, and manage your websites in one place."}</p></div>
             <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>
