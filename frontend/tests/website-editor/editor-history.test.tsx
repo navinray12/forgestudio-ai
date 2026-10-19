@@ -36,17 +36,14 @@ describe("undo history (characterised for useEditorHistory)", () => {
     expect([undoButton().disabled, redoButton().disabled]).toEqual([true, false]);
   });
 
-  it("keeps at most 50 entries (cap pinned structurally until useEditorHistory is extracted)", () => {
-    // Exercising the cap through the mounted editor needs ~100 full-editor commits (measured ~85s alone
-    // on a loaded machine), which destabilised the parallel suite. Until the history logic is a hook
-    // that can be driven cheaply with renderHook, pin the cap in the history effect: drop the oldest
-    // entry beyond 50 and clamp the index to 49. (A mutation to 51/50 was caught by the behavioural
-    // version of this test before it was replaced.)
+  it("the editor's history (incl. the 50-entry limit) comes from useEditorHistory", () => {
+    // Before Phase 5B-1 this pinned the cap constants inside WebsiteEditor.tsx because driving the cap
+    // through the mounted editor took ~85s. The logic now lives in core/useEditorHistory, whose limit,
+    // resets and redo-branch handling are tested behaviourally in milliseconds in
+    // use-editor-history.test.tsx; this checks the editor still delegates to it.
     const source = readFileSync(resolve(process.cwd(), "src/pages/editor/WebsiteEditor.tsx"), "utf8");
-    const effect = source.slice(source.indexOf("const isUndoRedoAction = useRef(false);"), source.indexOf("const handleUndo = () => {"));
-    expect(effect).toContain("if (updated.length > 50) updated.shift();");
-    expect(effect).toContain("setHistoryIndex(historyIndex >= 0 ? Math.min(historyIndex + 1, 49) : 0);");
-    expect(effect).toContain("const sliced = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev;");
+    expect(source).toContain("useEditorHistory(elements, setElements)");
+    expect(source).not.toMatch(/\bsetHistory\(|\bsetHistoryIndex\(|isUndoRedoAction/);
   });
 
   it("switching canvas scope starts a fresh history for that scope", async () => {

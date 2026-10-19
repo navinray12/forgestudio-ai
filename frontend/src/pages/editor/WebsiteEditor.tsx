@@ -336,6 +336,8 @@ import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
 import { buildSavePayload, buildPublishDraftSnapshot } from "./core/documentPayloads";
 import { loadSiteParts } from "./core/siteParts";
+import { useEditorHistory } from "./core/useEditorHistory";
+import { useEditorShortcuts } from "./core/useEditorShortcuts";
 
 // Monaco includes a substantial language runtime; load it only when a developer
 // opens code editing rather than with every editor session.
@@ -748,44 +750,8 @@ export default function WebsiteEditor() {
     });
   };
 
-  // Revision & History State (F-013)
-  const [history, setHistory] = useState<EditorElement[][]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const isUndoRedoAction = useRef(false);
-
-  useEffect(() => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
-      return;
-    }
-
-    setHistory((prev) => {
-      const sliced = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : prev;
-      const updated = [...sliced, JSON.parse(JSON.stringify(elements))];
-      if (updated.length > 50) updated.shift();
-      return updated;
-    });
-
-    setHistoryIndex(historyIndex >= 0 ? Math.min(historyIndex + 1, 49) : 0);
-  }, [elements]);
-
-  const handleUndo = () => {
-    if (historyIndex > 0 && history[historyIndex - 1]) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setElements(JSON.parse(JSON.stringify(history[newIndex])));
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1 && history[historyIndex + 1]) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setElements(JSON.parse(JSON.stringify(history[newIndex])));
-    }
-  };
+  // Revision & History State (F-013): see core/useEditorHistory
+  const { history, historyIndex, handleUndo, handleRedo, resetHistoryTo, clearHistoryForLoad } = useEditorHistory(elements, setElements);
 
 
   const handleSelectElement = (id: string | null, e?: React.MouseEvent) => {
@@ -1306,8 +1272,7 @@ export default function WebsiteEditor() {
     setCanvasMode("page");
 
     // 3. Reset undo/redo history to isolate active page history (Comment 6)
-    setHistory([target.elements || []]);
-    setHistoryIndex(0);
+    resetHistoryTo(target.elements || []);
 
     setActivePageId(target.id);
     setElements(target.elements || []);
@@ -1372,8 +1337,7 @@ export default function WebsiteEditor() {
       const activePage = pages.find((p) => p.id === activePageId);
       const targetEls = activePage?.elements || [];
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "header") {
       let targetEls = siteParts.header?.elements || [];
       if (targetEls.length === 0) {
@@ -1387,13 +1351,11 @@ export default function WebsiteEditor() {
         }));
       }
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "footer") {
       const targetEls = siteParts.footer?.elements || [];
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "single") {
       let targetEls = siteParts.single?.elements || [];
       if (targetEls.length === 0) {
@@ -1404,8 +1366,7 @@ export default function WebsiteEditor() {
         }));
       }
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "archive") {
       let targetEls = siteParts.archive?.elements || [];
       if (targetEls.length === 0) {
@@ -1416,8 +1377,7 @@ export default function WebsiteEditor() {
         }));
       }
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "404") {
       let targetEls = siteParts.notFound404?.elements || [];
       if (targetEls.length === 0) {
@@ -1428,8 +1388,7 @@ export default function WebsiteEditor() {
         }));
       }
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     } else if (mode === "search-results") {
       let targetEls = siteParts.searchResults?.elements || [];
       if (targetEls.length === 0) {
@@ -1440,8 +1399,7 @@ export default function WebsiteEditor() {
         }));
       }
       setElements(targetEls);
-      setHistory([targetEls]);
-      setHistoryIndex(0);
+      resetHistoryTo(targetEls);
     }
 
     setCanvasMode(mode);
@@ -1520,8 +1478,7 @@ export default function WebsiteEditor() {
     setSelectedId(null);
     setSelectedIds([]);
     setCanvasMode("page");
-    setHistory([initialElements]);
-    setHistoryIndex(0);
+    resetHistoryTo(initialElements);
 
     setNewPageName("");
     setNewPageSlug("");
@@ -1601,8 +1558,7 @@ export default function WebsiteEditor() {
     setSelectedId(null);
     setSelectedIds([]);
     setCanvasMode("page");
-    setHistory([starterElements]);
-    setHistoryIndex(0);
+    resetHistoryTo(starterElements);
     setIsPageSelectorOpen(false);
 
     setSaveMessage(`Created and opened "${pageName}" page!`);
@@ -1985,8 +1941,7 @@ export default function WebsiteEditor() {
 
           // The loaded document starts undo history: drop the pre-load [] entry so the history effect
           // records the elements set below as entry 0 (undo right after load must not empty the page).
-          setHistory([]);
-          setHistoryIndex(-1);
+          clearHistoryForLoad();
 
           if (initialHome.elements && Array.isArray(initialHome.elements)) {
             setElements(initialHome.elements);
@@ -2184,8 +2139,7 @@ export default function WebsiteEditor() {
         setActivePreviewPageId(currentActive.id);
         // The authoritative document is a history boundary: undo/redo must not restore the
         // pre-reload document, which autosave would then write over the newer server version.
-        setHistory([]);
-        setHistoryIndex(-1);
+        clearHistoryForLoad();
         setElements(currentActive.elements || []);
         if (currentActive.pageSettings) {
           setPageSettings((prev) => ({ ...prev, ...currentActive.pageSettings }));
@@ -2987,89 +2941,7 @@ export default function WebsiteEditor() {
   const [finderQuery, setFinderQuery] = useState("");
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      const isInput =
-        activeEl &&
-        (activeEl.tagName === "INPUT" ||
-          activeEl.tagName === "TEXTAREA" ||
-          (activeEl as HTMLElement).isContentEditable);
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setIsFinderOpen((prev) => !prev);
-        return;
-      }
-
-      if (isInput) return;
-
-      if (e.key === "Escape") {
-        if (isShortcutsHelpOpen) {
-          e.preventDefault();
-          setIsShortcutsHelpOpen(false);
-        } else if (isFinderOpen) {
-          e.preventDefault();
-          setIsFinderOpen(false);
-        } else if (isFullScreenCanvas) {
-          e.preventDefault();
-          setIsFullScreenCanvas(false);
-        }
-      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-        e.preventDefault();
-        setIsShortcutsHelpOpen((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handleSave();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        setIsPreview((prev) => !prev);
-      } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedId) {
-          e.preventDefault();
-          handleDeleteElement(selectedId);
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        handleRedo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
-        if (selectedId || selectedIds.length > 0) {
-          e.preventDefault();
-          handleCopyElement();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-        if (copiedElement) {
-          e.preventDefault();
-          handlePasteElement();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
-        if (selectedId) {
-          e.preventDefault();
-          handleDuplicateElement(selectedId);
-        }
-      } else if (e.altKey && e.key === "ArrowUp") {
-        if (selectedId) {
-          e.preventDefault();
-          handleReorderElement(selectedId, "up");
-        }
-      } else if (e.altKey && e.key === "ArrowDown") {
-        if (selectedId) {
-          e.preventDefault();
-          handleReorderElement(selectedId, "down");
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, selectedIds, copiedElement, elements, historyIndex, history, isFullScreenCanvas, isPreview, saving, isShortcutsHelpOpen, isFinderOpen]);
+  // Keyboard shortcuts (window keydown): see core/useEditorShortcuts, called after handleReorderElement
 
   // F-102 - F-141: Preview Mode Motion & Interaction Runtime
   useEffect(() => {
@@ -3390,6 +3262,34 @@ export default function WebsiteEditor() {
   const handleReorderElement = (id: string, direction: "up" | "down") => {
     setElements((prev) => reorderTreeElement(prev, id, direction));
   };
+
+  // Keyboard shortcuts: one window keydown listener, same handler and dependency list as before the
+  // extraction; called here because the handler references the element actions declared above.
+  useEditorShortcuts({
+    selectedId,
+    selectedIds,
+    copiedElement,
+    elements,
+    historyIndex,
+    history,
+    isFullScreenCanvas,
+    isPreview,
+    saving,
+    isShortcutsHelpOpen,
+    isFinderOpen,
+    setIsFinderOpen,
+    setIsShortcutsHelpOpen,
+    setIsFullScreenCanvas,
+    setIsPreview,
+    handleSave,
+    handleDeleteElement,
+    handleUndo,
+    handleRedo,
+    handleCopyElement,
+    handlePasteElement,
+    handleDuplicateElement,
+    handleReorderElement,
+  });
 
 
   const renderNavigatorTreeItem = (el: EditorElement, depth: number = 0, isLast: boolean = true): React.ReactNode => {
