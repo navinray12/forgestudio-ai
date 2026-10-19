@@ -13,7 +13,7 @@
  * The fake server here is stateful and enforces If-Match like the real document endpoint.
  */
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
-import { API, flush, heading, mountEditor, siteFixture, SITE_ID } from "./editor-harness";
+import { API, flush, heading, mountEditor, SAVED_BADGE, siteFixture, SITE_ID, watchForText } from "./editor-harness";
 
 vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
@@ -89,9 +89,11 @@ describe("Code Workspace reload is a history boundary", () => {
       expect(homeIds((s.body as any).editorData)).toEqual(["elC"]);
       expect(s.headers["If-Match"]).toBe(`"${SITE_ID}:document:5"`);
     }
-    // OBSERVED (redundant, characterised): one re-save of the reloaded document follows, because the
-    // reload's autosave baseline uses the raw page settings while editor state merges in its defaults.
-    expect(after).toHaveLength(1);
+    // FIXED (was OBSERVED at commit bc37b30): one redundant re-save of the unchanged reloaded document
+    // followed, because the reload's hand-built autosave baseline used the raw page settings while
+    // editor state merged in its defaults. An unchanged reloaded document is not saved again.
+    expect(after).toHaveLength(0);
+    expect(server.version).toBe(5);
     expect(homeIds(server.editorData)).toEqual(["elC"]);
   });
 
@@ -124,13 +126,23 @@ describe("Code Workspace reload is a history boundary", () => {
 
   it("a reload while there are unsaved edits is not applied: the edits and their history are kept and the user is told", async () => {
     const { server, route } = statefulServer();
-    const { backend, canvasIds, select, key } = await mountEditor(undefined, [route]);
+    // The edit's autosave is held unacknowledged until after the reload, so the edit is provably
+    // still unsaved when the reload arrives (under CPU load the debounced save could otherwise land
+    // first and make the editor clean). The server judges the held save only once released.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let firstPut = true;
+    const held = (r: Parameters<typeof route>[0]) => (r.method === "PUT" && firstPut ? (firstPut = false, gate.then(() => route(r)!)) : route(r));
+    const { backend, canvasIds, select, key } = await mountEditor(undefined, [held]);
     await select("elA");
-    await key("Delete"); // unsaved (autosave debounce pending)
+    await key("Delete"); // unsaved: its save is pending or in flight, never acknowledged before the reload
     server.workspaceWrite([heading("elC", "Charlie from code")]); // v4
+    const notice = watchForText(/Code Workspace updated \(v4\)/); // auto-hides after 5s
     await workspaceReload();
     expect(canvasIds()).toEqual(["elB"]);
-    expect(screen.getAllByText(/Code Workspace updated \(v4\)/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(notice.seen()).toBe(true));
+    notice.stop();
+    await act(async () => { release(); });
     // The pending autosave targets the version it was edited against, so the server rejects it
     // instead of the older draft silently replacing the workspace document.
     await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
@@ -144,7 +156,7 @@ describe("Code Workspace reload is a history boundary", () => {
 
   it("a delayed older reload response cannot roll back a newer applied one", async () => {
     const { server, route } = statefulServer();
-    const { canvasIds, key } = await mountEditor(undefined, [route]);
+    const { backend, canvasIds, key } = await mountEditor(undefined, [route]);
     let releaseSlow!: () => void;
     server.workspaceWrite([heading("elC", "Charlie v4")]); // v4, served slowly
     server.getDelays.push(new Promise<void>((r) => { releaseSlow = r; }));
@@ -157,6 +169,10 @@ describe("Code Workspace reload is a history boundary", () => {
     expect(canvasIds()).toEqual(["elD"]);
     await key("z", { ctrlKey: true });
     expect(canvasIds()).toEqual(["elD"]);
+    await settleAutosave();
+    await flush();
+    expect(backend.saves()).toHaveLength(0); // neither response leads to a write
+    expect(server.version).toBe(5);
   });
 
   it("a reload returning the version the editor already has is ignored and keeps history", async () => {
@@ -169,5 +185,58 @@ describe("Code Workspace reload is a history boundary", () => {
     expect(canvasIds()).toEqual(["elB"]);
     await key("z", { ctrlKey: true }); // ordinary history is untouched by a stale reload
     expect(canvasIds()).toEqual(["elA", "elB"]);
+  });
+});
+
+describe("no redundant autosave after an applied reload", () => {
+  const badge = () => screen.queryAllByRole("status").map((n) => n.textContent?.trim() ?? "").filter((t) => /^(Saved|Saving|Unsaved changes|Save failed)/.test(t));
+
+  it("a clean editor applies the reload, shows Saved and writes nothing", async () => {
+    const { server, route } = statefulServer();
+    const { backend, canvasIds } = await mountEditor(undefined, [route]);
+    server.workspaceWrite([heading("elC", "Charlie from code")]); // v4
+    await workspaceReload();
+    await waitFor(() => expect(canvasIds()).toEqual(["elC"]));
+    await settleAutosave();
+    await flush();
+    expect(backend.saves()).toHaveLength(0);
+    expect(badge()[0]).toMatch(SAVED_BADGE); // wall-clock wording not asserted
+    expect(server.version).toBe(4);
+  });
+
+  it("a genuine edit after the reload is autosaved exactly once, on the reloaded version", async () => {
+    const { server, route } = statefulServer();
+    const { backend, canvasIds, select, key } = await mountEditor(undefined, [route]);
+    server.workspaceWrite([heading("elC", "Charlie from code"), heading("elD", "Delta from code")]); // v4
+    await workspaceReload();
+    await waitFor(() => expect(canvasIds()).toEqual(["elC", "elD"]));
+    await settleAutosave(); // the reload alone must not produce a save
+    expect(backend.saves()).toHaveLength(0);
+    await select("elC");
+    await key("Delete");
+    await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
+    expect(backend.saves()[0].headers["If-Match"]).toBe(`"${SITE_ID}:document:4"`);
+    expect(homeIds((backend.saves()[0].body as any).editorData)).toEqual(["elD"]);
+    await settleAutosave();
+    expect(backend.saves()).toHaveLength(1);
+    expect(homeIds(server.editorData)).toEqual(["elD"]);
+  });
+
+  it("after a failed autosave the unsaved edit blocks the reload instead of being replaced", async () => {
+    const { server, route } = statefulServer();
+    let failNext = true;
+    const flaky = (r: Parameters<typeof route>[0]) => (r.method === "PUT" && failNext ? (failNext = false, { status: 500, body: { error: { message: "Database unavailable" } } }) : route(r));
+    const { backend, canvasIds, select, key } = await mountEditor(undefined, [flaky]);
+    await select("elA");
+    await key("Delete");
+    await waitFor(() => expect(badge()).toEqual(["Save failed"]), AUTOSAVE_WAIT);
+    server.workspaceWrite([heading("elC", "Charlie from code")]); // v4
+    const notice = watchForText(/Code Workspace updated \(v4\)/); // auto-hides after 5s
+    await workspaceReload();
+    expect(canvasIds()).toEqual(["elB"]); // the unsaved edit is kept
+    await waitFor(() => expect(notice.seen()).toBe(true));
+    notice.stop();
+    expect(backend.saves()).toHaveLength(1);
+    expect(homeIds(server.editorData)).toEqual(["elC"]); // and newer work on the server is untouched
   });
 });

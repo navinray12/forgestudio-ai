@@ -70,6 +70,8 @@ export function useAutosave({
   const mountedRef = useRef(true);
   const isInitializedRef = useRef<boolean>(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBaselineResetRef = useRef(false);
+  const [baselineResetTick, setBaselineResetTick] = useState(0);
   const isSavingRef = useRef<boolean>(false);
   const queuedPayloadRef = useRef<SavePayload | null>(null);
 
@@ -140,8 +142,8 @@ export function useAutosave({
       currentSiteParts?: any,
       currentGlobalSettings?: any,
       currentGlobalStyles?: any,
-      currentPublishing?: any,
-      currentDeployment?: any,
+      _currentPublishing?: any,
+      _currentDeployment?: any,
       currentBreakpoints?: any[],
       currentPopups?: any[],
       currentPageCss?: string
@@ -155,8 +157,8 @@ export function useAutosave({
           siteParts: currentSiteParts || null,
           globalSettings: currentGlobalSettings || null,
           globalStyles: currentGlobalStyles || currentGlobalSettings?.globalStyles || null,
-          publishing: currentPublishing || null,
-          deployment: currentDeployment || null,
+          // publishing / deployment are server-owned: draftWritePayload strips them from every draft
+          // write, so a change to them (e.g. after a publish) is not an unsaved document change.
           breakpoints: currentBreakpoints || null,
           popups: currentPopups || null,
           pageCss: currentPageCss || "",
@@ -264,10 +266,12 @@ export function useAutosave({
 
         isSavingRef.current = false;
 
-        // Check if newer changes arrived while the save request was in-flight
-        if (queuedPayloadRef.current) {
-          const nextPayload = queuedPayloadRef.current;
-          queuedPayloadRef.current = null;
+        // Check if newer changes arrived while the save request was in-flight. A queued payload
+        // identical to the snapshot just acknowledged is redundant (e.g. queued because unrelated,
+        // server-owned state re-ran change detection), so it is dropped rather than sent again.
+        const nextPayload = queuedPayloadRef.current;
+        queuedPayloadRef.current = null;
+        if (nextPayload && nextPayload.snapshot !== baselineRef.current) {
           performSave(nextPayload);
         } else {
           const currentLiveSnapshot = serializeState(
@@ -303,6 +307,63 @@ export function useAutosave({
     },
     [serializeState]
   );
+
+  /**
+   * For an authoritative replacement of the document (e.g. a Code Workspace reload): the baseline
+   * becomes exactly the state the editor renders next, instead of values assembled by the caller,
+   * so the unchanged reloaded document is never treated as an unsaved change. Until that render the
+   * editor reports unsaved changes (baseline null), so nothing else can overwrite it meanwhile.
+   */
+  const resetBaseline = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    queuedPayloadRef.current = null;
+    failedSnapshotRef.current = null;
+    baselineRef.current = null;
+    pendingBaselineResetRef.current = true;
+    setBaselineResetTick((tick) => tick + 1);
+  }, []);
+
+  // Applies resetBaseline() on the first render after it, before change detection runs.
+  useEffect(() => {
+    if (!pendingBaselineResetRef.current) return;
+    pendingBaselineResetRef.current = false;
+    baselineRef.current = serializeState(
+      elements,
+      pageSettings,
+      pages,
+      homePageId,
+      siteParts,
+      globalSettings,
+      globalStyles || globalSettings?.globalStyles,
+      publishing,
+      deployment,
+      breakpoints,
+      popups,
+      pageCss
+    );
+    isInitializedRef.current = true;
+    setStatus("saved");
+    setLastSavedAt(Date.now());
+    setErrorMessage(null);
+  }, [
+    baselineResetTick,
+    elements,
+    pageSettings,
+    pages,
+    homePageId,
+    siteParts,
+    globalSettings,
+    globalStyles,
+    publishing,
+    deployment,
+    breakpoints,
+    popups,
+    pageCss,
+    serializeState,
+  ]);
 
   // Initial Load Baseline Setup (Initial Load Protection)
   useEffect(() => {
@@ -496,5 +557,6 @@ export function useAutosave({
     isDirty: status === "unsaved" || status === "saving" || status === "error",
     hasUnsavedChanges: () => baselineRef.current === null || isSavingRef.current || queuedPayloadRef.current !== null || serializeState(elements, pageSettings, pages, homePageId, siteParts, globalSettings, globalStyles, publishing, deployment, breakpoints, popups, pageCss) !== baselineRef.current,
     updateBaseline,
+    resetBaseline,
   };
 }

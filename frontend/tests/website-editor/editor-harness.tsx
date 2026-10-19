@@ -1,4 +1,4 @@
-/* global vi -- vitest globals (globals: true); declared for `eslint .` */
+/* global vi, afterEach -- vitest globals (globals: true); declared for `eslint .` */
 /**
  * Mounts the real, unmodified WebsiteEditor under a MemoryRouter in jsdom.
  *
@@ -18,10 +18,42 @@ import WebsiteEditor from "../../src/pages/editor/WebsiteEditor";
 // suites run in parallel, so the 1s default for waitFor/findBy is too tight to be reliable.
 configure({ asyncUtilTimeout: 8000 });
 
+/**
+ * Test isolation: a test that times out keeps running in the background ("zombie") and, before
+ * this guard, went on dispatching events into the NEXT test's editor (observed: one timeout
+ * cascading into five failures in the same file). Every test gets a generation; once its test has
+ * ended, the harness interactions of an older generation throw instead of acting.
+ */
+let generation = 0;
+afterEach(() => { generation++; });
+function assertCurrent(owner: number) {
+  if (owner !== generation) throw new Error("editor-harness: this test has already ended (timed out?); refusing to act on a later test");
+}
+
+/**
+ * Watches whether text matching `pattern` is rendered at any point from now on. Save/publish toasts
+ * auto-hide after 2.5-5s, so checking for them at one instant fails whenever the preceding
+ * interaction is slow (observed under CPU load); start the watch before the action instead.
+ */
+export function watchForText(pattern: RegExp | string) {
+  let seen = false;
+  const check = () => {
+    const text = document.body.textContent ?? "";
+    if (!seen && (typeof pattern === "string" ? text.includes(pattern) : pattern.test(text))) seen = true;
+  };
+  const observer = new MutationObserver(check);
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  check();
+  return { seen: () => { check(); return seen; }, stop: () => observer.disconnect() };
+}
+
+/** The autosave badge's saved state, independent of the wall-clock "just now / Ns ago" wording. */
+export const SAVED_BADGE = /^Saved( just now| \d+[smh] ago)?$/;
+
 export const SITE_ID = "site1";
 export const API = "http://localhost:5000";
 
-export interface RecordedRequest { method: string; url: string; headers: Record<string, string>; body: unknown; signal?: AbortSignal }
+export interface RecordedRequest { method: string; url: string; headers: Record<string, string>; body: unknown; signal?: AbortSignal; at: number }
 type Reply = { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 export type Route_ = (req: RecordedRequest) => Reply | undefined;
 
@@ -67,7 +99,7 @@ export function installBackend(site: unknown, routes: Route_[] = []) {
     const headers = Object.fromEntries(Object.entries((init.headers ?? {}) as Record<string, string>));
     let body: unknown = init.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { /* keep text */ } }
-    const req: RecordedRequest = { method: (init.method ?? "GET").toUpperCase(), url, headers, body, signal: init.signal ?? undefined };
+    const req: RecordedRequest = { method: (init.method ?? "GET").toUpperCase(), url, headers, body, signal: init.signal ?? undefined, at: Date.now() };
     requests.push(req);
     for (const r of routes) {
       const reply = r(req);
@@ -93,11 +125,15 @@ export function installBackend(site: unknown, routes: Route_[] = []) {
 }
 
 /** Lets pending promises, effects and zero-delay timers run. */
-export async function flush(rounds = 10) {
-  for (let i = 0; i < rounds; i++) await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+export async function flush(rounds = 10, owner = generation) {
+  for (let i = 0; i < rounds; i++) {
+    assertCurrent(owner);
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+  }
 }
 
 export async function mountEditor(site: unknown = siteFixture(), routes: Route_[] = [], { waitForLoad = true } = {}) {
+  const owner = generation;
   installPolyfills();
   const consoleErrors: string[] = [];
   vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { consoleErrors.push(args.map(String).join(" ")); });
@@ -109,15 +145,16 @@ export async function mountEditor(site: unknown = siteFixture(), routes: Route_[
   );
   if (waitForLoad) {
     await waitFor(() => expect(view.container.querySelector("[data-el-id]")).not.toBeNull(), { timeout: 10000 });
-    await flush();
+    await flush(10, owner);
   }
   const canvasEl = (id: string) => view.container.querySelector<HTMLElement>(`[data-el-id="${id}"]`);
   const canvasIds = () => [...view.container.querySelectorAll<HTMLElement>("[data-el-id]")].map((n) => n.getAttribute("data-el-id"));
-  const select = async (id: string) => { fireEvent.click(canvasEl(id)!); await flush(2); };
+  const select = async (id: string) => { assertCurrent(owner); fireEvent.click(canvasEl(id)!); await flush(2, owner); };
   const key = async (k: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "shiftKey" | "altKey", boolean>> = {}, target: EventTarget = window) => {
+    assertCurrent(owner);
     const ev = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mods });
     await act(async () => { target.dispatchEvent(ev); });
-    await flush(2);
+    await flush(2, owner);
     return ev;
   };
   return { view, backend, consoleErrors, canvasEl, canvasIds, select, key };

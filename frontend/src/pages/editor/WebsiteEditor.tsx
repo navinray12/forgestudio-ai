@@ -2097,6 +2097,7 @@ export default function WebsiteEditor() {
     lastSavedAt: autosaveLastSavedAt,
     errorMessage: autosaveError,
     updateBaseline: updateAutosaveBaseline,
+    resetBaseline: resetAutosaveBaseline,
     hasUnsavedChanges: hasUnsavedDocumentChanges,
   } = useAutosave({
     websiteId,
@@ -2197,26 +2198,13 @@ export default function WebsiteEditor() {
       if (loadedSite?.editorData?.homePageId) {
         setHomePageId(loadedSite.editorData.homePageId);
       }
-      if (updateAutosaveBaseline) {
-        updateAutosaveBaseline(
-          currentActive?.elements || [],
-          currentActive?.pageSettings || {},
-          initialPages,
-          loadedSite?.editorData?.homePageId || initialPages[0]?.id || "home",
-          siteParts,
-          globalSettings,
-          globalSettings?.globalStyles,
-          publishing,
-          deployment,
-          breakpoints,
-          popups,
-          pageCss
-        );
-      }
+      // The reloaded document is the new saved state: take it from what the editor renders next
+      // (merged page settings, canonical pages), so the unchanged document is not saved again.
+      resetAutosaveBaseline();
     } catch (err) {
       console.warn("Failed to reload website after workspace sync:", err);
     }
-  }, [websiteId, apiUrl, documentWriter, updateAutosaveBaseline, siteParts, globalSettings, publishing, deployment, breakpoints, popups, pageCss]);
+  }, [websiteId, apiUrl, documentWriter, resetAutosaveBaseline, siteParts, globalSettings, publishing, deployment, breakpoints, popups, pageCss]);
 
   useEffect(() => {
     if (!websiteId) return;
@@ -3081,7 +3069,7 @@ export default function WebsiteEditor() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, selectedIds, copiedElement, elements, historyIndex, history, isFullScreenCanvas, isPreview, saving]);
+  }, [selectedId, selectedIds, copiedElement, elements, historyIndex, history, isFullScreenCanvas, isPreview, saving, isShortcutsHelpOpen, isFinderOpen]);
 
   // F-102 - F-141: Preview Mode Motion & Interaction Runtime
   useEffect(() => {
@@ -19767,6 +19755,14 @@ export default function WebsiteEditor() {
                 autoFocus
                 value={finderQuery}
                 onChange={(e) => setFinderQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  // Typing here is ignored by the window shortcut handler, so honour "Esc to close" locally
+                  // (shortcuts help, if also open, keeps priority as in the window handler).
+                  if (e.key !== "Escape") return;
+                  e.preventDefault();
+                  if (isShortcutsHelpOpen) setIsShortcutsHelpOpen(false);
+                  else setIsFinderOpen(false);
+                }}
                 placeholder="Search pages, templates, settings and features... (Esc to close)"
                 className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
               />

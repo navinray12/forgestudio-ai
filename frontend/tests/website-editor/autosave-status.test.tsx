@@ -7,7 +7,7 @@
  * refresh interval does not outlive the editor; read-only viewers see no save status.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
-import { flush, mountEditor, siteFixture, SITE_ID } from "./editor-harness";
+import { flush, mountEditor, SAVED_BADGE, siteFixture, SITE_ID } from "./editor-harness";
 
 vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
@@ -28,11 +28,21 @@ describe("autosave status indicator (FIXED, was KNOWN GAP 2)", () => {
   it("goes Saved -> Unsaved changes -> Saved just now around a successful autosave", async () => {
     const { backend, select, key } = await mountEditor();
     expect(indicator()).toEqual(["Saved"]);
+    // Record every badge state the DOM passes through: under full-suite load the 1.5s debounce can
+    // elapse before a point-in-time check, but each state is still rendered in its own commit.
+    const seen: string[] = [];
+    const record = () => { const t = indicator().join("|"); if (t && seen[seen.length - 1] !== t) seen.push(t); };
+    const observer = new MutationObserver(record);
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    record();
     await select("elA");
     await key("Delete");
-    expect(indicator()).toEqual(["Unsaved changes"]);
     await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
-    await waitFor(() => expect(indicator()).toEqual(["Saved just now"]));
+    await waitFor(() => expect(indicator()[0]).toMatch(SAVED_BADGE));
+    observer.disconnect();
+    const order = ["Saved", "Unsaved changes", "Saved just now"].map((s) => seen.indexOf(s));
+    expect(order.every((i) => i >= 0), seen.join(" -> ")).toBe(true);
+    expect([...order].sort((a, b) => a - b), seen.join(" -> ")).toEqual(order);
   });
 
   it("a failed autosave shows 'Save failed' with the server reason and never claims Saved", async () => {
@@ -57,7 +67,7 @@ describe("autosave status indicator (FIXED, was KNOWN GAP 2)", () => {
     await waitFor(() => expect(indicator()).toEqual(["Save failed"]), AUTOSAVE_WAIT);
     await select("elB");
     await key("Delete");
-    await waitFor(() => expect(indicator()).toEqual(["Saved just now"]), AUTOSAVE_WAIT);
+    await waitFor(() => expect(indicator()[0]).toMatch(SAVED_BADGE), AUTOSAVE_WAIT);
     const keys = backend.saves().map((s) => s.headers["Idempotency-Key"]);
     expect(keys.length).toBe(3);
     expect(keys[1]).toBe(keys[0]); // the unknown-outcome command is retried unchanged first
@@ -71,7 +81,7 @@ describe("autosave status indicator (FIXED, was KNOWN GAP 2)", () => {
     await key("Delete");
     await waitFor(() => expect(indicator()).toEqual(["Save failed"]), AUTOSAVE_WAIT);
     await key("s", { ctrlKey: true });
-    await waitFor(() => expect(indicator()).toEqual(["Saved just now"]));
+    await waitFor(() => expect(indicator()[0]).toMatch(SAVED_BADGE));
     expect(backend.saves().length).toBeGreaterThanOrEqual(2);
     expect(screen.queryAllByText("Save failed")).toHaveLength(0);
   });
@@ -95,7 +105,7 @@ describe("autosave status indicator (FIXED, was KNOWN GAP 2)", () => {
     await select("elA");
     await key("Delete");
     await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
-    await waitFor(() => expect(indicator()).toEqual(["Saved just now"]));
+    await waitFor(() => expect(indicator()[0]).toMatch(SAVED_BADGE));
     expect(live.size).toBe(1);
     view.unmount();
     expect(live.size).toBe(0);

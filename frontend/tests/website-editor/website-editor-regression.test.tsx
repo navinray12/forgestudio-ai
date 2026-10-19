@@ -10,7 +10,7 @@
  * record what each fix superseded).
  */
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { API, SITE_ID, flush, heading, mountEditor, siteFixture } from "./editor-harness";
+import { API, SITE_ID, flush, heading, mountEditor, siteFixture, watchForText } from "./editor-harness";
 
 vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 const AUTOSAVE_WAIT = { timeout: 8000 };
@@ -59,12 +59,15 @@ describe("known defects: follow-through", () => {
     await waitFor(() => expect(screen.getAllByRole("status").map((n) => n.textContent?.trim())).toContain("Save failed"));
     expect(screen.queryAllByRole("alert").map((n) => n.textContent)).toEqual([]);
     expect(screen.queryAllByText("Save failed — changes remain unsaved")).toHaveLength(0);
+    const manualFailure = watchForText("Save failed — changes remain unsaved"); // auto-hides after 3s
     await key("s", { ctrlKey: true });
-    await waitFor(() => expect(screen.getAllByText("Save failed — changes remain unsaved").length).toBeGreaterThan(0));
+    await waitFor(() => expect(manualFailure.seen()).toBe(true));
+    manualFailure.stop();
     expect(screen.getAllByRole("alert").map((n) => n.textContent)).toContain("Database unavailable");
   });
 
-  it("KNOWN DEFECT 3 (characterised): Escape does not close the finder it opened either", async () => {
+  it("FIXED (was KNOWN DEFECT 3): Escape closes the finder it opened", async () => {
+    // Previously (characterised at commit 0b6a3a6) the finder stayed open. See keyboard-escape.test.tsx.
     const { key } = await mountEditor();
     const finder = () => screen.queryByPlaceholderText(/Search pages, templates, settings and features/);
     await key("k", { ctrlKey: true });
@@ -72,8 +75,8 @@ describe("known defects: follow-through", () => {
     // Focus is not in an input here (the keydown is dispatched on window), so Escape reaches the handler.
     (document.activeElement as HTMLElement | null)?.blur();
     const ev = await key("Escape");
-    expect(finder()).toBeTruthy();
-    expect(ev.defaultPrevented).toBe(false);
+    expect(finder()).toBeNull();
+    expect(ev.defaultPrevented).toBe(true);
   });
 });
 
@@ -85,9 +88,11 @@ describe("save and publish: failures and versions", () => {
     const { backend, key } = await mountEditor(siteFixture(), [
       (r) => (r.method === "PUT" && conflict ? { status: 412, body: { code: "DOCUMENT_VERSION_CONFLICT", error: { message: "Document changed elsewhere" } } } : undefined),
     ]);
+    const manualFailure = watchForText("Save failed — changes remain unsaved"); // auto-hides after 3s
     await key("s", { ctrlKey: true });
     await waitFor(() => expect(screen.getAllByRole("alert").map((n) => n.textContent)).toContain("Document changed elsewhere"));
-    expect(screen.getAllByText("Save failed — changes remain unsaved").length).toBeGreaterThan(0);
+    expect(manualFailure.seen()).toBe(true);
+    manualFailure.stop();
     expect(backend.saves()[0].headers["If-Match"]).toBe(`"${SITE_ID}:document:3"`);
     conflict = false; // even once the server would accept, the editor does not retry
     await key("s", { ctrlKey: true });
@@ -104,25 +109,30 @@ describe("save and publish: failures and versions", () => {
     await waitFor(() => expect(screen.getAllByRole("alert").map((n) => n.textContent).join(" ")).toMatch(/Save outcome is unknown/));
   });
 
-  it("publishing sends no document precondition; one autosave then follows on the unchanged version, without server-owned keys", async () => {
-    // Publish updates publishing/deployment state, which autosave tracks, so one debounced document
-    // save follows every successful publish. draftWritePayload strips server-owned keys (publishing,
-    // deployment, publishedData, ...) from every write, so that save re-sends the unchanged document.
-    // Publish itself never advances the document version.
-    const { backend } = await mountEditor();
+  it("FIXED (was OBSERVED): publishing sends no document precondition and is not followed by a redundant autosave", async () => {
+    // Previously (characterised at commit 0b6a3a6) the publishing/deployment state change made
+    // autosave re-send the unchanged document: those keys are server-owned and stripped from every
+    // draft write (draftWritePayload), so no editable data had changed. Publish never advances the
+    // document version. See publish-autosave.test.tsx for pending-edit and failure cases.
+    const { backend, key } = await mountEditor();
+    const published = watchForText(/successfully published/i); // auto-hiding toast
     fireEvent.click(screen.getByTitle("Publish Website"));
     await flush(3);
     fireEvent.click(screen.getByText(/Publish Now/));
     await waitFor(() => expect(backend.publishes()).toHaveLength(1));
     expect(backend.publishes()[0].headers).toEqual({ "Content-Type": "application/json" });
-    await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
+    await waitFor(() => expect(published.seen()).toBe(true));
+    published.stop();
+    await settleAutosave();
+    await flush();
+    expect(backend.saves()).toHaveLength(0);
+    await key("s", { ctrlKey: true }); // the document version is still the loaded one
+    await waitFor(() => expect(backend.saves()).toHaveLength(1));
     const put = backend.saves()[0];
     expect(put.headers["If-Match"]).toBe(`"${SITE_ID}:document:3"`);
     const editorData = (put.body as { editorData: Record<string, unknown> }).editorData;
     for (const serverOwned of ["publishing", "deployment", "publishedData"]) expect(editorData).not.toHaveProperty(serverOwned);
     expect(homeIds(put.body)).toEqual(["elA", "elB"]);
-    await settleAutosave();
-    expect(backend.saves()).toHaveLength(1); // exactly one follow-up save
   });
 
   it("a publish that cannot reach the server shows an error and records no published state", async () => {
@@ -193,13 +203,29 @@ describe("paths through the extracted helpers", () => {
 });
 
 describe("unmount with pending work", () => {
-  it("unmounting before the autosave debounce fires sends no save", async () => {
+  it("unmounting with an autosave debounce pending clears it and sends nothing afterwards", async () => {
+    // Track the autosave debounce timers (1500ms) still pending. Under heavy CPU load the debounce can
+    // fire before the unmount (a point-in-time "no save" check then failed); the contract is that a
+    // pending debounce is cleared on unmount and no save is sent after it.
+    const pendingDebounces = new Set<unknown>();
+    const realSet = window.setTimeout.bind(window);
+    const realClear = window.clearTimeout.bind(window);
+    vi.spyOn(window, "setTimeout").mockImplementation(((fn: TimerHandler, ms?: number, ...rest: unknown[]) => {
+      let id: unknown;
+      const run = (...args: unknown[]) => { pendingDebounces.delete(id); if (typeof fn === "function") fn(...args); };
+      id = realSet(run, ms, ...rest);
+      if (ms === 1500) pendingDebounces.add(id);
+      return id;
+    }) as typeof window.setTimeout);
+    vi.spyOn(window, "clearTimeout").mockImplementation(((id?: number) => { pendingDebounces.delete(id); realClear(id); }) as typeof window.clearTimeout);
     const { backend, view, select, key } = await mountEditor();
     await select("elA");
     await key("Delete");
+    const savesAtUnmount = backend.saves().length;
     view.unmount();
+    expect(pendingDebounces.size).toBe(0);
     await settleAutosave();
-    expect(backend.saves()).toHaveLength(0);
+    expect(backend.saves()).toHaveLength(savesAtUnmount);
   });
 
   it("unmounting while an autosave is in flight raises no errors when the response arrives", async () => {

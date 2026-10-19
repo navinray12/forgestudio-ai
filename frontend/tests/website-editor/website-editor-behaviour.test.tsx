@@ -7,7 +7,7 @@
  * failure, page switching, permission gating and unmount cleanup.
  */
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { API, SITE_ID, flush, heading, mountEditor, siteFixture } from "./editor-harness";
+import { API, SITE_ID, flush, heading, mountEditor, siteFixture, watchForText } from "./editor-harness";
 
 // Each interaction re-renders the whole ~21k-line editor in jsdom (select ~0.7s, keypress ~0.35s).
 vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
@@ -29,7 +29,9 @@ describe("loading", () => {
     expect(backend.requests.find((r) => r.url === `${API}/api/v1/component-access/${SITE_ID}/all`)).toBeDefined();
     expect(canvasIds()).toEqual(["elA", "elB"]);
     await flush(40); // > autosave debounce would be 1500ms; loading alone must not write
-    await new Promise((r) => setTimeout(r, 1700));
+    // Waited inside act(): late load responses (revisions, products) may resolve during the wait, and
+    // outside act() React reports them as an un-wrapped update (seen under CPU load).
+    await act(async () => { await new Promise((r) => setTimeout(r, 1700)); });
     expect(backend.saves()).toHaveLength(0);
     expect(consoleErrors).toEqual([]);
   }, 60000);
@@ -100,14 +102,14 @@ describe("selection, deletion and keyboard shortcuts", () => {
     expect(finder()).toBeNull();
   });
 
-  it("KNOWN DEFECT (characterised): Escape does not close the shortcuts help it opened", async () => {
-    // The keydown effect's dependency list omits isShortcutsHelpOpen/isFinderOpen, so the handler
-    // keeps the values from its last re-subscription. Fixing it must flip this test deliberately.
+  it("FIXED (was KNOWN DEFECT 3): Escape closes the shortcuts help it opened", async () => {
+    // Previously (characterised at commit 0b6a3a6) the keydown effect's dependency list omitted
+    // isShortcutsHelpOpen/isFinderOpen, so the handler saw stale values. See keyboard-escape.test.tsx.
     const { key } = await mountEditor();
     await key("?");
     const ev = await key("Escape");
-    expect(screen.getByText("Keyboard Shortcuts")).toBeTruthy();
-    expect(ev.defaultPrevented).toBe(false);
+    expect(screen.queryByText("Keyboard Shortcuts")).toBeNull();
+    expect(ev.defaultPrevented).toBe(true);
   });
 
   it("Ctrl+P switches to preview, where clicks no longer select elements", async () => {
@@ -185,10 +187,14 @@ describe("autosave and manual save", () => {
   it("an edit is autosaved once after the debounce with the versioned document-command contract", async () => {
     const { backend, select, key } = await mountEditor();
     await select("elA");
+    const editDispatchedAt = Date.now();
     await key("Delete");
-    expect(backend.saves()).toHaveLength(0); // debounced, not immediate
     await waitFor(() => expect(backend.saves()).toHaveLength(1), AUTOSAVE_WAIT);
     const put = backend.saves()[0];
+    // Debounced, not immediate: the 1500ms timer can only start after the keypress, so the PUT is at
+    // least that long after it. (A point-in-time "no PUT yet" check failed under CPU load once the
+    // interaction itself took longer than the debounce; 1ms tolerance for timer rounding.)
+    expect(put.at - editDispatchedAt).toBeGreaterThanOrEqual(1499);
     expect(put.headers["If-Match"]).toBe(`"${SITE_ID}:document:3"`);
     expect(put.headers["X-Forge-Intent"]).toBe("document-command");
     expect(put.headers["Content-Type"]).toBe("application/json");
@@ -284,6 +290,7 @@ describe("publishing", () => {
     const { backend, select, key } = await mountEditor();
     await select("elA");
     await key("Delete");
+    const published = watchForText(/successfully published/i); // auto-hiding toast
     await publishNow();
     await waitFor(() => expect(backend.publishes()).toHaveLength(1));
     const req = backend.publishes()[0];
@@ -293,7 +300,8 @@ describe("publishing", () => {
     expect(body.destinationType).toBe("INTERNAL");
     expect(body.editorData.version).toBe(1);
     expect(body.editorData.pages.find((p) => p.id === "home")!.elements.map((e) => e.id)).toEqual(["elB"]);
-    await waitFor(() => expect(screen.getAllByText(/successfully published/i).length).toBeGreaterThan(0));
+    await waitFor(() => expect(published.seen()).toBe(true));
+    published.stop();
     // Current behaviour (characterised, not endorsed): the published draft is also written to localStorage.
     expect(JSON.parse(localStorage.getItem(`forgestudio_editor_${SITE_ID}`) ?? "null")?.pages?.[0]?.id).toBe("home");
   });
