@@ -22,11 +22,9 @@ import { DesignAssistant } from "../../features/ai/DesignAssistant";
 import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
 import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
-import { decideWorkspaceRefresh } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
 import { publishingService } from "../../features/publishing/services/publishingService";
 import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
-import { loadAuthorizedWebsite } from "../../features/editor-access/load-authorized-website";
 import { createDocumentSaveCoordinator } from "../../features/editor-access/document-save-coordinator";
 import { ContentOnlyInspector } from "./components/ContentOnlyInspector";
 import { ExperimentManagerModal } from "./components/experiments/ExperimentManagerModal";
@@ -335,10 +333,12 @@ import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./c
 import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
 import { buildSavePayload, buildPublishDraftSnapshot } from "./core/documentPayloads";
-import { loadSiteParts } from "./core/siteParts";
 import { useEditorHistory } from "./core/useEditorHistory";
 import { useEditorShortcuts } from "./core/useEditorShortcuts";
 import { ScrubbableNumberInput } from "./components/ScrubbableNumberInput";
+import { buildCanonicalPages } from "./core/canonicalPages";
+import { useWebsiteLoader } from "./core/useWebsiteLoader";
+import { useWorkspaceSync } from "./core/useWorkspaceSync";
 
 // Monaco includes a substantial language runtime; load it only when a developer
 // opens code editing rather than with every editor session.
@@ -1870,181 +1870,37 @@ export default function WebsiteEditor() {
     }
   };
 
-  // Fetch Website Data
-  useEffect(() => {
-    if (!websiteId) {
-      setLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const fetchWebsite = async () => {
-      try {
-        setLoading(true);
-        setWebsite(null);
-        setErrorMessage("");
-
-        const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, controller.signal);
-        if (controller.signal.aborted) return;
-
-        if (loadedSite) {
-          documentWriter.initialize(loadedSite.documentVersion);
-          lastSavedEditorDataRef.current = loadedSite.editorData ?? null;
-          setWebsite(loadedSite);
-
-          // Fetch component accesses
-          try {
-            const accessRes = await fetch(`${apiUrl}/api/v1/component-access/${websiteId}/all`, {
-              signal: controller.signal,
-              credentials: "include"
-            });
-            const accessData = await accessRes.json();
-            if (controller.signal.aborted) return;
-            if (accessRes.ok && accessData.accesses) {
-              setAllowedComponentIds(new Set(accessData.accesses.map((a: any) => a.componentId)));
-            }
-          } catch (e) {
-            if (controller.signal.aborted) return;
-            console.error("Failed to fetch accesses", e);
-          }
-
-          // Initialize multi-page website pages
-          let initialPages: PageConfig[] = [];
-          if (loadedSite?.editorData?.pages && Array.isArray(loadedSite.editorData.pages) && loadedSite.editorData.pages.length > 0) {
-            initialPages = loadedSite.editorData.pages.map((p: any, idx: number) => ({
-              id: p.id || `page_${idx + 1}`,
-              name: p.name || p.title || (idx === 0 ? "Home" : `Page ${idx + 1}`),
-              slug: p.slug || p.path || (idx === 0 ? "/" : `/${(p.name || p.title || `page-${idx + 1}`).toLowerCase().replace(/\s+/g, "-")}`),
-              elements: Array.isArray(p.elements) ? p.elements : [],
-              pageSettings: p.pageSettings || { title: p.name || p.title || "Page", path: p.slug || p.path || "/" },
-              customCss: p.customCss || "",
-              isHome: Boolean(p.isHome || p.slug === "/" || p.path === "/" || idx === 0),
-            }));
-          } else {
-            const defaultPageTitle = loadedSite?.editorData?.pageSettings?.title || loadedSite?.name || "Home";
-            const defaultPagePath = loadedSite?.editorData?.pageSettings?.path || "/";
-            initialPages = [
-              {
-                id: "home",
-                name: defaultPageTitle,
-                slug: defaultPagePath,
-                elements: loadedSite?.editorData?.elements || [],
-                pageSettings: loadedSite?.editorData?.pageSettings || { title: defaultPageTitle, path: defaultPagePath },
-                isHome: true,
-              },
-            ];
-          }
-          setPages(initialPages);
-
-          const initialHome = initialPages.find((p) => p.isHome || p.slug === "/" || p.id === "home") || initialPages[0];
-          setActivePageId(initialHome.id);
-          setActivePreviewPageId(initialHome.id);
-
-          // The loaded document starts undo history: drop the pre-load [] entry so the history effect
-          // records the elements set below as entry 0 (undo right after load must not empty the page).
-          clearHistoryForLoad();
-
-          if (initialHome.elements && Array.isArray(initialHome.elements)) {
-            setElements(initialHome.elements);
-          } else if (loadedSite?.editorData?.elements && Array.isArray(loadedSite.editorData.elements)) {
-            setElements(loadedSite.editorData.elements);
-          } else {
-            setElements([]);
-          }
-
-          if (initialHome.pageSettings) {
-            setPageSettings((prev) => ({ ...prev, ...initialHome.pageSettings }));
-          } else if (loadedSite?.editorData?.pageSettings) {
-            setPageSettings((prev) => ({ ...prev, ...loadedSite.editorData.pageSettings }));
-          } else if (loadedSite?.name) {
-            setPageSettings((prev) => ({ ...prev, title: loadedSite.name }));
-          }
-
-          if (loadedSite?.editorData?.breakpoints && Array.isArray(loadedSite.editorData.breakpoints)) {
-            setBreakpoints(loadedSite.editorData.breakpoints);
-          }
-
-          if (loadedSite?.editorData?.globalSettings) {
-            const mergedGlobalSettings = { ...loadedSite.editorData.globalSettings };
-            if (loadedSite.editorData.globalStyles && !mergedGlobalSettings.globalStyles) {
-              mergedGlobalSettings.globalStyles = loadedSite.editorData.globalStyles;
-            }
-            setGlobalSettings(mergedGlobalSettings);
-          } else if (loadedSite?.editorData?.globalStyles) {
-            setGlobalSettings((prev: any) => ({ ...prev, globalStyles: loadedSite.editorData.globalStyles }));
-          }
-
-          if (loadedSite?.editorData?.pageCss) {
-            setPageCss(loadedSite.editorData.pageCss);
-          }
-
-          if (loadedSite?.editorData?.homePageId) {
-            setHomePageId(loadedSite.editorData.homePageId);
-          } else {
-            setHomePageId(initialHome.id);
-          }
-
-          if (loadedSite?.editorData?.siteParts) {
-            setSiteParts(loadSiteParts(loadedSite.editorData.siteParts));
-          }
-
-          if (loadedSite?.editorData?.publishing) {
-            setPublishing(loadedSite.editorData.publishing);
-          }
-
-          if (loadedSite?.editorData?.deployment) {
-            setDeployment(loadedSite.editorData.deployment);
-          }
-
-          if (loadedSite?.editorData?.publishedData) {
-            publishedDataRef.current = loadedSite.editorData.publishedData;
-          }
-
-          if (Array.isArray(loadedSite?.editorData?.globalVariables)) {
-            setGlobalVariables(loadedSite.editorData.globalVariables);
-          }
-
-          if (Array.isArray(loadedSite?.editorData?.globalClasses)) {
-            setGlobalClasses(loadedSite.editorData.globalClasses);
-          }
-        } else {
-          // Default empty initialization if completely fresh project
-          const defaultHome: PageConfig = {
-            id: "home",
-            name: "Home",
-            slug: "/",
-            elements: [],
-            pageSettings: { title: "Home", path: "/" },
-            isHome: true,
-          };
-          setPages([defaultHome]);
-          setActivePageId("home");
-          setElements([]);
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) setErrorMessage(err instanceof Error ? err.message : "Website loading failed");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-
-    fetchWebsite();
-    return () => controller.abort();
-  }, [websiteId, apiUrl]);
+  // Fetch Website Data: see core/useWebsiteLoader (same position, so effect order is unchanged)
+  useWebsiteLoader({
+    websiteId,
+    apiUrl,
+    documentWriter,
+    lastSavedEditorDataRef,
+    publishedDataRef,
+    clearHistoryForLoad,
+    setLoading,
+    setWebsite,
+    setErrorMessage,
+    setAllowedComponentIds,
+    setPages,
+    setActivePageId,
+    setActivePreviewPageId,
+    setElements,
+    setPageSettings,
+    setBreakpoints,
+    setGlobalSettings,
+    setPageCss,
+    setHomePageId,
+    setSiteParts,
+    setPublishing,
+    setDeployment,
+    setGlobalVariables,
+    setGlobalClasses,
+  });
 
   // Single source of truth: canonicalPages ensures pages[activePageId] is always up-to-date synchronously
   const canonicalPages = useMemo(() => {
-    return pages.map((p) =>
-      p.id === activePageId && canvasMode === "page"
-        ? {
-          ...p,
-          elements,
-          pageSettings,
-          name: pageSettings.title || p.name,
-          slug: pageSettings.path || p.slug,
-        }
-        : p
-    );
+    return buildCanonicalPages({ pages, activePageId, canvasMode, elements, pageSettings });
   }, [pages, activePageId, canvasMode, elements, pageSettings]);
 
   // F-321 Autosave Integration
@@ -2074,139 +1930,34 @@ export default function WebsiteEditor() {
     persistDocument,
   });
 
-  // Real-Time Workspace Synchronization: listen for Code Workspace updates
-  const activePageIdRef = useRef(activePageId);
-  activePageIdRef.current = activePageId;
-  const workspaceReloadSequence = useRef(0);
-  const hasUnsavedRef = useRef(hasUnsavedDocumentChanges);
-  hasUnsavedRef.current = hasUnsavedDocumentChanges;
-  const websiteDocVerRef = useRef(website?.documentVersion ?? 1);
-  websiteDocVerRef.current = website?.documentVersion ?? 1;
-
-  const reloadWebsiteFromWorkspace = useCallback(async (forced = false) => {
-    if (!websiteId) return;
-    const requestSequence = ++workspaceReloadSequence.current;
-    try {
-      const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, AbortSignal.timeout(15000));
-      if (!loadedSite || requestSequence !== workspaceReloadSequence.current) return;
-
-      const serverVer = loadedSite.documentVersion ?? 1;
-      const decision = decideWorkspaceRefresh(serverVer, websiteDocVerRef.current, hasUnsavedRef.current, forced);
-      if (decision === "invalid" || decision === "stale") return;
-
-      if (decision === "dirty") {
-        setSaveMessage(`Code Workspace updated (v${serverVer}). Save or switch pages to merge.`);
-        setTimeout(() => setSaveMessage(""), 5000);
-        return;
-      }
-
-      // Advance synchronously so a delayed response cannot roll this snapshot back.
-      websiteDocVerRef.current = serverVer;
-      documentWriter.initialize(serverVer);
-      lastSavedEditorDataRef.current = loadedSite.editorData ?? null;
-      setWebsite(loadedSite);
-
-      let initialPages: PageConfig[] = [];
-      if (loadedSite?.editorData?.pages && Array.isArray(loadedSite.editorData.pages) && loadedSite.editorData.pages.length > 0) {
-        initialPages = loadedSite.editorData.pages.map((p: any, idx: number) => ({
-          id: p.id || `page_${idx + 1}`,
-          name: p.name || p.title || (idx === 0 ? "Home" : `Page ${idx + 1}`),
-          slug: p.slug || p.path || (idx === 0 ? "/" : `/${(p.name || p.title || `page-${idx + 1}`).toLowerCase().replace(/\s+/g, "-")}`),
-          elements: Array.isArray(p.elements) ? p.elements : [],
-          pageSettings: p.pageSettings || { title: p.name || p.title || "Page", path: p.slug || p.path || "/" },
-          customCss: p.customCss || "",
-          isHome: Boolean(p.isHome || p.slug === "/" || p.path === "/" || idx === 0),
-        }));
-      } else {
-        const defaultPageTitle = loadedSite?.editorData?.pageSettings?.title || loadedSite?.name || "Home";
-        const defaultPagePath = loadedSite?.editorData?.pageSettings?.path || "/";
-        initialPages = [
-          {
-            id: "home",
-            name: defaultPageTitle,
-            slug: defaultPagePath,
-            elements: loadedSite?.editorData?.elements || [],
-            pageSettings: loadedSite?.editorData?.pageSettings || { title: defaultPageTitle, path: defaultPagePath },
-            isHome: true,
-          },
-        ];
-      }
-      setPages(initialPages);
-
-      // Keep active page or fallback to home
-      const currentActive = initialPages.find((p) => p.id === activePageIdRef.current) || initialPages[0];
-      if (currentActive) {
-        setActivePageId(currentActive.id);
-        setActivePreviewPageId(currentActive.id);
-        // The authoritative document is a history boundary: undo/redo must not restore the
-        // pre-reload document, which autosave would then write over the newer server version.
-        clearHistoryForLoad();
-        setElements(currentActive.elements || []);
-        if (currentActive.pageSettings) {
-          setPageSettings((prev) => ({ ...prev, ...currentActive.pageSettings }));
-        }
-      }
-
-      if (loadedSite?.editorData?.breakpoints && Array.isArray(loadedSite.editorData.breakpoints)) {
-        setBreakpoints(loadedSite.editorData.breakpoints);
-      }
-      if (loadedSite?.editorData?.homePageId) {
-        setHomePageId(loadedSite.editorData.homePageId);
-      }
-      // The reloaded document is the new saved state: take it from what the editor renders next
-      // (merged page settings, canonical pages), so the unchanged document is not saved again.
-      resetAutosaveBaseline();
-    } catch (err) {
-      console.warn("Failed to reload website after workspace sync:", err);
-    }
-  }, [websiteId, apiUrl, documentWriter, resetAutosaveBaseline, siteParts, globalSettings, publishing, deployment, breakpoints, popups, pageCss]);
-
-  useEffect(() => {
-    if (!websiteId) return;
-
-    let channel: BroadcastChannel | null = null;
-    try {
-      channel = new BroadcastChannel("forge_workspace_sync");
-      channel.onmessage = (event) => {
-        if (event.data?.websiteId === websiteId) {
-          reloadWebsiteFromWorkspace(false);
-        }
-      };
-    } catch {}
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "forge_workspace_sync_event" && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed.websiteId === websiteId) {
-            reloadWebsiteFromWorkspace(false);
-          }
-        } catch {}
-      }
-    };
-
-    const handleFocus = () => {
-      reloadWebsiteFromWorkspace(false);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        reloadWebsiteFromWorkspace(false);
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      ++workspaceReloadSequence.current;
-      channel?.close();
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [websiteId, reloadWebsiteFromWorkspace]);
+  // Real-Time Workspace Synchronization: see core/useWorkspaceSync (same position, so hook and effect order are unchanged)
+  useWorkspaceSync({
+    activePageId,
+    hasUnsavedDocumentChanges,
+    website,
+    websiteId,
+    apiUrl,
+    documentWriter,
+    lastSavedEditorDataRef,
+    setSaveMessage,
+    setWebsite,
+    setPages,
+    setActivePageId,
+    setActivePreviewPageId,
+    clearHistoryForLoad,
+    setElements,
+    setPageSettings,
+    setBreakpoints,
+    setHomePageId,
+    resetAutosaveBaseline,
+    siteParts,
+    globalSettings,
+    publishing,
+    deployment,
+    breakpoints,
+    popups,
+    pageCss,
+  });
 
   // F-322 / F-334 Save & Update Template Integration
   const {
