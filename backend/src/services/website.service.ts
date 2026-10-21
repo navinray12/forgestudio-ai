@@ -1087,6 +1087,7 @@ export async function getPublicWebsiteById(websiteId: string): Promise<PublicWeb
 
   // Build explicit sanitized public DTO projection (Comment 8)
   const publicEditorData = {
+    integrations: sourceData.integrations ? { googleTags: sourceData.integrations.googleTags || [], googleMapsApiKey: sourceData.integrations.googleMapsApiKey || "", metaPixelId: sourceData.integrations.metaPixelId || "", delayPixelConsent: Boolean(sourceData.integrations.delayPixelConsent), recaptchaSiteKey: sourceData.integrations.recaptchaSiteKey || "", turnstileSiteKey: sourceData.integrations.turnstileSiteKey || "" } : undefined,
     version: sourceData.version || 1,
     homePageId: sourceData.homePageId,
     pages: resolvedPages,

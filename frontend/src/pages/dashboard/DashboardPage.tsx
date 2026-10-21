@@ -29,6 +29,10 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import MembersView from "../../features/workspaces/MembersView";
 import UsageView from "../../features/usage/UsageView";
+import BillingView from "../../features/billing/BillingView";
+import IntegrationsView from "../../features/integrations/IntegrationsView";
+import TemplateGallery from "../../features/template-gallery/TemplateGallery";
+import FormsView from "../../features/forms/FormsView";
 import "./DashboardPage.css";
 
 interface Website {
@@ -41,7 +45,7 @@ interface Website {
 }
 
 type ViewMode = "grid" | "list";
-type DashboardSection = "sites" | "archive" | "members" | "usage";
+type DashboardSection = "sites" | "archive" | "members" | "usage" | "billing" | "integrations" | "libraries" | "forms";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const folderStorageKey = "forgestudio.dashboard.folders";
@@ -169,7 +173,7 @@ function DashboardPage() {
   const currentSites = section === "archive" ? archivedWebsites : websites;
 
   return (
-    <div className="studio-dashboard">
+    <div className={`studio-dashboard ${section === "billing" ? "is-billing" : section === "integrations" ? "is-integrations" : section === "libraries" ? "is-libraries" : ""}`}>
       <header className="studio-header">
         <Link to="/dashboard" className="studio-brand">web studio</Link>
         <div className="header-divider" />
@@ -191,13 +195,13 @@ function DashboardPage() {
               <button key={label} className={`sidebar-link ${section === itemSection ? "is-active" : ""}`} onClick={() => { setSection(itemSection); setActiveFolder("All sites"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span></button>
             ))}
             <div className="sidebar-rule" />
-            {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
+            {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") || (label === "Billing" && section === "billing") || (label === "Integrations" && section === "integrations") || (label === "Libraries & Templates" && section === "libraries") || (label === "Forms" && section === "forms") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); else if (itemSection === "billing") setSection("billing"); else if (itemSection === "integrations") setSection("integrations"); else if (itemSection === "libraries") setSection("libraries"); else if (itemSection === "forms") setSection("forms"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
           </nav>
           <div className="sidebar-footer"><button className="sidebar-link"><CircleHelp size={16} /><span>Help center</span></button><button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button></div>
         </aside>
 
         <main className="studio-main">
-          {section === "members" ? <MembersView /> : section === "usage" ? <UsageView /> : <>
+          {section === "forms" ? <FormsView /> : section === "libraries" ? <TemplateGallery /> : section === "integrations" ? <IntegrationsView /> : section === "billing" ? <BillingView /> : section === "members" ? <MembersView /> : section === "usage" ? <UsageView /> : <>
           <div className="main-heading-row">
             <div><p className="eyebrow">{section === "archive" ? "YOUR SITES, STORED" : "YOUR WEB, ORGANIZED"}</p><h1>{section === "archive" ? "Archive" : "All sites"}</h1><p className="subtitle">{section === "archive" ? "Restore and manage sites you have moved out of your workspace." : "Create, design, and manage your websites in one place."}</p></div>
             <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>

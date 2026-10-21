@@ -45,6 +45,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
         })
       );
     } catch {}
+    window.dispatchEvent(new Event("forge-cookie-consent"));
     setVisible(false);
   };
 

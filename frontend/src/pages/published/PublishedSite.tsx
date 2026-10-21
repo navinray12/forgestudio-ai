@@ -1,3 +1,4 @@
+import { PublishedIntegrations, type PublicIntegrations } from "../../features/integrations/PublishedIntegrations";
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -855,6 +856,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
     const [globalVariables, setGlobalVariables] = useState<any[]>([]);
     const [globalClasses, setGlobalClasses] = useState<any[]>([]);
     const [cookieConsentConfig, setCookieConsentConfig] = useState<any>(null);
+    const [integrations, setIntegrations] = useState<PublicIntegrations | null>(null);
     const [sitePartsState, setSitePartsState] = useState<any>(null);
     const [siteStatus, setSiteStatus] = useState<string>("DRAFT");
     const [_themeRules, _setThemeRules] = useState<any[]>([]);
@@ -958,6 +960,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     ? (rawEditorData || {}) 
                     : (rawEditorData?.publishedData || rawEditorData || {});
 
+                setIntegrations(isPreview ? null : editorData?.integrations || null);
                 if (editorData?.siteParts) setSitePartsState(editorData.siteParts);
                 const loadedSiteParts = editorData?.siteParts;
 
@@ -1523,6 +1526,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             )}
 
             {/* F-438: Cookie Consent Runtime Banner */}
+            <PublishedIntegrations settings={integrations} />
             <CookieConsentBanner config={cookieConsentConfig} />
         </div>
         </WooCommerceProvider>

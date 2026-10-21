@@ -1,3 +1,4 @@
+import { integrationFormTokens } from "../../../../features/integrations/PublishedIntegrations";
 import { useState, useId, useRef } from "react";
 import { submissionKeyFor, type SubmissionKeySlot } from "../../../../utils/submissionKey";
 import type {
@@ -245,6 +246,7 @@ export default function FormWidgetRenderer({
       setStatusMessage("");
 
       const payload = {
+          integrationTokens: integrationFormTokens(e.currentTarget),
         websiteId,
         formId: config.id,
         formName: config.formName,
