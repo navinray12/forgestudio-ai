@@ -20,8 +20,8 @@ import { SaveTemplateDialog, ReplaceTemplateDialog, ImportWebsiteKitDialog, useS
 import { RevisionHistoryPanel, revisionHistoryService } from "../../features/revision-history";
 import { DesignAssistant } from "../../features/ai/DesignAssistant";
 import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
-import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
-import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
+import "../../features/editor-access/save-authorized-website";
+import { useAutosave } from "../../features/autosave";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
 import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
 import { createDocumentSaveCoordinator } from "../../features/editor-access/document-save-coordinator";
@@ -36,14 +36,59 @@ import { forgeProjectService } from "../../features/developer-workspace/services
 import { syncAcknowledgedSave } from "../../features/developer-workspace/services/canvasSourceSync";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
-  ChevronDown, ChevronRight, Layers, Type, Image as ImageIcon, Box, Grid,
-  Sliders, Palette, FileText, Globe, Code, Play, Check, X, Move, Lock, Unlock,
-  HelpCircle, ExternalLink, RefreshCw, Database, Server, Cpu, HardDrive, Key,
-  Mail, MessageSquare, Phone, User, Calendar, MapPin, Search, Star, Share2,
-  AlertCircle, Info, Download, Upload, Zap, Shield, Sparkles, Layout, Compass,
-  Terminal, ShieldCheck, StickyNote, FormInput, Link as LinkIcon, Navigation, ArrowRight, Menu,
-  ArrowLeft, Keyboard, Code2, Rocket, History as HistoryIcon
+  Tablet,
+  Undo,
+  Redo,
+  Save,
+  Settings,
+  Trash2,
+  Copy,
+  ChevronRight,
+  Type,
+  Image as ImageIcon,
+  Box,
+  Grid,
+  Sliders,
+  Palette,
+  Globe,
+  Code,
+  Play,
+  Check,
+  X,
+  Move,
+  Lock,
+  Unlock,
+  HelpCircle,
+  ExternalLink,
+  Database,
+  Server,
+  Cpu,
+  HardDrive,
+  Mail,
+  Phone,
+  User,
+  Calendar,
+  MapPin,
+  Search,
+  Star,
+  Share2,
+  AlertCircle,
+  Info,
+  Download,
+  Upload,
+  Zap,
+  Shield,
+  Layout,
+  Compass,
+  Terminal,
+  ShieldCheck,
+  StickyNote,
+  FormInput,
+  Link as LinkIcon,
+  Navigation,
+  ArrowRight,
+  Menu,
+  Keyboard,
 } from "lucide-react";
 
 // ==========================================
@@ -58,59 +103,18 @@ import { type SiteProduct } from "./types";
 import { IconRenderer } from "./widgets/icons";
 import {
   triggerImagePicker,
-  ImageWidgetInspector,
-  BackgroundImageInspector,
-  VideoWidgetInspector,
-  GalleryWidgetInspector,
-  SlidesWidgetInspector,
-  ShareButtonsInspector,
-  FormWidgetInspector,
-  ReviewsWidgetInspector,
-  VideoPlaylistInspector,
-  NavMenuWidgetInspector,
-  CountdownWidgetInspector,
-  LottieWidgetInspector,
-  CodeHighlightWidgetInspector,
-  ButtonWidgetInspector,
-  IconLibraryWidgetInspector,
   UniversalIconControls,
-  PortfolioWidgetInspector,
-  LoginWidgetInspector,
-  AnimatedTextWidgetInspector,
   PriceTableWidgetInspector,
-  PriceListWidgetInspector,
-  FlipBoxWidgetInspector,
   CTAWidgetInspector,
   MediaCarouselWidgetInspector,
   TestimonialCarouselWidgetInspector,
   NestedCarouselWidgetInspector,
   LoopCarouselWidgetInspector,
   TOCWidgetInspector,
-  FacebookWidgetInspector,
-  BlockquoteWidgetInspector,
-  PaymentWidgetInspector,
-  WooCommerceWidgetInspector,
-  AudioPlaylistInspector,
   PayPalWidgetInspector,
-  LinkInBioWidgetInspector,
-  ImageBoxWidgetInspector,
-  IconBoxWidgetInspector,
-  IconListWidgetInspector,
-  CounterWidgetInspector,
-  ProgressBarWidgetInspector,
-  RatingWidgetInspector,
-  AlertWidgetInspector,
-  GoogleMapsWidgetInspector,
-  DividerWidgetInspector,
-  SpacerWidgetInspector,
-  CustomSVGWidgetInspector,
-  QueryBuilderWidgetInspector,
-  DisplayConditionsWidgetInspector,
-  NestedTabsWidgetInspector,
-  NestedAccordionWidgetInspector,
 } from "./inspector/DynamicWidgetInspectors";
 import { MediaLightboxModal } from "../../components/MediaLightboxModal";
-import { MotionInteractionInspector } from "./inspector";
+import "./inspector";
 import { FontPickerModal } from "../../components/FontPickerModal";
 import { FontPickerControl } from "../../components/FontPickerControl";
 import { FontService } from "../../features/fonts/FontService";
@@ -123,7 +127,7 @@ import {
   TaxonomyFilterRenderer,
   SiteSearchRenderer,
 } from "./navigation/NavigationRenderers";
-import { NavigationSettingsPanel } from "./navigation/NavigationSettings";
+import "./navigation/NavigationSettings";
 import { isNavigationElement } from "./navigation/navigationDefaults";
 
 import type {
@@ -151,12 +155,11 @@ import type {
   PortfolioItem,
   ShareNetworkType,
   ShareNetworkItem,
-  PostItem,
   ContainerLayout,
   ElementStyles,
   ElementState,
   EditorElement,
-  WebsiteData
+  WebsiteData,
 } from "./types";
 import {
   ALL_WIDGET_REGISTRY,
@@ -171,7 +174,6 @@ import {
   getEffectiveHoverStyle,
   getControlStyleValue,
   isControlStyleConfigured,
-  getEffectiveLayout,
   getMergedStyles,
   getInnerStyles,
   generateElementsHoverCSS,
@@ -186,7 +188,7 @@ import {
   reorderTreeElement,
   resolveMotionAttrs,
   resolveStickyStyles,
-  initMotionRuntime
+  initMotionRuntime,
 } from "./utils";
 
 import {
@@ -195,48 +197,18 @@ import {
 } from "./defaults";
 
 import {
-  ContainerBoxIcon,
-  HeadingBoxIcon,
-  TextBoxIcon,
-  ImageBoxIcon,
-  ButtonBoxIcon,
-  PostsBoxIcon,
-  ShareButtonsBoxIcon,
-  PortfolioBoxIcon,
-  SlidesBoxIcon,
-  FormBoxIcon,
-  LoginBoxIcon,
-  NavMenuBoxIcon,
-  AnimatedHeadlineBoxIcon,
-  PriceTableBoxIcon,
-  PriceListBoxIcon,
-  GalleryBoxIcon,
-  FlipBoxIcon,
-  CtaBoxIcon,
-  MediaCarouselBoxIcon,
-  TestimonialBoxIcon,
-  NestedCarouselBoxIcon,
-  LoopCarouselBoxIcon,
-  TocBoxIcon,
-  CountdownBoxIcon,
-  FacebookPageBoxIcon,
-  BlockquoteBoxIcon,
-  TemplateBoxIcon,
-  ReviewsBoxIcon,
   FacebookButtonBoxIcon,
   FacebookEmbedBoxIcon,
   FacebookCommentsBoxIcon,
-  PayPalButtonBoxIcon,
   StripeButtonBoxIcon,
   LottieBoxIcon,
   CodeHighlightBoxIcon,
   VideoPlaylistBoxIcon,
   MegaMenuBoxIcon,
   OffCanvasBoxIcon,
-  ImageCarouselBoxIcon,
   EmptyPictureIcon,
   UploadCloudIcon,
-  AnimatedCounter
+  AnimatedCounter,
 } from "./widgets";
 
 import {
@@ -318,7 +290,7 @@ import {
 
 import { SpacingControl } from "./inspector";
 import { DefaultWebsiteNavbar } from "./components/DefaultWebsiteNavbar";
-import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./core/elementTree";
+import { findTreeElement, getAllElementIds } from "./core/elementTree";
 import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
 import { useEditorHistory } from "./core/useEditorHistory";
@@ -343,6 +315,39 @@ import { renderContainerElement } from "./canvas/elements/containerElement";
 import { canvasModeTarget, storeCanvasIntoActivePage } from "./core/canvasMode";
 import { sitePartKeyForScope, withSitePartElements } from "./core/sitePartScopes";
 import { renderAddPageModal } from "./shell/addPageModal";
+import { renderHeaderRightRegion } from "./shell/header/headerRightRegion";
+import { renderHeaderCenterRegion } from "./shell/header/headerCenterRegion";
+import { renderHeaderLeftRegion } from "./shell/header/headerLeftRegion";
+import { renderNavigatorPanel } from "./shell/sidebar/navigatorPanel";
+import { renderReusableComponentsSection } from "./shell/sidebar/reusableComponentsSection";
+import { renderWidgetLibraryGrid } from "./shell/sidebar/widgetLibraryGrid";
+import { renderFavoriteWidgetsSection } from "./shell/sidebar/favoriteWidgetsSection";
+import { renderImportAssetButton } from "./shell/sidebar/importAssetButton";
+import { renderSidebarTabBar } from "./shell/sidebar/sidebarTabBar";
+import { renderWidgetLibrarySearch } from "./shell/sidebar/widgetLibrarySearch";
+import { renderElementManagerOverlay } from "./shell/overlays/elementManagerOverlay";
+import { renderShortcutsHelpOverlay } from "./shell/overlays/shortcutsHelpOverlay";
+import { renderFinderOverlay } from "./shell/overlays/finderOverlay";
+import { renderElementContextMenu } from "./shell/overlays/elementContextMenu";
+import { renderEditPageModal } from "./shell/modals/editPageModal";
+import { renderDesignAssistantSection } from "./shell/modals/designAssistantSection";
+import { renderUnifiedAiAssistantSection } from "./shell/modals/unifiedAiAssistantSection";
+import { renderAiAssistantLauncher } from "./shell/modals/aiAssistantLauncher";
+import { renderMotionAccordion } from "./inspector/selected/motionAccordion";
+import { renderBoxShadowAccordion } from "./inspector/selected/boxShadowAccordion";
+import { renderBordersAccordion } from "./inspector/selected/bordersAccordion";
+import { renderTypographyAccordion } from "./inspector/selected/typographyAccordion";
+import { renderScrollSnapAccordion } from "./inspector/selected/scrollSnapAccordion";
+import { renderSmartLinkControls } from "./inspector/selected/smartLinkControls";
+import { renderNonContainerSpacingSection } from "./inspector/selected/nonContainerSpacingSection";
+import { renderWidgetInspectorSlots } from "./inspector/selected/widgetInspectorSlots";
+import { renderPostsControls } from "./inspector/selected/postsControls";
+import { renderUniversalSizingControls } from "./inspector/selected/universalSizingControls";
+import { renderContainerLayoutControls } from "./inspector/selected/containerLayoutControls";
+import { renderElementStateSelector } from "./inspector/selected/elementStateSelector";
+import { renderElementTypeHeader } from "./inspector/selected/elementTypeHeader";
+import { renderSiteSettingsSecondBlock } from "./inspector/noSelection/siteSettingsSecondBlock";
+import { renderSiteSettingsFirstBlock } from "./inspector/noSelection/siteSettingsFirstBlock";
 import { buildCanonicalPages } from "./core/canonicalPages";
 import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageIdFromUrl, previewPageParam, slugFromName, starterElementsOf, syncActivePageIntoPages } from "./core/pageManagement";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
@@ -3338,591 +3343,79 @@ export default function WebsiteEditor() {
             }`}
         >
           {/* 1. Left Region: Brand / Back / Breadcrumb & Page Selector */}
-          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 min-w-0">
-            {/* Quit Editor Button */}
-            <button
-              type="button"
-              onClick={handleQuitEditor}
-              className="w-8 h-8 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-sm cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500"
-              title="Back to Dashboard"
-              aria-label="Back to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-
-            {/* Project Title / Breadcrumb */}
-            <span className="text-xs font-bold text-white tracking-wide border-l border-slate-700/80 pl-2.5 hidden sm:inline-block max-w-[90px] md:max-w-[130px] truncate">
-              {website?.name || "ForgeStudio"}
-            </span>
-
-            {/* Page Selector Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsPageSelectorOpen(!isPageSelectorOpen)}
-                className="h-8 px-2.5 text-xs font-semibold text-white bg-slate-800/90 hover:bg-slate-700/90 rounded-lg border border-slate-700/80 transition flex items-center gap-1.5 shadow-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500"
-                title="Switch Active Page or Manage Site Pages"
-                aria-label="Switch Active Page"
-                aria-expanded={isPageSelectorOpen}
-                aria-haspopup="listbox"
-              >
-                <span className="text-amber-400 text-xs">📄</span>
-                <span className="max-w-[70px] sm:max-w-[110px] truncate font-bold">
-                  {pages.find((p) => p.id === activePageId)?.name || "Page"}
-                </span>
-                {homePageId === activePageId && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-bold hidden md:inline">Home</span>
-                )}
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-
-              {isPageSelectorOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
-                  <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
-                    <span>Site Pages ({pages.length})</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPageSelectorOpen(false);
-                        setIsPageManagerModalOpen(true);
-                      }}
-                      className="text-blue-400 hover:text-blue-300 font-semibold cursor-pointer text-[10px]"
-                    >
-                      Manage All ⚙️
-                    </button>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto py-1">
-                    {pages.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          handleSwitchEditingPage(p.id);
-                          setIsPageSelectorOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer ${p.id === activePageId ? "bg-blue-600/20 text-blue-300 font-bold" : "text-slate-300"
-                          }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <span>{p.id === homePageId ? "🏠" : "📄"}</span>
-                          <span className="truncate">{p.name}</span>
-                          {p.id === homePageId && (
-                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-bold">Home</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono">{p.slug}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Quick Add Presets: About, Contact, Services, Pricing */}
-                  <div className="p-2 border-t border-slate-800 bg-slate-950/60">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Quick Add Page</span>
-                      <span className="text-[9px] text-slate-500 font-normal">1-click create</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("About Us", "/about")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to About Us page"
-                      >
-                        <span className="text-blue-400">ℹ️</span>
-                        <span>+ About</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Contact", "/contact")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Contact page"
-                      >
-                        <span className="text-emerald-400">✉️</span>
-                        <span>+ Contact</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Services", "/services")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Services page"
-                      >
-                        <span className="text-purple-400">🛠️</span>
-                        <span>+ Services</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Pricing", "/pricing")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Pricing page"
-                      >
-                        <span className="text-amber-400">🏷️</span>
-                        <span>+ Pricing</span>
-                      </button>
-                    </div>
-
-                    <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPageSelectorOpen(false);
-                          setNewPageName("");
-                          setNewPageSlug("");
-                          setIsAddPageModalOpen(true);
-                        }}
-                        className="flex-1 text-center px-2 py-1 text-xs text-blue-400 hover:bg-blue-900/30 rounded-lg flex items-center justify-center gap-1 transition font-semibold cursor-pointer border border-blue-500/20"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Custom Page...</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPageSelectorOpen(false);
-                          setIsPageManagerModalOpen(true);
-                        }}
-                        className="px-2 py-1 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition font-medium cursor-pointer border border-slate-700/60"
-                        title="Open full page manager"
-                      >
-                        All Pages
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Direct Quick Add Page Button beside abc Home */}
-            <button
-              type="button"
-              onClick={() => {
-                setNewPageName("");
-                setNewPageSlug("");
-                setIsAddPageModalOpen(true);
-              }}
-              className="h-8 px-2 text-xs font-semibold text-blue-400 bg-blue-950/40 hover:bg-blue-900/60 hover:text-blue-300 rounded-lg border border-blue-500/30 transition flex items-center gap-1 shadow-sm cursor-pointer"
-              title="Add New Website Page (About, Contact, etc.)"
-              aria-label="Add New Page"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline font-bold">Page</span>
-            </button>
-
-            {/* Scope Switcher Dropdown (Page / Header / Footer / Single / Archive / 404 / Search Results) */}
-            <div className="relative" ref={scopeDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsScopeDropdownOpen((prev) => !prev)}
-                className="h-8 px-2 text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 hover:text-white rounded-lg border border-slate-700/80 transition flex items-center gap-1 shadow-sm cursor-pointer"
-                title="Switch Canvas Scope (Page / Header / Footer / Single / Archive / 404 / Search)"
-                aria-label="Switch Canvas Scope"
-              >
-                <span className="text-xs">
-                  {canvasMode === "page" && "📄"}
-                  {canvasMode === "header" && "🌐"}
-                  {canvasMode === "footer" && "🌐"}
-                  {canvasMode === "single" && "📰"}
-                  {canvasMode === "archive" && "📚"}
-                  {canvasMode === "404" && "⚠️"}
-                  {canvasMode === "search-results" && "🔍"}
-                </span>
-                <span className="capitalize font-semibold hidden md:inline">
-                  {canvasMode === "404" ? "404 Page" : canvasMode === "search-results" ? "Search Results" : canvasMode}
-                </span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-
-              {isScopeDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-44 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
-                  {(
-                    [
-                      { mode: "page", label: "Page Content", icon: "📄" },
-                      { mode: "header", label: "Global Header", icon: "🌐" },
-                      { mode: "footer", label: "Global Footer", icon: "🌐" },
-                      { mode: "single", label: "Single Post Template", icon: "📰" },
-                      { mode: "archive", label: "Archive Template", icon: "📚" },
-                      { mode: "404", label: "404 Not Found Page", icon: "⚠️" },
-                      { mode: "search-results", label: "Search Results Layout", icon: "🔍" },
-                    ] as const
-                  ).map(({ mode, label, icon }) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        handleSwitchCanvasMode(mode as ThemeBuilderScope);
-                        setIsScopeDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition cursor-pointer hover:bg-slate-800 ${canvasMode === mode
-                        ? "bg-blue-600/20 text-blue-300 font-bold"
-                        : "text-slate-300 hover:text-white"
-                        }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{icon}</span>
-                        <span>{label}</span>
-                      </div>
-                      {canvasMode === mode && (
-                        <span className="text-blue-400 text-xs">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* See shell/header/headerLeftRegion (moved verbatim) */}
+          {renderHeaderLeftRegion({
+            activePageId,
+            canvasMode,
+            handleQuickCreateOrSwitchPage,
+            handleQuitEditor,
+            handleSwitchCanvasMode,
+            handleSwitchEditingPage,
+            homePageId,
+            isPageSelectorOpen,
+            isScopeDropdownOpen,
+            pages,
+            scopeDropdownRef,
+            setIsAddPageModalOpen,
+            setIsPageManagerModalOpen,
+            setIsPageSelectorOpen,
+            setIsScopeDropdownOpen,
+            setNewPageName,
+            setNewPageSlug,
+            website,
+          })}
 
           {/* 2. Center Region: Viewport Switcher */}
-          <div className="hidden lg:flex items-center justify-center pointer-events-auto">
-            <div className="flex items-center gap-0.5 bg-slate-900/80 p-0.5 rounded-lg border border-slate-700/80 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setActiveDevice("desktop")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "desktop"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Desktop View"
-                aria-label="Desktop View"
-              >
-                <Monitor className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDevice("tablet")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "tablet"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Tablet View"
-                aria-label="Tablet View"
-              >
-                <Tablet className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDevice("mobile")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "mobile"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Mobile View"
-                aria-label="Mobile View"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+          {/* See shell/header/headerCenterRegion (moved verbatim) */}
+          {renderHeaderCenterRegion({
+            activeDevice,
+            setActiveDevice,
+          })}
 
           {/* 3. Right Region: Compact Tools, History, Primary Actions */}
-          <div className="flex items-center justify-end gap-1.5 md:gap-2 shrink-0">
-            {/* Status Messages */}
-            {saveMessage && <span role="status" aria-live="polite" className={`text-xs font-medium shrink-0 ${saveMessage.startsWith("Save failed") ? "text-red-400" : "text-emerald-400"}`}>{saveMessage}</span>}
-            {errorMessage && <span role="alert" className="text-xs font-medium text-red-400 shrink-0 max-w-sm">{errorMessage}</span>}
-            {/* Autosave status (F-321): shows failures instead of only logging them; hidden for read-only access */}
-            {userAccess.canEditContent && (
-              <AutosaveStatusIndicator status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} errorMessage={autosaveError} />
-            )}
-
-            {/* History Controls Group (Undo / Redo / History) */}
-            <div className="flex items-center gap-0.5 bg-[#16203a] p-0.5 rounded-lg border border-slate-700/80 shrink-0">
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo"
-              >
-                <Undo className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                title="Redo (Ctrl+Y)"
-                aria-label="Redo"
-              >
-                <Redo className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsRevisionHistoryOpen(true)}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 transition border-l border-slate-700/80 cursor-pointer"
-                title="Revision History"
-                aria-label="Revision History"
-              >
-                <HistoryIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Selected Element Quick Actions (Only active when element selected) */}
-            {selectedId && (
-              <div className="hidden xl:flex items-center gap-0.5 bg-[#16203a] p-0.5 rounded-lg border border-blue-500/40 shrink-0">
-                <button
-                  onClick={() => handleReorderElement(selectedId, "up")}
-                  className="w-6 h-6 flex items-center justify-center text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Move Up"
-                  aria-label="Move Up"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => handleReorderElement(selectedId, "down")}
-                  className="w-6 h-6 flex items-center justify-center text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Move Down"
-                  aria-label="Move Down"
-                >
-                  ▼
-                </button>
-                <button
-                  onClick={(e) => handleCopyElement(selectedId, e)}
-                  className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Copy (Ctrl+C)"
-                  aria-label="Copy Element"
-                >
-                  <Copy className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={(e) => handleDuplicateElement(selectedId, e)}
-                  className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Duplicate (Ctrl+D)"
-                  aria-label="Duplicate Element"
-                >
-                  <Layers className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => handleSaveAsComponent(selectedId)}
-                  className="w-6 h-6 flex items-center justify-center text-purple-300 bg-purple-900/40 hover:bg-purple-800 rounded cursor-pointer"
-                  title="Save as Reusable Component"
-                  aria-label="Save Component"
-                >
-                  🧩
-                </button>
-                <button
-                  onClick={handleOpenReplaceTemplate}
-                  className="w-6 h-6 flex items-center justify-center text-amber-300 bg-amber-900/40 hover:bg-amber-800 rounded cursor-pointer"
-                  title="Replace with Template"
-                  aria-label="Replace with Template"
-                >
-                  🔄
-                </button>
-              </div>
-            )}
-
-            {/* Icon-Based Utility Tools Group */}
-            <div className="flex items-center gap-1 border-l border-slate-700/80 pl-1.5 shrink-0">
-              {/* Search */}
-              <button
-                type="button"
-                onClick={() => setIsFinderOpen(true)}
-                className="w-7 h-7 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Search (Ctrl+K)"
-                aria-label="Search"
-              >
-                <Search className="w-3.5 h-3.5" />
-              </button>
-
-              {/* SEO & Quality Audit */}
-              <button
-                type="button"
-                onClick={() => setIsSeoModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="SEO & Quality Audit"
-                aria-label="SEO & Quality Audit"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              </button>
-
-              {/* Tokens */}
-              <button
-                type="button"
-                onClick={() => setIsVariablesModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Design Variables & CSS Tokens"
-                aria-label="Tokens"
-              >
-                <Palette className="w-3.5 h-3.5 text-indigo-400" />
-              </button>
-
-              {/* F-339: Dynamic Multi-Mode Theme Toggle */}
-              <button
-                type="button"
-                onClick={() => setCanvasTheme((t) => (t === "light" ? "dark" : "light"))}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 cursor-pointer ${canvasTheme === "dark"
-                  ? "bg-indigo-950/60 text-indigo-300 border-indigo-700/80 shadow-sm"
-                  : "bg-amber-950/30 text-amber-300 border-amber-700/60"
-                  }`}
-                title="Toggle Dynamic Canvas Theme (☀️ Light / 🌙 Dark)"
-              >
-                <span>{canvasTheme === "dark" ? "🌙 Dark" : "☀️ Light"}</span>
-              </button>
-
-              {/* Live Real-time Collaborators Avatar Stack */}
-              {canvasPeers.length > 0 && (
-                <div className="flex items-center -space-x-1.5 overflow-hidden pl-1 pr-1" title={`${canvasPeers.length} other collaborator(s) online`}>
-                  {canvasPeers.map((peer) => (
-                    <div
-                      key={peer.socketId}
-                      title={`${peer.user.name} is currently editing`}
-                      className="relative flex items-center justify-center w-6 h-6 rounded-full text-[9px] font-extrabold text-white ring-2 ring-slate-900 shadow-sm transition hover:z-20 hover:scale-110"
-                      style={{ backgroundColor: peer.user.color }}
-                    >
-                      {peer.user.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Client Restricted Mode Badge */}
-              {isRestrictedMode && (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs">
-                  <Lock className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Client Editor Mode (Content Only)</span>
-                </div>
-              )}
-
-              {/* F-339: Variables Manager (Tokens) */}
-              <button
-                type="button"
-                onClick={() => setIsVariablesModalOpen(true)}
-                className="px-3 py-1 text-xs font-semibold rounded-lg border text-indigo-300 bg-indigo-950/40 hover:bg-indigo-900/60 border-indigo-800/60 transition flex items-center gap-1.5 cursor-pointer"
-                title="Design Variables & CSS Tokens (F-339)"
-              >
-                <span>🎨</span>
-                <span>Tokens</span>
-              </button>
-
-
-              {/* Classes */}
-              <button
-                type="button"
-                onClick={() => setIsClassModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Global Utility Classes"
-                aria-label="Classes"
-              >
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-              </button>
-
-              {/* Notes */}
-              <button
-                type="button"
-                onClick={() => setIsDesignNotesOpen(!isDesignNotesOpen)}
-                className={`w-7 h-7 rounded-lg border transition flex items-center justify-center shadow-xs cursor-pointer ${isDesignNotesOpen
-                  ? "bg-purple-600/30 text-purple-200 border-purple-500/60"
-                  : "text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80"
-                  }`}
-                title="Collaborative Design Notes"
-                aria-label="Notes"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Dev Mode */}
-              <button
-                type="button"
-                onClick={() => setDevModalMode((prev) => (prev === "export-code" ? null : "export-code"))}
-                className={`w-7 h-7 rounded-lg border transition flex items-center justify-center shadow-xs cursor-pointer ${devModalMode === "export-code"
-                  ? "bg-blue-600 text-white border-blue-500"
-                  : "text-blue-300 bg-blue-900/40 hover:bg-blue-800/60 border-blue-700/60"
-                  }`}
-                title="Developer Mode"
-                aria-label="Developer Mode"
-              >
-                <Code2 className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Phase 3: A/B Split Testing */}
-              <button
-                type="button"
-                onClick={() => setIsExperimentModalOpen(true)}
-                className="px-3 py-1 text-xs font-semibold rounded-lg border text-purple-300 bg-purple-950/40 hover:bg-purple-900/60 border-purple-800/60 transition flex items-center gap-1.5 cursor-pointer"
-                title="A/B Split Testing & Conversion Experiments"
-              >
-                <span>🧪</span>
-                <span>A/B Tests</span>
-              </button>
-
-
-              {/* Fullscreen Canvas */}
-              <button
-                type="button"
-                onClick={() => setIsFullScreenCanvas(!isFullScreenCanvas)}
-                className="w-7 h-7 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Toggle Full Screen Canvas"
-                aria-label="Toggle Full Screen Canvas"
-              >
-                <span className="text-xs leading-none">⛶</span>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="h-4 w-px bg-slate-700/80 mx-0.5 shrink-0" />
-
-            {/* Primary Actions: Preview, Save, Publish */}
-            {/* Preview Button */}
-            <button
-              type="button"
-              onClick={() => setIsPreview(!isPreview)}
-              className={`w-8 h-8 rounded-lg border transition flex items-center justify-center shadow-sm cursor-pointer shrink-0 ${isPreview
-                ? "bg-amber-500/20 text-amber-300 border-amber-500/60 hover:bg-amber-500/30"
-                : "bg-slate-800/80 text-slate-300 border-slate-700/80 hover:bg-slate-700/80 hover:text-white"
-                }`}
-              title={isPreview ? "Exit Preview (Ctrl+P)" : "Preview"}
-              aria-label={isPreview ? "Exit Preview" : "Preview"}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-
-            {/* Save Button */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="h-8 px-3 rounded-lg border border-blue-500 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Save (Ctrl+S)"
-              aria-label="Save"
-            >
-              {saving ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              <span className="hidden sm:inline">Save</span>
-            </button>
-
-            {/* Code Workspace Button */}
-            <button
-              type="button"
-              onClick={async () => {
-                // The workspace generates code from the saved document, so an unconfirmed
-                // save must not navigate: handleSave reports the failure in the editor.
-                if (userAccess.canEditContent) {
-                  const saved = await handleSave();
-                  if (!saved) return;
-                }
-                navigate(`/workspace/website/${websiteId}`);
-              }}
-              className="h-8 px-3 rounded-lg border border-purple-500/60 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 hover:text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              title="Open Developer Code Workspace (Full Project IDE, React & Next.js Generation)"
-              aria-label="Developer Code Workspace"
-            >
-              <Code2 className="w-3.5 h-3.5 text-purple-400" />
-              <span className="hidden sm:inline">Code Workspace</span>
-            </button>
-
-            {/* Publish Button */}
-            <button
-              type="button"
-              onClick={() => setIsPublishModalOpen(true)}
-              className="h-8 px-3.5 relative rounded-lg border border-emerald-500/50 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              title="Publish Website"
-              aria-label="Publish"
-            >
-              <Rocket className="w-3.5 h-3.5" />
-              <span>Publish</span>
-              {publishing.status === "PUBLISHED" && (
-                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse ring-1 ring-emerald-950"></span>
-              )}
-            </button>
-          </div>
+          {/* See shell/header/headerRightRegion (moved verbatim) */}
+          {renderHeaderRightRegion({
+            autosaveError,
+            autosaveLastSavedAt,
+            autosaveStatus,
+            canvasPeers,
+            canvasTheme,
+            devModalMode,
+            errorMessage,
+            handleCopyElement,
+            handleDuplicateElement,
+            handleOpenReplaceTemplate,
+            handleRedo,
+            handleReorderElement,
+            handleSave,
+            handleSaveAsComponent,
+            handleUndo,
+            history,
+            historyIndex,
+            isDesignNotesOpen,
+            isFullScreenCanvas,
+            isPreview,
+            isRestrictedMode,
+            navigate,
+            publishing,
+            saveMessage,
+            saving,
+            selectedId,
+            setCanvasTheme,
+            setDevModalMode,
+            setIsClassModalOpen,
+            setIsDesignNotesOpen,
+            setIsExperimentModalOpen,
+            setIsFinderOpen,
+            setIsFullScreenCanvas,
+            setIsPreview,
+            setIsPublishModalOpen,
+            setIsRevisionHistoryOpen,
+            setIsSeoModalOpen,
+            setIsVariablesModalOpen,
+            userAccess,
+            websiteId,
+          })}
         </header>
       )}
 
@@ -3935,48 +3428,12 @@ export default function WebsiteEditor() {
         {/* ========================================== */}
         {!isPreview && !isFullScreenCanvas && (
           <aside className="w-64 md:w-72 shrink-0 border-r border-slate-200 bg-white p-3.5 overflow-y-auto shadow-sm flex flex-col">
-            <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 pb-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("elements")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "elements"
-                  ? "bg-slate-100 text-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("elements", "Elements")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("navigator")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "navigator"
-                  ? "bg-slate-100 text-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("navigator", "Navigator")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("templates")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "templates"
-                  ? "bg-purple-100 text-purple-700 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("templates", "Templates")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("atomic" as any)}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === ("atomic" as any)
-                  ? "bg-purple-100 text-purple-700 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                ⚛️ Atomic
-              </button>
-            </div>
+            {/* See shell/sidebar/sidebarTabBar (moved verbatim) */}
+            {renderSidebarTabBar({
+              leftSidebarTab,
+              setLeftSidebarTab,
+              t,
+            })}
 
             {isRestrictedMode ? (
               <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-center my-4 space-y-2">
@@ -3989,1313 +3446,64 @@ export default function WebsiteEditor() {
             ) : leftSidebarTab === "elements" ? (
               <div className="space-y-3">
                 {/* Main Widget Library Search Input */}
-                {!disabledWidgets.includes("search-bar") && (
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={widgetLibrarySearch}
-                      onChange={(e) => setWidgetLibrarySearch(e.target.value)}
-                      placeholder="Search active widgets..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2 pl-8 pr-7 text-xs font-medium text-slate-700 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition shadow-xs"
-                    />
-                    <span className="absolute left-2.5 top-2 text-xs text-slate-400">🔍</span>
-                    {widgetLibrarySearch && (
-                      <button
-                        type="button"
-                        onClick={() => setWidgetLibrarySearch("")}
-                        className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* See shell/sidebar/widgetLibrarySearch (moved verbatim) */}
+                {renderWidgetLibrarySearch({
+                  disabledWidgets,
+                  setWidgetLibrarySearch,
+                  widgetLibrarySearch,
+                })}
 
                 {/* Import Asset Button (F-014) */}
-                {!disabledWidgets.includes("import-asset") && (
-                  <>
-                    <input
-                      ref={importFileInputRef}
-                      type="file"
-                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.json,.svg"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleImportAsset(e.target.files[0]);
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => importFileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 p-2.5 text-xs font-bold text-blue-700 hover:border-blue-500 hover:bg-blue-100/60 transition disabled:opacity-50 shadow-xs"
-                    >
-                      <span>📁</span>
-                      <span>{isUploading ? "Importing Asset..." : "Import Asset / File"}</span>
-                    </button>
-                  </>
-                )}
+                {/* See shell/sidebar/importAssetButton (moved verbatim) */}
+                {renderImportAssetButton({
+                  disabledWidgets,
+                  handleImportAsset,
+                  importFileInputRef,
+                  isUploading,
+                })}
 
                 {/* Pinned Favorite Widgets & Reusable Components (F-012) */}
-                {!disabledWidgets.includes("favorite-widgets") && (() => {
-                  const visibleFavTypes = favoriteWidgets.filter(
-                    (type) => !disabledWidgets.includes(type) && isWidgetLibraryVisible(type)
-                  );
-                  const visibleFavComps = Object.entries(components).filter(
-                    ([_compId, comp]) => comp.isFavorite && (!widgetLibrarySearch || comp.name.toLowerCase().includes(widgetLibrarySearch.toLowerCase()))
-                  );
+                {/* See shell/sidebar/favoriteWidgetsSection (moved verbatim) */}
+                {renderFavoriteWidgetsSection({
+                  components,
+                  disabledWidgets,
+                  favoriteWidgets,
+                  handleAddElement,
+                  handleAddInstanceFromComponent,
+                  isWidgetLibraryVisible,
+                  toggleFavoriteComponent,
+                  toggleFavoriteWidget,
+                  widgetLibrarySearch,
+                })}
 
-                  if (visibleFavTypes.length === 0 && visibleFavComps.length === 0) {
-                    return null;
-                  }
-
-                  return (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 shadow-xs">
-                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-2.5 flex items-center justify-between">
-                        <span className="flex items-center gap-1">⭐ Favorite Widgets</span>
-                        <span className="text-[9px] text-amber-600/70 font-normal">Quick Access ({visibleFavTypes.length + visibleFavComps.length})</span>
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Core Favorite Widgets */}
-                        {visibleFavTypes.map((type) => {
-                          const widgetDef = ALL_WIDGET_REGISTRY.find((w) => w.type === type);
-                          const name = widgetDef?.name || type;
-                          return (
-                            <div
-                              key={`fav_${type}`}
-                              draggable={true}
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: type }));
-                                e.dataTransfer.effectAllowed = "copy";
-                              }}
-                              onClick={() => handleAddElement(type)}
-                              className="relative flex flex-col items-center justify-center rounded-lg border border-amber-200 bg-white p-2.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => toggleFavoriteWidget(type, e)}
-                                className="absolute top-1 right-1 text-amber-500 text-[11px] hover:scale-125 transition cursor-pointer p-0.5"
-                                title="Remove from favorites"
-                              >
-                                ★
-                              </button>
-                              {type === "container" ? <ContainerBoxIcon /> :
-                                type === "heading" ? <HeadingBoxIcon /> :
-                                  type === "text" ? <TextBoxIcon /> :
-                                    type === "image" ? <ImageBoxIcon /> :
-                                      type === "button" ? <ButtonBoxIcon /> :
-                                        type === "posts" ? <PostsBoxIcon /> :
-                                          type === "share-buttons" ? <ShareButtonsBoxIcon /> :
-                                            type === "portfolio" ? <PortfolioBoxIcon /> :
-                                              type === "slides" ? <SlidesBoxIcon /> :
-                                                type === "form" ? <FormBoxIcon /> :
-                                                  type === "login" ? <LoginBoxIcon /> :
-                                                    type === "nav-menu" ? <NavMenuBoxIcon /> :
-                                                      type === "animated-headline" ? <AnimatedHeadlineBoxIcon /> :
-                                                        type === "price-table" ? <PriceTableBoxIcon /> :
-                                                          type === "price-list" ? <PriceListBoxIcon /> :
-                                                            type === "gallery" ? <GalleryBoxIcon /> :
-                                                              type === "flip-box" ? <FlipBoxIcon /> :
-                                                                type === "call-to-action" ? <CtaBoxIcon /> :
-                                                                  type === "media-carousel" ? <MediaCarouselBoxIcon /> :
-                                                                    type === "testimonial-carousel" ? <TestimonialBoxIcon /> :
-                                                                      type === "nested-carousel" ? <NestedCarouselBoxIcon /> :
-                                                                        type === "loop-carousel" ? <LoopCarouselBoxIcon /> :
-                                                                          type === "facebook-page" ? <FacebookPageBoxIcon /> :
-                                                                            type === "blockquote" ? <BlockquoteBoxIcon /> :
-                                                                              type === "template" ? <TemplateBoxIcon /> :
-                                                                                type === "reviews" ? <ReviewsBoxIcon /> :
-                                                                                  type === "facebook-button" ? <FacebookButtonBoxIcon /> :
-                                                                                    type === "facebook-embed" ? <FacebookEmbedBoxIcon /> :
-                                                                                      type === "facebook-comments" ? <FacebookCommentsBoxIcon /> :
-                                                                                        type === "paypal-button" ? <PayPalButtonBoxIcon /> :
-                                                                                          type === "stripe-button" ? <StripeButtonBoxIcon /> :
-                                                                                            type === "lottie" ? <LottieBoxIcon /> :
-                                                                                              type === "code-highlight" ? <CodeHighlightBoxIcon /> :
-                                                                                                type === "video-playlist" ? <VideoPlaylistBoxIcon /> :
-                                                                                                  type === "mega-menu" ? <MegaMenuBoxIcon /> :
-                                                                                                    type === "off-canvas" ? <OffCanvasBoxIcon /> :
-                                                                                                      type === "image-carousel" ? <ImageCarouselBoxIcon /> :
-                                                                                                        <span className="text-xl">{widgetDef?.icon || "📦"}</span>}
-                              <span className="mt-1 text-[11px] font-semibold text-slate-700 text-center line-clamp-1 group-hover:text-amber-700">
-                                {name}
-                              </span>
-                            </div>
-                          );
-                        })}
-
-                        {/* Favorite Reusable Components */}
-                        {visibleFavComps.map(([compId, comp]) => (
-                          <div
-                            key={`fav_comp_${compId}`}
-                            onClick={() => handleAddInstanceFromComponent(compId)}
-                            className="relative flex flex-col items-center justify-center rounded-lg border border-purple-200 bg-purple-50/70 p-2.5 shadow-xs hover:border-purple-400 hover:bg-purple-100/70 hover:-translate-y-0.5 active:scale-95 group cursor-pointer transition"
-                          >
-                            <button
-                              type="button"
-                              onClick={(e) => toggleFavoriteComponent(compId, e)}
-                              className="absolute top-1 right-1 text-amber-500 text-[11px] hover:scale-125 transition cursor-pointer p-0.5"
-                              title="Remove favorite component"
-                            >
-                              ★
-                            </button>
-                            <span className="text-lg">🧩</span>
-                            <span className="mt-1 text-[11px] font-semibold text-purple-900 text-center line-clamp-1 group-hover:text-purple-950">
-                              {comp.name}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Container */}
-                  {isWidgetLibraryVisible("container", "Container") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "container" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("container")}
-                      className="relative col-span-2 flex items-center justify-center gap-3 rounded-xl border border-blue-200 bg-blue-50/50 p-3 shadow-xs hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("container", e)}
-                        className={`absolute top-2 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("container") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("container") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("container") ? "★" : "☆"}
-                      </button>
-                      <ContainerBoxIcon />
-                      <span className="text-xs font-bold text-blue-700 group-hover:text-blue-800">
-                        + Add Container
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Heading */}
-                  {isWidgetLibraryVisible("heading", "Heading") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "heading" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("heading")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("heading", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("heading") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("heading") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("heading") ? "★" : "☆"}
-                      </button>
-                      <HeadingBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Heading
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Text */}
-                  {isWidgetLibraryVisible("text", "Text") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "text" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("text")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("text", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("text") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("text") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("text") ? "★" : "☆"}
-                      </button>
-                      <TextBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Text
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Image */}
-                  {isWidgetLibraryVisible("image", "Image") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "image" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("image")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("image", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("image") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("image") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("image") ? "★" : "☆"}
-                      </button>
-                      <ImageBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Image
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Button */}
-                  {isWidgetLibraryVisible("button", "Button") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "button" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("button")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("button", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("button") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("button") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("button") ? "★" : "☆"}
-                      </button>
-                      <ButtonBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Button
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Posts Widget (F-174) */}
-                  {isWidgetLibraryVisible("posts", "Posts") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "posts" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("posts")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("posts", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("posts") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("posts") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("posts") ? "★" : "☆"}
-                      </button>
-                      <PostsBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-purple-600">
-                        Posts
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Share Buttons Widget (F-175) */}
-                  {isWidgetLibraryVisible("share-buttons", "Share Buttons") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "share-buttons" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("share-buttons")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("share-buttons", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("share-buttons") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("share-buttons") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("share-buttons") ? "★" : "☆"}
-                      </button>
-                      <ShareButtonsBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Share Buttons
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Portfolio Widget (F-176) */}
-                  {isWidgetLibraryVisible("portfolio", "Portfolio") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "portfolio" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("portfolio")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-indigo-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("portfolio", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("portfolio") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("portfolio") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("portfolio") ? "★" : "☆"}
-                      </button>
-                      <PortfolioBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
-                        Portfolio
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Slides Widget (F-177) */}
-                  {isWidgetLibraryVisible("slides", "Slides") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "slides" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("slides")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-pink-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("slides", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("slides") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("slides") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("slides") ? "★" : "☆"}
-                      </button>
-                      <SlidesBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-pink-600">
-                        Slides
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Form Widget (F-178) */}
-                  {isWidgetLibraryVisible("form", "Form") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "form" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("form")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-emerald-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("form", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("form") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("form") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("form") ? "★" : "☆"}
-                      </button>
-                      <FormBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-emerald-600">
-                        Form
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Login Widget (F-179) */}
-                  {isWidgetLibraryVisible("login", "Login") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "login" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("login")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("login", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("login") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("login") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("login") ? "★" : "☆"}
-                      </button>
-                      <LoginBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Login
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Nav Menu Widget (F-180) */}
-                  {isWidgetLibraryVisible("nav-menu", "Nav Menu") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "nav-menu" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("nav-menu")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("nav-menu", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("nav-menu") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("nav-menu") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("nav-menu") ? "★" : "☆"}
-                      </button>
-                      <NavMenuBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        Nav Menu
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Animated Headline Widget (F-181) */}
-                  {isWidgetLibraryVisible("animated-headline", "Animated Headline") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "animated-headline" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("animated-headline")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-violet-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("animated-headline", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("animated-headline") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("animated-headline") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("animated-headline") ? "★" : "☆"}
-                      </button>
-                      <AnimatedHeadlineBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-violet-600">
-                        Animated Text
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Price Table Widget (F-182) */}
-                  {isWidgetLibraryVisible("price-table", "Price Table") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "price-table" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("price-table")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-emerald-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("price-table", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("price-table") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("price-table") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("price-table") ? "★" : "☆"}
-                      </button>
-                      <PriceTableBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-emerald-600">
-                        Price Table
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Price List Widget (F-183) */}
-                  {isWidgetLibraryVisible("price-list", "Price List") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "price-list" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("price-list")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-teal-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("price-list", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("price-list") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("price-list") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("price-list") ? "★" : "☆"}
-                      </button>
-                      <PriceListBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-teal-600">
-                        Price List
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Gallery Widget (F-184) */}
-                  {isWidgetLibraryVisible("gallery", "Gallery") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "gallery" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("gallery")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-pink-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("gallery", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("gallery") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("gallery") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("gallery") ? "★" : "☆"}
-                      </button>
-                      <GalleryBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-pink-600">
-                        Gallery
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Flip Box Widget (F-185) */}
-                  {isWidgetLibraryVisible("flip-box", "Flip Box") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "flip-box" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("flip-box")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("flip-box", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("flip-box") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("flip-box") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("flip-box") ? "★" : "☆"}
-                      </button>
-                      <FlipBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        Flip Box
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Call to Action Widget (F-186) */}
-                  {isWidgetLibraryVisible("call-to-action", "Call to Action") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "call-to-action" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("call-to-action")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-rose-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("call-to-action", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("call-to-action") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("call-to-action") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("call-to-action") ? "★" : "☆"}
-                      </button>
-                      <CtaBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-rose-600">
-                        Call to Action
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Media Carousel Widget (F-187) */}
-                  {isWidgetLibraryVisible("media-carousel", "Media Carousel") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "media-carousel" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("media-carousel")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-cyan-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("media-carousel", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("media-carousel") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("media-carousel") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("media-carousel") ? "★" : "☆"}
-                      </button>
-                      <MediaCarouselBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-cyan-600">
-                        Media Carousel
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Testimonial Carousel Widget (F-188) */}
-                  {isWidgetLibraryVisible("testimonial-carousel", "Testimonials") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "testimonial-carousel" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("testimonial-carousel")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-emerald-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("testimonial-carousel", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("testimonial-carousel") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("testimonial-carousel") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("testimonial-carousel") ? "★" : "☆"}
-                      </button>
-                      <TestimonialBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-emerald-600">
-                        Testimonials
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Nested Carousel Widget (F-189) */}
-                  {isWidgetLibraryVisible("nested-carousel", "Nested Carousel") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "nested-carousel" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("nested-carousel")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-indigo-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("nested-carousel", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("nested-carousel") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("nested-carousel") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("nested-carousel") ? "★" : "☆"}
-                      </button>
-                      <NestedCarouselBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
-                        Nested Carousel
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Loop Carousel Widget (F-190) */}
-                  {isWidgetLibraryVisible("loop-carousel", "Loop Carousel") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "loop-carousel" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("loop-carousel")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("loop-carousel", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("loop-carousel") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("loop-carousel") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("loop-carousel") ? "★" : "☆"}
-                      </button>
-                      <LoopCarouselBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-purple-600">
-                        Loop Carousel
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Table of Contents Widget (F-191) */}
-                  {isWidgetLibraryVisible("table-of-contents", "Table of Contents") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "table-of-contents" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("table-of-contents")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-teal-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("table-of-contents", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("table-of-contents") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("table-of-contents") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("table-of-contents") ? "★" : "☆"}
-                      </button>
-                      <TocBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-teal-600">
-                        Table of Contents
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Countdown Widget (F-192) */}
-                  {isWidgetLibraryVisible("countdown", "Countdown") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "countdown" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("countdown")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("countdown", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("countdown") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("countdown") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("countdown") ? "★" : "☆"}
-                      </button>
-                      <CountdownBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        Countdown
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Facebook Page Widget (F-193) */}
-                  {isWidgetLibraryVisible("facebook-page", "Facebook Page") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "facebook-page" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("facebook-page")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("facebook-page", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("facebook-page") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("facebook-page") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("facebook-page") ? "★" : "☆"}
-                      </button>
-                      <FacebookPageBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Facebook Page
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Blockquote Widget (F-194) */}
-                  {isWidgetLibraryVisible("blockquote", "Blockquote") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "blockquote" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("blockquote")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-indigo-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("blockquote", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("blockquote") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("blockquote") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("blockquote") ? "★" : "☆"}
-                      </button>
-                      <BlockquoteBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
-                        Blockquote
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Template Widget (F-195) */}
-                  {isWidgetLibraryVisible("template", "Template") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "template" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("template")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("template", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("template") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("template") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("template") ? "★" : "☆"}
-                      </button>
-                      <TemplateBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-purple-600">
-                        Template
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Reviews Widget (F-196) */}
-                  {isWidgetLibraryVisible("reviews", "Reviews") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "reviews" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("reviews")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("reviews", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("reviews") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("reviews") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("reviews") ? "★" : "☆"}
-                      </button>
-                      <ReviewsBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        Reviews
-                      </span>
-                    </div>
-                  )}
-
-
-
-                  {/* PayPal Button Widget (F-200) */}
-                  {isWidgetLibraryVisible("paypal-button", "PayPal Button") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "paypal-button" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("paypal-button")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("paypal-button", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("paypal-button") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("paypal-button") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("paypal-button") ? "★" : "☆"}
-                      </button>
-                      <PayPalButtonBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        PayPal
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Stripe Button Widget (F-201) */}
-                  {isWidgetLibraryVisible("stripe-button", "Stripe Button") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "stripe-button" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("stripe-button")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-indigo-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("stripe-button", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("stripe-button") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("stripe-button") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("stripe-button") ? "★" : "☆"}
-                      </button>
-                      <StripeButtonBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
-                        Stripe
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Lottie Widget (F-202) */}
-                  {isWidgetLibraryVisible("lottie", "Lottie Animation") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "lottie" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("lottie")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-teal-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("lottie", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("lottie") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("lottie") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("lottie") ? "★" : "☆"}
-                      </button>
-                      <LottieBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-teal-600">
-                        Lottie
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Code Highlight Widget (F-203) */}
-                  {isWidgetLibraryVisible("code-highlight", "Code Highlight") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "code-highlight" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("code-highlight")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("code-highlight", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("code-highlight") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("code-highlight") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("code-highlight") ? "★" : "☆"}
-                      </button>
-                      <CodeHighlightBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-purple-600">
-                        Code Highlight
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Video Playlist Widget (F-204) */}
-                  {isWidgetLibraryVisible("video-playlist", "Video Playlist") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "video-playlist" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("video-playlist")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-red-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("video-playlist", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("video-playlist") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("video-playlist") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("video-playlist") ? "★" : "☆"}
-                      </button>
-                      <VideoPlaylistBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-red-600">
-                        Video Playlist
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Mega Menu Widget (F-205) */}
-                  {isWidgetLibraryVisible("mega-menu", "Mega Menu") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "mega-menu" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("mega-menu")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("mega-menu", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("mega-menu") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("mega-menu") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("mega-menu") ? "★" : "☆"}
-                      </button>
-                      <MegaMenuBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Mega Menu
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Off Canvas Widget (F-206) */}
-                  {isWidgetLibraryVisible("off-canvas", "Off Canvas") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "off-canvas" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("off-canvas")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-amber-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("off-canvas", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("off-canvas") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("off-canvas") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("off-canvas") ? "★" : "☆"}
-                      </button>
-                      <OffCanvasBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-amber-600">
-                        Off Canvas
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Image Carousel Widget (F-210) */}
-                  {isWidgetLibraryVisible("image-carousel", "Image Carousel") && (
-                    <div
-                      draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: "image-carousel" }));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                      onClick={() => handleAddElement("image-carousel")}
-                      className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavoriteWidget("image-carousel", e)}
-                        className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${favoriteWidgets.includes("image-carousel") ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                          }`}
-                        title={favoriteWidgets.includes("image-carousel") ? "Remove favorite" : "Mark as favorite"}
-                      >
-                        {favoriteWidgets.includes("image-carousel") ? "★" : "☆"}
-                      </button>
-                      <ImageCarouselBoxIcon />
-                      <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600">
-                        Image Carousel
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Dynamically Render All Additional Registered Widgets (F-212 to F-222 & future widgets) */}
-                  {ALL_WIDGET_REGISTRY.filter((w) => ![
-                    "container", "heading", "text", "image", "button", "posts", "share-buttons", "portfolio", "slides", "form",
-                    "login", "nav-menu", "animated-headline", "price-table", "price-list", "gallery", "flip-box", "call-to-action",
-                    "media-carousel", "testimonial-carousel", "nested-carousel", "loop-carousel", "table-of-contents", "countdown",
-                    "facebook-page", "blockquote", "template", "reviews", "facebook-button", "facebook-embed", "facebook-comments",
-                    "paypal-button", "stripe-button", "lottie", "code-highlight", "video-playlist", "mega-menu", "off-canvas", "image-carousel"
-                  ].includes(w.type)).map((widget) => {
-                    if (!isWidgetLibraryVisible(widget.type, widget.name)) return null;
-                    const isFav = favoriteWidgets.includes(widget.type);
-                    return (
-                      <div
-                        key={widget.type}
-                        draggable={true}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", widgetType: widget.type }));
-                          e.dataTransfer.effectAllowed = "copy";
-                        }}
-                        onClick={() => handleAddElement(widget.type)}
-                        className="relative flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-blue-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95 group cursor-grab transition"
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => toggleFavoriteWidget(widget.type, e)}
-                          className={`absolute top-1.5 right-2 text-xs transition hover:scale-125 ${isFav ? "text-amber-500" : "text-slate-300 hover:text-amber-400"
-                            }`}
-                          title={isFav ? "Remove favorite" : "Mark as favorite"}
-                        >
-                          {isFav ? "★" : "☆"}
-                        </button>
-                        <span className="text-2xl">{widget.icon || "📦"}</span>
-                        <span className="mt-2 text-xs font-semibold text-slate-700 group-hover:text-blue-600 text-center line-clamp-1">
-                          {widget.name}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {/* See shell/sidebar/widgetLibraryGrid (moved verbatim) */}
+                {renderWidgetLibraryGrid({
+                  favoriteWidgets,
+                  handleAddElement,
+                  isWidgetLibraryVisible,
+                  toggleFavoriteWidget,
+                })}
 
                 {/* Reusable Components Section (F-005) */}
-                {!disabledWidgets.includes("reusable-components") && (
-                  <div className="col-span-2 pt-3 border-t border-slate-200 mt-2">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-purple-600 mb-2 flex items-center gap-1">
-                      <span>🧩</span> Reusable Components
-                    </h4>
-                    {Object.keys(components).length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-purple-200 bg-purple-50/30 p-2.5 text-center text-[10px] text-purple-600/70">
-                        Select any element & click "Save as Comp" to create reusable components.
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {Object.entries(components)
-                          .filter(([_id, comp]) => !widgetLibrarySearch || comp.name.toLowerCase().includes(widgetLibrarySearch.toLowerCase()))
-                          .filter((entry, idx, arr) => arr.findIndex((([_, c]) => c.name.trim().toLowerCase() === entry[1].name.trim().toLowerCase())) === idx)
-                          .map(([compId, comp]) => (
-                            <div
-                              key={compId}
-                              className="w-full flex items-center justify-between gap-2 rounded-lg border border-purple-200 bg-purple-50/50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 transition hover:bg-purple-100 hover:border-purple-300"
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => toggleFavoriteComponent(compId, e)}
-                                className={`text-xs transition hover:scale-125 cursor-pointer ${comp.isFavorite ? "text-amber-500" : "text-slate-300 hover:text-amber-400"}`}
-                                title={comp.isFavorite ? "Remove favorite" : "Mark favorite"}
-                              >
-                                {comp.isFavorite ? "★" : "☆"}
-                              </button>
-                              <span className="truncate flex-1 text-left cursor-pointer" onClick={() => handleAddInstanceFromComponent(compId)}>
-                                {comp.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleAddInstanceFromComponent(compId)}
-                                className="text-[10px] font-bold text-purple-600 bg-purple-200/60 hover:bg-purple-300/80 px-1.5 py-0.5 rounded cursor-pointer"
-                              >
-                                + Add Instance
-                              </button>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* See shell/sidebar/reusableComponentsSection (moved verbatim) */}
+                {renderReusableComponentsSection({
+                  components,
+                  disabledWidgets,
+                  handleAddInstanceFromComponent,
+                  toggleFavoriteComponent,
+                  widgetLibrarySearch,
+                })}
               </div>
             ) : leftSidebarTab === "navigator" ? (
-              <div className="space-y-3">
-                {/* Structure Search Input (F-030) */}
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400 text-xs">
-                    🔍
-                  </span>
-                  <input
-                    type="text"
-                    value={structureSearchQuery}
-                    onChange={(e) => setStructureSearchQuery(e.target.value)}
-                    placeholder="Search structure layers..."
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 transition shadow-sm"
-                  />
-                  {structureSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setStructureSearchQuery("")}
-                      className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 text-xs"
-                      title="Clear search"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {structureSearchQuery.trim() !== "" ? (
-                  /* Filtered Search Results */
-                  <div className="space-y-1">
-                    {flattenAndSearchElements(elements, structureSearchQuery).length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-400 italic">
-                        No structure elements matching "{structureSearchQuery}"
-                      </div>
-                    ) : (
-                      flattenAndSearchElements(elements, structureSearchQuery).map(({ element, path }) => (
-                        <div
-                          key={element.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectElement(element.id, e);
-                          }}
-                          className={`flex items-center justify-between rounded-lg p-2 text-xs transition cursor-pointer border ${selectedId === element.id || selectedIds.includes(element.id)
-                            ? "bg-blue-600 font-bold text-white border-blue-600 shadow-sm"
-                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-blue-300"
-                            }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs">
-                              {element.type === "container" && "📦"}
-                              {element.type === "heading" && "🔤"}
-                              {element.type === "text" && "📝"}
-                              {element.type === "image" && "🖼️"}
-                              {element.type === "button" && "🔘"}
-                            </span>
-                            <div className="flex flex-col min-w-0">
-                              <span className="truncate font-semibold capitalize">
-                                {element.type === "heading" ? (element.content ? `"${element.content.slice(0, 15)}"` : "Heading") :
-                                  element.type === "text" ? (element.content ? `"${element.content.slice(0, 15)}"` : "Text") :
-                                    element.type === "button" ? (element.content ? `"${element.content.slice(0, 15)}"` : "Button") :
-                                      element.type === "image" ? (element.alt ? `Image (${element.alt})` : "Image") :
-                                        element.type === "container" ? "Container" : element.type}
-                              </span>
-                              <span className={`text-[9px] truncate ${selectedId === element.id || selectedIds.includes(element.id) ? "text-blue-200" : "text-slate-400"}`}>
-                                {path}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ) : (
-                  /* Full Tree Hierarchy View */
-                  <div className="space-y-1">
-                    {elements.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-slate-400">
-                        No elements on canvas.
-                      </div>
-                    ) : (
-                      elements.map((el, idx) =>
-                        renderNavigatorTreeItem(el, 0, idx === elements.length - 1)
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
+              /* See shell/sidebar/navigatorPanel (moved verbatim) */ renderNavigatorPanel({
+                elements,
+                handleSelectElement,
+                renderNavigatorTreeItem,
+                selectedId,
+                selectedIds,
+                setStructureSearchQuery,
+                structureSearchQuery,
+              })
             ) : leftSidebarTab === ("atomic" as any) ? (
               <AtomicEditor
                 onClose={() => setLeftSidebarTab("elements")}
@@ -5883,1834 +4091,142 @@ export default function WebsiteEditor() {
                 {selectedElementAny ? (
                   <div className="space-y-5">
                     {/* Element Type Header & Quick Actions */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <span className="text-xs font-bold uppercase tracking-wide text-blue-600">
-                        {selectedElementAny.type}
-                      </span>
-
-                      <div className="flex items-center gap-2 text-xs font-semibold">
-                        <button
-                          onClick={(e) => handleCopyStyle(selectedElementAny.id, e)}
-                          className="text-slate-600 hover:text-blue-600 hover:underline"
-                          title="Copy Element Style"
-                        >
-                          Copy Style
-                        </button>
-                        {copiedStyles && (
-                          <button
-                            onClick={(e) => handlePasteStyle(selectedElementAny.id, e)}
-                            className="text-emerald-600 hover:underline"
-                            title="Paste Copied Style"
-                          >
-                            Paste Style
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => handleDuplicateElement(selectedElementAny.id, e)}
-                          className="text-blue-600 hover:underline"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteElement(selectedElementAny.id, e)}
-                          className="text-red-500 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                    {/* See inspector/selected/elementTypeHeader (moved verbatim) */}
+                    {renderElementTypeHeader({
+                      copiedStyles,
+                      handleCopyStyle,
+                      handleDeleteElement,
+                      handleDuplicateElement,
+                      handlePasteStyle,
+                      selectedElementAny,
+                    })}
 
                     {/* Element State Selector (F-036) */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Element State
-                        </span>
-                        {activeElementState === "hover" && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                            Editing :hover State
-                          </span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveElementState("normal")}
-                          className={`rounded-md px-3 py-1 text-xs font-semibold transition ${activeElementState === "normal"
-                            ? "bg-white text-blue-600 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
-                        >
-                          Normal
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveElementState("hover")}
-                          className={`rounded-md px-3 py-1 text-xs font-semibold transition ${activeElementState === "hover"
-                            ? "bg-white text-blue-600 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
-                        >
-                          Hover (:hover)
-                        </button>
-                      </div>
-                    </div>
+                    {/* See inspector/selected/elementStateSelector (moved verbatim) */}
+                    {renderElementStateSelector({
+                      activeElementState,
+                      setActiveElementState,
+                    })}
 
                     {/* Container Specific Layout Controls (Flexbox & CSS Grid) */}
-                    {selectedElementAny.type === "container" && (() => {
-                      const effectiveLayoutType = getEffectiveLayout(selectedElementAny, activeDevice, "layoutType") ?? selectedElementAny.layout?.layoutType ?? "flex";
-                      const isGrid = effectiveLayoutType === "grid";
-                      const effectiveGridCols = getEffectiveLayout(selectedElementAny, activeDevice, "gridTemplateColumns") ?? selectedElementAny.layout?.gridTemplateColumns ?? "repeat(2, minmax(0, 1fr))";
-                      const effectiveGridFlow = getEffectiveLayout(selectedElementAny, activeDevice, "gridAutoFlow") ?? selectedElementAny.layout?.gridAutoFlow ?? "row";
-                      const effectiveJustifyItems = getEffectiveLayout(selectedElementAny, activeDevice, "justifyItems") ?? selectedElementAny.layout?.justifyItems ?? "stretch";
-                      const effectiveAlignItems = getEffectiveLayout(selectedElementAny, activeDevice, "alignItems") ?? selectedElementAny.layout?.alignItems ?? "stretch";
-                      const effectiveDirection = getEffectiveLayout(selectedElementAny, activeDevice, "direction") ?? selectedElementAny.layout?.direction ?? "column";
-                      const effectiveJustifyContent = getEffectiveLayout(selectedElementAny, activeDevice, "justifyContent") ?? selectedElementAny.layout?.justifyContent ?? "flex-start";
-                      const effectiveGap = getEffectiveLayout(selectedElementAny, activeDevice, "gap") ?? selectedElementAny.layout?.gap ?? 10;
-                      const effectiveRowGap = getEffectiveLayout(selectedElementAny, activeDevice, "rowGap") ?? selectedElementAny.layout?.rowGap ?? "";
-                      const effectiveColGap = getEffectiveLayout(selectedElementAny, activeDevice, "columnGap") ?? selectedElementAny.layout?.columnGap ?? "";
-
-                      const isMasonry = effectiveLayoutType === "masonry";
-                      const effectiveMasonryCols = getEffectiveLayout(selectedElementAny, activeDevice, "masonryColumns") ?? selectedElementAny.layout?.masonryColumns ?? 3;
-                      const effectiveMasonryGap = getEffectiveLayout(selectedElementAny, activeDevice, "masonryGap") ?? selectedElementAny.layout?.masonryGap ?? 16;
-
-                      return (
-                        <div className="space-y-4">
-                          {/* Layout Type Toggle (F-041, F-042, F-043, F-051) */}
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="block text-xs font-semibold text-slate-700">
-                                Layout Type
-                              </label>
-                              <span className="text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-1.5 py-0.5 rounded">
-                                {activeDevice}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 border border-slate-200">
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedLayout("layoutType", "flex")}
-                                className={`py-1.5 text-xs font-bold rounded transition-colors ${!isGrid && !isMasonry ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:bg-slate-200"
-                                  }`}
-                              >
-                                ⚡ Flexbox
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedLayout("layoutType", "grid")}
-                                className={`py-1.5 text-xs font-bold rounded transition-colors ${isGrid ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:bg-slate-200"
-                                  }`}
-                              >
-                                ▦ CSS Grid
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedLayout("layoutType", "masonry")}
-                                className={`py-1.5 text-xs font-bold rounded transition-colors ${isMasonry ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:bg-slate-200"
-                                  }`}
-                              >
-                                🧱 Masonry
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Masonry Setup Controls (F-051) */}
-                          {isMasonry ? (
-                            <div className="space-y-3 p-3 bg-slate-50/80 rounded-lg border border-slate-200/80">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Masonry Columns (2 - 6)
-                                </label>
-                                <div className="grid grid-cols-5 gap-1 mb-2">
-                                  {[2, 3, 4, 5, 6].map((cols) => {
-                                    const isSelected = Number(effectiveMasonryCols) === cols;
-                                    return (
-                                      <button
-                                        key={cols}
-                                        type="button"
-                                        onClick={() => updateSelectedLayout("masonryColumns", cols)}
-                                        className={`py-1 text-xs font-bold rounded border ${isSelected
-                                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                          : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
-                                          }`}
-                                      >
-                                        {cols} Col
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Masonry Column Gap (px)
-                                </label>
-                                <ScrubbableNumberInput
-                                  value={effectiveMasonryGap}
-                                  onChange={(val) => updateSelectedLayout("masonryGap", Number(val))}
-                                  min={0}
-                                  max={100}
-                                  step={1}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-                            </div>
-                          ) : isGrid ? (
-                            /* CSS Grid Setup Controls (F-041, F-043, F-038) */
-                            <div className="space-y-3 p-3 bg-slate-50/80 rounded-lg border border-slate-200/80">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Equal Columns (F-038)
-                                </label>
-                                <div className="grid grid-cols-6 gap-1 mb-2">
-                                  {[1, 2, 3, 4, 6, 12].map((cols) => {
-                                    const template = `repeat(${cols}, minmax(0, 1fr))`;
-                                    const isSelected = effectiveGridCols === template;
-                                    return (
-                                      <button
-                                        key={cols}
-                                        type="button"
-                                        onClick={() => updateSelectedLayout("gridTemplateColumns", template)}
-                                        className={`py-1 text-xs font-bold rounded border ${isSelected
-                                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                          : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
-                                          }`}
-                                        title={`${cols} Column${cols > 1 ? "s" : ""}`}
-                                      >
-                                        {cols}c
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Column Split Ratios (F-038)
-                                </label>
-                                <div className="grid grid-cols-3 gap-1 mb-2">
-                                  {[
-                                    { label: "50 / 50", val: "repeat(2, minmax(0, 1fr))" },
-                                    { label: "33 / 66", val: "1fr 2fr" },
-                                    { label: "66 / 33", val: "2fr 1fr" },
-                                    { label: "33 / 33 / 33", val: "repeat(3, minmax(0, 1fr))" },
-                                    { label: "1:2:1", val: "1fr 2fr 1fr" },
-                                    { label: "4 Equal", val: "repeat(4, minmax(0, 1fr))" },
-                                  ].map((preset) => {
-                                    const isSelected = effectiveGridCols === preset.val;
-                                    return (
-                                      <button
-                                        key={preset.label}
-                                        type="button"
-                                        onClick={() => updateSelectedLayout("gridTemplateColumns", preset.val)}
-                                        className={`py-1 px-1 text-[10px] font-bold rounded border ${isSelected
-                                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                                          }`}
-                                      >
-                                        {preset.label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                <label className="block text-[11px] text-slate-500 mb-1">
-                                  Custom Template (grid-template-columns)
-                                </label>
-                                <input
-                                  type="text"
-                                  value={effectiveGridCols}
-                                  onChange={(e) => updateSelectedLayout("gridTemplateColumns", e.target.value)}
-                                  placeholder="e.g. repeat(3, minmax(0, 1fr)) or 1fr 2fr"
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                    Auto Flow
-                                  </label>
-                                  <select
-                                    value={effectiveGridFlow}
-                                    onChange={(e) => updateSelectedLayout("gridAutoFlow", e.target.value as any)}
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                  >
-                                    <option value="row">Row</option>
-                                    <option value="column">Column</option>
-                                    <option value="dense">Dense</option>
-                                    <option value="row dense">Row Dense</option>
-                                    <option value="column dense">Column Dense</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                    Justify Items
-                                  </label>
-                                  <select
-                                    value={effectiveJustifyItems}
-                                    onChange={(e) => updateSelectedLayout("justifyItems", e.target.value as any)}
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                  >
-                                    <option value="stretch">Stretch</option>
-                                    <option value="start">Start</option>
-                                    <option value="center">Center</option>
-                                    <option value="end">End</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Align Items
-                                </label>
-                                <select
-                                  value={effectiveAlignItems}
-                                  onChange={(e) => updateSelectedLayout("alignItems", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="stretch">Stretch</option>
-                                  <option value="flex-start">Start</option>
-                                  <option value="center">Center</option>
-                                  <option value="flex-end">End</option>
-                                </select>
-                              </div>
-                            </div>
-                          ) : (
-                            /* Flexbox Controls (F-042) */
-                            <div className="space-y-4">
-                              {/* Direction */}
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Direction (F-039, F-040)
-                                </label>
-                                <select
-                                  value={effectiveDirection}
-                                  onChange={(e) => updateSelectedLayout("direction", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="column">Column (Vertical Stack)</option>
-                                  <option value="row">Row (Horizontal)</option>
-                                </select>
-                              </div>
-
-                              {/* Justify Content */}
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Justify Content (F-045)
-                                </label>
-                                <select
-                                  value={effectiveJustifyContent}
-                                  onChange={(e) => updateSelectedLayout("justifyContent", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="flex-start">Start (flex-start)</option>
-                                  <option value="center">Center</option>
-                                  <option value="flex-end">End (flex-end)</option>
-                                  <option value="space-between">Space Between</option>
-                                  <option value="space-around">Space Around</option>
-                                  <option value="space-evenly">Space Evenly</option>
-                                </select>
-                              </div>
-
-                              {/* Align Items */}
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Align Items (F-045)
-                                </label>
-                                <select
-                                  value={effectiveAlignItems}
-                                  onChange={(e) => updateSelectedLayout("alignItems", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="stretch">Stretch</option>
-                                  <option value="flex-start">Start (flex-start)</option>
-                                  <option value="center">Center</option>
-                                  <option value="flex-end">End (flex-end)</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Gap Controls (Common to Flex & Grid) */}
-                          {!isMasonry && (
-                            <div className="space-y-2 pt-1 border-t border-slate-200">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Gap (px)
-                                </label>
-                                <ScrubbableNumberInput
-                                  value={effectiveGap}
-                                  onChange={(val) => updateSelectedLayout("gap", Number(val))}
-                                  min={0}
-                                  step={1}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                                    Row Gap (px)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={effectiveRowGap}
-                                    onChange={(e) => updateSelectedLayout("rowGap", e.target.value ? Number(e.target.value) : undefined)}
-                                    placeholder="Inherit gap"
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                                    Col Gap (px)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={effectiveColGap}
-                                    onChange={(e) => updateSelectedLayout("columnGap", e.target.value ? Number(e.target.value) : undefined)}
-                                    placeholder="Inherit gap"
-                                    className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {/* See inspector/selected/containerLayoutControls (moved verbatim) */}
+                    {renderContainerLayoutControls({
+                      activeDevice,
+                      selectedElementAny,
+                      updateSelectedLayout,
+                    })}
 
                     {/* Universal Sizing, Background & Spacing Controls (For ALL Elements) (F-002, F-035, F-052) */}
-                    <div className="space-y-4 pt-2">
-                      {/* Width & Height */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Width (F-052)
-                            </label>
-                            {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "width") && (
-                              <button
-                                type="button"
-                                onClick={() => resetSelectedStyle("width")}
-                                className="text-[10px] text-slate-400 hover:text-blue-600"
-                                title="Reset width"
-                              >
-                                ↺ Reset
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "width") || ""}
-                            onChange={(e) => updateSelectedStyle("width", e.target.value || undefined)}
-                            placeholder="auto, 100%, 50vw"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Height (F-052)
-                            </label>
-                            {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "height") && (
-                              <button
-                                type="button"
-                                onClick={() => resetSelectedStyle("height")}
-                                className="text-[10px] text-slate-400 hover:text-blue-600"
-                                title="Reset height"
-                              >
-                                ↺ Reset
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "height") || ""}
-                            onChange={(e) => updateSelectedStyle("height", e.target.value || undefined)}
-                            placeholder="auto, 100vh, 400px"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Min / Max Dimensions (F-052) */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] font-medium text-slate-600">
-                              Min Height
-                            </label>
-                            {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "minHeight") && (
-                              <button
-                                type="button"
-                                onClick={() => resetSelectedStyle("minHeight")}
-                                className="text-[10px] text-slate-400 hover:text-blue-600"
-                              >
-                                ↺
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "minHeight") || ""}
-                            onChange={(e) => updateSelectedStyle("minHeight", e.target.value || undefined)}
-                            placeholder="e.g. 100vh, 300px"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] font-medium text-slate-600">
-                              Max Width
-                            </label>
-                            {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "maxWidth") && (
-                              <button
-                                type="button"
-                                onClick={() => resetSelectedStyle("maxWidth")}
-                                className="text-[10px] text-slate-400 hover:text-blue-600"
-                              >
-                                ↺
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "maxWidth") || ""}
-                            onChange={(e) => updateSelectedStyle("maxWidth", e.target.value || undefined)}
-                            placeholder="e.g. 1200px, 100%"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Universal Alignment Control (For ALL Elements & Widgets including Mega Menu) */}
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Alignment
-                        </label>
-                        <div className="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1 border border-slate-200">
-                          {(["left", "center", "right", "justify"] as const).map((align) => {
-                            const currentAlign =
-                              getControlStyleValue(
-                                selectedElementAny,
-                                activeDevice,
-                                activeElementState,
-                                "textAlign"
-                              ) || "left";
-                            const isActive = currentAlign === align;
-                            return (
-                              <button
-                                key={align}
-                                type="button"
-                                onClick={() => {
-                                  updateSelectedStyle("textAlign", align);
-                                  const flexJustify =
-                                    align === "left"
-                                      ? "flex-start"
-                                      : align === "right"
-                                        ? "flex-end"
-                                        : align === "center"
-                                          ? "center"
-                                          : "space-between";
-                                  updateSelectedStyle("justifyContent", flexJustify);
-                                  if (selectedElementAny.type === "nav-menu") {
-                                    updateSelectedProp("navAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "mega-menu") {
-                                    updateSelectedProp("megaMenuAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "share-buttons") {
-                                    updateSelectedProp("shareAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "posts") {
-                                    updateSelectedProp("postsAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "portfolio") {
-                                    updateSelectedProp("portfolioAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "slides") {
-                                    updateSelectedProp("slidesAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "price-table") {
-                                    updateSelectedProp("pricingAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "price-list") {
-                                    updateSelectedProp("priceListAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "table-of-contents") {
-                                    updateSelectedProp("tocAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "image-carousel") {
-                                    updateSelectedProp("imageCarouselAlignment", align as any);
-                                  }
-                                  if (selectedElementAny.type === "container" || selectedElementAny.layout) {
-                                    updateSelectedLayout("justifyContent", flexJustify);
-                                  }
-                                }}
-                                className={`rounded py-1 text-xs font-bold capitalize transition ${isActive
-                                  ? "bg-white text-blue-600 shadow-xs"
-                                  : "text-slate-600 hover:text-slate-900"
-                                  }`}
-                              >
-                                {align}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Background Color */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Background Color
-                          </label>
-                          {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "backgroundColor") && (
-                            <button
-                              type="button"
-                              onClick={() => resetSelectedStyle("backgroundColor")}
-                              title="Reset Background Color to Default"
-                              className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-                            >
-                              ↺ Reset
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "backgroundColor") || "#ffffff"}
-                            onChange={(e) => updateSelectedStyle("backgroundColor", e.target.value)}
-                            className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                          />
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "backgroundColor") || "#ffffff"}
-                            onChange={(e) => updateSelectedStyle("backgroundColor", e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSampleColor((hex) => updateSelectedStyle("backgroundColor", hex))}
-                            title="Sample Color from Screen / Image"
-                            className="h-8 px-2 rounded border border-slate-300 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-xs font-bold text-slate-700 hover:text-blue-600 transition flex items-center gap-1 shrink-0"
-                          >
-                            <span>🧪</span>
-                            <span className="text-[10px]">Sample</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Background Image & Overlay Controls */}
-                      <BackgroundImageInspector el={selectedElementAny} updateStyle={updateSelectedStyle} />
-
-                      {/* Advanced Spacing Controls for ALL Elements */}
-                      {render4SideSpacingControl("Margin", "margin", isMarginLinked, setIsMarginLinked)}
-                      {render4SideSpacingControl("Padding", "padding", isPaddingLinked, setIsPaddingLinked)}
-                    </div>
+                    {/* See inspector/selected/universalSizingControls (moved verbatim) */}
+                    {renderUniversalSizingControls({
+                      activeDevice,
+                      activeElementState,
+                      handleSampleColor,
+                      isMarginLinked,
+                      isPaddingLinked,
+                      render4SideSpacingControl,
+                      resetSelectedStyle,
+                      selectedElementAny,
+                      setIsMarginLinked,
+                      setIsPaddingLinked,
+                      updateSelectedLayout,
+                      updateSelectedProp,
+                      updateSelectedStyle,
+                    })}
 
                     {/* Posts Specific Layout & Content Controls (F-174) */}
-                    {selectedElementAny.type === "posts" && (
-                      <div className="space-y-4 pt-2 border-t border-slate-100">
-                        <div className="border-b border-slate-100 pb-2">
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1.5">
-                            <span>📰</span> Posts Layout Controls
-                          </h3>
-                        </div>
-
-                        {/* Columns Selector */}
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Grid Columns
-                          </label>
-                          <select
-                            value={selectedElementAny.postsColumns || 3}
-                            onChange={(e) => updateSelectedProp("postsColumns", parseInt(e.target.value, 10))}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          >
-                            <option value={1}>1 Column (Stack)</option>
-                            <option value={2}>2 Columns</option>
-                            <option value={3}>3 Columns</option>
-                            <option value={4}>4 Columns</option>
-                          </select>
-                        </div>
-
-                        {/* Gap / Spacing */}
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Grid Gap (Spacing)
-                          </label>
-                          <select
-                            value={selectedElementAny.postsGap ?? 20}
-                            onChange={(e) => updateSelectedProp("postsGap", parseInt(e.target.value, 10))}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          >
-                            <option value={12}>12px (Compact)</option>
-                            <option value={16}>16px (Small)</option>
-                            <option value={20}>20px (Medium)</option>
-                            <option value={24}>24px (Large)</option>
-                            <option value={32}>32px (Extra Large)</option>
-                          </select>
-                        </div>
-
-                        {/* Featured Image Height */}
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Featured Image Height
-                          </label>
-                          <select
-                            value={selectedElementAny.postsImageHeight || "180px"}
-                            onChange={(e) => updateSelectedProp("postsImageHeight", e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          >
-                            <option value="140px">140px (Small)</option>
-                            <option value="180px">180px (Standard)</option>
-                            <option value="220px">220px (Tall)</option>
-                            <option value="260px">260px (Extra Tall)</option>
-                            <option value="auto">Auto (Natural Ratio)</option>
-                          </select>
-                        </div>
-
-                        {/* Alignment */}
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Content Alignment
-                          </label>
-                          <select
-                            value={selectedElementAny.postsAlignment || "left"}
-                            onChange={(e) => updateSelectedProp("postsAlignment", e.target.value as any)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          >
-                            <option value="left">Left Aligned</option>
-                            <option value="center">Center Aligned</option>
-                            <option value="right">Right Aligned</option>
-                          </select>
-                        </div>
-
-                        {/* Visibility Toggles */}
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                          <span className="block text-[11px] font-bold text-slate-600 mb-1">
-                            Display Elements
-                          </span>
-                          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedElementAny.postsShowImage !== false}
-                              onChange={(e) => updateSelectedProp("postsShowImage", e.target.checked)}
-                              className="rounded border-slate-300 text-blue-600"
-                            />
-                            <span>Featured Image</span>
-                          </label>
-                          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedElementAny.postsShowDate !== false}
-                              onChange={(e) => updateSelectedProp("postsShowDate", e.target.checked)}
-                              className="rounded border-slate-300 text-blue-600"
-                            />
-                            <span>Date & Author Metadata</span>
-                          </label>
-                          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedElementAny.postsShowExcerpt !== false}
-                              onChange={(e) => updateSelectedProp("postsShowExcerpt", e.target.checked)}
-                              className="rounded border-slate-300 text-blue-600"
-                            />
-                            <span>Post Excerpt</span>
-                          </label>
-                          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedElementAny.postsShowReadMore !== false}
-                              onChange={(e) => updateSelectedProp("postsShowReadMore", e.target.checked)}
-                              className="rounded border-slate-300 text-blue-600"
-                            />
-                            <span>Read More Link</span>
-                          </label>
-                        </div>
-
-                        {/* Post Items Editor */}
-                        <div className="pt-2">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-bold text-slate-700">
-                              Post Items ({selectedElementAny.posts?.length || 0})
-                            </h4>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentPosts = selectedElementAny.posts || [];
-                                const newPost: PostItem = {
-                                  id: "post_" + Math.random().toString(36).substring(2, 9),
-                                  title: "New Blog Article",
-                                  excerpt: "Short excerpt or summary of the blog post.",
-                                  date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-                                  author: "Author",
-                                  image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80",
-                                  readMoreText: "Read Article →",
-                                  readMoreUrl: "#",
-                                };
-                                updateSelectedProp("posts", [...currentPosts, newPost]);
-                              }}
-                              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded shadow-xs"
-                            >
-                              + Add Post
-                            </button>
-                          </div>
-
-                          <div className="space-y-3">
-                            {(selectedElementAny.posts || []).map((post, idx) => (
-                              <div key={post.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs space-y-2">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                                  <span className="text-[11px] font-bold text-slate-800 truncate max-w-[170px]">
-                                    Post #{idx + 1}: {post.title || "Untitled"}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updatedPosts = (selectedElementAny.posts || []).filter((p) => p.id !== post.id);
-                                      updateSelectedProp("posts", updatedPosts);
-                                    }}
-                                    className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:underline"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-
-                                <div>
-                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                                    Title
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={post.title}
-                                    onChange={(e) => {
-                                      const updatedPosts = (selectedElementAny.posts || []).map((p) =>
-                                        p.id === post.id ? { ...p, title: e.target.value } : p
-                                      );
-                                      updateSelectedProp("posts", updatedPosts);
-                                    }}
-                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                                    Excerpt
-                                  </label>
-                                  <textarea
-                                    rows={2}
-                                    value={post.excerpt}
-                                    onChange={(e) => {
-                                      const updatedPosts = (selectedElementAny.posts || []).map((p) =>
-                                        p.id === post.id ? { ...p, excerpt: e.target.value } : p
-                                      );
-                                      updateSelectedProp("posts", updatedPosts);
-                                    }}
-                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
-                                  />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                                      Date
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={post.date || ""}
-                                      onChange={(e) => {
-                                        const updatedPosts = (selectedElementAny.posts || []).map((p) =>
-                                          p.id === post.id ? { ...p, date: e.target.value } : p
-                                        );
-                                        updateSelectedProp("posts", updatedPosts);
-                                      }}
-                                      placeholder="Sep 1, 2026"
-                                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                                      Author
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={post.author || ""}
-                                      onChange={(e) => {
-                                        const updatedPosts = (selectedElementAny.posts || []).map((p) =>
-                                          p.id === post.id ? { ...p, author: e.target.value } : p
-                                        );
-                                        updateSelectedProp("posts", updatedPosts);
-                                      }}
-                                      placeholder="Jane Doe"
-                                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/* See inspector/selected/postsControls (moved verbatim) */}
+                    {renderPostsControls({
+                      selectedElementAny,
+                      updateSelectedProp,
+                    })}
 
                     {/* Image Widget Specific Inspector */}
-                    {selectedElementAny.type === "image" && (
-                      <ImageWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        updateStyle={updateSelectedStyle}
-                      />
-                    )}
-
-                    {/* Video Widget Specific Inspector */}
-                    {selectedElementAny.type === "video" && (
-                      <VideoWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Gallery Widget Specific Inspector */}
-                    {(selectedElementAny.type === "gallery" || selectedElementAny.type === "basic-gallery") && (
-                      <GalleryWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Slides Widget Specific Inspector */}
-                    {selectedElementAny.type === "slides" && (
-                      <SlidesWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Share Buttons Specific Inspector */}
-                    {selectedElementAny.type === "share-buttons" && (
-                      <ShareButtonsInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        pages={pages}
-                        activePageId={activePageId}
-                      />
-                    )}
-
-                    {/* Form Builder Specific Inspector */}
-                    {selectedElementAny.type === "form" && (
-                      <FormWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Reviews / Testimonials Specific Inspector */}
-                    {(selectedElementAny.type === "reviews" || selectedElementAny.type === "testimonial-carousel") && (
-                      <ReviewsWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Video Playlist Specific Inspector */}
-                    {selectedElementAny.type === "video-playlist" && (
-                      <VideoPlaylistInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Audio Playlist Specific Inspector */}
-                    {selectedElementAny.type === "audio-playlist" && (
-                      <AudioPlaylistInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Navigation Menu Specific Inspector */}
-                    {selectedElementAny.type === "nav-menu" && (
-                      <NavMenuWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        pages={pages}
-                        siteProducts={siteProducts}
-                        onCreatePage={handleCreatePageQuick}
-                      />
-                    )}
-
-                    {/* Module 10: Navigation Settings Panel */}
-                    {selectedElement && [
-                      "nav-menu",
-                      "wp-menu",
-                      "menu-widget",
-                      "mega-menu",
-                      "breadcrumbs",
-                      "menu-anchor",
-                      "post-nav",
-                      "off-canvas",
-                      "off-canvas-nav",
-                      "site-search",
-                      "search-form",
-                      "taxonomy-filter"
-                    ].includes(selectedElement.type) && (
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-                        <NavigationSettingsPanel
-                          selectedElement={selectedElement}
-                          onUpdateElement={updateElementProperties}
-                          availablePages={pages}
-                          activeBreakpointId={activeDevice}
-                          breakpoints={breakpoints}
-                          updateSelectedStyle={updateSelectedStyle}
-                          updateSelectedProp={updateSelectedProp}
-                          renderResponsiveLabel={renderResponsiveLabel}
-                        />
-                      </div>
-                    )}
-
-                    {/* Countdown Specific Inspector */}
-                    {selectedElementAny.type === "countdown" && (
-                      <CountdownWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Lottie Specific Inspector */}
-                    {selectedElementAny.type === "lottie" && (
-                      <LottieWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Code Highlight Specific Inspector */}
-                    {selectedElementAny.type === "code-highlight" && (
-                      <CodeHighlightWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Button Inspector */}
-                    {selectedElementAny.type === "button" && (
-                      <ButtonWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        updateStyle={updateSelectedStyle}
-                        pages={pages}
-                        activePageId={activePageId}
-                        onCreatePage={handleCreatePageQuick}
-                        siteProducts={siteProducts}
-                        onOpenIconPicker={() => handleOpenIconPicker("iconName")}
-                      />
-                    )}
-
-                    {/* Icon Library Inspector */}
-                    {selectedElementAny.type === "icon-library" && (
-                      <IconLibraryWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        updateStyle={updateSelectedStyle}
-                        onOpenIconPicker={() => handleOpenIconPicker("iconName")}
-                      />
-                    )}
-
-                    {/* Portfolio Inspector */}
-                    {selectedElementAny.type === "portfolio" && (
-                      <PortfolioWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Login Inspector */}
-                    {selectedElementAny.type === "login" && (
-                      <LoginWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Animated Text Inspector */}
-                    {selectedElementAny.type === "animated-headline" && (
-                      <AnimatedTextWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Price Table Inspector */}
-                    {selectedElementAny.type === "price-table" && (
-                      <PriceTableWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Price List Inspector */}
-                    {selectedElementAny.type === "price-list" && (
-                      <PriceListWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-{/* Flip Box Inspector */}
-                {selectedElementAny.type === "flip-box" && (
-                  <FlipBoxWidgetInspector
-                    el={selectedElementAny}
-                    updateProp={updateSelectedProp}
-                  />
-                )}
-
-                {/* Nested Tabs Inspector */}
-                {selectedElementAny.type === "nested-tabs" && (
-                  <NestedTabsWidgetInspector
-                    el={selectedElementAny}
-                    updateProp={updateSelectedProp}
-                  />
-                )}
-
-                {/* Nested Accordion Inspector */}
-                {selectedElementAny.type === "nested-accordion" && (
-                  <NestedAccordionWidgetInspector
-                    el={selectedElementAny}
-                    updateProp={updateSelectedProp}
-                  />
-                )}
-
-                {/* Query Builder Inspector */}
-                {(selectedElementAny.type === "posts" || selectedElementAny.type === "portfolio" || selectedElementAny.type === "loop-grid") && (
-                  <QueryBuilderWidgetInspector
-                    el={selectedElementAny}
-                    updateProp={updateSelectedProp}
-                  />
-                )}
-
-                    {/* Call to Action Inspector */}
-                    {selectedElementAny.type === "call-to-action" && (
-                      <CTAWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Media & Loop Carousel Inspector */}
-                    {(selectedElementAny.type === "media-carousel" || selectedElementAny.type === "loop-carousel" || selectedElementAny.type === "basic-media-carousel" || selectedElementAny.type === "image-carousel") && (
-                      <MediaCarouselWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Table of Contents Inspector */}
-                    {selectedElementAny.type === "table-of-contents" && (
-                      <TOCWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Facebook Widgets Inspector */}
-                    {(selectedElementAny.type === "facebook-page" || selectedElementAny.type === "facebook-button" || selectedElementAny.type === "facebook-embed" || selectedElementAny.type === "facebook-comments") && (
-                      <FacebookWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Blockquote Inspector */}
-                    {selectedElementAny.type === "blockquote" && (
-                      <BlockquoteWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Payment Widgets Inspector (PayPal & Stripe) */}
-                    {(selectedElementAny.type === "paypal-button" || selectedElementAny.type === "stripe-button" || selectedElementAny.type === "paypal" || selectedElementAny.type === "stripe") && (
-                      <PaymentWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* WooCommerce Widgets Inspector */}
-                    {selectedElementAny.type?.startsWith("wc-") && (
-                      <WooCommerceWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        siteProducts={siteProducts}
-                      />
-                    )}
-
-                    {/* Link in Bio Inspector */}
-                    {selectedElementAny.type === "link-in-bio" && (
-                      <LinkInBioWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Image Box Inspector */}
-                    {selectedElementAny.type === "image-box" && (
-                      <ImageBoxWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        updateStyle={updateSelectedStyle}
-                      />
-                    )}
-
-                    {/* Icon Box Inspector */}
-                    {selectedElementAny.type === "icon-box" && (
-                      <IconBoxWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Icon List Inspector */}
-                    {selectedElementAny.type === "icon-list" && (
-                      <IconListWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Counter Inspector */}
-                    {selectedElementAny.type === "counter" && (
-                      <CounterWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Progress Bar Inspector */}
-                    {selectedElementAny.type === "progress-bar" && (
-                      <ProgressBarWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Rating Inspector */}
-                    {selectedElementAny.type === "rating" && (
-                      <RatingWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Alert Inspector */}
-                    {selectedElementAny.type === "alert" && (
-                      <AlertWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Google Maps Inspector */}
-                    {selectedElementAny.type === "google-maps" && (
-                      <GoogleMapsWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Divider Inspector */}
-                    {selectedElementAny.type === "divider" && (
-                      <DividerWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                        updateStyle={updateSelectedStyle}
-                      />
-                    )}
-
-                    {/* Spacer Inspector */}
-                    {selectedElementAny.type === "spacer" && (
-                      <SpacerWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Custom SVG Inspector */}
-                    {selectedElementAny.type === "custom-svg" && (
-                      <CustomSVGWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Query Builder Inspector */}
-                    {(selectedElementAny.type === "posts" || selectedElementAny.type === "portfolio" || selectedElementAny.type === "loop-grid") && (
-                      <QueryBuilderWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
-
-                    {/* Display Conditions Inspector */}
-                    {selectedElementAny.type === "template" && (
-                      <DisplayConditionsWidgetInspector
-                        el={selectedElementAny}
-                        updateProp={updateSelectedProp}
-                      />
-                    )}
+                    {/* See inspector/selected/widgetInspectorSlots (moved verbatim) */}
+                    {renderWidgetInspectorSlots({
+                      activeDevice,
+                      activePageId,
+                      breakpoints,
+                      handleCreatePageQuick,
+                      handleOpenIconPicker,
+                      pages,
+                      renderResponsiveLabel,
+                      selectedElement,
+                      selectedElementAny,
+                      siteProducts,
+                      updateElementProperties,
+                      updateSelectedProp,
+                      updateSelectedStyle,
+                    })}
 
 
-                    {selectedElementAny.type !== "container" && selectedElementAny.type !== "image" && selectedElementAny.type !== "video" && selectedElementAny.type !== "spacer" && selectedElementAny.type !== "divider" && selectedElementAny.type !== "icon" && selectedElementAny.type !== "counter" && selectedElementAny.type !== "gallery" && selectedElementAny.type !== "basic-gallery" && selectedElementAny.type !== "slides" && selectedElementAny.type !== "share-buttons" && selectedElementAny.type !== "form" && selectedElementAny.type !== "reviews" && selectedElementAny.type !== "testimonial-carousel" && selectedElementAny.type !== "video-playlist" && selectedElementAny.type !== "nav-menu" && selectedElementAny.type !== "countdown" && selectedElementAny.type !== "lottie" && selectedElementAny.type !== "code-highlight" && (
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wide">
-                          {selectedElementAny.type === "html" ? "Raw HTML Editor" : selectedElementAny.type === "shortcode" ? "Dynamic Shortcode" : "Content"}
-                        </label>
-                        {selectedElementAny.type === "html" || selectedElementAny.type === "text" || selectedElementAny.type === "shortcode" ? (
-                          <textarea
-                            value={selectedElementAny.content || ""}
-                            onChange={(e) => updateSelectedProp("content", e.target.value)}
-                            rows={selectedElementAny.type === "html" ? 8 : selectedElementAny.type === "shortcode" ? 3 : 4}
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-[12px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm ${selectedElementAny.type === "html" || selectedElementAny.type === "shortcode" ? "font-mono bg-[#1E1E1E] text-slate-300 resize-y" : "bg-white text-slate-800"}`}
-                            placeholder={selectedElementAny.type === "html" ? "<div class=\"custom\">\n  Your HTML\n</div>" : selectedElementAny.type === "shortcode" ? "wp_plugin_id='xyz'" : "Enter text..."}
-                          />
-                        ) : (
-                          <input
-                            type="text"
-                            value={selectedElementAny.content || ""}
-                            onChange={(e) => updateSelectedProp("content", e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm bg-white"
-                          />
-                        )}
-                      </div>
-                    )}
+                    {/* See inspector/selected/nonContainerSpacingSection (moved verbatim) */}
+                    {renderNonContainerSpacingSection({
+                      selectedElementAny,
+                      updateSelectedProp,
+                    })}
 
                     {/* Smart Link & URL Controls */}
-                    {selectedElementAny.type !== "button" && (selectedElementAny.type === "image" || selectedElementAny.href !== undefined) && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase">
-                          Link & Smart Actions
-                        </label>
-                        <input
-                          type="text"
-                          value={selectedElementAny.href || ""}
-                          onChange={(e) => updateSelectedProp("href", e.target.value)}
-                          placeholder="https://..., popup:open(id), scroll:to(id)"
-                          className="w-full rounded-lg border border-slate-300 p-1.5 text-xs font-mono"
-                        />
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {popups.length > 0 && (
-                            <select
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  updateSelectedProp("href", `popup:open(${e.target.value})`);
-                                  e.target.value = "";
-                                }
-                              }}
-                              className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700"
-                            >
-                              <option value="">+ Open Popup...</option>
-                              {popups.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => updateSelectedProp("href", "popup:close")}
-                            className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
-                          >
-                            Close Popup
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateSelectedProp("href", "scroll:to(top)")}
-                            className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
-                          >
-                            Scroll to Top
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* See inspector/selected/smartLinkControls (moved verbatim) */}
+                    {renderSmartLinkControls({
+                      popups,
+                      selectedElementAny,
+                      updateSelectedProp,
+                    })}
 
                     {/* 1. Typography & Colors Accordion */}
-                    {renderAccordion(
-                      "Typography & Colors",
-                      "typography",
-                      (() => {
-                        const currentFontFamily = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontFamily");
-                        const supportedWeights = FontService.getSupportedWeights(currentFontFamily);
-                        const hasItalic = FontService.hasItalic(currentFontFamily);
-
-                        const weightLabels: Record<number, string> = {
-                          100: "100 Thin",
-                          200: "200 Extra Light",
-                          300: "300 Light",
-                          400: "400 Normal",
-                          500: "500 Medium",
-                          600: "600 Semi-Bold",
-                          700: "700 Bold",
-                          800: "800 Extra Bold",
-                          900: "900 Black"
-                        };
-
-                        return (
-                          <div className="space-y-3">
-                            {/* Font Family */}
-                            <FontPickerControl
-                              value={currentFontFamily}
-                              onChange={(fam) => updateSelectedStyle("fontFamily", fam)}
-                              onOpenModal={() => handleOpenFontPicker((fam) => updateSelectedStyle("fontFamily", fam))}
-                              onReset={() => resetSelectedStyle("fontFamily")}
-                              isConfigured={isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontFamily")}
-                            />
-
-                            {/* Font Size & Weight */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                {renderResponsiveLabel("Font Size")}
-                                <input
-                                  type="text"
-                                  value={
-                                    getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontSize") || "16px"
-                                  }
-                                  onChange={(e) =>
-                                    updateSelectedStyle(
-                                      "fontSize",
-                                      e.target.value.endsWith("px") || e.target.value.endsWith("rem")
-                                        ? e.target.value
-                                        : `${e.target.value}px`
-                                    )
-                                  }
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                  placeholder="16px"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Font Weight
-                                </label>
-                                <select
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontWeight") || "normal"}
-                                  onChange={(e) => updateSelectedStyle("fontWeight", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="inherit">Default</option>
-                                  {supportedWeights.map((w) => (
-                                    <option key={w} value={String(w)}>
-                                      {weightLabels[w] || `${w}`}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-
-                            {/* Font Style & Alignment */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Font Style
-                                </label>
-                                <select
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontStyle") || "normal"}
-                                  onChange={(e) => updateSelectedStyle("fontStyle", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="normal">Normal</option>
-                                  <option value="italic" disabled={!hasItalic}>
-                                    Italic {!hasItalic ? "(N/A)" : ""}
-                                  </option>
-                                </select>
-                              </div>
-                            </div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                              Text Align
-                            </label>
-                            <div className="grid grid-cols-4 gap-0.5 rounded-lg bg-slate-100 p-0.5 border border-slate-200">
-                              {(["left", "center", "right", "justify"] as const).map((align) => {
-                                const currentAlign = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "textAlign") || "left";
-                                const isActive = currentAlign === align;
-                                return (
-                                  <button
-                                    key={align}
-                                    type="button"
-                                    onClick={() => updateSelectedStyle("textAlign", align)}
-                                    className={`rounded py-1 text-[10px] font-bold uppercase transition ${isActive
-                                      ? "bg-white text-blue-600 shadow-xs"
-                                      : "text-slate-500 hover:text-slate-900"
-                                      }`}
-                                  >
-                                    {align.slice(0, 1).toUpperCase()}
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            {/* Line Height & Letter Spacing */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Line Height
-                                </label>
-                                <input
-                                  type="text"
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "lineHeight") || ""}
-                                  onChange={(e) => updateSelectedStyle("lineHeight", e.target.value)}
-                                  placeholder="e.g. 1.5 or 24px"
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Letter Spacing
-                                </label>
-                                <input
-                                  type="text"
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "letterSpacing") || ""}
-                                  onChange={(e) => updateSelectedStyle("letterSpacing", e.target.value)}
-                                  placeholder="e.g. 0.5px"
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Text Transform & Decoration */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Text Transform
-                                </label>
-                                <select
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "textTransform") || "none"}
-                                  onChange={(e) => updateSelectedStyle("textTransform", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="capitalize">Capitalize</option>
-                                  <option value="uppercase">Uppercase</option>
-                                  <option value="lowercase">Lowercase</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Decoration
-                                </label>
-                                <select
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "textDecoration") || "none"}
-                                  onChange={(e) => updateSelectedStyle("textDecoration", e.target.value as any)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="underline">Underline</option>
-                                  <option value="line-through">Line-Through</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            {/* Text Color Picker */}
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-xs font-semibold text-slate-700">
-                                  Text Color
-                                </label>
-                                {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "color") && (
-                                  <button
-                                    type="button"
-                                    onClick={() => resetSelectedStyle("color")}
-                                    className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-                                  >
-                                    ↺ Reset
-                                  </button>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="color"
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "color") || "#0f172a"}
-                                  onChange={(e) => updateSelectedStyle("color", e.target.value)}
-                                  className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                                />
-                                <input
-                                  type="text"
-                                  value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "color") || "#0f172a"}
-                                  onChange={(e) => updateSelectedStyle("color", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    )}
+                    {/* See inspector/selected/typographyAccordion (moved verbatim) */}
+                    {renderTypographyAccordion({
+                      activeDevice,
+                      activeElementState,
+                      handleOpenFontPicker,
+                      renderAccordion,
+                      renderResponsiveLabel,
+                      resetSelectedStyle,
+                      selectedElementAny,
+                      updateSelectedStyle,
+                    })}
 
                     {/* 2. Borders & Radius Accordion */}
-                    {renderAccordion(
-                      "Borders & Radius",
-                      "borders",
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                              Border Style
-                            </label>
-                            <select
-                              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "borderStyle") || "none"}
-                              onChange={(e) => updateSelectedStyle("borderStyle", e.target.value as any)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                            >
-                              <option value="none">None</option>
-                              <option value="solid">Solid</option>
-                              <option value="dashed">Dashed</option>
-                              <option value="dotted">Dotted</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                              Border Width
-                            </label>
-                            <input
-                              type="text"
-                              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "borderWidth") || "1px"}
-                              onChange={(e) =>
-                                updateSelectedStyle(
-                                  "borderWidth",
-                                  e.target.value.endsWith("px") ? e.target.value : `${e.target.value}px`
-                                )
-                              }
-                              placeholder="1px"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Border Color */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Border Color
-                            </label>
-                            {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "borderColor") && (
-                              <button
-                                type="button"
-                                onClick={() => resetSelectedStyle("borderColor")}
-                                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-                              >
-                                ↺ Reset
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "borderColor") || "#cbd5e1"}
-                              onChange={(e) => updateSelectedStyle("borderColor", e.target.value)}
-                              className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                            />
-                            <input
-                              type="text"
-                              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "borderColor") || "#cbd5e1"}
-                              onChange={(e) => updateSelectedStyle("borderColor", e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Border Radius */}
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Border Radius
-                          </label>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "borderRadius") || ""}
-                            onChange={(e) => updateSelectedStyle("borderRadius", e.target.value)}
-                            placeholder="e.g. 8px or 50%"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {/* See inspector/selected/bordersAccordion (moved verbatim) */}
+                    {renderBordersAccordion({
+                      activeDevice,
+                      activeElementState,
+                      renderAccordion,
+                      resetSelectedStyle,
+                      selectedElementAny,
+                      updateSelectedStyle,
+                    })}
 
                     {/* 3. Box Shadow & Effects Accordion */}
-                    {renderAccordion(
-                      "Box Shadow & Effects",
-                      "box-shadow",
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Box Shadow Presets
-                          </label>
-                          <select
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "boxShadow") || "none"}
-                            onChange={(e) => updateSelectedStyle("boxShadow", e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          >
-                            <option value="none">None</option>
-                            <option value="0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)">Subtle (SM)</option>
-                            <option value="0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)">Soft (MD)</option>
-                            <option value="0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)">Medium (LG)</option>
-                            <option value="0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)">Large (XL)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Opacity
-                          </label>
-                          <input
-                            type="text"
-                            value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "opacity") ?? "1"}
-                            onChange={(e) => updateSelectedStyle("opacity", e.target.value)}
-                            placeholder="0.0 - 1.0"
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {/* See inspector/selected/boxShadowAccordion (moved verbatim) */}
+                    {renderBoxShadowAccordion({
+                      activeDevice,
+                      activeElementState,
+                      renderAccordion,
+                      selectedElementAny,
+                      updateSelectedStyle,
+                    })}
 
                     {/* 4. Scroll Snap & Overflow (F-050) Accordion — if applicable */}
-                    {(selectedElementAny.type === "container" || selectedElementAny.type === "section" || selectedElementAny.type === "row" || Boolean(selectedElementAny.layout)) && renderAccordion(
-                      "Scroll Snap & Overflow (F-050)",
-                      "scroll-snap",
-                      (() => {
-                        const snapType = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "scrollSnapType") || "none";
-                        const snapAlign = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "scrollSnapAlign") || "none";
-                        const snapStop = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "scrollSnapStop") || "normal";
-                        const overflowX = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "overflowX") || "visible";
-                        const overflowY = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "overflowY") || "visible";
-
-                        return (
-                          <div className="space-y-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-xs font-semibold text-slate-700">
-                                  Scroll Snap Type (Container)
-                                </label>
-                                {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "scrollSnapType") && (
-                                  <button
-                                    type="button"
-                                    onClick={() => resetSelectedStyle("scrollSnapType")}
-                                    className="text-[10px] text-slate-400 hover:text-blue-600"
-                                    title="Reset snap type"
-                                  >
-                                    ↺ Reset
-                                  </button>
-                                )}
-                              </div>
-                              <select
-                                value={snapType}
-                                onChange={(e) => updateSelectedStyle("scrollSnapType", e.target.value)}
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                              >
-                                <option value="none">None</option>
-                                <option value="x mandatory">Horizontal Mandatory (x mandatory)</option>
-                                <option value="y mandatory">Vertical Mandatory (y mandatory)</option>
-                                <option value="both mandatory">Both Mandatory</option>
-                                <option value="x proximity">Horizontal Proximity</option>
-                                <option value="y proximity">Vertical Proximity</option>
-                              </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-xs font-semibold text-slate-700">
-                                    Snap Align
-                                  </label>
-                                  {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "scrollSnapAlign") && (
-                                    <button
-                                      type="button"
-                                      onClick={() => resetSelectedStyle("scrollSnapAlign")}
-                                      className="text-[10px] text-slate-400 hover:text-blue-600"
-                                    >
-                                      ↺
-                                    </button>
-                                  )}
-                                </div>
-                                <select
-                                  value={snapAlign}
-                                  onChange={(e) => updateSelectedStyle("scrollSnapAlign", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="start">Start</option>
-                                  <option value="center">Center</option>
-                                  <option value="end">End</option>
-                                </select>
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-xs font-semibold text-slate-700">
-                                    Snap Stop
-                                  </label>
-                                  {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "scrollSnapStop") && (
-                                    <button
-                                      type="button"
-                                      onClick={() => resetSelectedStyle("scrollSnapStop")}
-                                      className="text-[10px] text-slate-400 hover:text-blue-600"
-                                    >
-                                      ↺
-                                    </button>
-                                  )}
-                                </div>
-                                <select
-                                  value={snapStop}
-                                  onChange={(e) => updateSelectedStyle("scrollSnapStop", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="normal">Normal</option>
-                                  <option value="always">Always</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Overflow X
-                                </label>
-                                <select
-                                  value={overflowX}
-                                  onChange={(e) => updateSelectedStyle("overflowX", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="visible">Visible</option>
-                                  <option value="hidden">Hidden</option>
-                                  <option value="auto">Auto</option>
-                                  <option value="scroll">Scroll</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                  Overflow Y
-                                </label>
-                                <select
-                                  value={overflowY}
-                                  onChange={(e) => updateSelectedStyle("overflowY", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                                >
-                                  <option value="visible">Visible</option>
-                                  <option value="hidden">Hidden</option>
-                                  <option value="auto">Auto</option>
-                                  <option value="scroll">Scroll</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    )}
+                    {/* See inspector/selected/scrollSnapAccordion (moved verbatim) */}
+                    {renderScrollSnapAccordion({
+                      activeDevice,
+                      activeElementState,
+                      renderAccordion,
+                      resetSelectedStyle,
+                      selectedElementAny,
+                      updateSelectedStyle,
+                    })}
 
                     {/* 5. Motion & Interaction Accordion — ALWAYS LAST */}
-                    {renderAccordion(
-                      "Motion & Interaction",
-                      "motion-interaction",
-                      <MotionInteractionInspector
-                        selectedElement={selectedElementAny}
-                        updateSelectedProp={updateSelectedProp}
-                        updateSelectedStyle={updateSelectedStyle}
-                      />
-                    )}
+                    {/* See inspector/selected/motionAccordion (moved verbatim) */}
+                    {renderMotionAccordion({
+                      renderAccordion,
+                      selectedElementAny,
+                      updateSelectedProp,
+                      updateSelectedStyle,
+                    })}
                   </div>
                 ) : activeSidebarTab === "advanced" && selectedElementAny ? (
                   <div className="space-y-4">
@@ -14856,1096 +11372,48 @@ export default function WebsiteEditor() {
                 ) : (
                   <div className="space-y-5">
                     {/* Page Settings Section (F-018 & F-019) */}
-                    <div className="border-b border-slate-100 pb-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wide text-blue-600 flex items-center gap-1.5">
-                        <span>📄</span>
-                        <span>PAGE SETTINGS</span>
-                      </h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Configure page-level properties & SEO settings.
-                      </p>
-                    </div>
-                    {/* Site Identity */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                      <h3 className="text-xs font-bold text-slate-700 mb-2">Site Identity</h3>
-                      <input
-                        type="text"
-                        value={globalSettings.siteIdentity?.name || ""}
-                        onChange={(e) =>
-                          setGlobalSettings((prev: any) => ({
-                            ...prev,
-                            siteIdentity: { ...prev.siteIdentity, name: e.target.value },
-                          }))
-                        }
-                        placeholder="Site Name"
-                        className="w-full rounded border px-2 py-1 text-xs"
-                      />
-                    </div>
-
-                    {/* Back To Top Button Settings */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-slate-700">Back To Top Button</h3>
-                        <input
-                          type="checkbox"
-                          checked={globalSettings.backToTop?.enabled !== false}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              backToTop: { ...prev.backToTop, enabled: e.target.checked },
-                            }))
-                          }
-                          className="h-4 w-4 rounded text-blue-600"
-                        />
-                      </div>
-                      {globalSettings.backToTop?.enabled !== false && (
-                        <div className="space-y-2 pt-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <label className="text-[11px] font-semibold text-slate-600">Position:</label>
-                            <select
-                              value={globalSettings.backToTop?.position || "bottom-right"}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  backToTop: { ...prev.backToTop, position: e.target.value },
-                                }))
-                              }
-                              className="rounded border px-2 py-1 text-[11px]"
-                            >
-                              <option value="bottom-right">Bottom Right</option>
-                              <option value="bottom-left">Bottom Left</option>
-                            </select>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <label className="text-[11px] font-semibold text-slate-600">Scroll Offset (px):</label>
-                            <input
-                              type="number"
-                              value={globalSettings.backToTop?.offset ?? 300}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  backToTop: { ...prev.backToTop, offset: Number(e.target.value) },
-                                }))
-                              }
-                              className="w-20 rounded border px-2 py-1 text-[11px]"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Floating Action Button Settings */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-slate-700">Floating Action Button (FAB)</h3>
-                        <input
-                          type="checkbox"
-                          checked={globalSettings.floatingActionButton?.enabled === true}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              floatingActionButton: {
-                                ...prev.floatingActionButton,
-                                enabled: e.target.checked,
-                              },
-                            }))
-                          }
-                          className="h-4 w-4 rounded text-blue-600"
-                        />
-                      </div>
-
-                      {globalSettings.floatingActionButton?.enabled && (
-                        <div className="space-y-2 pt-1">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                              Icon & Type
-                            </label>
-                            <select
-                              value={globalSettings.floatingActionButton?.icon || "whatsapp"}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  floatingActionButton: {
-                                    ...prev.floatingActionButton,
-                                    icon: e.target.value,
-                                    backgroundColor:
-                                      e.target.value === "whatsapp" ? "#25D366" : prev.floatingActionButton?.backgroundColor || "#2563eb",
-                                  },
-                                }))
-                              }
-                              className="w-full rounded border px-2 py-1 text-[11px]"
-                            >
-                              <option value="whatsapp">WhatsApp Button</option>
-                              <option value="chat">Live Chat / Message</option>
-                              <option value="phone">Call Now (Phone)</option>
-                              <option value="email">Email Us</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                              Label
-                            </label>
-                            <input
-                              type="text"
-                              value={globalSettings.floatingActionButton?.label || ""}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  floatingActionButton: {
-                                    ...prev.floatingActionButton,
-                                    label: e.target.value,
-                                  },
-                                }))
-                              }
-                              placeholder="Chat with us"
-                              className="w-full rounded border px-2 py-1 text-[11px]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                              Link or Smart Action
-                            </label>
-                            <input
-                              type="text"
-                              value={globalSettings.floatingActionButton?.link || ""}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  floatingActionButton: {
-                                    ...prev.floatingActionButton,
-                                    link: e.target.value,
-                                  },
-                                }))
-                              }
-                              placeholder="https://wa.me/... or popup:open(id)"
-                              className="w-full rounded border px-2 py-1 text-[11px] font-mono"
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2">
-                            <label className="text-[11px] font-semibold text-slate-600">Position:</label>
-                            <select
-                              value={globalSettings.floatingActionButton?.position || "bottom-left"}
-                              onChange={(e) =>
-                                setGlobalSettings((prev: any) => ({
-                                  ...prev,
-                                  floatingActionButton: {
-                                    ...prev.floatingActionButton,
-                                    position: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="rounded border px-2 py-1 text-[11px]"
-                            >
-                              <option value="bottom-left">Bottom Left</option>
-                              <option value="bottom-right">Bottom Right</option>
-                            </select>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Maintenance Mode Toggle (F-019) */}
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer">
-                          <span>🛠️</span>
-                          <span>Maintenance Mode</span>
-                        </label>
-                        <input
-                          type="checkbox"
-                          checked={!!pageSettings.isMaintenanceMode}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, isMaintenanceMode: e.target.checked }))}
-                          className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-normal">
-                        Show temporary maintenance state to public visitors & preview while editing.
-                      </p>
-                      {pageSettings.isMaintenanceMode && (
-                        <span className="inline-block rounded bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                          Active — Site displays Maintenance Notice
-                        </span>
-                      )}
-
-                    </div>
-
-                    {/* Page Title */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Page Title
-                      </label>
-                      <input
-                        type="text"
-                        value={pageSettings.title || ""}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, title: e.target.value }))}
-                        placeholder="Home"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Meta Description */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Meta Description (SEO)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={pageSettings.description || ""}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, description: e.target.value }))}
-                        placeholder="Page SEO description..."
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Page Path / URL Slug */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        URL Path Slug
-                      </label>
-                      <input
-                        type="text"
-                        value={pageSettings.path || "/"}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, path: e.target.value }))}
-                        placeholder="/"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Page SEO & Social Graph (Phase 4) */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <span>🌐</span>
-                          <span>SEO & Social Graph</span>
-                        </label>
-                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded">
-                          Metadata
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsSeoModalOpen(true)}
-                        className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Open Full SEO & Quality Audit</span>
-                      </button>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Canonical URL
-                        </label>
-                        <input
-                          type="url"
-                          value={pageSettings.canonicalUrl || ""}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, canonicalUrl: e.target.value }))}
-                          placeholder="https://example.com/canonical-page"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-mono outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          OpenGraph Title
-                        </label>
-                        <input
-                          type="text"
-                          value={pageSettings.ogTitle || ""}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, ogTitle: e.target.value }))}
-                          placeholder={pageSettings.title || "Social title..."}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          OpenGraph Description
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={pageSettings.ogDescription || ""}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, ogDescription: e.target.value }))}
-                          placeholder={pageSettings.description || "Social share description..."}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Social Share Image URL (og:image)
-                        </label>
-                        <input
-                          type="url"
-                          value={pageSettings.ogImage || ""}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, ogImage: e.target.value }))}
-                          placeholder="https://example.com/share-card.jpg"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-mono outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      {/* Search Engine Robots Indexing */}
-                      <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          Robots Directives
-                        </span>
-                        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={!!pageSettings.noindex}
-                            onChange={(e) => setPageSettings((prev) => ({ ...prev, noindex: e.target.checked }))}
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
-                          />
-                          <span>Prevent search engine indexing (<code className="text-[10px] bg-slate-200 px-1 py-0.5 rounded">noindex</code>)</span>
-                        </label>
-                        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={!!pageSettings.nofollow}
-                            onChange={(e) => setPageSettings((prev) => ({ ...prev, nofollow: e.target.checked }))}
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
-                          />
-                          <span>Do not follow links on this page (<code className="text-[10px] bg-slate-200 px-1 py-0.5 rounded">nofollow</code>)</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Site / Website Published Language (F-022) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                        <span>{t("siteLang", "Site Language (Published)")}</span>
-                        <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">HTML lang</span>
-                      </label>
-                      <select
-                        value={pageSettings.siteLanguage || "en"}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, siteLanguage: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                      >
-                        <option value="en">English (en)</option>
-                        <option value="es">Spanish (es)</option>
-                        <option value="fr">French (fr)</option>
-                        <option value="de">German (de)</option>
-                        <option value="it">Italian (it)</option>
-                        <option value="ja">Japanese (ja)</option>
-                      </select>
-                      <p className="mt-1 text-[10px] text-slate-400">
-                        Controls published HTML website language. Completely independent from Editor UI language.
-                      </p>
-                    </div>
-
-                    {/* Page Canvas Background Color */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Page Canvas Background Color
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={pageSettings.backgroundColor || "#ffffff"}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                          className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                        />
-                        <input
-                          type="text"
-                          value={pageSettings.backgroundColor || "#ffffff"}
-                          onChange={(e) => setPageSettings((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Custom Head Script/Tags */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Custom Head Tags / Scripts
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={pageSettings.customHead || ""}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, customHead: e.target.value }))}
-                        placeholder="<meta name='keywords' content='builder' />"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                {/* F-222: Icon Library Inspector */}
-                {selectedElementAny?.type === "icon-library" && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100">
-                    <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      ✨ Icon Library Styling
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-1">Icon Size (px)</label>
-                        <input
-                          type="number"
-                          value={selectedElementAny.iconSize || 48}
-                          onChange={(e) => updateSelectedProp("iconSize", Number(e.target.value))}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-600 mb-1">Icon Color</label>
-                        <input
-                          type="color"
-                          value={selectedElementAny.iconColor || "#e11d48"}
-                          onChange={(e) => updateSelectedProp("iconColor", e.target.value)}
-                          className="h-8 w-full cursor-pointer rounded border border-slate-300 p-0.5"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Advanced Spacing Controls for non-container elements */}
-                {selectedElementAny?.type !== "container" && (
-                  <div className="space-y-4 pt-4 border-t border-slate-200">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Advanced Spacing
-                    </h3>
-                    {render4SideSpacingControl("Margin", "margin", isMarginLinked, setIsMarginLinked)}
-                    {render4SideSpacingControl("Padding", "padding", isPaddingLinked, setIsPaddingLinked)}
-                  </div>
-                )}
-
-                {/* Background & Border Controls */}
-                {renderBackgroundAndBorderControls()}
+                    {/* See inspector/noSelection/siteSettingsFirstBlock (moved verbatim) */}
+                    {renderSiteSettingsFirstBlock({
+                      globalSettings,
+                      isMarginLinked,
+                      isPaddingLinked,
+                      pageSettings,
+                      render4SideSpacingControl,
+                      renderBackgroundAndBorderControls,
+                      selectedElementAny,
+                      setGlobalSettings,
+                      setIsMarginLinked,
+                      setIsPaddingLinked,
+                      setIsSeoModalOpen,
+                      setPageSettings,
+                      t,
+                      updateSelectedProp,
+                    })}
 
                 {/* Extended Page & Site Controls */}
                 {/* Page Settings Section (F-018 & F-019) */}
-                <div className="border-b border-slate-100 pb-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-blue-600 flex items-center gap-1.5">
-                    <span>📄</span>
-                    <span>PAGE SETTINGS</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Configure page-level properties & SEO settings.
-                  </p>
-                </div>
-                {/* Site Identity */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <h3 className="text-xs font-bold text-slate-700 mb-2">Site Identity</h3>
-                  <input
-                    type="text"
-                    value={globalSettings.siteIdentity?.name || ""}
-                    onChange={(e) =>
-                      setGlobalSettings((prev: any) => ({
-                        ...prev,
-                        siteIdentity: { ...prev.siteIdentity, name: e.target.value },
-                      }))
-                    }
-                    placeholder="Site Name"
-                    className="w-full rounded border px-2 py-1 text-xs"
-                  />
-                </div>
-
-                {/* Back To Top Button Settings */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-700">Back To Top Button</h3>
-                    <input
-                      type="checkbox"
-                      checked={globalSettings.backToTop?.enabled !== false}
-                      onChange={(e) =>
-                        setGlobalSettings((prev: any) => ({
-                          ...prev,
-                          backToTop: { ...prev.backToTop, enabled: e.target.checked },
-                        }))
-                      }
-                      className="h-4 w-4 rounded text-blue-600"
-                    />
-                  </div>
-                  {globalSettings.backToTop?.enabled !== false && (
-                    <div className="space-y-2 pt-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[11px] font-semibold text-slate-600">Position:</label>
-                        <select
-                          value={globalSettings.backToTop?.position || "bottom-right"}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              backToTop: { ...prev.backToTop, position: e.target.value },
-                            }))
-                          }
-                          className="rounded border px-2 py-1 text-[11px]"
-                        >
-                          <option value="bottom-right">Bottom Right</option>
-                          <option value="bottom-left">Bottom Left</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[11px] font-semibold text-slate-600">Scroll Offset (px):</label>
-                        <input
-                          type="number"
-                          value={globalSettings.backToTop?.offset ?? 300}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              backToTop: { ...prev.backToTop, offset: Number(e.target.value) },
-                            }))
-                          }
-                          className="w-20 rounded border px-2 py-1 text-[11px]"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Floating Action Button Settings */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-700">Floating Action Button (FAB)</h3>
-                    <input
-                      type="checkbox"
-                      checked={globalSettings.floatingActionButton?.enabled === true}
-                      onChange={(e) =>
-                        setGlobalSettings((prev: any) => ({
-                          ...prev,
-                          floatingActionButton: {
-                            ...prev.floatingActionButton,
-                            enabled: e.target.checked,
-                          },
-                        }))
-                      }
-                      className="h-4 w-4 rounded text-blue-600"
-                    />
-                  </div>
-
-                  {globalSettings.floatingActionButton?.enabled && (
-                    <div className="space-y-2 pt-1">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                          Icon & Type
-                        </label>
-                        <select
-                          value={globalSettings.floatingActionButton?.icon || "whatsapp"}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              floatingActionButton: {
-                                ...prev.floatingActionButton,
-                                icon: e.target.value,
-                                backgroundColor:
-                                  e.target.value === "whatsapp" ? "#25D366" : prev.floatingActionButton?.backgroundColor || "#2563eb",
-                              },
-                            }))
-                          }
-                          className="w-full rounded border px-2 py-1 text-[11px]"
-                        >
-                          <option value="whatsapp">WhatsApp Button</option>
-                          <option value="chat">Live Chat / Message</option>
-                          <option value="phone">Call Now (Phone)</option>
-                          <option value="email">Email Us</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                          Label
-                        </label>
-                        <input
-                          type="text"
-                          value={globalSettings.floatingActionButton?.label || ""}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              floatingActionButton: {
-                                ...prev.floatingActionButton,
-                                label: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Chat with us"
-                          className="w-full rounded border px-2 py-1 text-[11px]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                          Link or Smart Action
-                        </label>
-                        <input
-                          type="text"
-                          value={globalSettings.floatingActionButton?.link || ""}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              floatingActionButton: {
-                                ...prev.floatingActionButton,
-                                link: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="https://wa.me/... or popup:open(id)"
-                          className="w-full rounded border px-2 py-1 text-[11px] font-mono"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-[11px] font-semibold text-slate-600">Position:</label>
-                        <select
-                          value={globalSettings.floatingActionButton?.position || "bottom-left"}
-                          onChange={(e) =>
-                            setGlobalSettings((prev: any) => ({
-                              ...prev,
-                              floatingActionButton: {
-                                ...prev.floatingActionButton,
-                                position: e.target.value,
-                              },
-                            }))
-                          }
-                          className="rounded border px-2 py-1 text-[11px]"
-                        >
-                          <option value="bottom-left">Bottom Left</option>
-                          <option value="bottom-right">Bottom Right</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Maintenance Mode Toggle (F-019) */}
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer">
-                      <span>🛠️</span>
-                      <span>Maintenance Mode</span>
-                    </label>
-                    <input
-                      type="checkbox"
-                      checked={!!pageSettings.isMaintenanceMode}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, isMaintenanceMode: e.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Show temporary maintenance state to public visitors & preview while editing.
-                  </p>
-                  {pageSettings.isMaintenanceMode && (
-                    <span className="inline-block rounded bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                      Active — Site displays Maintenance Notice
-                    </span>
-                  )}
-                </div>
-
-                {/* Temporary Support Credentials (F-020) */}
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🔑</span>
-                      <span>Support Access Credentials</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsSupportCredentialsOpen(true)}
-                      className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white shadow hover:bg-indigo-500"
-                      id="btn-support-credentials"
-                    >
-                      Manage Tokens
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Generate temporary scoped tokens for customer support & audit access with revocation control.
-                  </p>
-                </div>
-
-                {/* Page Title */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Page Title
-                  </label>
-                  <input
-                    type="text"
-                    value={pageSettings.title || ""}
-                    onChange={(e) => setPageSettings((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Home"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Meta Description */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Meta Description (SEO)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={pageSettings.description || ""}
-                    onChange={(e) => setPageSettings((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Page SEO description..."
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Page Path / URL Slug */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    URL Path Slug
-                  </label>
-                  <input
-                    type="text"
-                    value={pageSettings.path || "/"}
-                    onChange={(e) => setPageSettings((prev) => ({ ...prev, path: e.target.value }))}
-                    placeholder="/"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Page SEO & Social Graph (Phase 4) */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🌐</span>
-                      <span>SEO & Social Graph</span>
-                    </label>
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded">
-                      Metadata
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsSeoModalOpen(true)}
-                    className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Open Full SEO & Quality Audit</span>
-                  </button>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Canonical URL
-                    </label>
-                    <input
-                      type="url"
-                      value={pageSettings.canonicalUrl || ""}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, canonicalUrl: e.target.value }))}
-                      placeholder="https://example.com/canonical-page"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-mono outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      OpenGraph Title
-                    </label>
-                    <input
-                      type="text"
-                      value={pageSettings.ogTitle || ""}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, ogTitle: e.target.value }))}
-                      placeholder={pageSettings.title || "Social title..."}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      OpenGraph Description
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={pageSettings.ogDescription || ""}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, ogDescription: e.target.value }))}
-                      placeholder={pageSettings.description || "Social share description..."}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Social Share Image URL (og:image)
-                    </label>
-                    <input
-                      type="url"
-                      value={pageSettings.ogImage || ""}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, ogImage: e.target.value }))}
-                      placeholder="https://example.com/share-card.jpg"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-mono outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {/* Search Engine Robots Indexing */}
-                  <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Robots Directives
-                    </span>
-                    <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={!!pageSettings.noindex}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, noindex: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
-                      />
-                      <span>Prevent search engine indexing (<code className="text-[10px] bg-slate-200 px-1 py-0.5 rounded">noindex</code>)</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={!!pageSettings.nofollow}
-                        onChange={(e) => setPageSettings((prev) => ({ ...prev, nofollow: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
-                      />
-                      <span>Do not follow links on this page (<code className="text-[10px] bg-slate-200 px-1 py-0.5 rounded">nofollow</code>)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Site / Website Published Language (F-022) */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>{t("siteLang", "Site Language (Published)")}</span>
-                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">HTML lang</span>
-                  </label>
-                  <select
-                    value={pageSettings.siteLanguage || "en"}
-                    onChange={(e) => setPageSettings((prev) => ({ ...prev, siteLanguage: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                  >
-                    <option value="en">English (en)</option>
-                    <option value="es">Spanish (es)</option>
-                    <option value="fr">French (fr)</option>
-                    <option value="de">German (de)</option>
-                    <option value="it">Italian (it)</option>
-                    <option value="ja">Japanese (ja)</option>
-                    <option value="ar">Arabic (ar - RTL)</option>
-                    <option value="he">Hebrew (he - RTL)</option>
-                    <option value="ta">Tamil (ta)</option>
-                  </select>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Controls published HTML website language. Completely independent from Editor UI language.
-                  </p>
-                </div>
-
-                {/* F-380: Site Layout Direction (RTL / LTR) */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Site Layout Direction (F-380 RTL)</span>
-                    <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">dir</span>
-                  </label>
-                  <select
-                    value={pageSettings.siteDirection || "ltr"}
-                    onChange={(e) => setPageSettings((prev) => ({ ...prev, siteDirection: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                  >
-                    <option value="ltr">Left-to-Right (LTR - Standard)</option>
-                    <option value="rtl">Right-to-Left (RTL - Arabic, Hebrew, Urdu)</option>
-                  </select>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Mirrors published website text direction and layout alignment for RTL languages.
-                  </p>
-                </div>
-
-                {/* Action Buttons for Accessibility Audit & Multilingual Export */}
-                <div className="space-y-2 pt-2 border-t border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setIsSeoAnalyzerOpen(true)}
-                    className="w-full py-2 px-3 rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-                  >
-                    <span>✨</span>
-                    <span>Run WCAG & SEO Audit (F-363/F-371)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsMultilingualModalOpen(true)}
-                    className="w-full py-2 px-3 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-bold text-xs hover:bg-purple-100 transition flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>🌐</span>
-                    <span>Multilingual Export (F-381 WPML/Weglot)</span>
-                  </button>
-                </div>
-
-                {/* Accessibility & Usability Widget Settings (F-364, F-367) */}
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-3.5 space-y-3">
-                  <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>♿</span>
-                      <span>Accessibility Widget (F-364 / F-367)</span>
-                    </label>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
-                      WCAG 2.1
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">Enable Floating Toolbar Widget</span>
-                      <input
-                        type="checkbox"
-                        checked={globalSettings?.accessibilityWidget?.enabled !== false}
-                        onChange={(e) =>
-                          setGlobalSettings((prev: any) => ({
-                            ...prev,
-                            accessibilityWidget: { ...prev?.accessibilityWidget, enabled: e.target.checked },
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Widget Corner Position</label>
-                      <select
-                        value={globalSettings?.accessibilityWidget?.position || "bottom-right"}
-                        onChange={(e) =>
-                          setGlobalSettings((prev: any) => ({
-                            ...prev,
-                            accessibilityWidget: { ...prev?.accessibilityWidget, position: e.target.value },
-                          }))
-                        }
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-indigo-500"
-                      >
-                        <option value="bottom-right">Bottom Right</option>
-                        <option value="bottom-left">Bottom Left</option>
-                        <option value="top-right">Top Right</option>
-                        <option value="top-left">Top Left</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Page Canvas Background Color */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Page Canvas Background Color
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={pageSettings.backgroundColor || "#ffffff"}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                      className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                    />
-                    <input
-                      type="text"
-                      value={pageSettings.backgroundColor || "#ffffff"}
-                      onChange={(e) => setPageSettings((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Temporary Support Credentials (F-020) */}
-                <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-3 pt-3">
-                  <div className="flex items-center justify-between border-b border-purple-100 pb-2">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🔐</span>
-                      <span>Temporary Support Access</span>
-                    </label>
-                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                      2-Hr Limit
-                    </span>
-                  </div>
-
-                      <p className="text-[11px] text-slate-500 leading-normal">
-                        Generate temporary, time-limited credentials for support troubleshooting without sharing your password.
-                      </p>
-
-                      {supportToken ? (
-                        <div className="space-y-2 rounded-lg border border-purple-200 bg-white p-3">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                            <span>Support Token:</span>
-                            <span className="text-purple-600 font-bold">Expires ~{supportExpiresAt}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              readOnly
-                              value={supportToken}
-                              className="w-full rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-800"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (supportToken) {
-                                  navigator.clipboard.writeText(supportToken);
-                                  setSupportCopied(true);
-                                  setTimeout(() => setSupportCopied(false), 2000);
-                                }
-                              }}
-                              className="rounded-md bg-purple-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-purple-700 transition shrink-0"
-                            >
-                              {supportCopied ? "Copied!" : "Copy"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {supportMessage && (
-                        <p className="text-[11px] font-semibold text-purple-700">{supportMessage}</p>
-                      )}
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={isGeneratingToken}
-                          onClick={handleGenerateSupportToken}
-                          className="flex-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-50 transition"
-                        >
-                          {isGeneratingToken ? "Generating..." : "Generate Support Token"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleRevokeSupportTokens}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition"
-                          title="Revoke active support credentials"
-                        >
-                          Revoke
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Editor User Preferences (F-026) */}
-                    <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
-                      <div className="flex items-center justify-between border-b border-blue-100 pb-2">
-                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <span>⚙️</span>
-                          <span>Editor User Preferences</span>
-                        </label>
-                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                          Persistent
-                        </span>
-                      </div>
-
-                      <div className="space-y-2.5 pt-1">
-                        {/* Auto Save Toggle */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-700">⚡ Auto-Save Drafts</span>
-                          <input
-                            type="checkbox"
-                            checked={userPreferences.autoSaveEnabled}
-                            onChange={(e) => updatePreference("autoSaveEnabled", e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </div>
-
-                        {/* Canvas Grid Alignment Overlay Toggle */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-700">📐 Canvas Alignment Grid</span>
-                          <input
-                            type="checkbox"
-                            checked={userPreferences.gridOverlay}
-                            onChange={(e) => updatePreference("gridOverlay", e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </div>
-
-                        {/* Header Toolbar Theme Switch */}
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-xs font-semibold text-slate-700">🎨 Header Toolbar Theme</span>
-                          <button
-                            type="button"
-                            onClick={() => updatePreference("themeMode", userPreferences.themeMode === "dark" ? "light" : "dark")}
-                            className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm transition"
-                          >
-                            {userPreferences.themeMode === "dark" ? "🌙 Dark Navy" : "☀️ Light Modern"}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                {/* See inspector/noSelection/siteSettingsSecondBlock (moved verbatim) */}
+                {renderSiteSettingsSecondBlock({
+                  globalSettings,
+                  handleGenerateSupportToken,
+                  handleRevokeSupportTokens,
+                  isGeneratingToken,
+                  pageSettings,
+                  setGlobalSettings,
+                  setIsMultilingualModalOpen,
+                  setIsSeoAnalyzerOpen,
+                  setIsSeoModalOpen,
+                  setIsSupportCredentialsOpen,
+                  setPageSettings,
+                  setSupportCopied,
+                  supportCopied,
+                  supportExpiresAt,
+                  supportMessage,
+                  supportToken,
+                  t,
+                  updatePreference,
+                  userPreferences,
+                })}
                   </div>
                 )}
               </>
@@ -15955,725 +11423,69 @@ export default function WebsiteEditor() {
       </div>
 
       {/* Contextual Action Menu Overlay (F-010) */}
-      {contextMenu && !isPreview && (
-        <div
-          style={{
-            top: `${Math.min(contextMenu.y, window.innerHeight - 260)}px`,
-            left: `${Math.min(contextMenu.x, window.innerWidth - 190)}px`,
-          }}
-          className="fixed z-50 min-w-[170px] rounded-xl border border-slate-200 bg-white/95 backdrop-blur-md p-1.5 shadow-xl text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-            Element Actions
-          </div>
-          <button
-            onClick={() => {
-              handleReorderElement(contextMenu.elementId, "up");
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-100 hover:text-blue-600 transition"
-          >
-            <span>Move Up</span>
-            <span className="text-[10px] text-slate-400">▲</span>
-          </button>
-          <button
-            onClick={() => {
-              handleReorderElement(contextMenu.elementId, "down");
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-100 hover:text-blue-600 transition"
-          >
-            <span>Move Down</span>
-            <span className="text-[10px] text-slate-400">▼</span>
-          </button>
-          <div className="my-1 border-t border-slate-100" />
-          <button
-            onClick={(e) => {
-              handleCopyElement(contextMenu.elementId, e);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-100 hover:text-blue-600 transition"
-          >
-            <span>Copy</span>
-            <span className="text-[10px] text-slate-400">Ctrl+C</span>
-          </button>
-          <button
-            onClick={(e) => {
-              handleCopyStyle(contextMenu.elementId, e);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-100 hover:text-blue-600 transition"
-          >
-            <span>Copy Style</span>
-            <span className="text-[10px]">🎨</span>
-          </button>
-          {copiedStyles && (
-            <button
-              onClick={(e) => {
-                handlePasteStyle(contextMenu.elementId, e);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-emerald-50 text-emerald-600 font-bold transition"
-            >
-              <span>Paste Style</span>
-              <span className="text-[10px]">🖌️</span>
-            </button>
-          )}
-          <button
-            onClick={(e) => {
-              handleDuplicateElement(contextMenu.elementId, e);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-100 hover:text-blue-600 transition"
-          >
-            <span>Duplicate</span>
-            <span className="text-[10px] text-slate-400">Ctrl+D</span>
-          </button>
-          <button
-            onClick={() => {
-              handleSaveAsComponent(contextMenu.elementId);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-purple-50 text-purple-700 transition"
-          >
-            <span>Save as Comp</span>
-            <span className="text-[10px]">🧩</span>
-          </button>
-          <div className="my-1 border-t border-slate-100" />
-          <button
-            onClick={(e) => {
-              handleDeleteElement(contextMenu.elementId, e);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left hover:bg-red-50 text-red-600 transition"
-          >
-            <span>Delete</span>
-            <span className="text-[10px] text-red-400">✕</span>
-          </button>
-        </div>
-      )}
+      {/* See shell/overlays/elementContextMenu (moved verbatim) */}
+      {renderElementContextMenu({
+        contextMenu,
+        copiedStyles,
+        handleCopyElement,
+        handleCopyStyle,
+        handleDeleteElement,
+        handleDuplicateElement,
+        handlePasteStyle,
+        handleReorderElement,
+        handleSaveAsComponent,
+        isPreview,
+        setContextMenu,
+      })}
 
       {/* Finder Command Palette Modal (F-027) */}
-      {isFinderOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
-            {/* Search Header Input */}
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/50">
-              <span className="text-slate-400 text-lg">🔍</span>
-              <input
-                type="text"
-                autoFocus
-                value={finderQuery}
-                onChange={(e) => setFinderQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  // Typing here is ignored by the window shortcut handler, so honour "Esc to close" locally
-                  // (shortcuts help, if also open, keeps priority as in the window handler).
-                  if (e.key !== "Escape") return;
-                  e.preventDefault();
-                  if (isShortcutsHelpOpen) setIsShortcutsHelpOpen(false);
-                  else setIsFinderOpen(false);
-                }}
-                placeholder="Search pages, templates, settings and features... (Esc to close)"
-                className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
-              />
-              <button
-                type="button"
-                onClick={() => setIsFinderOpen(false)}
-                className="rounded-lg px-2 py-1 text-xs font-bold text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 px-4 py-2 border-b border-slate-100 bg-white text-[11px] overflow-x-auto">
-              <span className="text-slate-400 font-semibold mr-1">Filter:</span>
-              <span className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 font-medium">Pages</span>
-              <span className="rounded-full bg-purple-50 text-purple-600 px-2 py-0.5 font-medium">Templates</span>
-              <span className="rounded-full bg-blue-50 text-blue-600 px-2 py-0.5 font-medium">Settings</span>
-              <span className="rounded-full bg-emerald-50 text-emerald-600 px-2 py-0.5 font-medium">Features</span>
-            </div>
-
-            {/* Search Results List */}
-            <div className="max-h-[380px] overflow-y-auto p-2 divide-y divide-slate-50">
-              {[
-                {
-                  id: "page-home",
-                  title: "Home Page",
-                  category: "page",
-                  icon: "📄",
-                  description: "Current main landing page route (/)",
-                  keywords: "home page index main route",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                  },
-                },
-                {
-                  id: "page-settings",
-                  title: "Page Settings",
-                  category: "page",
-                  icon: "⚙️",
-                  description: "Configure page title, SEO description, URL slug",
-                  keywords: "page settings config seo title description slug",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                  },
-                },
-                {
-                  id: "tpl-hero",
-                  title: "Hero Section Template",
-                  category: "template",
-                  icon: "✨",
-                  description: "Header section with title, subtitle & action button",
-                  keywords: "hero header template banner section title subtitle button",
-                  action: () => {
-                    setIsPreview(false);
-                    setLeftSidebarTab("elements");
-                    handleAddElement("container");
-                  },
-                },
-                {
-                  id: "tpl-features",
-                  title: "Features Grid Template",
-                  category: "template",
-                  icon: "📌",
-                  description: "Container block layout for product feature cards",
-                  keywords: "features grid template cards layout block container",
-                  action: () => {
-                    setIsPreview(false);
-                    setLeftSidebarTab("elements");
-                    handleAddElement("container");
-                  },
-                },
-                {
-                  id: "tpl-cta",
-                  title: "Call to Action Template",
-                  category: "template",
-                  icon: "🚀",
-                  description: "Conversion banner block with text and primary button",
-                  keywords: "call to action cta template banner button conversion",
-                  action: () => {
-                    setIsPreview(false);
-                    setLeftSidebarTab("elements");
-                    handleAddElement("button");
-                  },
-                },
-                {
-                  id: "set-maintenance",
-                  title: "Maintenance Mode",
-                  category: "setting",
-                  icon: "🛠️",
-                  description: "Show temporary maintenance state to public visitors",
-                  keywords: "maintenance mode public temporary offline state",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                  },
-                },
-                {
-                  id: "set-sitelang",
-                  title: "Site Published Language",
-                  category: "setting",
-                  icon: "🌐",
-                  description: "Set published HTML lang attribute (en, es, fr, de...)",
-                  keywords: "site language html lang published website",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                  },
-                },
-                {
-                  id: "set-editorlang",
-                  title: "Editor UI Language",
-                  category: "setting",
-                  icon: "🗣️",
-                  description: "Switch Editor interface language (English, Spanish...)",
-                  keywords: "editor language ui interface translate english spanish french german",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                  },
-                },
-                {
-                  id: "set-grid",
-                  title: "Canvas Alignment Grid",
-                  category: "setting",
-                  icon: "📐",
-                  description: "Toggle 20px visual layout grid overlay on canvas",
-                  keywords: "grid alignment layout overlay canvas guidelines",
-                  action: () => {
-                    updatePreference("gridOverlay", !userPreferences.gridOverlay);
-                  },
-                },
-                {
-                  id: "set-theme",
-                  title: "Header Toolbar Theme",
-                  category: "setting",
-                  icon: "🎨",
-                  description: "Switch Header theme between Dark Navy and Light Modern",
-                  keywords: "theme dark light header toolbar appearance mode",
-                  action: () => {
-                    updatePreference("themeMode", userPreferences.themeMode === "dark" ? "light" : "dark");
-                  },
-                },
-                {
-                  id: "feat-elements",
-                  title: "Elements Palette",
-                  category: "feature",
-                  icon: "🧱",
-                  description: "Browse containers, headings, text, images & buttons",
-                  keywords: "elements palette add container heading text image button widgets",
-                  action: () => {
-                    setIsPreview(false);
-                    setLeftSidebarTab("elements");
-                  },
-                },
-                {
-                  id: "feat-navigator",
-                  title: "Navigator Layers",
-                  category: "feature",
-                  icon: "🌳",
-                  description: "Visual tree structure hierarchy navigation panel",
-                  keywords: "navigator layers tree structure hierarchy elements outline",
-                  action: () => {
-                    setIsPreview(false);
-                    setLeftSidebarTab("navigator");
-                  },
-                },
-                {
-                  id: "feat-save",
-                  title: "Save Website",
-                  category: "feature",
-                  icon: "💾",
-                  description: "Persist all editor elements & page settings (Ctrl+S)",
-                  keywords: "save site website persist publish store ctrl+s",
-                  action: () => {
-                    handleSave();
-                  },
-                },
-                {
-                  id: "feat-preview",
-                  title: "Toggle Preview Mode",
-                  category: "feature",
-                  icon: "👁️",
-                  description: "Switch between editing canvas and published site view (Ctrl+P)",
-                  keywords: "preview mode view exit preview test ctrl+p",
-                  action: () => {
-                    setIsPreview(!isPreview);
-                  },
-                },
-                {
-                  id: "feat-undo",
-                  title: "Undo Action",
-                  category: "feature",
-                  icon: "↩️",
-                  description: "Restore previous canvas state (Ctrl+Z)",
-                  keywords: "undo revert history ctrl+z",
-                  action: () => {
-                    handleUndo();
-                  },
-                },
-                {
-                  id: "feat-redo",
-                  title: "Redo Action",
-                  category: "feature",
-                  icon: "↪️",
-                  description: "Reapply undone canvas change (Ctrl+Y)",
-                  keywords: "redo reapply history ctrl+y",
-                  action: () => {
-                    handleRedo();
-                  },
-                },
-                {
-                  id: "feat-moveup",
-                  title: "Move Section Up",
-                  category: "feature",
-                  icon: "▲",
-                  description: "Move selected section upward in page hierarchy (Alt+Up)",
-                  keywords: "move section up reorder upward alt+up",
-                  action: () => {
-                    if (selectedId) handleReorderElement(selectedId, "up");
-                  },
-                },
-                {
-                  id: "feat-movedown",
-                  title: "Move Section Down",
-                  category: "feature",
-                  icon: "▼",
-                  description: "Move selected section downward in page hierarchy (Alt+Down)",
-                  keywords: "move section down reorder downward alt+down",
-                  action: () => {
-                    if (selectedId) handleReorderElement(selectedId, "down");
-                  },
-                },
-                {
-                  id: "feat-support",
-                  title: "Temporary Support Token",
-                  category: "feature",
-                  icon: "🔐",
-                  description: "Generate 2-hour temporary support access credential",
-                  keywords: "support token access credentials temporary auth troubleshooting",
-                  action: () => {
-                    setIsPreview(false);
-                    setSelectedId(null);
-                    handleGenerateSupportToken();
-                  },
-                },
-                {
-                  id: "feat-quit",
-                  title: "Quit Editor",
-                  category: "feature",
-                  icon: "🚪",
-                  description: "Exit visual editor and return to Dashboard",
-                  keywords: "quit exit return dashboard leave back",
-                  action: () => {
-                    handleQuitEditor();
-                  },
-                },
-              ]
-                .filter((item) => {
-                  if (!finderQuery.trim()) return true;
-                  const q = finderQuery.toLowerCase().trim();
-                  return (
-                    item.title.toLowerCase().includes(q) ||
-                    item.description.toLowerCase().includes(q) ||
-                    item.keywords.toLowerCase().includes(q) ||
-                    item.category.toLowerCase().includes(q)
-                  );
-                })
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setIsFinderOpen(false);
-                      setFinderQuery("");
-                      item.action();
-                    }}
-                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-base shadow-sm group-hover:bg-blue-600 group-hover:text-white transition">
-                        {item.icon}
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition flex items-center gap-2">
-                          <span>{item.title}</span>
-                          <span
-                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${item.category === "page"
-                              ? "bg-slate-100 text-slate-600"
-                              : item.category === "template"
-                                ? "bg-purple-100 text-purple-700"
-                                : item.category === "setting"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                              }`}
-                          >
-                            {item.category}
-                          </span>
-                        </h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className="text-xs text-slate-300 group-hover:text-blue-500 transition font-bold">
-                      →
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* See shell/overlays/finderOverlay (moved verbatim) */}
+      {renderFinderOverlay({
+        finderQuery,
+        handleAddElement,
+        handleGenerateSupportToken,
+        handleQuitEditor,
+        handleRedo,
+        handleReorderElement,
+        handleSave,
+        handleUndo,
+        isFinderOpen,
+        isPreview,
+        isShortcutsHelpOpen,
+        selectedId,
+        setFinderQuery,
+        setIsFinderOpen,
+        setIsPreview,
+        setIsShortcutsHelpOpen,
+        setLeftSidebarTab,
+        setSelectedId,
+        updatePreference,
+        userPreferences,
+      })}
       {/* ========================================== */}
       {/* Keyboard Shortcuts Help Modal (F-031)      */}
       {/* ========================================== */}
-      {isShortcutsHelpOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in"
-          onClick={() => setIsShortcutsHelpOpen(false)}
-        >
-          <div
-            className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-900 text-white">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">⌨️</span>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">Keyboard Shortcuts</h3>
-                  <p className="text-[11px] text-slate-400">Supported editor actions & key bindings</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsShortcutsHelpOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Shortcuts Content List */}
-            <div className="p-6 overflow-y-auto space-y-6">
-              {/* Category 1: Editor Navigation & Canvas */}
-              <div>
-                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                  <span>🚀</span> Editor & Navigation
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Finder Search Palette</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + K</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Save Website</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + S</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Toggle Preview Mode</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + P</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Shortcuts Help Modal</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">?</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 sm:col-span-2">
-                    <span className="text-xs font-semibold text-slate-700">Exit Fullscreen / Close Modal</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Esc</kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Category 2: Element Editing & Clipboard */}
-              <div>
-                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 mb-3 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-                  <span>🎨</span> Element Editing & Clipboard
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Undo Action</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + Z</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Redo Action</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + Y</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Copy Element</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + C</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Paste Element</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + V</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Duplicate Element</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Ctrl + D</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Delete Element</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Delete / Backspace</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Move Section Up</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Alt + Up</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-700">Move Section Down</span>
-                    <kbd className="text-[10px] font-mono font-bold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">Alt + Down</kbd>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-slate-100 bg-slate-50 px-6 py-3 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Press <kbd className="font-mono bg-white border border-slate-200 px-1 rounded">Esc</kbd> anytime to close</span>
-              <button
-                type="button"
-                onClick={() => setIsShortcutsHelpOpen(false)}
-                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* See shell/overlays/shortcutsHelpOverlay (moved verbatim) */}
+      {renderShortcutsHelpOverlay({
+        isShortcutsHelpOpen,
+        setIsShortcutsHelpOpen,
+      })}
       {/* ========================================== */}
       {/* Manage Widgets & Visibility Modal (F-032)  */}
       {/* ========================================== */}
-      {isElementManagerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in"
-          onClick={() => setIsElementManagerOpen(false)}
-        >
-          <div
-            className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-900 text-white">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">⚙️</span>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight">Manage Widgets & Visibility</h3>
-                  <p className="text-[11px] text-slate-400">
-                    Control which widgets appear in the main Widget Library. Hiding a widget preserves all canvas elements.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsElementManagerOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Top Toolbar: Search & Quick Action Buttons */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:w-64">
-                <input
-                  type="text"
-                  value={managerSearchQuery}
-                  onChange={(e) => setManagerSearchQuery(e.target.value)}
-                  placeholder="Search all widgets..."
-                  className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-7 text-xs font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition shadow-xs"
-                />
-                <span className="absolute left-2.5 top-2 text-xs text-slate-400">🔍</span>
-                {managerSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setManagerSearchQuery("")}
-                    className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  type="button"
-                  onClick={enableAllWidgets}
-                  className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-xs"
-                >
-                  Enable All ({ALL_WIDGET_REGISTRY.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={resetWidgetsToDefault}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-xs"
-                >
-                  Reset Default (5 Core)
-                </button>
-              </div>
-            </div>
-
-            {/* Category Filter Tabs */}
-            <div className="px-6 py-2.5 border-b border-slate-100 bg-white flex items-center gap-1.5 overflow-x-auto">
-              {["All", "Layout", "Basic", "Content", "Interactive", "Media", "Commerce", "Social"].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setManagerCategoryFilter(cat)}
-                  className={`px-3 py-1 rounded-full text-[11px] font-bold transition whitespace-nowrap ${managerCategoryFilter === cat
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Widget Toggles List */}
-            <div className="p-6 overflow-y-auto space-y-2.5 max-h-[50vh]">
-              {ALL_WIDGET_REGISTRY.filter((w) => {
-                const matchesCat = managerCategoryFilter === "All" || w.category === managerCategoryFilter;
-                if (!matchesCat) return false;
-                if (!managerSearchQuery.trim()) return true;
-                const q = managerSearchQuery.toLowerCase().trim();
-                return (
-                  w.name.toLowerCase().includes(q) ||
-                  w.type.toLowerCase().includes(q) ||
-                  w.description.toLowerCase().includes(q) ||
-                  w.category.toLowerCase().includes(q)
-                );
-              }).map((w) => {
-                const isDisabled = disabledWidgets.includes(w.type);
-                return (
-                  <div
-                    key={w.type}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition ${isDisabled
-                      ? "border-slate-200 bg-slate-50/60 opacity-80"
-                      : "border-emerald-200 bg-emerald-50/20 shadow-xs"
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-xs">
-                        {w.icon}
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                          <span>{w.name}</span>
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                            {w.category}
-                          </span>
-                          <span
-                            className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isDisabled
-                              ? "bg-slate-200 text-slate-600"
-                              : "bg-emerald-100 text-emerald-700"
-                              }`}
-                          >
-                            {isDisabled ? "Hidden" : "Visible"}
-                          </span>
-                        </h4>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{w.description}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleWidgetAvailability(w.type)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isDisabled ? "bg-slate-300" : "bg-emerald-500"
-                        }`}
-                      title={isDisabled ? `Enable ${w.name} in Widget Library` : `Hide ${w.name} from Widget Library`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isDisabled ? "translate-x-0" : "translate-x-5"
-                          }`}
-                      />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-slate-100 bg-slate-50 px-6 py-3 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">
-                {ALL_WIDGET_REGISTRY.length - disabledWidgets.length} of {ALL_WIDGET_REGISTRY.length} widgets active in Main Library
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsElementManagerOpen(false)}
-                className="rounded-lg bg-blue-600 px-5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* See shell/overlays/elementManagerOverlay (moved verbatim) */}
+      {renderElementManagerOverlay({
+        disabledWidgets,
+        enableAllWidgets,
+        isElementManagerOpen,
+        managerCategoryFilter,
+        managerSearchQuery,
+        resetWidgetsToDefault,
+        setIsElementManagerOpen,
+        setManagerCategoryFilter,
+        setManagerSearchQuery,
+        toggleWidgetAvailability,
+      })}
 
       {/* Popup Manager Modal */}
       <PopupManagerModal
@@ -16773,88 +11585,40 @@ export default function WebsiteEditor() {
       />
 
       {/* AI Studio Floating Trigger - Matching Accessibility Widget Geometry & Style */}
-      {websiteId && userAccess.canEditDesign && (
-        <div className="fixed bottom-6 right-24 z-[99998] font-sans antialiased">
-          <button
-            type="button"
-            id="ai-studio-floating-trigger-btn"
-            aria-label="Open AI Studio & Full Design Engine"
-            onClick={() => setIsUnifiedAiOpen(true)}
-            className="group relative flex h-14 items-center gap-2.5 px-4 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-700 text-white shadow-2xl hover:shadow-purple-500/40 hover:scale-105 active:scale-95 transition-all duration-300 border border-purple-400/30 focus:outline-none focus:ring-4 focus:ring-purple-400 cursor-pointer"
-            title="Open AI Studio (Assistant, Full Design, Content, Sections, Images, Code, Audits)"
-          >
-            <Sparkles className="w-5 h-5 text-amber-300 animate-pulse transition-transform group-hover:rotate-12 group-hover:scale-110" />
-            <div className="flex flex-col text-left">
-              <span className="text-xs font-black tracking-wide leading-none">AI STUDIO</span>
-              <span className="text-[10px] text-purple-200 font-medium leading-none mt-1">Design & Tools</span>
-            </div>
-            <span className="absolute -top-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-purple-400 border-2 border-slate-900"></span>
-            </span>
-          </button>
-        </div>
-      )}
+      {/* See shell/modals/aiAssistantLauncher (moved verbatim) */}
+      {renderAiAssistantLauncher({
+        setIsUnifiedAiOpen,
+        userAccess,
+        websiteId,
+      })}
 
-      {isUnifiedAiOpen && websiteId && (
-        <UnifiedAiAssistant
-          apiUrl={apiUrl}
-          websiteId={websiteId}
-          onClose={() => setIsUnifiedAiOpen(false)}
-          onApplied={() => {
-            window.location.reload();
-          }}
-          selectedElementId={selectedId || undefined}
-          selectedElementType={selectedElement?.type}
-          pageId={activePageId}
-          prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
-          apply={async (proposal, key) => {
-            if (pendingDesignApplyKey.current !== key) {
-              if (hasUnsavedDocumentChanges()) {
-                const saved = await handleSave();
-                if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
-              }
-              pendingDesignApplyKey.current = key;
-            }
-            await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
-              let response: Response;
-              try { response = await fetch(`${apiUrl}/api/v1/ai/changesets/${proposal.id}/apply`, { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { "Content-Type": "application/json", "X-Forge-Intent": "document-command", "Idempotency-Key": options.key, "If-Match": `"${websiteId}:document:${options.expectedVersion}"` } }); }
-              catch { throw new DocumentSaveError("Apply outcome is unknown. Retry Apply to confirm the same operation.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true); }
-              let body;
-              try { body = await response.json(); } catch { throw new DocumentSaveError("Apply response was interrupted. Retry Apply.", response.status, "DOCUMENT_OUTCOME_UNKNOWN", true); }
-              if (!response.ok) throw new DocumentSaveError(response.status === 412 ? "The website changed. Generate a new proposal." : "The proposal could not be applied.", response.status, body?.code || "AI_APPLY_FAILED", response.status >= 500);
-              if (body?.website?.id !== websiteId || !Number.isInteger(body.website.documentVersion) || body.website.documentVersion < options.expectedVersion || body.website.documentVersion > options.expectedVersion + 1) throw new DocumentSaveError("Apply acknowledgement was invalid. Retry Apply.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true);
-              return body.website;
-            });
-            window.location.reload();
-          }}
-        />
-      )}
-      {isDesignAssistantOpen && websiteId && <DesignAssistant apiUrl={apiUrl} websiteId={websiteId} pageId={activePageId} elementId={selectedId || undefined}
-        onClose={() => setIsDesignAssistantOpen(false)}
-        prepare={async () => { const saved = await handleSave(); if (!saved) throw new Error("Save failed. Your local edits are still here; resolve the save before generating."); return saved.documentVersion; }}
-        apply={async (proposal, key) => {
-          if (pendingDesignApplyKey.current !== key) {
-            if (hasUnsavedDocumentChanges()) {
-              const saved = await handleSave();
-              if (!saved) throw new Error("Save failed. Preserve your local changes before applying a proposal.");
-            }
-            pendingDesignApplyKey.current = key;
-          }
-          await documentWriter.applyExternal({ changesetId: proposal.id }, proposal.expectedDocumentVersion, key, async (_payload, options) => {
-            let response: Response;
-            try { response = await fetch(`${apiUrl}/api/v1/ai/changesets/${proposal.id}/apply`, { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { "Content-Type": "application/json", "X-Forge-Intent": "document-command", "Idempotency-Key": options.key, "If-Match": `"${websiteId}:document:${options.expectedVersion}"` } }); }
-            catch { throw new DocumentSaveError("Apply outcome is unknown. Retry Apply to confirm the same operation.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true); }
-            let body;
-            try { body = await response.json(); } catch { throw new DocumentSaveError("Apply response was interrupted. Retry Apply.", response.status, "DOCUMENT_OUTCOME_UNKNOWN", true); }
-            if (!response.ok) throw new DocumentSaveError(response.status === 412 ? "The website changed. Generate a new proposal." : "The proposal could not be applied.", response.status, body?.code || "AI_APPLY_FAILED", response.status >= 500);
-            if (body?.website?.id !== websiteId || !Number.isInteger(body.website.documentVersion) || body.website.documentVersion < options.expectedVersion || body.website.documentVersion > options.expectedVersion + 1) throw new DocumentSaveError("Apply acknowledgement was invalid. Retry Apply.", 0, "DOCUMENT_OUTCOME_UNKNOWN", true);
-            return body.website;
-          });
-          // Remount from the acknowledged server document; old queued saves have
-          // been invalidated by the coordinator's generation barrier.
-          window.location.reload();
-        }} />}
+      {/* See shell/modals/unifiedAiAssistantSection (moved verbatim) */}
+      {renderUnifiedAiAssistantSection({
+        activePageId,
+        apiUrl,
+        documentWriter,
+        handleSave,
+        hasUnsavedDocumentChanges,
+        isUnifiedAiOpen,
+        pendingDesignApplyKey,
+        selectedElement,
+        selectedId,
+        setIsUnifiedAiOpen,
+        websiteId,
+      })}
+      {/* See shell/modals/designAssistantSection (moved verbatim) */}
+      {renderDesignAssistantSection({
+        activePageId,
+        apiUrl,
+        documentWriter,
+        handleSave,
+        hasUnsavedDocumentChanges,
+        isDesignAssistantOpen,
+        pendingDesignApplyKey,
+        selectedId,
+        setIsDesignAssistantOpen,
+        websiteId,
+      })}
       <RevisionHistoryPanel
         isOpen={isRevisionHistoryOpen}
         onClose={() => setIsRevisionHistoryOpen(false)}
@@ -16887,75 +11651,16 @@ export default function WebsiteEditor() {
       })}
 
       {/* Modal for Editing Existing Page */}
-      {isEditPageModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <span>✏️</span>
-                <span>Edit Page Settings</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsEditPageModalOpen(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Page Title / Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. About Us, Our Services, Contact"
-                  value={editPageName}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setEditPageName(val);
-                  }}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500 transition"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  URL Path / Slug
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. /about, /services, /contact"
-                  value={editPageSlug}
-                  onChange={(e) => setEditPageSlug(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500 transition font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsEditPageModalOpen(false)}
-                className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEditPage}
-                disabled={!editPageName.trim()}
-                className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-500 disabled:opacity-50 transition cursor-pointer"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* See shell/modals/editPageModal (moved verbatim) */}
+      {renderEditPageModal({
+        editPageName,
+        editPageSlug,
+        handleSaveEditPage,
+        isEditPageModalOpen,
+        setEditPageName,
+        setEditPageSlug,
+        setIsEditPageModalOpen,
+      })}
 
       {/* Multi-Page Management Modal (Comments 10, 11, 23, 36, 37) */}
       <PageManagerModal
