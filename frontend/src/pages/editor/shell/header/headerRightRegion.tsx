@@ -29,7 +29,7 @@ export interface HeaderRightRegionDeps {
   history: EditorElement[][];
   historyIndex: number;
   isDesignNotesOpen: boolean;
-  isFullScreenCanvas: false;
+  isFullScreenCanvas: boolean;
   isPreview: boolean;
   isRestrictedMode: boolean;
   navigate: NavigateFunction;

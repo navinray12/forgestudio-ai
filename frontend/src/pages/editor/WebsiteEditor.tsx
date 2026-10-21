@@ -367,6 +367,10 @@ import { renderRestrictedModeInspector } from "./inspector/restrictedModeInspect
 import { applyStyleReset, applyStyleUpdate } from "./core/elementStyles";
 import { selectionRangeIds, toggleSelectedId } from "./core/elementSelection";
 import { upsertImportedPage, wordpressImportedPage } from "./core/wordpressImport";
+import { cloneWithFreshIds, insertElementsInOrder, instantiateTemplateComponent, replaceElementById, replaceElementWithMany, withTemplateSelection } from "./core/templateElements";
+import { restoredRevisionState, revisionBaselineArgs } from "./core/revisionRestore";
+import { resolveCustomAttrProps } from "./canvas/elementPresentation";
+import { renderLeafElementChrome } from "./canvas/leafElementChrome";
 import { buildCanonicalPages } from "./core/canonicalPages";
 import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageIdFromUrl, previewPageParam, slugFromName, starterElementsOf, syncActivePageIntoPages } from "./core/pageManagement";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
@@ -667,12 +671,7 @@ export default function WebsiteEditor() {
 
   const handleSelectTemplate = (elementId: string, templateId?: string, presetName?: string) => {
     setElements((prev) =>
-      updateTreeElement(prev, elementId, (item) => ({
-        ...item,
-        templateId: templateId,
-        templateSource: templateId ? "custom" : "preset",
-        templatePresetName: presetName as any,
-      }))
+      updateTreeElement(prev, elementId, (item) => withTemplateSelection(item, templateId, presetName))
     );
   };
 
@@ -684,35 +683,14 @@ export default function WebsiteEditor() {
 
     if (el.templateId && components[el.templateId]) {
       const comp = components[el.templateId];
-      const createInstance = (base: EditorElement): EditorElement => ({
-        ...JSON.parse(JSON.stringify(base)),
-        id: generateId(),
-        children: base.children ? base.children.map(createInstance) : undefined,
-      });
-      unpackedElements = createInstance(comp.element);
+      unpackedElements = instantiateTemplateComponent(comp.element, generateId);
     } else if (el.templatePresetName && PRESET_SECTION_TEMPLATES[el.templatePresetName]) {
       unpackedElements = PRESET_SECTION_TEMPLATES[el.templatePresetName].getElements(generateId);
     }
 
     if (!unpackedElements) return;
 
-    setElements((prev) => {
-      const replaceInTree = (list: EditorElement[]): EditorElement[] => {
-        return list.map((item) => {
-          if (item.id === elementId) {
-            return unpackedElements!;
-          }
-          if (item.children && item.children.length > 0) {
-            return {
-              ...item,
-              children: replaceInTree(item.children),
-            };
-          }
-          return item;
-        });
-      };
-      return replaceInTree(prev);
-    });
+    setElements((prev) => replaceElementById(prev, elementId, unpackedElements!));
 
     setSelectedId(unpackedElements.id);
     setSelectedIds([unpackedElements.id]);
@@ -894,32 +872,32 @@ export default function WebsiteEditor() {
   const [managerCategoryFilter, setManagerCategoryFilter] = useState<string>("All");
 
   const handleRestoreRevision = (restoredElements: EditorElement[], restoredPageSettings?: any, fullRestoredState?: any) => {
-    if (Array.isArray(restoredElements)) {
-      setElements(JSON.parse(JSON.stringify(restoredElements)));
+    const restored = restoredRevisionState(restoredElements, restoredPageSettings, fullRestoredState);
+    if (restored.elements !== undefined) {
+      setElements(restored.elements);
     }
-    if (restoredPageSettings) {
-      setPageSettings(JSON.parse(JSON.stringify(restoredPageSettings)));
+    if (restored.pageSettings !== undefined) {
+      setPageSettings(restored.pageSettings);
     }
-    if (fullRestoredState?.pages && Array.isArray(fullRestoredState.pages)) {
-      setPages(JSON.parse(JSON.stringify(fullRestoredState.pages)));
+    if (restored.pages !== undefined) {
+      setPages(restored.pages);
     }
-    if (fullRestoredState?.siteParts) {
-      setSiteParts(JSON.parse(JSON.stringify(fullRestoredState.siteParts)));
+    if (restored.siteParts !== undefined) {
+      setSiteParts(restored.siteParts);
     }
     if (updateAutosaveBaseline) {
       updateAutosaveBaseline(
-        restoredElements,
-        restoredPageSettings,
-        fullRestoredState?.pages || pages,
-        fullRestoredState?.homePageId || homePageId,
-        fullRestoredState?.siteParts || siteParts,
-        fullRestoredState?.globalSettings || globalSettings,
-        fullRestoredState?.globalStyles || globalSettings?.globalStyles,
-        publishing,
-        deployment,
-        fullRestoredState?.breakpoints || breakpoints,
-        fullRestoredState?.popups || popups,
-        fullRestoredState?.pageCss || pageCss
+        ...revisionBaselineArgs(restoredElements, restoredPageSettings, fullRestoredState, {
+          pages,
+          homePageId,
+          siteParts,
+          globalSettings,
+          publishing,
+          deployment,
+          breakpoints,
+          popups,
+          pageCss,
+        })
       );
     }
     setSelectedId(null);
@@ -1868,44 +1846,9 @@ export default function WebsiteEditor() {
       return;
     }
 
-    const cloneAndReassign = (list: EditorElement[]): EditorElement[] => {
-      const cloned: EditorElement[] = JSON.parse(JSON.stringify(list));
-      const reassignIds = (node: EditorElement): EditorElement => {
-        const newNode: EditorElement = {
-          ...node,
-          id: generateId(),
-        };
-        if (newNode.children && Array.isArray(newNode.children)) {
-          newNode.children = newNode.children.map(reassignIds);
-        }
-        return newNode;
-      };
-      return cloned.map(reassignIds);
-    };
+    const freshElements = cloneWithFreshIds(templateElements, generateId);
 
-    const freshElements = cloneAndReassign(templateElements);
-
-    const replaceTreeElement = (
-      list: EditorElement[],
-      targetId: string,
-      replacements: EditorElement[]
-    ): EditorElement[] => {
-      const result: EditorElement[] = [];
-      for (const item of list) {
-        if (item.id === targetId) {
-          result.push(...replacements);
-        } else {
-          const newItem = { ...item };
-          if (newItem.children && Array.isArray(newItem.children)) {
-            newItem.children = replaceTreeElement(newItem.children, targetId, replacements);
-          }
-          result.push(newItem);
-        }
-      }
-      return result;
-    };
-
-    const updatedElements = replaceTreeElement(elements, selectedId, freshElements);
+    const updatedElements = replaceElementWithMany(elements, selectedId, freshElements);
 
     setElements(updatedElements);
 
@@ -1929,29 +1872,8 @@ export default function WebsiteEditor() {
     }
 
     // Deep clone template elements & recursively generate new unique IDs
-    const cloneAndReassign = (list: EditorElement[]): EditorElement[] => {
-      const cloned: EditorElement[] = JSON.parse(JSON.stringify(list));
-      const reassignIds = (node: EditorElement): EditorElement => {
-        const newNode: EditorElement = {
-          ...node,
-          id: generateId(),
-        };
-        if (newNode.children && Array.isArray(newNode.children)) {
-          newNode.children = newNode.children.map(reassignIds);
-        }
-        return newNode;
-      };
-      return cloned.map(reassignIds);
-    };
-
-    const freshElements = cloneAndReassign(templateElements);
-    let updatedElements = [...elements];
-    let lastInsertedId: string | null = null;
-
-    freshElements.forEach((el) => {
-      updatedElements = insertTreeElement(updatedElements, selectedId, el);
-      lastInsertedId = el.id;
-    });
+    const freshElements = cloneWithFreshIds(templateElements, generateId);
+    const { updatedElements, lastInsertedId } = insertElementsInOrder(elements, selectedId, freshElements);
 
     setElements(updatedElements);
 
@@ -2837,11 +2759,7 @@ export default function WebsiteEditor() {
     const isEditingHoverState = isSelected && activeElementState === "hover";
     const mergedStyles = getMergedStyles(el, activeDevice, isEditingHoverState ? "hover" : "normal");
 
-    const customAttrs = Array.isArray(el.customAttributes) ? el.customAttributes : [];
-    const customAttrProps = customAttrs.reduce((acc, curr) => {
-      if (curr.name && curr.name.trim()) acc[curr.name.trim()] = curr.value || "";
-      return acc;
-    }, {} as any);
+    const customAttrProps = resolveCustomAttrProps(el);
 
     const motionAttrs = resolveMotionAttrs(el);
     const stickyStyles = resolveStickyStyles(el);
@@ -2987,106 +2905,24 @@ export default function WebsiteEditor() {
         }}
       >
         {/* Drop Indicators for Leaf Element */}
-        {isDropTarget && dropPosition === "before" && (
-          <div className="absolute -top-1.5 left-0 right-0 h-1.5 bg-blue-600 rounded-full z-50 pointer-events-none shadow-md animate-pulse" />
-        )}
-        {isDropTarget && dropPosition === "after" && (
-          <div className="absolute -bottom-1.5 left-0 right-0 h-1.5 bg-blue-600 rounded-full z-50 pointer-events-none shadow-md animate-pulse" />
-        )}
-
-        {isHovered && !isSelected && !isPreview && (
-          <span className="absolute -top-3 left-3 z-30 rounded-full bg-blue-500/90 text-white px-2 py-0.5 text-[9px] font-bold shadow-sm pointer-events-none uppercase tracking-wider">
-            {el.type}
-          </span>
-        )}
-
-        {isSelected && (
-          <div className="absolute -top-3.5 right-3 z-30 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-0.5 text-[11px] font-semibold text-white shadow">
-            {path && path.length > 1 ? (
-              <span className="flex items-center gap-1">
-                {path.map((item, idx) => (
-                  <span key={item.id} className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedId(item.id);
-                      }}
-                      className={`capitalize hover:underline ${item.id === el.id ? "font-bold text-white" : "text-blue-200"
-                        }`}
-                    >
-                      {item.type}
-                    </button>
-                    {idx < path.length - 1 && <span>›</span>}
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <span className="capitalize">{el.type}</span>
-            )}
-            <span>•</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReorderElement(el.id, "up");
-              }}
-              className="hover:underline"
-              title="Move Element Up"
-            >
-              ▲
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReorderElement(el.id, "down");
-              }}
-              className="hover:underline"
-              title="Move Element Down"
-            >
-              ▼
-            </button>
-            <span>•</span>
-            <button
-              onClick={(e) => handleCopyElement(el.id, e)}
-              className="hover:underline"
-            >
-              Copy
-            </button>
-            <span>•</span>
-            <button
-              onClick={(e) => handleCopyStyle(el.id, e)}
-              className="hover:underline"
-              title="Copy Element Style"
-            >
-              Copy Style
-            </button>
-            {copiedStyles && (
-              <>
-                <span>•</span>
-                <button
-                  onClick={(e) => handlePasteStyle(el.id, e)}
-                  className="hover:underline text-emerald-200 hover:text-white"
-                  title="Paste Copied Style"
-                >
-                  Paste Style
-                </button>
-              </>
-            )}
-            <span>•</span>
-            <button
-              onClick={(e) => handleDuplicateElement(el.id, e)}
-              className="hover:underline"
-            >
-              Duplicate
-            </button>
-            <span>•</span>
-            <button
-              onClick={(e) => handleDeleteElement(el.id, e)}
-              className="hover:underline text-red-200 hover:text-white"
-            >
-              Delete
-            </button>
-          </div>
-        )}
+        {/* See canvas/leafElementChrome (moved verbatim) */}
+        {renderLeafElementChrome({
+          copiedStyles,
+          dropPosition,
+          el,
+          handleCopyElement,
+          handleCopyStyle,
+          handleDeleteElement,
+          handleDuplicateElement,
+          handlePasteStyle,
+          handleReorderElement,
+          isDropTarget,
+          isHovered,
+          isPreview,
+          isSelected,
+          path,
+          setSelectedId,
+        })}
 
         {/* Element Renderers */}
         {/* See canvas/elements/textElements (moved verbatim) */}
