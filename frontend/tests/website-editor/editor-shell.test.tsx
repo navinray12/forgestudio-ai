@@ -133,3 +133,36 @@ describe("inspector (reachable branches)", () => {
     expect(page.elements.find((e: { id: string }) => e.id === "elA").styles.width).toBe("50%");
   });
 });
+
+describe("WordPress page import event", () => {
+  // CURRENT BEHAVIOUR (characterised, not endorsed): the import replaces the canvas and opens the page,
+  // but unless the event carries pageSettings the editor keeps the previous page settings, so the
+  // active-page sync renames the imported page from them (here: Home, "/").
+  const fireImport = async (detail: unknown) => { const { act } = await import("@testing-library/react"); await act(async () => { window.dispatchEvent(new CustomEvent("forgestudio:wp-page-imported", { detail })); }); await flush(3); };
+  const savedPages = async (editor: Awaited<ReturnType<typeof mountEditor>>) => { fireEvent.click(screen.getByRole("button", { name: "Save" })); await flush(4); return (editor.backend.saves().at(-1)!.body as any).editorData.pages; };
+
+  it("adds and opens the imported page; without pageSettings it takes the previous page settings", async () => {
+    const editor = await mountEditor(site());
+    await fireImport({ wordpressPageId: 42, pageTitle: "From WP", slug: "from-wp", elements: [heading("wp1", "WP heading")], status: "draft" });
+    expect(editor.canvasIds()).toEqual(["wp1"]);
+    const pages = await savedPages(editor);
+    expect(pages.map((p: any) => p.id)).toEqual(["home", "wp_42"]);
+    expect([pages[1].name, pages[1].slug, pages[1].pageSettings.title]).toEqual(["Home", "/", "Home"]);
+    expect(pages[1].elements.map((e: any) => e.id)).toEqual(["wp1"]);
+    await fireImport({ pageTitle: "ignored" }); // no elements: ignored
+    expect(editor.canvasIds()).toEqual(["wp1"]);
+  });
+
+  it("with pageSettings they are merged in; importing the same WordPress page again updates it in place", async () => {
+    const editor = await mountEditor(site());
+    await fireImport({ wordpressPageId: 7, pageTitle: "From WP", elements: [heading("wp1", "WP heading")], pageSettings: { title: "From WP", path: "/from-wp" } });
+    let pages = await savedPages(editor);
+    expect(pages.map((p: any) => p.id)).toEqual(["home", "wp_7"]);
+    expect([pages[1].name, pages[1].slug, pages[1].pageSettings.wordpressPageId]).toEqual(["From WP", "/from-wp", 7]);
+    await fireImport({ wordpressPageId: 7, pageTitle: "From WP v2", elements: [heading("wp2", "WP heading 2")], pageSettings: { title: "From WP v2", path: "/from-wp" } });
+    pages = await savedPages(editor);
+    expect(pages.map((p: any) => p.id)).toEqual(["home", "wp_7"]);
+    expect(pages[1].name).toBe("From WP v2");
+    expect(pages[1].elements.map((e: any) => e.id)).toEqual(["wp2"]);
+  });
+});

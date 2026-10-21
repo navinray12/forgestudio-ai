@@ -172,3 +172,22 @@ describe("edit page modal (rendered directly)", () => {
     expect(screen.getByTestId("host").innerHTML).toBe("");
   });
 });
+
+describe("restricted (content-only) inspector", () => {
+  it("a CONTENT_EDITOR sees the content-only inspector for the selected element, without the multi-select banner", async () => {
+    const editor = await mountEditor(siteFixture({ userPermission: "CONTENT_EDITOR" }));
+    await editor.select("elA");
+    expect(screen.getByText("CONTENT-ONLY SANDBOX")).toBeTruthy();
+    expect(screen.queryByText("SETTINGS & STYLING")).toBeNull();
+    expect(screen.queryByText(/Multi-Select \(/)).toBeNull();
+  });
+
+  it("a designer selecting two elements sees the multi-select banner", async () => {
+    const editor = await mountEditor(site());
+    await editor.select("elA");
+    fireEvent.click(editor.canvasEl("elB")!, { shiftKey: true });
+    await flush(2);
+    expect(screen.getByText("Multi-Select (2 elements selected)")).toBeTruthy();
+    expect(screen.getByText("SETTINGS & STYLING")).toBeTruthy();
+  });
+});

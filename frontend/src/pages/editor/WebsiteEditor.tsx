@@ -15,9 +15,9 @@ import { DesignNotesOverlay } from "./components/notes/DesignNotesOverlay";
 import { VariablesManagerModal } from "./components/VariablesManagerModal";
 import { ClassManagerModal } from "./components/ClassManagerModal";
 import { validateSlug, generateSlug, safeDeletePage, createStarterPages } from "./utils/pageManagerService";
-import { matchesThemeCondition, type SitePartsConfig, type PublishingState, type DeploymentConfig, type CanonicalWebsiteData, type ThemeBuilderScope, resolveDynamicTokens, type DynamicContext } from "./types";
-import { SaveTemplateDialog, ReplaceTemplateDialog, ImportWebsiteKitDialog, useSaveTemplate, useTemplateLibrary, TemplateLibrary, exportWebsiteKitAsJson, type Template } from "../../features/templates";
-import { RevisionHistoryPanel, revisionHistoryService } from "../../features/revision-history";
+import { type SitePartsConfig, type PublishingState, type DeploymentConfig, type CanonicalWebsiteData, type ThemeBuilderScope, resolveDynamicTokens, type DynamicContext } from "./types";
+import { useSaveTemplate, useTemplateLibrary, TemplateLibrary, exportWebsiteKitAsJson, type Template } from "../../features/templates";
+import { revisionHistoryService } from "../../features/revision-history";
 import { DesignAssistant } from "../../features/ai/DesignAssistant";
 import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import "../../features/editor-access/save-authorized-website";
@@ -102,7 +102,6 @@ export type { EditorElement, ElementStyles, ContainerLayout, Breakpoint, Element
 import { type SiteProduct } from "./types";
 import { IconRenderer } from "./widgets/icons";
 import {
-  triggerImagePicker,
   UniversalIconControls,
   PriceTableWidgetInspector,
   CTAWidgetInspector,
@@ -348,6 +347,26 @@ import { renderElementStateSelector } from "./inspector/selected/elementStateSel
 import { renderElementTypeHeader } from "./inspector/selected/elementTypeHeader";
 import { renderSiteSettingsSecondBlock } from "./inspector/noSelection/siteSettingsSecondBlock";
 import { renderSiteSettingsFirstBlock } from "./inspector/noSelection/siteSettingsFirstBlock";
+import { renderPageCanvasContent } from "./canvas/pageCanvasContent";
+import { renderScopeBanners } from "./canvas/scopeBanners";
+import { renderPreviewPageBody } from "./canvas/previewPageBody";
+import { renderPreviewHeader } from "./canvas/previewHeader";
+import { renderCanvasThemeStyle } from "./canvas/canvasThemeStyle";
+import { renderFullScreenExitButton } from "./canvas/fullScreenExitButton";
+import { renderPeerCursors } from "./canvas/peerCursors";
+import { renderAccessibilityAndSupport } from "./shell/modals/accessibilityAndSupport";
+import { renderExperimentSeoMultilingualModals } from "./shell/modals/experimentSeoMultilingualModals";
+import { renderDesignSystemModals } from "./shell/modals/designSystemModals";
+import { renderSeoAndNotesModals } from "./shell/modals/seoAndNotesModals";
+import { renderPageManagerSection } from "./shell/modals/pageManagerSection";
+import { renderRevisionHistorySection } from "./shell/modals/revisionHistorySection";
+import { renderTemplateDialogs } from "./shell/modals/templateDialogs";
+import { renderPopupSections } from "./shell/modals/popupSections";
+import { renderMultiSelectBanner } from "./inspector/multiSelectBanner";
+import { renderRestrictedModeInspector } from "./inspector/restrictedModeInspector";
+import { applyStyleReset, applyStyleUpdate } from "./core/elementStyles";
+import { selectionRangeIds, toggleSelectedId } from "./core/elementSelection";
+import { upsertImportedPage, wordpressImportedPage } from "./core/wordpressImport";
 import { buildCanonicalPages } from "./core/canonicalPages";
 import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageIdFromUrl, previewPageParam, slugFromName, starterElementsOf, syncActivePageIntoPages } from "./core/pageManagement";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
@@ -780,21 +799,13 @@ export default function WebsiteEditor() {
 
     if (e && (e.ctrlKey || e.metaKey)) {
       setSelectedIds((prev) => {
-        const isAlreadySelected = prev.includes(id);
-        const updated = isAlreadySelected
-          ? prev.filter((item) => item !== id)
-          : [...prev, id];
+        const updated = toggleSelectedId(prev, id);
         setSelectedId(updated.length > 0 ? updated[updated.length - 1] : null);
         return updated;
       });
     } else if (e && e.shiftKey && selectedId && elements.length > 0) {
-      const allIds = getAllElementIds(elements);
-      const startIdx = allIds.indexOf(selectedId);
-      const endIdx = allIds.indexOf(id);
-      if (startIdx !== -1 && endIdx !== -1) {
-        const minIdx = Math.min(startIdx, endIdx);
-        const maxIdx = Math.max(startIdx, endIdx);
-        const rangeIds = allIds.slice(minIdx, maxIdx + 1);
+      const rangeIds = selectionRangeIds(getAllElementIds(elements), selectedId, id);
+      if (rangeIds) {
         setSelectedIds((prev) => Array.from(new Set([...prev, ...rangeIds])));
         setSelectedId(id);
       } else {
@@ -1817,29 +1828,9 @@ export default function WebsiteEditor() {
       const data = e.detail;
       if (!data || !data.elements) return;
 
-      const newPageId = data.forgePageId || `wp_${data.wordpressPageId || Date.now()}`;
-      const importedPage: PageConfig = {
-        id: newPageId,
-        name: data.pageTitle || data.pageSettings?.title || "WordPress Page",
-        slug: data.slug || data.pageSettings?.slug || `wp-${data.wordpressPageId}`,
-        elements: data.elements,
-        pageSettings: {
-          title: data.pageTitle || data.pageSettings?.title || "WordPress Page",
-          slug: data.slug || data.pageSettings?.slug || `wp-${data.wordpressPageId}`,
-          status: data.status || "publish",
-          wordpressPageId: data.wordpressPageId,
-        },
-      };
+      const { newPageId, importedPage } = wordpressImportedPage(data);
 
-      setPages((prev: any[]) => {
-        const existingIdx = prev.findIndex((p) => p.id === newPageId || (p.pageSettings as any)?.wordpressPageId === data.wordpressPageId);
-        if (existingIdx !== -1) {
-          const updated = [...prev];
-          updated[existingIdx] = { ...updated[existingIdx], ...importedPage };
-          return updated;
-        }
-        return [...prev, importedPage];
-      });
+      setPages((prev: any[]) => upsertImportedPage(prev, newPageId, importedPage, data));
 
       setActivePageId(newPageId);
       setElements(data.elements);
@@ -2379,51 +2370,7 @@ export default function WebsiteEditor() {
     if (!selectedId) return;
     setElements((prev) =>
       updateTreeElement(prev, selectedId, (el) => {
-        if (activeElementState === "hover") {
-          if (activeDevice === "desktop") {
-            const newHoverStyles = { ...(el.hoverStyles || {}), [key]: value };
-            let newResponsiveHover = el.responsiveHoverStyles;
-            if (newResponsiveHover?.desktop) {
-              newResponsiveHover = {
-                ...newResponsiveHover,
-                desktop: { ...newResponsiveHover.desktop, [key]: value },
-              };
-            }
-            return { ...el, hoverStyles: newHoverStyles, responsiveHoverStyles: newResponsiveHover };
-          } else {
-            const currentDeviceObj = el.responsiveHoverStyles?.[activeDevice] || {};
-            const updatedDeviceObj = { ...currentDeviceObj, [key]: value };
-            return {
-              ...el,
-              responsiveHoverStyles: {
-                ...el.responsiveHoverStyles,
-                [activeDevice]: updatedDeviceObj,
-              },
-            };
-          }
-        } else {
-          if (activeDevice === "desktop") {
-            const newStyles = { ...el.styles, [key]: value };
-            let newResponsive = el.responsiveStyles;
-            if (newResponsive?.desktop) {
-              newResponsive = {
-                ...newResponsive,
-                desktop: { ...newResponsive.desktop, [key]: value },
-              };
-            }
-            return { ...el, styles: newStyles, responsiveStyles: newResponsive };
-          } else {
-            const currentDeviceObj = el.responsiveStyles?.[activeDevice] || {};
-            const updatedDeviceObj = { ...currentDeviceObj, [key]: value };
-            return {
-              ...el,
-              responsiveStyles: {
-                ...el.responsiveStyles,
-                [activeDevice]: updatedDeviceObj,
-              },
-            };
-          }
-        }
+        return applyStyleUpdate(el, key, value, activeElementState, activeDevice);
       })
     );
   };
@@ -2432,59 +2379,7 @@ export default function WebsiteEditor() {
     if (!selectedId) return;
     setElements((prev) =>
       updateTreeElement(prev, selectedId, (el) => {
-        if (activeElementState === "hover") {
-          if (activeDevice === "desktop") {
-            const newHoverStyles = { ...(el.hoverStyles || {}) };
-            delete newHoverStyles[key];
-            let newResponsiveHover = el.responsiveHoverStyles;
-            if (newResponsiveHover?.desktop) {
-              const newDesktopResp = { ...newResponsiveHover.desktop };
-              delete newDesktopResp[key];
-              newResponsiveHover = { ...newResponsiveHover, desktop: newDesktopResp };
-            }
-            return {
-              ...el,
-              hoverStyles: Object.keys(newHoverStyles).length > 0 ? newHoverStyles : undefined,
-              responsiveHoverStyles: newResponsiveHover,
-            };
-          } else {
-            if (!el.responsiveHoverStyles?.[activeDevice]) return el;
-            const currentDeviceObj = { ...el.responsiveHoverStyles[activeDevice] };
-            delete currentDeviceObj[key];
-            const newResponsiveHover = {
-              ...el.responsiveHoverStyles,
-              [activeDevice]: currentDeviceObj,
-            };
-            if (Object.keys(currentDeviceObj).length === 0) {
-              delete newResponsiveHover[activeDevice];
-            }
-            return { ...el, responsiveHoverStyles: newResponsiveHover };
-          }
-        } else {
-          if (activeDevice === "desktop") {
-            const newStyles = { ...el.styles };
-            delete newStyles[key];
-            let newResponsive = el.responsiveStyles;
-            if (newResponsive?.desktop) {
-              const newDesktopResp = { ...newResponsive.desktop };
-              delete newDesktopResp[key];
-              newResponsive = { ...newResponsive, desktop: newDesktopResp };
-            }
-            return { ...el, styles: newStyles, responsiveStyles: newResponsive };
-          } else {
-            if (!el.responsiveStyles?.[activeDevice]) return el;
-            const currentDeviceObj = { ...el.responsiveStyles[activeDevice] };
-            delete currentDeviceObj[key];
-            const newResponsive = {
-              ...el.responsiveStyles,
-              [activeDevice]: currentDeviceObj,
-            };
-            if (Object.keys(currentDeviceObj).length === 0) {
-              delete newResponsive[activeDevice];
-            }
-            return { ...el, responsiveStyles: newResponsive };
-          }
-        }
+        return applyStyleReset(el, key, activeElementState, activeDevice);
       })
     );
   };
@@ -3545,50 +3440,17 @@ export default function WebsiteEditor() {
           <style dangerouslySetInnerHTML={{ __html: generateElementsHoverCSS(elements, activeDevice) }} />
 
           {/* Live Real-time Multi-Cursor Overlays */}
-          {canvasPeers.map((peer) => {
-            if (!peer.cursor) return null;
-            return (
-              <div
-                key={`cursor-${peer.socketId}`}
-                className="pointer-events-none absolute z-50 transition-all duration-75 ease-out"
-                style={{
-                  left: `${peer.cursor.x}px`,
-                  top: `${peer.cursor.y}px`,
-                }}
-              >
-                <svg
-                  className="w-4 h-4 drop-shadow-md"
-                  viewBox="0 0 24 24"
-                  fill={peer.user.color}
-                  stroke="#ffffff"
-                  strokeWidth="1.5"
-                >
-                  <path d="M5.653 3.123A1 1 0 0 0 4.19 4.316l3.5 14.5a1 1 0 0 0 1.838.256l3.224-6.448 6.448-3.224a1 1 0 0 0 .256-1.838l-14.5-3.5z" />
-                </svg>
-                <div
-                  className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white shadow-md whitespace-nowrap ml-3 -mt-2"
-                  style={{ backgroundColor: peer.user.color }}
-                >
-                  {peer.user.name}
-                </div>
-              </div>
-            );
+          {/* See canvas/peerCursors (moved verbatim) */}
+          {renderPeerCursors({
+            canvasPeers,
           })}
 
           {/* Floating Exit Full Screen Overlay Button (F-015) */}
-          {isFullScreenCanvas && (
-            <div className="absolute top-4 right-6 z-50">
-              <button
-                type="button"
-                onClick={() => setIsFullScreenCanvas(false)}
-                className="flex items-center gap-1.5 rounded-full bg-slate-900/90 text-white px-4 py-2 text-xs font-bold shadow-lg border border-slate-700 hover:bg-black hover:scale-105 transition"
-                title="Exit Full Screen Mode (Esc)"
-              >
-                <span>✕</span>
-                <span>Exit Full Screen (Esc)</span>
-              </button>
-            </div>
-          )}
+          {/* See canvas/fullScreenExitButton (moved verbatim) */}
+          {renderFullScreenExitButton({
+            isFullScreenCanvas,
+            setIsFullScreenCanvas,
+          })}
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -3610,452 +3472,65 @@ export default function WebsiteEditor() {
               }`}
           >
             {/* Global Design Tokens / CSS Variables (Comment 14) */}
-            <style>{`
-              :root {
-                --forge-primary: ${globalSettings?.globalStyles?.primaryColor || "#3b82f6"};
-                --forge-secondary: ${globalSettings?.globalStyles?.secondaryColor || "#64748b"};
-                --forge-accent: ${globalSettings?.globalStyles?.accentColor || "#10b981"};
-                --forge-text: ${globalSettings?.globalStyles?.textColor || "#1e293b"};
-                --forge-bg: ${globalSettings?.globalStyles?.backgroundColor || "#ffffff"};
-                --forge-font-heading: ${globalSettings?.globalStyles?.headingFont || "inherit"};
-                --forge-font-body: ${globalSettings?.globalStyles?.bodyFont || "inherit"};
-                --forge-btn-radius: ${globalSettings?.globalStyles?.buttonBorderRadius || "6px"};
-              }
-            `}</style>
+            {/* See canvas/canvasThemeStyle (moved verbatim) */}
+            {renderCanvasThemeStyle({
+              globalSettings,
+            })}
 
             {/* Dynamic Website Navigation Header in Preview Mode */}
             {isPreview ? (
               <div className="space-y-6">
-                <header className="sticky top-0 z-30 w-full rounded-xl border border-slate-200/80 bg-white/95 backdrop-blur-md shadow-sm transition-all overflow-hidden">
-                  <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-                    {/* Website Brand / Logo */}
-                    <div
-                      className="flex items-center gap-2.5 cursor-pointer"
-                      onClick={() => {
-                        const homePage = pages.find((p) => p.isHome || p.id === homePageId || p.slug === "/") || pages[0];
-                        if (homePage) handlePreviewPageNavigate(homePage);
-                      }}
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs shadow-md">
-                        {(website?.name || pageSettings?.title || "W").charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <span className="text-sm font-extrabold tracking-tight text-slate-900 block leading-tight">
-                          {globalSettings?.siteIdentity?.name || website?.name || "My Website"}
-                        </span>
-                        <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider block">
-                          Website Preview
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Desktop Navigation Links */}
-                    {pages.length > 0 && (
-                      <nav className="hidden sm:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
-                        {pages.map((p) => {
-                          const isCurrent = (activePreviewPageId || pages[0]?.id) === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => handlePreviewPageNavigate(p)}
-                              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${isCurrent
-                                ? "bg-white text-blue-600 shadow-sm border border-slate-200/60 font-extrabold"
-                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                                }`}
-                            >
-                              {p.name || p.pageSettings?.title || "Untitled"}
-                            </button>
-                          );
-                        })}
-                      </nav>
-                    )}
-
-                    {/* Mobile Hamburger Toggle Button */}
-                    {pages.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        className="sm:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                        aria-label="Toggle Navigation Menu"
-                      >
-                        <span className="text-sm">{mobileMenuOpen ? "✕" : "☰"}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Mobile Dropdown Menu Drawer */}
-                  {mobileMenuOpen && pages.length > 0 && (
-                    <div className="sm:hidden border-t border-slate-200 bg-slate-50 p-2.5 space-y-1 animate-fadeIn">
-                      {pages.map((p) => {
-                        const isCurrent = (activePreviewPageId || pages[0]?.id) === p.id;
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              handlePreviewPageNavigate(p);
-                              setMobileMenuOpen(false);
-                            }}
-                            className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-lg transition flex items-center justify-between ${isCurrent
-                              ? "bg-blue-600 text-white font-extrabold shadow-sm"
-                              : "text-slate-700 hover:bg-slate-200/70"
-                              }`}
-                          >
-                            <span>{p.name || p.pageSettings?.title || "Untitled"}</span>
-                            <span className="text-[10px] opacity-70 font-mono">{p.slug}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </header>
+                {/* See canvas/previewHeader (moved verbatim) */}
+                {renderPreviewHeader({
+                  activePreviewPageId,
+                  globalSettings,
+                  handlePreviewPageNavigate,
+                  homePageId,
+                  mobileMenuOpen,
+                  pageSettings,
+                  pages,
+                  setMobileMenuOpen,
+                  website,
+                })}
 
                 {/* Currently Selected Preview Page Content */}
-                {(() => {
-                  const currentPreviewPage = pages.find((p) => p.id === activePreviewPageId) || pages[0];
-                  const activeElements = currentPreviewPage?.id === activePageId ? elements : (currentPreviewPage?.elements || []);
-
-                  if (pageSettings.isMaintenanceMode) {
-                    return (
-                      <div className="flex min-h-[450px] flex-col items-center justify-center rounded-2xl bg-amber-50/60 border border-amber-200/80 p-8 text-center shadow-inner my-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-md mb-4 animate-pulse">
-                          <span className="text-3xl">🛠️</span>
-                        </div>
-                        <span className="inline-block rounded-full bg-amber-200/80 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 mb-2">
-                          Temporary Maintenance State
-                        </span>
-                        <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">
-                          Website Under Maintenance
-                        </h2>
-                        <p className="mt-2 max-w-md text-xs leading-relaxed text-slate-600">
-                          This website is currently undergoing scheduled maintenance and upgrades. Please check back shortly!
-                        </p>
-                        <div className="mt-6 flex items-center justify-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setIsPreview(false)}
-                            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-black transition"
-                          >
-                            Return to Editor
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="space-y-6 py-2">
-                      {/* Global Header in Preview (Comment 5, 21) */}
-                      {(siteParts.header?.enabled ?? siteParts.header?.isEnabled ?? true) &&
-                        matchesThemeCondition(siteParts.header?.conditions, {
-                          pageId: currentPreviewPage?.id,
-                          isHome: currentPreviewPage?.isHome,
-                          slug: currentPreviewPage?.slug,
-                        }) && (
-                          <div className="site-global-header border-b border-slate-100 pb-4 mb-4">
-                            {siteParts.header?.elements && siteParts.header.elements.length > 0 ? (
-                              siteParts.header.elements.map((el) => renderElementTree(el))
-                            ) : (
-                              <DefaultWebsiteNavbar
-                                websiteName={website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio"}
-                                pages={pages}
-                                activePageId={currentPreviewPage?.id || activePageId}
-                                isPreview={true}
-                                activeDevice={activeDevice}
-                                onNavigatePage={(targetPage) => handlePreviewPageNavigate(targetPage)}
-                                onEditHeader={() => {
-                                  setIsPreview(false);
-                                  handleSwitchCanvasMode("header");
-                                }}
-                              />
-                            )}
-                          </div>
-                        )}
-
-                      {/* Active Page Elements */}
-                      <div className="site-page-content">
-                        {(!activeElements || activeElements.length === 0) ? (
-                          <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-center p-8 bg-slate-50/50">
-                            <p className="text-sm font-bold text-slate-700">
-                              Page "{currentPreviewPage?.name || "Untitled"}" is Empty
-                            </p>
-                            <p className="mt-1 text-xs text-slate-400">
-                              Switch back to the editor to add elements to this page.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {activeElements.map((el) => renderElementTree(el))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Global Footer in Preview (Comment 5, 21) */}
-                      {(siteParts.footer?.enabled ?? siteParts.footer?.isEnabled ?? true) &&
-                        matchesThemeCondition(siteParts.footer?.conditions, {
-                          pageId: currentPreviewPage?.id,
-                          isHome: currentPreviewPage?.isHome,
-                          slug: currentPreviewPage?.slug,
-                        }) && (
-                          <div className="site-global-footer border-t border-slate-100 pt-6 mt-10">
-                            {siteParts.footer?.elements && siteParts.footer.elements.length > 0 ? (
-                              siteParts.footer.elements.map((el) => renderElementTree(el))
-                            ) : (
-                              <div className="py-6 text-center text-xs text-slate-500">
-                                © {new Date().getFullYear()} {website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio"}. All rights reserved.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  );
-                })()}
+                {/* See canvas/previewPageBody (moved verbatim) */}
+                {renderPreviewPageBody({
+                  activeDevice,
+                  activePageId,
+                  activePreviewPageId,
+                  elements,
+                  globalSettings,
+                  handlePreviewPageNavigate,
+                  handleSwitchCanvasMode,
+                  pageSettings,
+                  pages,
+                  renderElementTree,
+                  setIsPreview,
+                  siteParts,
+                  website,
+                })}
               </div>
             ) : (
               <>
                 {/* Canvas Target Banner: Header Mode */}
-                {canvasMode === "header" && (
-                  <div className="flex items-center justify-between border-b-2 border-purple-500 bg-purple-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">🌐</span>
-                      <div>
-                        <span className="text-xs font-bold text-purple-900 block">
-                          Editing Shared Global Header
-                        </span>
-                        <span className="text-[10px] text-purple-600 block">
-                          Changes made here appear across all pages in the website.
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page ({pages.find((p) => p.id === activePageId)?.name || "Page"})</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Canvas Target Banner: Footer Mode */}
-                {canvasMode === "footer" && (
-                  <div className="flex items-center justify-between border-b-2 border-purple-500 bg-purple-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">🌐</span>
-                      <div>
-                        <span className="text-xs font-bold text-purple-900 block">
-                          Editing Shared Global Footer
-                        </span>
-                        <span className="text-[10px] text-purple-600 block">
-                          Changes made here appear across all pages in the website.
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page ({pages.find((p) => p.id === activePageId)?.name || "Page"})</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Canvas Target Banner: Single Post Template Mode */}
-                {canvasMode === "single" && (
-                  <div className="flex items-center justify-between border-b-2 border-indigo-500 bg-indigo-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">📰</span>
-                      <div>
-                        <span className="text-xs font-bold text-indigo-900 block">
-                          Editing Single Post Template (F-237)
-                        </span>
-                        <span className="text-[10px] text-indigo-600 block">
-                          Dynamic layout applied when viewing individual blog posts or articles (/post/:slug).
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Canvas Target Banner: Archive Template Mode */}
-                {canvasMode === "archive" && (
-                  <div className="flex items-center justify-between border-b-2 border-emerald-500 bg-emerald-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">📚</span>
-                      <div>
-                        <span className="text-xs font-bold text-emerald-900 block">
-                          Editing Archive Template (F-238)
-                        </span>
-                        <span className="text-[10px] text-emerald-600 block">
-                          Layout applied to category listings, taxonomy archives, and blog indexes (/archive.html).
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-white hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Canvas Target Banner: 404 Template Mode */}
-                {canvasMode === "404" && (
-                  <div className="flex items-center justify-between border-b-2 border-amber-500 bg-amber-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">⚠️</span>
-                      <div>
-                        <span className="text-xs font-bold text-amber-900 block">
-                          Editing 404 Error Template (F-239)
-                        </span>
-                        <span className="text-[10px] text-amber-600 block">
-                          Layout displayed when visitors navigate to invalid URLs or unlisted routes (/404.html).
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-amber-700 hover:text-amber-900 bg-white hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Canvas Target Banner: Search Results Template Mode */}
-                {canvasMode === "search-results" && (
-                  <div className="flex items-center justify-between border-b-2 border-blue-500 bg-blue-50/90 rounded-xl px-4 py-3 mb-6 shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">🔍</span>
-                      <div>
-                        <span className="text-xs font-bold text-blue-900 block">
-                          Editing Search Results Template (F-240)
-                        </span>
-                        <span className="text-[10px] text-blue-600 block">
-                          Layout presented when visitors search site content (/search.html?q=...).
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchCanvasMode("page")}
-                      className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-300 transition shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>←</span>
-                      <span>Back to Page</span>
-                    </button>
-                  </div>
-                )}
+                {/* See canvas/scopeBanners (moved verbatim) */}
+                {renderScopeBanners({
+                  activePageId,
+                  canvasMode,
+                  handleSwitchCanvasMode,
+                  pages,
+                })}
 
                 {/* Blank Page Layout Bar (F-016) - Page Mode */}
-                {canvasMode === "page" && (
-                  <>
-                    {/* Shared Global Header & Navigation in Page Mode Canvas (Only rendered if custom header elements exist) */}
-                    {(siteParts.header?.enabled ?? siteParts.header?.isEnabled ?? true) && siteParts.header?.elements && siteParts.header.elements.length > 0 && (
-                      <div className="mb-6 rounded-2xl border border-dashed border-purple-300/80 bg-purple-50/20 p-2.5 transition hover:border-purple-400">
-                        <div className="flex items-center justify-between pb-2 border-b border-purple-200/50 mb-2 px-1">
-                          <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
-                            <span>🌐</span>
-                            <span>Website Header & Navigation (Shared Across Pages)</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleSwitchCanvasMode("header")}
-                            className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-300 transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                            title="Customize Header & Navigation"
-                          >
-                            <span>✏️</span>
-                            <span>Edit Header</span>
-                          </button>
-                        </div>
-                        <div className="space-y-3">
-                          {siteParts.header.elements.map((el) => renderElementTree(el))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Elements Tree Rendering */}
-                {elements.length === 0 ? (
-                  <div className="flex h-96 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-center p-8">
-                    <p className="text-sm font-bold text-slate-700">
-                      {canvasMode === "header"
-                        ? "Global Header is Empty"
-                        : canvasMode === "footer"
-                          ? "Global Footer is Empty"
-                          : canvasMode === "single"
-                            ? "Single Post Template is Empty"
-                            : canvasMode === "archive"
-                              ? "Archive Template is Empty"
-                              : canvasMode === "404"
-                                ? "404 Not Found Template is Empty"
-                                : canvasMode === "search-results"
-                                  ? "Search Results Template is Empty"
-                                  : "Your Page Canvas is Empty"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {canvasMode === "header"
-                        ? "Add navigation menu, logo, buttons, or links from the left panel."
-                        : canvasMode === "footer"
-                          ? "Add footer links, copyright text, or social icons from the left panel."
-                          : canvasMode === "single"
-                            ? "Add post title, breadcrumbs, excerpt, or post navigation."
-                            : canvasMode === "archive"
-                              ? "Add taxonomy filter, archive title, or post cards."
-                              : canvasMode === "404"
-                                ? "Add 404 message, homepage link, or search bar."
-                                : canvasMode === "search-results"
-                                  ? "Add search input, results layout, or query heading."
-                                  : "Click any element from the left panel to start building."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 w-full max-w-full box-border overflow-x-hidden">
-                    {elements.map((el) => renderElementTree(el))}
-                  </div>
-                )}
-
-                {/* Shared Global Footer in Page Mode Canvas (Only rendered if custom footer elements exist) */}
-                {canvasMode === "page" && (siteParts.footer?.enabled ?? siteParts.footer?.isEnabled ?? true) && siteParts.footer?.elements && siteParts.footer.elements.length > 0 && (
-                  <div className="mt-8 rounded-2xl border border-dashed border-purple-300/80 bg-purple-50/20 p-2.5 transition hover:border-purple-400">
-                    <div className="flex items-center justify-between pb-2 border-b border-purple-200/50 mb-2 px-1">
-                      <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <span>🌐</span>
-                        <span>Website Footer (Shared Across Pages)</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchCanvasMode("footer")}
-                        className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100 px-2.5 py-1 rounded-md border border-purple-300 transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                        title="Customize Footer"
-                      >
-                        <span>✏️</span>
-                        <span>Edit Footer</span>
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {siteParts.footer.elements.map((el) => renderElementTree(el))}
-                    </div>
-                  </div>
-                )}
+                {/* See canvas/pageCanvasContent (moved verbatim) */}
+                {renderPageCanvasContent({
+                  canvasMode,
+                  elements,
+                  handleSwitchCanvasMode,
+                  renderElementTree,
+                  siteParts,
+                })}
               </>
             )}
           </div>
@@ -4071,22 +3546,16 @@ export default function WebsiteEditor() {
             </h2>
 
             {isRestrictedMode ? (
-              <ContentOnlyInspector
-                element={selectedElementAny}
-                onUpdateElement={(id, updates) => {
-                  setElements((prev) => updateTreeElement(prev, id, (el) => ({ ...el, ...updates })));
-                }}
-                onTriggerImagePicker={(callback) => {
-                  triggerImagePicker(callback);
-                }}
-              />
+              /* See inspector/restrictedModeInspector (moved verbatim) */ renderRestrictedModeInspector({
+                selectedElementAny,
+                setElements,
+              })
             ) : (
               <>
-                {selectedIds.length > 1 && (
-                  <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 p-2 text-center text-xs font-semibold text-blue-700">
-                    Multi-Select ({selectedIds.length} elements selected)
-                  </div>
-                )}
+                {/* See inspector/multiSelectBanner (moved verbatim) */}
+                {renderMultiSelectBanner({
+                  selectedIds,
+                })}
 
                 {selectedElementAny ? (
                   <div className="space-y-5">
@@ -11488,28 +10957,22 @@ export default function WebsiteEditor() {
       })}
 
       {/* Popup Manager Modal */}
-      <PopupManagerModal
-        isOpen={isPopupManagerOpen}
-        onClose={() => setIsPopupManagerOpen(false)}
-        popups={popups}
-        onSelectPopupForEdit={handleSelectPopupForEdit}
-        onCreatePopup={handleCreatePopup}
-        onUpdatePopup={handleUpdatePopup}
-        onDeletePopup={handleDeletePopup}
-        onDuplicatePopup={handleDuplicatePopup}
-      />
-
-      {/* Runtime Simulation in Preview Mode (F-282 - F-291) */}
-      {isPreview && (
-        <PopupRuntimePreview
-          popups={popups}
-          renderElementTree={renderElementTree}
-          onTrackView={handleTrackPopupView}
-          onTrackClick={handleTrackPopupClick}
-          isPreviewMode={true}
-          globalSettings={globalSettings}
-        />
-      )}
+      {/* See shell/modals/popupSections (moved verbatim) */}
+      {renderPopupSections({
+        globalSettings,
+        handleCreatePopup,
+        handleDeletePopup,
+        handleDuplicatePopup,
+        handleSelectPopupForEdit,
+        handleTrackPopupClick,
+        handleTrackPopupView,
+        handleUpdatePopup,
+        isPopupManagerOpen,
+        isPreview,
+        popups,
+        renderElementTree,
+        setIsPopupManagerOpen,
+      })}
 
       {/* Developer Modal (F-102 - F-109) */}
       {devModalMode && <Suspense fallback={null}><DeveloperModal
@@ -11548,41 +11011,34 @@ export default function WebsiteEditor() {
       /></Suspense>}
 
       {/* F-322 / F-334 Save as Template / Update Template Dialog Modal */}
-      <SaveTemplateDialog
-        isOpen={isSaveTemplateOpen}
-        isUpdateMode={isSaveTemplateUpdateMode}
-        name={saveTemplateName}
-        setName={setSaveTemplateName}
-        description={saveTemplateDescription}
-        setDescription={setSaveTemplateDescription}
-        type={saveTemplateType}
-        setType={setSaveTemplateType}
-        category={saveTemplateCategory}
-        setCategory={setSaveTemplateCategory}
-        isSaving={isSavingTemplate}
-        error={saveTemplateError}
-        validationError={saveTemplateValidationError}
-        onClose={closeSaveTemplateDialog}
-        onSave={handleSaveTemplateSubmit}
-        elements={elements}
-        pageSettings={pageSettings}
-      />
-
-      {/* F-332 Replace Template Dialog Modal */}
-      <ReplaceTemplateDialog
-        isOpen={isReplaceTemplateOpen}
-        targetElementName={selectedElement ? selectedElement.content || selectedElement.type : "Selected Element"}
-        templates={libraryTemplates}
-        onClose={() => setIsReplaceTemplateOpen(false)}
-        onConfirmReplace={handleConfirmReplaceTemplate}
-      />
-
-      {/* F-336 Import Website Kit Dialog Modal */}
-      <ImportWebsiteKitDialog
-        isOpen={isImportWebsiteKitOpen}
-        onClose={() => setIsImportWebsiteKitOpen(false)}
-        onImportKit={handleConfirmImportWebsiteKit}
-      />
+      {/* See shell/modals/templateDialogs (moved verbatim) */}
+      {renderTemplateDialogs({
+        closeSaveTemplateDialog,
+        elements,
+        handleConfirmImportWebsiteKit,
+        handleConfirmReplaceTemplate,
+        handleSaveTemplateSubmit,
+        isImportWebsiteKitOpen,
+        isReplaceTemplateOpen,
+        isSaveTemplateOpen,
+        isSaveTemplateUpdateMode,
+        isSavingTemplate,
+        libraryTemplates,
+        pageSettings,
+        saveTemplateCategory,
+        saveTemplateDescription,
+        saveTemplateError,
+        saveTemplateName,
+        saveTemplateType,
+        saveTemplateValidationError,
+        selectedElement,
+        setIsImportWebsiteKitOpen,
+        setIsReplaceTemplateOpen,
+        setSaveTemplateCategory,
+        setSaveTemplateDescription,
+        setSaveTemplateName,
+        setSaveTemplateType,
+      })}
 
       {/* AI Studio Floating Trigger - Matching Accessibility Widget Geometry & Style */}
       {/* See shell/modals/aiAssistantLauncher (moved verbatim) */}
@@ -11619,24 +11075,23 @@ export default function WebsiteEditor() {
         setIsDesignAssistantOpen,
         websiteId,
       })}
-      <RevisionHistoryPanel
-        isOpen={isRevisionHistoryOpen}
-        onClose={() => setIsRevisionHistoryOpen(false)}
-        websiteId={websiteId || ""}
-        apiUrl={apiUrl}
-        onRestore={handleRestoreRevision}
-        currentWorkingState={{
-          elements,
-          pageSettings,
-          pages,
-          siteParts,
-          globalSettings,
-          breakpoints,
-          popups,
-          pageCss,
-          homePageId,
-        }}
-      />
+      {/* See shell/modals/revisionHistorySection (moved verbatim) */}
+      {renderRevisionHistorySection({
+        apiUrl,
+        breakpoints,
+        elements,
+        globalSettings,
+        handleRestoreRevision,
+        homePageId,
+        isRevisionHistoryOpen,
+        pageCss,
+        pageSettings,
+        pages,
+        popups,
+        setIsRevisionHistoryOpen,
+        siteParts,
+        websiteId,
+      })}
 
       {/* Modal for Adding New Page */}
       {/* Add Page modal: see shell/addPageModal (moved verbatim) */}
@@ -11663,22 +11118,18 @@ export default function WebsiteEditor() {
       })}
 
       {/* Multi-Page Management Modal (Comments 10, 11, 23, 36, 37) */}
-      <PageManagerModal
-        isOpen={isPageManagerModalOpen}
-        onClose={() => setIsPageManagerModalOpen(false)}
-        pages={pages}
-        activePageId={activePageId}
-        homePageId={homePageId}
-        onSwitchPage={(pageId) => {
-          handleSwitchEditingPage(pageId);
-          setIsPageManagerModalOpen(false);
-        }}
-        onUpdatePages={(updatedPages, newHomeId) => {
-          setPages(updatedPages);
-          if (newHomeId) setHomePageId(newHomeId);
-        }}
-        siteParts={siteParts}
-      />
+      {/* See shell/modals/pageManagerSection (moved verbatim) */}
+      {renderPageManagerSection({
+        activePageId,
+        handleSwitchEditingPage,
+        homePageId,
+        isPageManagerModalOpen,
+        pages,
+        setHomePageId,
+        setIsPageManagerModalOpen,
+        setPages,
+        siteParts,
+      })}
 
       {/* Website Publishing & Deployment Modal (Comment 8) */}
       <PublishModal
@@ -11700,145 +11151,79 @@ export default function WebsiteEditor() {
       />
 
       {/* SEO & Quality Analyzer Modal */}
-      <SeoAnalyzerModal
-        isOpen={isSeoModalOpen}
-        onClose={() => setIsSeoModalOpen(false)}
-        websiteId={websiteId || ""}
-        activePage={pages.find((p) => p.id === activePageId) || pages[0] || { elements }}
-        allPages={pages}
-        websiteData={{
-          name: website?.name,
-          siteSettings: globalSettings || {},
-          pages,
-        }}
-        onSelectElement={handleSelectElementFromAudit}
-        onUpdateElementProp={handleUpdateElementPropById}
-        onUpdatePageSettings={setPageSettings}
-      />
-
-      {/* Collaborative Design Notes & Feedback Overlay */}
-      <DesignNotesOverlay
-        isOpen={isDesignNotesOpen}
-        onClose={() => setIsDesignNotesOpen(false)}
-        websiteId={websiteId || ""}
-        activeElementId={selectedElementAny?.id || null}
-      />
+      {/* See shell/modals/seoAndNotesModals (moved verbatim) */}
+      {renderSeoAndNotesModals({
+        activePageId,
+        elements,
+        globalSettings,
+        handleSelectElementFromAudit,
+        handleUpdateElementPropById,
+        isDesignNotesOpen,
+        isSeoModalOpen,
+        pages,
+        selectedElementAny,
+        setIsDesignNotesOpen,
+        setIsSeoModalOpen,
+        setPageSettings,
+        website,
+        websiteId,
+      })}
 
       {/* Advanced Icon Library Modal */}
-      <IconPickerModal
-        isOpen={isIconPickerOpen}
-        onClose={() => setIsIconPickerOpen(false)}
-        currentIcon={
-          selectedElementAny
-            ? (selectedElementAny as any)[iconPickerTargetField] || selectedElementAny.iconName || selectedElementAny.icon || ""
-            : ""
-        }
-        onSelectIcon={(iconName, iconProvider) => {
-          if (selectedElementAny) {
-            updateSelectedProp((iconPickerTargetField || "iconName") as keyof EditorElement, iconName);
-            if (iconProvider) {
-              updateSelectedProp("iconProvider", iconProvider);
-            }
-            updateSelectedProp("icon", iconName);
-          }
-        }}
-        onRemoveIcon={() => {
-          if (selectedElementAny) {
-            updateSelectedProp((iconPickerTargetField || "iconName") as keyof EditorElement, "");
-            updateSelectedProp("icon", "");
-          }
-        }}
-      />
-
-      {/* Dynamic Font System Modal */}
-      <FontPickerModal
-        isOpen={isFontPickerModalOpen}
-        onClose={() => setIsFontPickerModalOpen(false)}
-        selectedFont={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontFamily")}
-        onSelectFont={(fontFamily) => {
-          if (fontPickerCallback) {
-            fontPickerCallback(fontFamily);
-          } else {
-            updateSelectedStyle("fontFamily", fontFamily);
-          }
-          setIsFontPickerModalOpen(false);
-        }}
-      />
-
-      {/* F-339: Variables Manager Modal */}
-      <VariablesManagerModal
-        isOpen={isVariablesModalOpen}
-        onClose={() => setIsVariablesModalOpen(false)}
-        variables={globalVariables}
-        onSaveVariables={(updated) => {
-          setGlobalVariables(updated);
-          handleSave();
-        }}
-      />
-
-      {/* F-340: Global Class Manager Modal */}
-      <ClassManagerModal
-        isOpen={isClassModalOpen}
-        onClose={() => setIsClassModalOpen(false)}
-        classes={globalClasses}
-        userRole="OWNER"
-        onSaveClasses={(updated) => {
-          setGlobalClasses(updated);
-          handleSave();
-        }}
-      />
+      {/* See shell/modals/designSystemModals (moved verbatim) */}
+      {renderDesignSystemModals({
+        activeDevice,
+        activeElementState,
+        fontPickerCallback,
+        globalClasses,
+        globalVariables,
+        handleSave,
+        iconPickerTargetField,
+        isClassModalOpen,
+        isFontPickerModalOpen,
+        isIconPickerOpen,
+        isVariablesModalOpen,
+        selectedElementAny,
+        setGlobalClasses,
+        setGlobalVariables,
+        setIsClassModalOpen,
+        setIsFontPickerModalOpen,
+        setIsIconPickerOpen,
+        setIsVariablesModalOpen,
+        updateSelectedProp,
+        updateSelectedStyle,
+      })}
 
 {/* Phase 3: A/B Split Testing & Conversion Experiments Modal */}
-      <ExperimentManagerModal
-        isOpen={isExperimentModalOpen}
-        onClose={() => setIsExperimentModalOpen(false)}
-        websiteId={websiteId || (website as any)?.id || ""}
-      />
-
-      {/* F-363 & F-371: SEO & WCAG Accessibility Audit Modal */}
-      <SeoAnalyzerModal
-        isOpen={isSeoAnalyzerOpen}
-        onClose={() => setIsSeoAnalyzerOpen(false)}
-        websiteId={websiteId || ""}
-        activePage={pages.find((p) => p.id === activePageId) || { id: activePageId || "home", name: pageSettings.title || "Home", elements, pageSettings }}
-        allPages={pages}
-        websiteData={website}
-        onSelectElement={(elId) => {
-          setSelectedId(elId);
-        }}
-        onUpdateElementProp={(elId, propKey, propVal) => {
-          setElements((prev) => updateTreeElement(prev, elId, (item) => ({ ...item, [propKey]: propVal })));
-        }}
-        onUpdatePageSettings={(updater) => {
-          setPageSettings((prev) => updater(prev));
-        }}
-      />
-
-      {/* F-381: Multilingual Plugin Compatibility Modal */}
-      <MultilingualExportModal
-        isOpen={isMultilingualModalOpen}
-        onClose={() => setIsMultilingualModalOpen(false)}
-        activePage={pages.find((p) => p.id === activePageId) || { id: activePageId || "home", name: pageSettings.title || "Home", elements, pageSettings }}
-        websiteData={website}
-      />
+      {/* See shell/modals/experimentSeoMultilingualModals (moved verbatim) */}
+      {renderExperimentSeoMultilingualModals({
+        activePageId,
+        elements,
+        isExperimentModalOpen,
+        isMultilingualModalOpen,
+        isSeoAnalyzerOpen,
+        pageSettings,
+        pages,
+        setElements,
+        setIsExperimentModalOpen,
+        setIsMultilingualModalOpen,
+        setIsSeoAnalyzerOpen,
+        setPageSettings,
+        setSelectedId,
+        website,
+        websiteId,
+      })}
 
       {/* F-364 & F-376: Visitor Accessibility Usability Toolbar & Reading Guide */}
-      <ReadingGuideBar />
-      <AccessibilityWidget
-        config={globalSettings?.accessibilityWidget}
-        onOpenStatement={() => setIsStatementOpen(true)}
-      />
-      <AccessibilityStatementModal
-        isOpen={isStatementOpen}
-        onClose={() => setIsStatementOpen(false)}
-        organizationName={globalSettings?.siteIdentity?.name || website?.name || "Website"}
-      />
-
-      {/* F-020 Temporary Support Credentials Modal */}
-      <SupportCredentialsModal
-        isOpen={isSupportCredentialsOpen}
-        onClose={() => setIsSupportCredentialsOpen(false)}
-      />
+      {/* See shell/modals/accessibilityAndSupport (moved verbatim) */}
+      {renderAccessibilityAndSupport({
+        globalSettings,
+        isStatementOpen,
+        isSupportCredentialsOpen,
+        setIsStatementOpen,
+        setIsSupportCredentialsOpen,
+        website,
+      })}
     </div>
     </WooCommerceProvider>
   );
