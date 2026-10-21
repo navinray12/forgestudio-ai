@@ -171,12 +171,10 @@ import {
   getEffectiveHoverStyle,
   getControlStyleValue,
   isControlStyleConfigured,
-  hasHoverStyleOverride,
   getEffectiveLayout,
   getMergedStyles,
   getMergedLayout,
   getInnerStyles,
-  hasStyleOverride,
   generateElementsHoverCSS,
   getElementBreadcrumbPath,
   updateTreeElement,
@@ -334,7 +332,13 @@ import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } fro
 import { useEditorHistory } from "./core/useEditorHistory";
 import { useEditorShortcuts } from "./core/useEditorShortcuts";
 import { ScrubbableNumberInput } from "./components/ScrubbableNumberInput";
+import { assetFileError, buildImportedAssetElement, IMAGE_UPLOAD_RULE, IMPORT_ASSET_RULE, recordImportedAsset, uploadOrReadAsDataUrl, VIDEO_UPLOAD_RULE } from "./core/assetUpload";
+import { buildTypographySection } from "./inspector/typographySection";
+import { buildPositioningControls } from "./inspector/positioningControls";
+import { buildBackgroundAndBorderControls } from "./inspector/backgroundBorderControls";
+import { buildNavigatorTreeItem } from "./navigator/navigatorTreeItem";
 import { buildCanonicalPages } from "./core/canonicalPages";
+import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageParam, slugFromName, starterElementsOf } from "./core/pageManagement";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
 import { useWorkspaceSync } from "./core/useWorkspaceSync";
 import { useManualSave } from "./core/useManualSave";
@@ -1235,10 +1239,7 @@ export default function WebsiteEditor() {
 
     const newUrl = new URL(window.location.href);
 
-    const cleanSlug =
-      targetPage.id === homePageId || targetPage.slug === "/"
-        ? "home"
-        : targetPage.slug.replace(/^\//, "");
+    const cleanSlug = previewPageParam(targetPage, homePageId);
 
     newUrl.searchParams.set("page", cleanSlug);
 
@@ -1266,12 +1267,7 @@ export default function WebsiteEditor() {
     setActivePageId(target.id);
     setElements(target.elements || []);
 
-    setPageSettings(
-      target.pageSettings || {
-        title: target.name,
-        path: target.slug,
-      }
-    );
+    setPageSettings(pageSettingsOf(target));
 
     setIsPageSelectorOpen(false);
   };
@@ -1414,34 +1410,17 @@ export default function WebsiteEditor() {
 
     // Check if starter template elements match (About, Contact, Services, etc.)
     const starters = createStarterPages(website?.name || "ForgeStudio");
-    const starterMatch = starters.find(
-      (s) => s.slug.toLowerCase() === validation.slug.toLowerCase() || s.name.toLowerCase().includes(rawTitle.toLowerCase())
-    );
-    const initialElements = starterMatch?.elements && starterMatch.elements.length > 0 ? starterMatch.elements : [];
+    const starterMatch = findStarterPage(starters, validation.slug, rawTitle);
+    const initialElements = starterElementsOf(starterMatch);
 
-    const newPageObj: PageConfig = {
-      id: `page_${Date.now()}_${Math.random()
-        .toString(36)
-        .substring(2, 6)}`,
-
+    const newPageObj: PageConfig = buildNewPage({
+      id: newPageId(),
       name: rawTitle,
       slug: validation.slug,
-
       elements: initialElements,
-
-      pageSettings: {
-        title: rawTitle,
-        path: validation.slug,
-        description: starterMatch?.pageSettings?.description || "",
-        backgroundColor: "#ffffff",
-        isMaintenanceMode: false,
-        siteLanguage: "en",
-      },
-
+      description: starterMatch?.pageSettings?.description || "",
       isHome: currentPagesSnapshot.length === 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
     const updatedPages = [...currentPagesSnapshot, newPageObj];
 
@@ -1468,7 +1447,7 @@ export default function WebsiteEditor() {
   };
 
   const handleQuickCreateOrSwitchPage = (pageName: string, preferredSlug?: string) => {
-    const defaultSlug = preferredSlug || `/${pageName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+    const defaultSlug = preferredSlug || slugFromName(pageName);
 
     // Check if a page with matching slug or name already exists
     const existing = pages.find(
@@ -1487,31 +1466,20 @@ export default function WebsiteEditor() {
     const currentPagesSnapshot = buildCanonicalPages({ pages, activePageId, canvasMode, elements, pageSettings });
 
     const starters = createStarterPages(website?.name || "ForgeStudio");
-    const starterMatch = starters.find(
-      (s) => s.slug.toLowerCase() === defaultSlug.toLowerCase() || s.name.toLowerCase().includes(pageName.toLowerCase())
-    );
+    const starterMatch = findStarterPage(starters, defaultSlug, pageName);
 
     const newSlug = generateSlug(pageName, currentPagesSnapshot.map((p) => p.slug));
-    const newId = `page_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const starterElements = starterMatch?.elements && starterMatch.elements.length > 0 ? starterMatch.elements : [];
+    const newId = newPageId();
+    const starterElements = starterElementsOf(starterMatch);
 
-    const newPageObj: PageConfig = {
+    const newPageObj: PageConfig = buildNewPage({
       id: newId,
       name: pageName,
       slug: newSlug,
       elements: starterElements,
-      pageSettings: {
-        title: pageName,
-        path: newSlug,
-        description: starterMatch?.pageSettings?.description || `${pageName} page`,
-        backgroundColor: "#ffffff",
-        isMaintenanceMode: false,
-        siteLanguage: "en",
-      },
+      description: starterMatch?.pageSettings?.description || `${pageName} page`,
       isHome: currentPagesSnapshot.length === 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
     const updatedPages = [...currentPagesSnapshot, newPageObj];
     setPages(updatedPages);
@@ -1531,9 +1499,9 @@ export default function WebsiteEditor() {
   const handleCreatePageQuick = (customName?: string): PageConfig => {
     const count = pages.length + 1;
     const rawTitle = customName || `New Page ${count}`;
-    const formattedSlug = `/${rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+    const formattedSlug = slugFromName(rawTitle);
     const newPageObj: PageConfig = {
-      id: `page_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: newPageId(),
       name: rawTitle,
       slug: formattedSlug,
       elements: [],
@@ -2675,172 +2643,15 @@ export default function WebsiteEditor() {
     );
   };
 
-  const renderTypographySection = () => {
-    if (!selectedElementAny || !selectedElementAny.type) return null;
-    const textTypes = ["heading", "text", "button", "paragraph", "blockquote"];
-    if (!textTypes.includes(selectedElementAny.type)) return null;
-
-    const currentFontFamily = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontFamily");
-    const supportedWeights = FontService.getSupportedWeights(currentFontFamily);
-    const hasItalic = FontService.hasItalic(currentFontFamily);
-
-    const weightLabels: Record<number, string> = {
-      100: "100 Thin",
-      200: "200 Extra Light",
-      300: "300 Light",
-      400: "400 Normal",
-      500: "500 Medium",
-      600: "600 Semi-Bold",
-      700: "700 Bold",
-      800: "800 Extra Bold",
-      900: "900 Black",
-    };
-
-    return (
-      <div className="space-y-3 p-3 bg-slate-50/80 rounded-lg border border-slate-200/80 mt-2 mb-3">
-        <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold text-slate-800">
-            Typography
-          </label>
-          {(isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontFamily") ||
-            isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontSize") ||
-            isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontWeight") ||
-            isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "lineHeight") ||
-            isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "textAlign")) && (
-              <button
-                type="button"
-                onClick={() => {
-                  resetSelectedStyle("fontFamily");
-                  resetSelectedStyle("fontSize");
-                  resetSelectedStyle("fontWeight");
-                  resetSelectedStyle("lineHeight");
-                  resetSelectedStyle("textAlign");
-                }}
-                title="Reset typography to defaults"
-                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-              >
-                ↺ Reset All
-              </button>
-            )}
-        </div>
-
-        {/* Font Family */}
-        <FontPickerControl
-          value={currentFontFamily}
-          onChange={(fam) => updateSelectedStyle("fontFamily", fam)}
-          onOpenModal={() => handleOpenFontPicker((fam) => updateSelectedStyle("fontFamily", fam))}
-          onReset={() => resetSelectedStyle("fontFamily")}
-          isConfigured={isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontFamily")}
-        />
-
-        {/* Font Size & Weight */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-slate-700">Font Size</label>
-              {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontSize") && (
-                <button
-                  type="button"
-                  onClick={() => resetSelectedStyle("fontSize")}
-                  title="Reset font size"
-                  className="text-[10px] text-slate-400 hover:text-blue-600"
-                >
-                  ↺
-                </button>
-              )}
-            </div>
-            <input
-              type="text"
-              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontSize") || ""}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                updateSelectedStyle(
-                  "fontSize",
-                  val === "" ? undefined : (val.endsWith("px") || val.endsWith("rem") || val.endsWith("em") || val.endsWith("%") ? val : `${val}px`)
-                );
-              }}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              placeholder="e.g. 16px"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-slate-700">Font Weight</label>
-              {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "fontWeight") && (
-                <button
-                  type="button"
-                  onClick={() => resetSelectedStyle("fontWeight")}
-                  title="Reset font weight"
-                  className="text-[10px] text-slate-400 hover:text-blue-600"
-                >
-                  ↺
-                </button>
-              )}
-            </div>
-            <select
-              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "fontWeight") || "inherit"}
-              onChange={(e) => updateSelectedStyle("fontWeight", e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-            >
-              <option value="inherit">Default</option>
-              {supportedWeights.map((w) => (
-                <option key={w} value={String(w)}>
-                  {weightLabels[w] || `${w}`}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Line Height & Text Align */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-slate-700">Line Height</label>
-              {isControlStyleConfigured(selectedElementAny, activeDevice, activeElementState, "lineHeight") && (
-                <button
-                  type="button"
-                  onClick={() => resetSelectedStyle("lineHeight")}
-                  title="Reset line height"
-                  className="text-[10px] text-slate-400 hover:text-blue-600"
-                >
-                  ↺
-                </button>
-              )}
-            </div>
-            <input
-              type="text"
-              value={getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "lineHeight") || ""}
-              onChange={(e) => updateSelectedStyle("lineHeight", e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              placeholder="e.g. 1.5 or 24px"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Text Align</label>
-            <div className="grid grid-cols-4 gap-0.5 rounded-lg bg-slate-100 p-0.5 border border-slate-200">
-              {(["left", "center", "right", "justify"] as const).map((align) => {
-                const currentAlign = getControlStyleValue(selectedElementAny, activeDevice, activeElementState, "textAlign") || "left";
-                const isActive = currentAlign === align;
-                return (
-                  <button
-                    key={align}
-                    type="button"
-                    onClick={() => updateSelectedStyle("textAlign", align)}
-                    className={`py-1 text-[10px] font-semibold capitalize rounded transition-colors ${isActive ? "bg-white text-blue-600 shadow-sm font-bold" : "text-slate-600 hover:bg-slate-200"
-                      }`}
-                    title={`Align ${align}`}
-                  >
-                    {align.slice(0, 1).toUpperCase()}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // See inspector/typographySection.tsx (moved verbatim; same name and call sites)
+  const renderTypographySection = () => buildTypographySection({
+    activeDevice,
+    activeElementState,
+    handleOpenFontPicker,
+    resetSelectedStyle,
+    selectedElementAny,
+    updateSelectedStyle,
+  });
 
   const toggleContainerCollapse = (id: string) => {
     setCollapsedContainers((prev) => ({
@@ -2882,186 +2693,22 @@ export default function WebsiteEditor() {
   });
 
 
-  const renderNavigatorTreeItem = (el: EditorElement, depth: number = 0, isLast: boolean = true): React.ReactNode => {
-    if (!el || !el.id) return null;
-    const isSelected = selectedIds.includes(el.id) || selectedId === el.id;
-    const isContainer = el.type === "container";
-    const isCollapsed = isContainer && !!collapsedContainers[el.id];
-
-    const getElementIcon = (type: ElementType) => {
-      if (!type) return "📄";
-      switch (type) {
-        case "container":
-          return "📦";
-        case "heading":
-          return "🔤";
-        case "text":
-          return "📝";
-        case "image":
-          return "🖼️";
-        case "button":
-          return "🔘";
-        case "posts":
-          return "📰";
-        case "loop-grid":
-          return "➿";
-        case "wc-product-title":
-          return <WcProductTitleWidgetRenderer el={el} getMergedStyles={getMergedStyles} activeDevice={activeDevice} />;
-        case "wc-product-price":
-          return <WcProductPriceWidgetRenderer el={el} getMergedStyles={getMergedStyles} activeDevice={activeDevice} />;
-        case "wc-product-images":
-          return <WcProductImagesWidgetRenderer el={el} getMergedStyles={getMergedStyles} activeDevice={activeDevice} />;
-        case "wc-add-to-cart":
-          return <WcAddToCartWidgetRenderer el={el} getMergedStyles={getMergedStyles} activeDevice={activeDevice} />;
-        case "wc-product-rating":
-          return <WcProductRatingWidgetRenderer el={el} getMergedStyles={getMergedStyles} activeDevice={activeDevice} />;
-        case "share-buttons":
-          return "🔗";
-        case "portfolio":
-          return "💼";
-        case "slides":
-          return "🎠";
-        default:
-          return "📄";
-      }
-    };
-
-    const getElementLabel = (item: EditorElement) => {
-      if (!item || !item.type) return "Element";
-      if (item.type === "heading") return item.content ? `"${item.content.slice(0, 15)}"` : "Heading";
-      if (item.type === "text") return item.content ? `"${item.content.slice(0, 15)}"` : "Text";
-      if (item.type === "button") return item.content ? `"${item.content.slice(0, 15)}"` : "Button";
-      if (item.type === "image") return item.alt ? `Image (${item.alt})` : "Image";
-      if (item.type === "container") return "Container";
-      if (item.type === "posts") return item.posts ? `Posts (${item.posts.length})` : "Posts Widget";
-      if (item.type === "loop-grid") return "Loop Grid";
-      if (item.type === "share-buttons") return item.shareNetworks ? `Share (${item.shareNetworks.length})` : "Share Buttons";
-      if (item.type === "portfolio") return item.portfolioItems ? `Portfolio (${item.portfolioItems.length})` : "Portfolio Widget";
-      if (item.type === "slides") return item.slidesItems ? `Slides (${item.slidesItems.length})` : "Slides Widget";
-      return item.type || "Element";
-    };
-
-    return (
-      <div key={el.id} className="select-none">
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSelectElement(el.id, e);
-          }}
-          onMouseEnter={(e) => {
-            e.stopPropagation();
-            setHoveredId(el.id);
-          }}
-          onMouseLeave={(e) => {
-            e.stopPropagation();
-            if (hoveredId === el.id) setHoveredId(null);
-          }}
-          style={{ paddingLeft: `${depth * 14 + 4}px` }}
-          className={`group flex items-center justify-between rounded-lg py-1.5 pr-2 text-xs transition cursor-pointer mb-0.5 ${isSelected
-            ? "bg-blue-600 font-bold text-white shadow-sm"
-            : hoveredId === el.id
-              ? "bg-blue-50 text-blue-700 font-semibold"
-              : "text-slate-700 hover:bg-slate-100"
-            }`}
-        >
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            {/* Visual Tree Branch Connectors (F-021) */}
-            {depth > 0 && (
-              <span className="font-mono text-slate-400 text-[10px] shrink-0 select-none">
-                {isLast ? "└──" : "├──"}
-              </span>
-            )}
-
-            {isContainer ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleContainerCollapse(el.id);
-                }}
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] transition ${isSelected ? "text-white hover:bg-blue-700" : "text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                  }`}
-              >
-                {isCollapsed ? "▶" : "▼"}
-              </button>
-            ) : (
-              <span className="w-2 shrink-0" />
-            )}
-
-            <span className="shrink-0 text-[11px]">{getElementIcon(el.type)}</span>
-            <span className="truncate text-[11px] font-medium capitalize">{getElementLabel(el)}</span>
-          </div>
-
-          <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0">
-            <button
-              type="button"
-              title="Copy"
-              onClick={(e) => handleCopyElement(el.id, e)}
-              className={`px-1 py-0.5 text-[9px] rounded hover:bg-black/10 ${isSelected ? "text-white" : "text-slate-500"
-                }`}
-            >
-              📋
-            </button>
-            <button
-              type="button"
-              title="Duplicate"
-              onClick={(e) => handleDuplicateElement(el.id, e)}
-              className={`px-1 py-0.5 text-[9px] rounded hover:bg-black/10 ${isSelected ? "text-white" : "text-slate-500"
-                }`}
-            >
-              ⧉
-            </button>
-            <button
-              type="button"
-              title="Move Up"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReorderElement(el.id, "up");
-              }}
-              className={`px-1 py-0.5 text-[9px] rounded hover:bg-black/10 ${isSelected ? "text-white" : "text-slate-500"
-                }`}
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              title="Move Down"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReorderElement(el.id, "down");
-              }}
-              className={`px-1 py-0.5 text-[9px] rounded hover:bg-black/10 ${isSelected ? "text-white" : "text-slate-500"
-                }`}
-            >
-              ▼
-            </button>
-            <button
-              type="button"
-              title="Delete"
-              onClick={(e) => handleDeleteElement(el.id, e)}
-              className={`px-1 py-0.5 text-[9px] rounded hover:bg-red-500 hover:text-white ${isSelected ? "text-red-200" : "text-red-500"
-                }`}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* Render Nested Children if container is expanded */}
-        {isContainer && !isCollapsed && el.children && el.children.length > 0 && (
-          <div className="space-y-0.5">
-            {el.children.map((child, idx) =>
-              renderNavigatorTreeItem(
-                child,
-                depth + 1,
-                idx === (el.children?.length ?? 0) - 1
-              )
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // See navigator/navigatorTreeItem.tsx (moved verbatim; same name and call sites)
+  const renderNavigatorTreeItem = (el: EditorElement, depth: number = 0, isLast: boolean = true): React.ReactNode => buildNavigatorTreeItem({
+    activeDevice,
+    collapsedContainers,
+    handleCopyElement,
+    handleDeleteElement,
+    handleDuplicateElement,
+    handleReorderElement,
+    handleSelectElement,
+    hoveredId,
+    renderNavigatorTreeItem,
+    selectedId,
+    selectedIds,
+    setHoveredId,
+    toggleContainerCollapse,
+  }, el, depth, isLast);
 
   const updateSelectedLayout = (key: keyof ContainerLayout, value: any) => {
     if (!selectedId) return;
@@ -3205,14 +2852,9 @@ export default function WebsiteEditor() {
   const handleImageFileSelect = async (file: File) => {
     if (!file) return;
 
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
-    if (!validTypes.includes(file.type)) {
-      setUploadError("Please select a valid image file (JPG, PNG, WEBP, GIF, SVG).");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("Image size must be less than 5 MB.");
+    const invalid = assetFileError(file, IMAGE_UPLOAD_RULE);
+    if (invalid) {
+      setUploadError(invalid);
       return;
     }
 
@@ -3220,41 +2862,7 @@ export default function WebsiteEditor() {
     setIsUploading(true);
 
     try {
-      let finalUrl = "";
-      try {
-        const formData = new FormData();
-        formData.append("image", file);
-
-        let uploadRes = await fetch(`${apiUrl}/api/v1/uploads/image`, {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-
-        if (!uploadRes.ok && uploadRes.status === 404) {
-          uploadRes = await fetch(`${apiUrl}/api/uploads/image`, {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-        }
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          finalUrl = uploadData.url || uploadData?.data?.url || "";
-        }
-      } catch {
-        // Fallback to local Data URL
-      }
-
-      if (!finalUrl) {
-        finalUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error("Failed to read image file."));
-          reader.readAsDataURL(file);
-        });
-      }
+      const finalUrl = await uploadOrReadAsDataUrl(apiUrl, file, IMAGE_UPLOAD_RULE);
 
       if (finalUrl) {
         updateSelectedProp("src", finalUrl);
@@ -3274,14 +2882,9 @@ export default function WebsiteEditor() {
   const handleVideoFileSelect = async (file: File) => {
     if (!file) return;
 
-    const validTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
-    if (!validTypes.includes(file.type) && !file.type.startsWith("video/")) {
-      setUploadError("Please select a valid video file (MP4, WEBM, OGG, MOV).");
-      return;
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadError("Video file size must be less than 50 MB.");
+    const invalid = assetFileError(file, VIDEO_UPLOAD_RULE);
+    if (invalid) {
+      setUploadError(invalid);
       return;
     }
 
@@ -3289,41 +2892,7 @@ export default function WebsiteEditor() {
     setIsUploading(true);
 
     try {
-      let finalUrl = "";
-      try {
-        const formData = new FormData();
-        formData.append("video", file);
-
-        let uploadRes = await fetch(`${apiUrl}/api/v1/uploads/video`, {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-
-        if (!uploadRes.ok && uploadRes.status === 404) {
-          uploadRes = await fetch(`${apiUrl}/api/uploads/video`, {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-        }
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          finalUrl = uploadData.url || uploadData?.data?.url || "";
-        }
-      } catch {
-        // Fallback to FileReader / Data URL
-      }
-
-      if (!finalUrl) {
-        finalUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error("Failed to read video file."));
-          reader.readAsDataURL(file);
-        });
-      }
+      const finalUrl = await uploadOrReadAsDataUrl(apiUrl, file, VIDEO_UPLOAD_RULE);
 
       if (finalUrl) {
         updateSelectedProp("src", finalUrl);
@@ -3393,14 +2962,9 @@ export default function WebsiteEditor() {
   const handleImportAsset = async (file: File) => {
     if (!file) return;
 
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
-    if (!validTypes.includes(file.type)) {
-      setUploadError("Invalid file type. Supported: JPG, PNG, WEBP, GIF, SVG.");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("Imported asset size must be less than 5 MB.");
+    const invalid = assetFileError(file, IMPORT_ASSET_RULE);
+    if (invalid) {
+      setUploadError(invalid);
       return;
     }
 
@@ -3408,49 +2972,10 @@ export default function WebsiteEditor() {
     setIsUploading(true);
 
     try {
-      let finalUrl = "";
-      try {
-        const formData = new FormData();
-        formData.append("image", file);
-
-        let uploadRes = await fetch(`${apiUrl}/api/v1/uploads/image`, {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-
-        if (!uploadRes.ok && uploadRes.status === 404) {
-          uploadRes = await fetch(`${apiUrl}/api/uploads/image`, {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-        }
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          finalUrl = uploadData.url || uploadData?.data?.url || "";
-        }
-      } catch {
-        // Fallback to local Data URL
-      }
-
-      if (!finalUrl) {
-        finalUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error("Failed to read imported file."));
-          reader.readAsDataURL(file);
-        });
-      }
+      const finalUrl = await uploadOrReadAsDataUrl(apiUrl, file, IMPORT_ASSET_RULE);
 
       // Store in local asset history
-      try {
-        const historyRaw = localStorage.getItem("forgestudio_imported_assets");
-        const history = historyRaw ? JSON.parse(historyRaw) : [];
-        history.unshift({ name: file.name, url: finalUrl, type: file.type, date: new Date().toISOString() });
-        localStorage.setItem("forgestudio_imported_assets", JSON.stringify(history.slice(0, 50)));
-      } catch { }
+      recordImportedAsset(file, finalUrl);
 
       if (selectedId) {
         const selected = findTreeElement(elements, selectedId);
@@ -3461,32 +2986,7 @@ export default function WebsiteEditor() {
         }
       }
 
-      let detectedType: ElementType = "image";
-      if (file.type.startsWith("video/")) {
-        detectedType = "video" as ElementType;
-      } else if (file.type.startsWith("audio/")) {
-        detectedType = "audio-playlist";
-      } else if (file.name.endsWith(".json")) {
-        detectedType = "lottie";
-      } else if (!file.type.startsWith("image/")) {
-        detectedType = "import-asset";
-      }
-
-      const newAssetEl: EditorElement = {
-        id: generateId(),
-        type: detectedType,
-        content: file.name || "Imported Asset",
-        src: finalUrl,
-        href: finalUrl,
-        alt: file.name || "Imported Asset",
-        assetType: file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file",
-        styles: {
-          width: "100%",
-          borderRadius: "12px",
-          marginTop: "16px",
-          marginBottom: "16px",
-        },
-      };
+      const newAssetEl: EditorElement = buildImportedAssetElement(file, finalUrl, generateId());
       setElements((prev) => [...prev, newAssetEl]);
       setSelectedId(newAssetEl.id);
       setSelectedIds([newAssetEl.id]);
@@ -3509,225 +3009,14 @@ export default function WebsiteEditor() {
   const compileBackgroundAndBorderStyles = createBackgroundAndBorderStylesCompiler(apiUrl);
 
 
-  const renderPositioningControls = () => {
-    if (!selectedElement) return null;
-
-    const currentPos = getControlStyleValue(selectedElement, activeDevice, activeElementState, "position") || "static";
-
-    const rawTop = String(getControlStyleValue(selectedElement, activeDevice, activeElementState, "top") || "");
-    const rawRight = String(getControlStyleValue(selectedElement, activeDevice, activeElementState, "right") || "");
-    const rawBottom = String(getControlStyleValue(selectedElement, activeDevice, activeElementState, "bottom") || "");
-    const rawLeft = String(getControlStyleValue(selectedElement, activeDevice, activeElementState, "left") || "");
-
-    const currentZIndex = getControlStyleValue(selectedElement, activeDevice, activeElementState, "zIndex");
-    const zIndexStr = currentZIndex !== undefined && currentZIndex !== null ? String(currentZIndex) : "";
-
-    const parsedTop = parseSpacingUnit(rawTop);
-    const parsedRight = parseSpacingUnit(rawRight);
-    const parsedBottom = parseSpacingUnit(rawBottom);
-    const parsedLeft = parseSpacingUnit(rawLeft);
-
-    const activeOffsetUnit = parsedTop.unit || parsedRight.unit || parsedBottom.unit || parsedLeft.unit || "px";
-
-    const isPosOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "position") : hasStyleOverride(selectedElement, activeDevice, "position");
-    const isOffsetsOverridden = activeElementState === "hover"
-      ? hasHoverStyleOverride(selectedElement, activeDevice, "top") ||
-      hasHoverStyleOverride(selectedElement, activeDevice, "right") ||
-      hasHoverStyleOverride(selectedElement, activeDevice, "bottom") ||
-      hasHoverStyleOverride(selectedElement, activeDevice, "left")
-      : hasStyleOverride(selectedElement, activeDevice, "top") ||
-      hasStyleOverride(selectedElement, activeDevice, "right") ||
-      hasStyleOverride(selectedElement, activeDevice, "bottom") ||
-      hasStyleOverride(selectedElement, activeDevice, "left");
-    const isZIndexOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "zIndex") : hasStyleOverride(selectedElement, activeDevice, "zIndex");
-
-    const handleOffsetChange = (key: keyof ElementStyles, numVal: string, unitVal: string) => {
-      const formattedVal = numVal.trim() === "" ? "" : `${numVal}${unitVal}`;
-      updateSelectedStyle(key, formattedVal);
-    };
-
-    const handleUnitChange = (newUnit: string) => {
-      const convertUnit = (parsed: { num: string; unit: string }, sideKey: keyof ElementStyles) => {
-        if (parsed.num) {
-          updateSelectedStyle(sideKey, `${parsed.num}${newUnit}`);
-        }
-      };
-      convertUnit(parsedTop, "top");
-      convertUnit(parsedRight, "right");
-      convertUnit(parsedBottom, "bottom");
-      convertUnit(parsedLeft, "left");
-    };
-
-    return (
-      <div className="space-y-4 pt-4 border-t border-slate-200">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Positioning & Layering
-        </h3>
-
-        {/* 1. Position Type Dropdown */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-700">
-              Position Type
-              {isPosOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </label>
-            {(selectedElement?.styles?.position || isPosOverridden) && (
-              <button
-                type="button"
-                onClick={() => resetSelectedStyle("position")}
-                title="Reset Position Type to Default"
-                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-              >
-                ↺ Reset
-              </button>
-            )}
-          </div>
-          <select
-            value={currentPos}
-            onChange={(e) => updateSelectedStyle("position", e.target.value as any)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-          >
-            <option value="static">Default (Static)</option>
-            <option value="relative">Relative</option>
-            <option value="absolute">Absolute</option>
-            <option value="fixed">Fixed</option>
-            <option value="sticky">Sticky</option>
-          </select>
-        </div>
-
-        {/* 2. Position Offsets (Top, Right, Bottom, Left) */}
-        {currentPos !== "static" && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">
-                Position Offsets
-                {isOffsetsOverridden && (
-                  <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                    {activeDevice}
-                  </span>
-                )}
-              </label>
-
-              <div className="flex items-center gap-1.5">
-                <select
-                  value={activeOffsetUnit}
-                  onChange={(e) => handleUnitChange(e.target.value)}
-                  className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-                >
-                  <option value="px">px</option>
-                  <option value="%">%</option>
-                  <option value="rem">rem</option>
-                  <option value="em">em</option>
-                </select>
-
-                {(selectedElement?.styles?.top || selectedElement?.styles?.right || selectedElement?.styles?.bottom || selectedElement?.styles?.left || isOffsetsOverridden) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetSelectedStyle("top");
-                      resetSelectedStyle("right");
-                      resetSelectedStyle("bottom");
-                      resetSelectedStyle("left");
-                    }}
-                    title="Reset Offsets to Default"
-                    className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-                  >
-                    ↺ Reset
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-1.5">
-              <div>
-                <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                  Top
-                </span>
-                <ScrubbableNumberInput
-                  value={parsedTop.num}
-                  onChange={(val) => handleOffsetChange("top", val, activeOffsetUnit)}
-                  placeholder="auto"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                  Right
-                </span>
-                <ScrubbableNumberInput
-                  value={parsedRight.num}
-                  onChange={(val) => handleOffsetChange("right", val, activeOffsetUnit)}
-                  placeholder="auto"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                  Bottom
-                </span>
-                <ScrubbableNumberInput
-                  value={parsedBottom.num}
-                  onChange={(val) => handleOffsetChange("bottom", val, activeOffsetUnit)}
-                  placeholder="auto"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                  Left
-                </span>
-                <ScrubbableNumberInput
-                  value={parsedLeft.num}
-                  onChange={(val) => handleOffsetChange("left", val, activeOffsetUnit)}
-                  placeholder="auto"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 3. Z-Index Control */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-700">
-              Z-Index
-              {isZIndexOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </label>
-            {(selectedElement?.styles?.zIndex !== undefined || isZIndexOverridden) && (
-              <button
-                type="button"
-                onClick={() => resetSelectedStyle("zIndex")}
-                title="Reset Z-Index to Default"
-                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-              >
-                ↺ Reset
-              </button>
-            )}
-          </div>
-          <ScrubbableNumberInput
-            value={zIndexStr}
-            onChange={(val) =>
-              updateSelectedStyle(
-                "zIndex",
-                val !== "" ? Number(val) : undefined
-              )
-            }
-            placeholder="0"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-          />
-        </div>
-      </div>
-    );
-  };
+  // See inspector/positioningControls.tsx (moved verbatim; same name and call sites)
+  const renderPositioningControls = () => buildPositioningControls({
+    activeDevice,
+    activeElementState,
+    resetSelectedStyle,
+    selectedElement,
+    updateSelectedStyle,
+  });
 
   const handleBgImageFileSelect = async (file: File) => {
     if (!file) return;
@@ -3783,542 +3072,20 @@ export default function WebsiteEditor() {
     }
   };
 
-  const renderBackgroundAndBorderControls = () => {
-    if (!selectedElement) return null;
-
-    const currentBgColor = getControlStyleValue(selectedElement, activeDevice, activeElementState, "backgroundColor") || "";
-    const currentBgImage = getControlStyleValue(selectedElement, activeDevice, activeElementState, "backgroundImage") || "";
-    const currentBgPos = getControlStyleValue(selectedElement, activeDevice, activeElementState, "backgroundPosition") || "center";
-    const currentBgSize = getControlStyleValue(selectedElement, activeDevice, activeElementState, "backgroundSize") || "cover";
-    const currentBgRepeat = getControlStyleValue(selectedElement, activeDevice, activeElementState, "backgroundRepeat") || "no-repeat";
-
-    const currentBorderStyle = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderStyle") || "none";
-    const currentBorderWidth = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderWidth") || "1px";
-    const currentBorderColor = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderColor") || "#cbd5e1";
-
-    const currentTLRadius = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderTopLeftRadius") || getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderRadius") || "";
-    const currentTRRadius = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderTopRightRadius") || getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderRadius") || "";
-    const currentBRRadius = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderBottomRightRadius") || getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderRadius") || "";
-    const currentBLRadius = getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderBottomLeftRadius") || getControlStyleValue(selectedElement, activeDevice, activeElementState, "borderRadius") || "";
-
-    const currentBoxShadow = getControlStyleValue(selectedElement, activeDevice, activeElementState, "boxShadow") || "";
-
-    const shadowMatch = currentBoxShadow.match(/(-?\d+px)\s+(-?\d+px)\s+(-?\d+px)\s+(-?\d+px)\s+(.*)/);
-    const shadowX = shadowMatch ? shadowMatch[1].replace("px", "") : "0";
-    const shadowY = shadowMatch ? shadowMatch[2].replace("px", "") : "0";
-    const shadowBlur = shadowMatch ? shadowMatch[3].replace("px", "") : "0";
-    const shadowSpread = shadowMatch ? shadowMatch[4].replace("px", "") : "0";
-    const shadowColor = shadowMatch ? shadowMatch[5] : "rgba(0,0,0,0.25)";
-
-    const parsedTL = parseSpacingUnit(currentTLRadius, "px");
-    const parsedTR = parseSpacingUnit(currentTRRadius, "px");
-    const parsedBR = parseSpacingUnit(currentBRRadius, "px");
-    const parsedBL = parseSpacingUnit(currentBLRadius, "px");
-    const activeRadiusUnit = parsedTL.unit || "px";
-
-    const isBgColorOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "backgroundColor") : hasStyleOverride(selectedElement, activeDevice, "backgroundColor");
-    const isBgImageOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "backgroundImage") : hasStyleOverride(selectedElement, activeDevice, "backgroundImage");
-    const isBorderOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "borderStyle") : hasStyleOverride(selectedElement, activeDevice, "borderStyle");
-    const isRadiusOverridden = activeElementState === "hover" ? (hasHoverStyleOverride(selectedElement, activeDevice, "borderTopLeftRadius") || hasHoverStyleOverride(selectedElement, activeDevice, "borderRadius")) : (hasStyleOverride(selectedElement, activeDevice, "borderTopLeftRadius") || hasStyleOverride(selectedElement, activeDevice, "borderRadius"));
-    const isShadowOverridden = activeElementState === "hover" ? hasHoverStyleOverride(selectedElement, activeDevice, "boxShadow") : hasStyleOverride(selectedElement, activeDevice, "boxShadow");
-
-    const updateCornerRadius = (cornerKey: keyof ElementStyles, valStr: string) => {
-      if (isBorderRadiusLinked) {
-        updateSelectedStyle("borderTopLeftRadius", valStr);
-        updateSelectedStyle("borderTopRightRadius", valStr);
-        updateSelectedStyle("borderBottomRightRadius", valStr);
-        updateSelectedStyle("borderBottomLeftRadius", valStr);
-        updateSelectedStyle("borderRadius", valStr);
-      } else {
-        updateSelectedStyle(cornerKey, valStr);
-      }
-    };
-
-    return (
-      <div className="space-y-4 pt-4 border-t border-slate-200">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Background & Border
-        </h3>
-
-        {/* 1. Background Color */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-700">
-              Background Color
-              {isBgColorOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </label>
-            {(isControlStyleConfigured(selectedElement, activeDevice, activeElementState, "backgroundColor") || isBgColorOverridden) && (
-              <button
-                type="button"
-                onClick={() => resetSelectedStyle("backgroundColor")}
-                title="Reset Background Color to Default"
-                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-              >
-                ↺ Reset
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={currentBgColor.startsWith("#") ? currentBgColor : "#ffffff"}
-              onChange={(e) => updateSelectedStyle("backgroundColor", e.target.value)}
-              className="h-8 w-10 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-            />
-            <input
-              type="text"
-              value={currentBgColor}
-              onChange={(e) => updateSelectedStyle("backgroundColor", e.target.value)}
-              placeholder="transparent / #ffffff / rgba(...)"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-            />
-            <button
-              type="button"
-              onClick={() => handleSampleColor((hex) => updateSelectedStyle("backgroundColor", hex))}
-              title="Sample Color from Screen / Image"
-              className="h-8 px-2 rounded border border-slate-300 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-xs font-bold text-slate-700 hover:text-blue-600 transition flex items-center gap-1 shrink-0"
-            >
-              <span>🧪</span>
-              <span className="text-[10px]">Sample</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 2. Background Image & Settings */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="block text-xs font-bold text-slate-700">
-              Background Image
-              {isBgImageOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </label>
-            {currentBgImage && (
-              <button
-                type="button"
-                onClick={() => {
-                  updateSelectedStyle("backgroundImage", "");
-                  if (activeDevice !== "desktop") resetSelectedStyle("backgroundImage");
-                }}
-                className="text-[10px] font-semibold text-red-500 hover:underline"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-
-          <input
-            ref={bgFileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                handleBgImageFileSelect(e.target.files[0]);
-              }
-            }}
-          />
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={isUploading}
-              onClick={() => bgFileInputRef.current?.click()}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {isUploading ? "Uploading..." : "Upload Image"}
-            </button>
-            <input
-              type="text"
-              value={currentBgImage}
-              onChange={(e) => updateSelectedStyle("backgroundImage", e.target.value)}
-              placeholder="Or enter Image URL"
-              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {currentBgImage && (
-            <div className="space-y-2 pt-2 border-t border-slate-200">
-              {/* Background Position */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Position
-                </label>
-                <select
-                  value={currentBgPos}
-                  onChange={(e) => updateSelectedStyle("backgroundPosition", e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                >
-                  <option value="center">Center</option>
-                  <option value="top">Top</option>
-                  <option value="bottom">Bottom</option>
-                  <option value="left">Left</option>
-                  <option value="right">Right</option>
-                </select>
-              </div>
-
-              {/* Background Size */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Size
-                </label>
-                <select
-                  value={currentBgSize}
-                  onChange={(e) => updateSelectedStyle("backgroundSize", e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                  <option value="auto">Auto</option>
-                </select>
-              </div>
-
-              {/* Background Repeat */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Repeat
-                </label>
-                <select
-                  value={currentBgRepeat}
-                  onChange={(e) => updateSelectedStyle("backgroundRepeat", e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                >
-                  <option value="no-repeat">No Repeat</option>
-                  <option value="repeat">Repeat</option>
-                  <option value="repeat-x">Repeat X</option>
-                  <option value="repeat-y">Repeat Y</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 3. Border Controls */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-semibold text-slate-700">
-              Border Style
-              {isBorderOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </label>
-            {(selectedElement?.styles?.borderStyle || selectedElement?.styles?.borderColor || selectedElement?.styles?.borderWidth || isBorderOverridden) && (
-              <button
-                type="button"
-                onClick={() => {
-                  resetSelectedStyle("borderStyle");
-                  resetSelectedStyle("borderWidth");
-                  resetSelectedStyle("borderColor");
-                }}
-                title="Reset Border to Default"
-                className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 hover:underline"
-              >
-                ↺ Reset
-              </button>
-            )}
-          </div>
-          <select
-            value={currentBorderStyle}
-            onChange={(e) => updateSelectedStyle("borderStyle", e.target.value as any)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-blue-500 mb-2"
-          >
-            <option value="none">None</option>
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-            <option value="dotted">Dotted</option>
-          </select>
-
-          {currentBorderStyle !== "none" && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Width (px)
-                </label>
-                <input
-                  type="number"
-                  value={currentBorderWidth.replace("px", "")}
-                  onChange={(e) =>
-                    updateSelectedStyle(
-                      "borderWidth",
-                      e.target.value ? `${e.target.value}px` : "1px"
-                    )
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Color
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="color"
-                    value={currentBorderColor.startsWith("#") ? currentBorderColor : "#cbd5e1"}
-                    onChange={(e) => updateSelectedStyle("borderColor", e.target.value)}
-                    className="h-7 w-8 cursor-pointer rounded border border-slate-300 bg-transparent p-0.5"
-                  />
-                  <input
-                    type="text"
-                    value={currentBorderColor}
-                    onChange={(e) => updateSelectedStyle("borderColor", e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSampleColor((hex) => updateSelectedStyle("borderColor", hex))}
-                    title="Sample Color from Screen / Image"
-                    className="h-7 px-1.5 rounded border border-slate-300 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-xs font-bold text-slate-700 hover:text-blue-600 transition flex items-center gap-0.5 shrink-0"
-                  >
-                    <span>🧪</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 4. Border Radius (4 Corners) */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <label className="block text-xs font-semibold text-slate-700">
-                Border Radius
-              </label>
-              {isRadiusOverridden && (
-                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsBorderRadiusLinked(!isBorderRadiusLinked)}
-                className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold transition ${isBorderRadiusLinked
-                  ? "bg-blue-100 text-blue-700 border border-blue-200"
-                  : "bg-slate-100 text-slate-600 border border-slate-200"
-                  }`}
-                title={isBorderRadiusLinked ? "Unlink Corners" : "Link Corners"}
-              >
-                <span>{isBorderRadiusLinked ? "🔗" : "🔓"}</span>
-                <span className="text-[10px]">
-                  {isBorderRadiusLinked ? "Linked" : "Unlinked"}
-                </span>
-              </button>
-
-              {activeDevice !== "desktop" && isRadiusOverridden && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetSelectedStyle("borderTopLeftRadius");
-                    resetSelectedStyle("borderTopRightRadius");
-                    resetSelectedStyle("borderBottomRightRadius");
-                    resetSelectedStyle("borderBottomLeftRadius");
-                    resetSelectedStyle("borderRadius");
-                  }}
-                  className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline transition"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-1.5">
-            <div>
-              <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                TL
-              </span>
-              <input
-                type="number"
-                value={parsedTL.num}
-                onChange={(e) =>
-                  updateCornerRadius(
-                    "borderTopLeftRadius",
-                    e.target.value ? `${e.target.value}${activeRadiusUnit}` : ""
-                  )
-                }
-                placeholder="0"
-                className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                TR
-              </span>
-              <input
-                type="number"
-                value={parsedTR.num}
-                onChange={(e) =>
-                  updateCornerRadius(
-                    "borderTopRightRadius",
-                    e.target.value ? `${e.target.value}${activeRadiusUnit}` : ""
-                  )
-                }
-                placeholder="0"
-                className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                BR
-              </span>
-              <input
-                type="number"
-                value={parsedBR.num}
-                onChange={(e) =>
-                  updateCornerRadius(
-                    "borderBottomRightRadius",
-                    e.target.value ? `${e.target.value}${activeRadiusUnit}` : ""
-                  )
-                }
-                placeholder="0"
-                className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <span className="block text-[9px] font-semibold text-slate-400 text-center mb-0.5">
-                BL
-              </span>
-              <input
-                type="number"
-                value={parsedBL.num}
-                onChange={(e) =>
-                  updateCornerRadius(
-                    "borderBottomLeftRadius",
-                    e.target.value ? `${e.target.value}${activeRadiusUnit}` : ""
-                  )
-                }
-                placeholder="0"
-                className="w-full rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-center text-xs font-medium text-slate-800 outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 5. Box Shadow */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">
-              Box Shadow
-              {isShadowOverridden && (
-                <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
-                  {activeDevice}
-                </span>
-              )}
-            </span>
-            {currentBoxShadow && (
-              <button
-                type="button"
-                onClick={() => {
-                  updateSelectedStyle("boxShadow", "");
-                  if (activeDevice !== "desktop") resetSelectedStyle("boxShadow");
-                }}
-                className="text-[10px] font-semibold text-red-500 hover:underline"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-4 gap-1.5 text-[10px]">
-            <div>
-              <span className="text-slate-400">X (px)</span>
-              <input
-                type="number"
-                value={shadowX}
-                onChange={(e) =>
-                  updateSelectedStyle(
-                    "boxShadow",
-                    `${e.target.value}px ${shadowY}px ${shadowBlur}px ${shadowSpread}px ${shadowColor}`
-                  )
-                }
-                className="w-full rounded border border-slate-200 bg-white p-1 text-center text-xs"
-              />
-            </div>
-            <div>
-              <span className="text-slate-400">Y (px)</span>
-              <input
-                type="number"
-                value={shadowY}
-                onChange={(e) =>
-                  updateSelectedStyle(
-                    "boxShadow",
-                    `${shadowX}px ${e.target.value}px ${shadowBlur}px ${shadowSpread}px ${shadowColor}`
-                  )
-                }
-                className="w-full rounded border border-slate-200 bg-white p-1 text-center text-xs"
-              />
-            </div>
-            <div>
-              <span className="text-slate-400">Blur</span>
-              <input
-                type="number"
-                value={shadowBlur}
-                onChange={(e) =>
-                  updateSelectedStyle(
-                    "boxShadow",
-                    `${shadowX}px ${shadowY}px ${e.target.value}px ${shadowSpread}px ${shadowColor}`
-                  )
-                }
-                className="w-full rounded border border-slate-200 bg-white p-1 text-center text-xs"
-              />
-            </div>
-            <div>
-              <span className="text-slate-400">Spread</span>
-              <input
-                type="number"
-                value={shadowSpread}
-                onChange={(e) =>
-                  updateSelectedStyle(
-                    "boxShadow",
-                    `${shadowX}px ${shadowY}px ${shadowBlur}px ${e.target.value}px ${shadowColor}`
-                  )
-                }
-                className="w-full rounded border border-slate-200 bg-white p-1 text-center text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] font-medium text-slate-500">Color</span>
-            <input
-              type="color"
-              value={shadowColor.startsWith("#") ? shadowColor : "#000000"}
-              onChange={(e) =>
-                updateSelectedStyle(
-                  "boxShadow",
-                  `${shadowX}px ${shadowY}px ${shadowBlur}px ${shadowSpread}px ${e.target.value}`
-                )
-              }
-              className="h-6 w-8 cursor-pointer rounded border border-slate-200 bg-transparent p-0.5"
-            />
-            <input
-              type="text"
-              value={shadowColor}
-              onChange={(e) =>
-                updateSelectedStyle(
-                  "boxShadow",
-                  `${shadowX}px ${shadowY}px ${shadowBlur}px ${shadowSpread}px ${e.target.value}`
-                )
-              }
-              placeholder="rgba(0,0,0,0.25)"
-              className="w-full rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-mono"
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // See inspector/backgroundBorderControls.tsx (moved verbatim; same name and call sites)
+  const renderBackgroundAndBorderControls = () => buildBackgroundAndBorderControls({
+    activeDevice,
+    activeElementState,
+    bgFileInputRef,
+    handleBgImageFileSelect,
+    handleSampleColor,
+    isBorderRadiusLinked,
+    isUploading,
+    resetSelectedStyle,
+    selectedElement,
+    setIsBorderRadiusLinked,
+    updateSelectedStyle,
+  });
 
 
 
@@ -20039,8 +18806,8 @@ export default function WebsiteEditor() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setNewPageName(val);
-                    if (!newPageSlug || newPageSlug === `/${newPageName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`) {
-                      setNewPageSlug(`/${val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`);
+                    if (!newPageSlug || newPageSlug === slugFromName(newPageName)) {
+                      setNewPageSlug(slugFromName(val));
                     }
                   }}
                   className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500 transition"

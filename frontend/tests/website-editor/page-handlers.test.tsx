@@ -8,7 +8,7 @@
  * buildCanonicalPages and kept as their contract (page-merge-equivalence covers the merge itself).
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { flush, heading, mountEditor, siteFixture } from "./editor-harness";
+import { flush, heading, mountEditor, siteFixture, watchForText } from "./editor-harness";
 
 vi.setConfig({ testTimeout: 60000 }); // heavy real-editor mounts; generous under full-suite CPU load
 
@@ -87,6 +87,129 @@ describe("handleCreateNewPage", () => {
     expect(s).toHaveLength(3);
     expect(s[2]).toEqual({ id: expect.stringMatching(/^page_\d+_[a-z0-9]{1,4}$/), name: "Team Roster", slug: "/team-roster", elements: [], title: "Team Roster", path: "/team-roster" });
     expect(screen.getByTitle(/Switch Active Page/).textContent).toContain("Team Roster"); // the new page is active
+  });
+});
+
+const NEW_PAGE_ID = /^page_\d+_[a-z0-9]{1,4}$/;
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const nameInput = () => screen.getByPlaceholderText("e.g. About, Services, Contact, Pricing") as HTMLInputElement;
+const slugInput = () => screen.getByPlaceholderText("e.g. /about, /services, /contact") as HTMLInputElement;
+async function openAddPage() {
+  fireEvent.click(screen.getByRole("button", { name: "Add New Page" }));
+  await flush(2);
+}
+async function savedPages(editor: Awaited<ReturnType<typeof mountEditor>>) {
+  const before = editor.backend.saves().length;
+  await editor.key("s", { ctrlKey: true });
+  await waitFor(() => expect(editor.backend.saves().length).toBe(before + 1));
+  return (editor.backend.saves().at(-1)!.body as { editorData: { pages: any[] } }).editorData.pages;
+}
+
+describe("handleCreateNewPage: page object, validation and messages", () => {
+  it("builds the full page object and announces it (no starter match)", async () => {
+    const editor = await mountEditor(site());
+    const toast = watchForText('Page "Team Roster" created!');
+    await openAddPage();
+    fireEvent.change(nameInput(), { target: { value: "Team Roster" } });
+    await flush(1);
+    fireEvent.click(screen.getByRole("button", { name: "Create Page" }));
+    await flush(3);
+    expect(toast.seen()).toBe(true);
+    toast.stop();
+    const created = (await savedPages(editor))[2];
+    expect(created).toEqual({
+      id: expect.stringMatching(NEW_PAGE_ID), name: "Team Roster", slug: "/team-roster", elements: [],
+      pageSettings: { title: "Team Roster", path: "/team-roster", description: "", backgroundColor: "#ffffff", isMaintenanceMode: false, siteLanguage: "en" },
+      isHome: false, createdAt: expect.stringMatching(ISO), updatedAt: expect.stringMatching(ISO),
+    });
+    expect(screen.queryByPlaceholderText("e.g. About, Services, Contact, Pricing")).toBeNull(); // modal closed
+  });
+
+  it("a starter slug brings the starter's elements and description", async () => {
+    const editor = await mountEditor(site());
+    await openAddPage();
+    fireEvent.change(nameInput(), { target: { value: "Services" } });
+    await flush(1);
+    fireEvent.click(screen.getByRole("button", { name: "Create Page" }));
+    await flush(3);
+    const created = (await savedPages(editor))[2];
+    expect(created.slug).toBe("/services");
+    expect(created.elements.length).toBeGreaterThan(0);
+    expect(editor.canvasIds()[0]).toBe(created.elements[0].id); // the canvas also lists nested children
+    expect(created.pageSettings.description).toBe("Our core services and solutions.");
+  });
+
+  it("a slug already in use is rejected with the validation message; nothing is created", async () => {
+    const editor = await mountEditor(site());
+    await openAddPage();
+    fireEvent.change(nameInput(), { target: { value: "Second About" } });
+    fireEvent.change(slugInput(), { target: { value: "/about" } });
+    await flush(1);
+    fireEvent.click(screen.getByRole("button", { name: "Create Page" }));
+    await flush(3);
+    expect(screen.getAllByRole("alert").map((n) => n.textContent)).toContain('Slug "/about" is already in use by page "About". Please choose a unique slug.');
+    expect(nameInput().value).toBe("Second About"); // modal still open
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" })); // shortcuts are ignored while its input has focus
+    await flush(2);
+    expect((await savedPages(editor)).map((p) => p.id)).toEqual(["home", "about"]);
+  });
+
+  it("the slug follows the name until it is edited by hand", async () => {
+    await mountEditor(site());
+    await openAddPage();
+    fireEvent.change(nameInput(), { target: { value: "Team Roster" } });
+    await flush(1);
+    expect(slugInput().value).toBe("/team-roster");
+    fireEvent.change(nameInput(), { target: { value: "Team Roster 2026!" } });
+    await flush(1);
+    expect(slugInput().value).toBe("/team-roster-2026");
+    fireEvent.change(slugInput(), { target: { value: "/crew" } });
+    fireEvent.change(nameInput(), { target: { value: "Crew" } });
+    await flush(1);
+    expect(slugInput().value).toBe("/crew");
+  });
+});
+
+describe("handleQuickCreateOrSwitchPage: page object and messages", () => {
+  it("a preset without a starter gets the '<name> page' description and the created message", async () => {
+    const editor = await mountEditor(site());
+    const toast = watchForText('Created and opened "Pricing" page!');
+    await openPageSelector();
+    fireEvent.click(screen.getByTitle("Create or switch to Pricing page"));
+    await flush(3);
+    expect(toast.seen()).toBe(true);
+    toast.stop();
+    const created = (await savedPages(editor))[2];
+    expect(created).toEqual({
+      id: expect.stringMatching(NEW_PAGE_ID), name: "Pricing", slug: "/pricing", elements: [],
+      pageSettings: { title: "Pricing", path: "/pricing", description: "Pricing page", backgroundColor: "#ffffff", isMaintenanceMode: false, siteLanguage: "en" },
+      isHome: false, createdAt: expect.stringMatching(ISO), updatedAt: expect.stringMatching(ISO),
+    });
+  });
+
+  it("an existing page is switched to with the switched message", async () => {
+    await mountEditor(site());
+    const toast = watchForText('Switched to "About" page');
+    await openPageSelector();
+    fireEvent.click(screen.getByTitle("Create or switch to About Us page"));
+    await flush(3);
+    expect(toast.seen()).toBe(true);
+    toast.stop();
+  });
+});
+
+describe("handlePreviewPageNavigate", () => {
+  it("sets ?page= to the page slug, or 'home' for the home page", async () => {
+    const editor = await mountEditor(site());
+    const push = vi.spyOn(window.history, "pushState");
+    await editor.key("p", { ctrlKey: true }); // preview
+    const navButton = (label: string) => [...document.querySelectorAll("nav button")].find((b) => b.textContent === label) as HTMLButtonElement;
+    fireEvent.click(navButton("About"));
+    await flush(2);
+    expect(new URL(String(push.mock.calls.at(-1)![2])).searchParams.get("page")).toBe("about");
+    fireEvent.click(navButton("Home"));
+    await flush(2);
+    expect(new URL(String(push.mock.calls.at(-1)![2])).searchParams.get("page")).toBe("home");
   });
 });
 
