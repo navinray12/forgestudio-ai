@@ -1,0 +1,4275 @@
+[
+ {
+  "name": "createProject",
+  "params": [
+   {
+    "name": "payload",
+    "type": "{\r\n    name: string;\r\n    slug?: string;\r\n    description?: string;\r\n    projectType?: string;\r\n    websiteId?: string;\r\n    workspaceId?: string;\r\n    frameworkMeta?: any;\r\n    capabilities?: any;\r\n  }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getProjectByWebsite",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listProjects",
+  "params": [
+   {
+    "name": "params",
+    "type": "{ workspaceId?: string; status?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "updates",
+    "type": "Partial<ForgeProject> & { frameworkMeta?: any }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "transitionLifecycle",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "cloneProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "overrides",
+    "type": "{ name?: string; slug?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getFileTree",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "includeIgnored",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "readFile",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "writeFile",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      content: string;\r\n      encoding?: string;\r\n      expectedVersion?: number;\r\n      isProtected?: boolean;\r\n      reason?: string;\r\n    }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteFile",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "moveFile",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sourcePath",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "destPath",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getFileRevisions",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "fileId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createSnapshot",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; description?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listSnapshots",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getManifest",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "updateManifest",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "manifest",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "compileProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "editorData",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncVisualToCode",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "element",
+    "type": "{ id: string; textContent?: string; content?: string; buttonText?: string }",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ mutation?: VisualSourceMutation; expectedRevision?: number }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "planVisualToCode",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "body",
+    "type": "{ before: unknown; after: unknown; paths?: string[] }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "syncCodeToVisual",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "resolve",
+    "type": "\"code\" | \"visual\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listPages",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createPage",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; route?: string; sourcePath?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "updatePage",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageKey",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name?: string; route?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deletePage",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageKey",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getSourcePreview",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "route",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWorkspaceState",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "saveWorkspaceState",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ layout?: any; preferences?: any }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getDependencies",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "installDependency",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; version?: string; isDev?: boolean; isExact?: boolean }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "removeDependency",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "name",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "explainDependencyFailure",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "errorMessage",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getRuntimeStatus",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeSandboxCommand",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ command: string; args?: string[]; cwd?: string; env?: any; secrets?: string[] }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "stopSandboxProcess",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "processId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "triggerBuild",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ buildMode?: \"development\" | \"production\"; trigger?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listBuilds",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createPreviewSession",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ viewport?: any; route?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updatePreviewViewport",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionToken",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "viewport",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "logPreviewConsole",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionToken",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "message",
+    "type": "{ type: string; text: string; sourceFile?: string; lineNumber?: number }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createTerminalSession",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "name",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "executeTerminalCommand",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "command",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "confirmedByUser",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getTerminalTasks",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "startDebugSession",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "target",
+    "type": "\"client\" | \"server\" | \"fullstack\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "setBreakpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "breakpoint",
+    "type": "{ file: string; line: number; condition?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "removeBreakpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bpId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "stepDebug",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "askAiDebug",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ errorMessage: string; sourceFile?: string; line?: number }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "generateReactProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "generateNextJsProject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "exportProjectZip",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "fallbackName",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getGenerationPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "framework",
+    "type": "\"react\" | \"nextjs\"",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "regenerateScope",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "framework",
+    "type": "\"react\" | \"nextjs\"",
+    "optional": false
+   },
+   {
+    "name": "scope",
+    "type": "{ type: \"full\" | \"page\" | \"component\" | \"route\"; targetId?: string; targetPath?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "detectRuntime",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createDeployment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      environment?: \"preview\" | \"staging\" | \"production\" | \"development\";\r\n      branch?: string;\r\n      commitHash?: string;\r\n      config?: Record<string, any>;\r\n      skipHealthCheck?: boolean;\r\n    }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listDeployments",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "environment",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getDeployment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "deploymentId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "promoteDeployment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ sourceDeploymentId: string; targetEnvironment: \"staging\" | \"production\" }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "rollbackDeployment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ targetDeploymentId?: string; targetEnvironment: \"preview\" | \"staging\" | \"production\" }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeDeploymentHealthCheck",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "deploymentId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createPipelineRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      trigger?: \"push\" | \"pull_request\" | \"manual\" | \"schedule\";\r\n      environment?: \"preview\" | \"staging\" | \"production\";\r\n      branch?: string;\r\n      commitHash?: string;\r\n      requireApproval?: boolean;\r\n    }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listPipelines",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getPipeline",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pipelineId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "approvePipelineGate",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pipelineId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "notes",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "rerunPipeline",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pipelineId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "cancelPipeline",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pipelineId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "checkDomainAvailability",
+  "params": [
+   {
+    "name": "domain",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "connectDomain",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      domain: string;\r\n      provider?: \"godaddy\" | \"manual\";\r\n      environment?: \"preview\" | \"staging\" | \"production\";\r\n      autoRenew?: boolean;\r\n    }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listDomains",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "configureDomainDns",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "domainId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ preserveExisting?: boolean }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "verifyDomainOwnership",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "domainId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "bindDomainDeployment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "domainId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "deploymentId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "detachDomain",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "domainId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "initGit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "initialBranch",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getGitStatus",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "stageGitFiles",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "paths",
+    "type": "string[] | \"all\"",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "unstageGitFiles",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "paths",
+    "type": "string[] | \"all\"",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "commitGit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ message: string; author?: { name: string; email: string } }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listGitBranches",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createGitBranch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; startPoint?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "switchGitBranch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; createIfMissing?: boolean }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteGitBranch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "branchName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "force",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getGitDiff",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ staged?: boolean; filePath?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getGitHistory",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ filePath?: string; limit?: number }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "mergeGitBranch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ sourceBranch: string; noFastForward?: boolean }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "resolveGitConflict",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ filePath: string; resolution: \"ours\" | \"theirs\" | \"manual\"; manualContent?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "abortGitMerge",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "rebaseGit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ upstreamBranch: string; force?: boolean }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listGitStashes",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createGitStash",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "message",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "applyGitStash",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "index",
+    "type": null,
+    "optional": true
+   },
+   {
+    "name": "drop",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "dropGitStash",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "index",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "cherryPickGit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "commitHash",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listGitTags",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createGitTag",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; commitHash?: string; message?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteGitTag",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "name",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getGitGraph",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "limit",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "connectGithub",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ repoOwner: string; repoName: string; defaultBranch?: string; token?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "importGithub",
+  "params": [
+   {
+    "name": "payload",
+    "type": "{ repoUrl: string; projectName?: string; defaultBranch?: string; token?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createGithubRepo",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; description?: string; isPrivate?: boolean; defaultBranch?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "fetchGithubRemote",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "pullGithubRemote",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "branch",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "pushGithubRemote",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ branch?: string; force?: boolean }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncGithubBranch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "branch",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createGithubPr",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ title: string; body?: string; sourceBranch: string; targetBranch?: string; issueNumber?: number }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listGithubPrs",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "\"OPEN\" | \"MERGED\" | \"CLOSED\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getGithubPrDetails",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "prNumber",
+    "type": "number",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "updateGithubPr",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "prNumber",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "updates",
+    "type": "{ title?: string; body?: string; status?: \"OPEN\" | \"MERGED\" | \"CLOSED\" }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getGithubChecks",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "commitHash",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeCli",
+  "params": [
+   {
+    "name": "payload",
+    "type": "{ args: string[]; cwd?: string; json?: boolean; nonInteractive?: boolean; projectId?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "completeAi",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ task: string; messages: any[]; model?: string; provider?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getAiModels",
+  "params": []
+ },
+ {
+  "name": "getAiHealth",
+  "params": []
+ },
+ {
+  "name": "getAiUsage",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listAiTools",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "category",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "executeAiTool",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; parameters: any; sessionId?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "resolveToolApproval",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ executionId: string; decision: \"APPROVED\" | \"DENIED\" }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createCodingSession",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ goal: string; targetFiles?: string[] }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "generateCodingPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeCodingPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sessionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "planId",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "generateCreatorPlan",
+  "params": [
+   {
+    "name": "prompt",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "framework",
+    "type": "\"react\" | \"nextjs\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createFromPrompt",
+  "params": [
+   {
+    "name": "prompt",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "framework",
+    "type": "\"react\" | \"nextjs\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "regenerateCreatorSection",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ targetFilePath: string; instruction: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "auditWebsite",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "fixWebsiteFinding",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "findingId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listMcpServers",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "registerMcpServer",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; endpoint: string; transport?: string; trustLevel?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "invokeMcpTool",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ serverId: string; toolName: string; arguments: any }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "assembleContext",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      objective?: string;\r\n      query?: string;\r\n      files?: string[];\r\n      contextProfile?: string;\r\n      tokenBudget?: number;\r\n    }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getContextSnapshot",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "snapshotId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createMemory",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      type: string;\r\n      title: string;\r\n      content: string;\r\n      severity?: string;\r\n      tags?: string[];\r\n      relatedFiles?: string[];\r\n    }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listMemories",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filters",
+    "type": "{ type?: string; status?: string; severity?: string; q?: string }",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateMemory",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "memoryId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "revokeMemory",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "memoryId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "reason",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "generateAiPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ objective: string; targetFiles?: string[]; constraints?: string[] }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getAiPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "planId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "approveAiPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "planId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "rejectAiPlan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "planId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "reason",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "analyzeArchitecture",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getArchitectureSnapshot",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listArchitectureFindings",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createAiTask",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ title: string; objective: string; priority?: string }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listAiTasks",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getAiTask",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "taskId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "startAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "taskId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "pauseAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "resumeAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "cancelAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "retryAiRun",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "compareAiRuns",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "otherRunId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getRunEvents",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listRunArtifacts",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "runId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getDatabase",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "environment",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listDatabases",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "branchDatabase",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "parentEnv",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "branchName",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listDatabaseTables",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getTableSchema",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createTable",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "alterTable",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "dropTable",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "confirmed",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "introspectDatabaseSchema",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createDatabaseBackup",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "name",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listDatabaseBackups",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "restoreDatabaseBackup",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "backupId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getDatabaseMetrics",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listDatabaseMigrations",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "applyDatabaseMigration",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "migrationId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "rollbackDatabaseMigration",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "migrationId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getTableData",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "params",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "insertTableRow",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "row",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "updateTableRow",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pkField",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pkValue",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "changes",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteTableRow",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pkField",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pkValue",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeSqlQuery",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sql",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "confirmDestructive",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "explainSqlQuery",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "sql",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "analyze",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getQueryHistory",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "seedTableData",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "count",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getApiConfigs",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "updateApiConfig",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tableName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getOpenApiSpec",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getTypedClientCode",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "databaseId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createStorageBucket",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{ name: string; accessPolicy?: string; maxSizeBytes?: number }",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listStorageBuckets",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteStorageBucket",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bucketName",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listStorageObjects",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bucketName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "prefix",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "uploadStorageObject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bucketName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "content",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "fileName",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "mimeType",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteStorageObject",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bucketName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "generateSignedStorageUrl",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bucketName",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "method",
+    "type": null,
+    "optional": true
+   },
+   {
+    "name": "expiresInSeconds",
+    "type": null,
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listRuntimeFunctions",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "environment",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createRuntimeFunction",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "invokeRuntimeFunction",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "fnId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteRuntimeFunction",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "fnId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listTaskQueues",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createTaskQueue",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getQueueMetrics",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "queueId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listQueueJobs",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "queueId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "enqueueQueueJob",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "queueId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "replayDlqJob",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "queueId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "jobId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listCronSchedules",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createCronSchedule",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "triggerCronSchedule",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "scheduleId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteCronSchedule",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "scheduleId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listEventTopics",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createEventTopic",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "publishEvent",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "topicId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listEventSubscriptions",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "topicId",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createEventSubscription",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listRealtimeChannels",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createRealtimeChannel",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "broadcastRealtimeMessage",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "channel",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getChannelPresence",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "channel",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listKvNamespaces",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createKvNamespace",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listKvKeys",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "namespace",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "prefix",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getKvKey",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "namespace",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "setKvKey",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "namespace",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteKvKey",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "namespace",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listGatewayRoutes",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createGatewayRoute",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteGatewayRoute",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "routeId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listSchemas",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "registerSchema",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listTestSuites",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "discoverTestSuites",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "runProjectTests",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listTestRuns",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listApiCollections",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createApiCollection",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listApiRequests",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "collectionId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createApiRequest",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "collectionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "executeApiRequest",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "requestId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "variables",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "runApiCollection",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "collectionId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "variables",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "importOpenApiToCollection",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "spec",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "name",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getDevToolsState",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "ingestDevToolsConsole",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "ingestDevToolsNetwork",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "captureDevToolsSnapshot",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "url",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "analyzeDevToolsErrorWithAi",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "errorLogId",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listPreviewEnvironments",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createPreviewEnvironment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deployPreviewEnvironment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "envId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "extendPreviewTtl",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "envId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "additionalHours",
+    "type": "number",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "teardownPreviewEnvironment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "envId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "promotePreviewEnvironment",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "envId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "targetEnvironment",
+    "type": "\"staging\" | \"production\"",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "queryObservabilityLogs",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filter",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getApmMetrics",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getTrace",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "traceId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listObservabilityIssues",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateObservabilityIssue",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "issueId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "diagnoseObservabilityIssue",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "issueId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "runSecurityScan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "scanType",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "policy",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getLatestSecurityScan",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listSecurityScans",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "generateSecurityRemediation",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "findingId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listFeatureFlags",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createFeatureFlag",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "toggleFeatureFlag",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "isEnabled",
+    "type": "boolean",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteFeatureFlag",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "evaluateFeatureFlags",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "context",
+    "type": "any",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listRemoteConfigs",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "environment",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "setRemoteConfig",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "deleteRemoteConfig",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "key",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "environment",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "runOptimizationAudit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getLatestOptimizationAudit",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listOptimizationAudits",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "generateOptimizationPatch",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "recId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "createProjectCheckpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "listProjectCheckpoints",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "tag",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getProjectCheckpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "checkpointId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "diffProjectCheckpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "checkpointId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "rollbackProjectCheckpoint",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "checkpointId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "restoreProjectSingleFile",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "checkpointId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filePath",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "exportDisasterRecoveryBundle",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "checkpointId",
+    "type": "string",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "importDisasterRecoveryBundle",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "bundle",
+    "type": "any",
+    "optional": false
+   }
+  ]
+ },
+ {
+  "name": "getArchitectureGraph",
+  "params": [
+   {
+    "name": "projectId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "layer",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ }
+]

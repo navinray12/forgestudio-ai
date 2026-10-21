@@ -1,0 +1,1737 @@
+[
+ {
+  "name": "validateWebsite",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "editorData",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "publishWebsite",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{\r\n      editorData?: any;\r\n      environment?: \"PRODUCTION\" | \"STAGING\" | \"DEVELOPMENT\";\r\n      destinationType?: \"INTERNAL\" | \"WORDPRESS\" | \"STATIC\";\r\n      metadata?: Record<string, any>;\r\n    }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getDeployments",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "rollbackDeployment",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "deploymentId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "connectWordPress",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "siteUrl",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiKey",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "siteName",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressStatus",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "verifyWordPress",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "disconnectWordPress",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "revokeWordPressConnection",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getSftpConfig",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "saveSftpConfig",
+  "params": [
+   {
+    "name": "config",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "downloadWordPressPlugin",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressSiteInfo",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressSiteHealth",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressPages",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "query",
+    "type": "{ search?: string; status?: string; parent?: number; page?: number; perPage?: number }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "importWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageData",
+    "type": "{ title: string; slug?: string; content?: string; status?: string; parent?: number; menuOrder?: number; template?: string; excerpt?: string; forgePageId?: string }",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "verifySftpConfig",
+  "params": [
+   {
+    "name": "config",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "pageData",
+    "type": "{ title?: string; slug?: string; content?: string; status?: string; parent?: number; menuOrder?: number; template?: string; excerpt?: string; forgePageId?: string }",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "force",
+    "type": "boolean",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "duplicateWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ customTitle?: string; customSlug?: string }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "reorderWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ targetPageId?: number; position?: \"BEFORE\" | \"AFTER\" | \"FIRST\" | \"LAST\"; parentId?: number }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "uploadWordPressMedia",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "file",
+    "type": "File",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ title?: string; altText?: string; caption?: string; description?: string }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "onProgress",
+    "type": "(percent: number) => void",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressMedia",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "query",
+    "type": "{\r\n      search?: string;\r\n      mimeType?: string;\r\n      mediaType?: \"image\" | \"document\" | \"all\";\r\n      order?: \"ASC\" | \"DESC\";\r\n      orderby?: \"date\" | \"modified\" | \"title\" | \"filename\";\r\n      page?: number;\r\n      perPage?: number;\r\n    }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressMedia",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "mediaId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressMedia",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "mediaId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "metadata",
+    "type": "{ title?: string; altText?: string; caption?: string; description?: string }",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressMedia",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "mediaId",
+    "type": "number",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{ force?: boolean }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "publishWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "{\r\n      pageId?: string;\r\n      wordpressPageId?: number;\r\n      title?: string;\r\n      slug?: string;\r\n      status?: \"draft\" | \"publish\" | \"private\";\r\n      content?: string;\r\n      excerpt?: string;\r\n      template?: string;\r\n      format?: \"html\" | \"gutenberg\";\r\n      mode?: \"html\" | \"gutenberg\";\r\n    }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "previewWordPressHtml",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "previewWordPressGutenberg",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressPublishStatus",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressRollbackTargets",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "rollbackWordPressPage",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "snapshotId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createWordPressPublishJob",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "options",
+    "type": "{ targetWpPostId?: number; slug?: string; status?: string; title?: string; format?: \"html\" | \"gutenberg\" }",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressPublishJobStatus",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "jobId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressPublishJobs",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "cancelWordPressPublishJob",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "jobId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "reason",
+    "type": "string",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "retryWordPressPublishJob",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "jobId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncSftp",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "options",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressFormsCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressForms",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncWordPressForm",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "formId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "submitWordPressForm",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "formId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressSeoCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressPageSeo",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressPageSeo",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "metadata",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncWordPressPageSeo",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pageId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressAnalyticsCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressAnalyticsConfig",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressAnalyticsConfig",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "config",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressAnalyticsData",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "params",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "syncWordPressAnalytics",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressMenuCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressMenus",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createWordPressMenu",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuData",
+    "type": "{ name: string; slug?: string; description?: string }",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressMenu",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressMenuItems",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createWordPressMenuItem",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "itemData",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "reorderWordPressMenuItems",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "reorderPayload",
+    "type": "any[]",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressMenuLocations",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "assignWordPressMenuLocation",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "menuId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "location",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressWebhookCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressWebhooks",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "createWordPressWebhook",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "webhookData",
+    "type": "any",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressWebhook",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "webhookId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "enableWordPressWebhook",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "webhookId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "disableWordPressWebhook",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "webhookId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressWebhookDeliveries",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "webhookId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressPluginCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressPlugins",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filter",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "activateWordPressPlugin",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pluginId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "isNetwork",
+    "type": null,
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deactivateWordPressPlugin",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pluginId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "isNetwork",
+    "type": null,
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressPlugin",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pluginId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressPlugin",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "pluginId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressThemeCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listWordPressThemes",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "filter",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getActiveWordPressTheme",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "activateWordPressTheme",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "themeId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "updateWordPressTheme",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "themeId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "deleteWordPressTheme",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "themeId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressCacheCapabilities",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "getWordPressCacheStatus",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "purgeWordPressCache",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "target",
+    "type": "any",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "clearWordPressCache",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "warmWordPressCache",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "urls",
+    "type": "string[]",
+    "optional": true
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "scheduleCodePublish",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "payload",
+    "type": "{\r\n      scheduledTime: string;\r\n      codeSnippet?: string;\r\n      location?: \"head\" | \"body\" | \"footer\";\r\n      environment?: string;\r\n      targetPages?: string[];\r\n    }",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "listScheduledCodePublishes",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ },
+ {
+  "name": "cancelScheduledCodePublish",
+  "params": [
+   {
+    "name": "websiteId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "jobId",
+    "type": "string",
+    "optional": false
+   },
+   {
+    "name": "apiUrl",
+    "type": "string",
+    "optional": true
+   }
+  ]
+ }
+]
