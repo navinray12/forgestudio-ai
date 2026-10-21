@@ -157,8 +157,10 @@ describe("handleCreateNewPage: page object, validation and messages", () => {
   it("the slug follows the name until it is edited by hand", async () => {
     await mountEditor(site());
     await openAddPage();
+    expect(document.activeElement).toBe(nameInput()); // autoFocus
     fireEvent.change(nameInput(), { target: { value: "Team Roster" } });
     await flush(1);
+    expect(document.activeElement).toBe(nameInput()); // the modal is not remounted while typing
     expect(slugInput().value).toBe("/team-roster");
     fireEvent.change(nameInput(), { target: { value: "Team Roster 2026!" } });
     await flush(1);

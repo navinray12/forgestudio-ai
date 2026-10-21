@@ -72,3 +72,74 @@ export function previewPageParam(page: PageConfig, homePageId: string): string {
     ? "home"
     : page.slug.replace(/^\//, "");
 }
+
+/**
+ * The active-page sync effect's setPages updater, moved verbatim: brings the active page up to date with
+ * the canvas elements and page settings (name / slug from the settings title / path). Returns the
+ * previous array itself when there are no pages or the active page is missing, and the same page object
+ * when nothing changed (otherwise a new array, as before).
+ */
+export function syncActivePageIntoPages(prevPages: PageConfig[], activePageId: string, elements: PageConfig["elements"], pageSettings: any): PageConfig[] {
+  if (!prevPages || prevPages.length === 0) return prevPages;
+
+  const exists = prevPages.some((p) => p.id === activePageId);
+  if (!exists) return prevPages;
+
+  return prevPages.map((p) => {
+    if (p.id === activePageId) {
+      const updatedName = pageSettings.title || p.name;
+      const updatedSlug = pageSettings.path || p.slug;
+
+      if (
+        p.elements === elements &&
+        p.pageSettings === pageSettings &&
+        p.name === updatedName &&
+        p.slug === updatedSlug
+      ) {
+        return p;
+      }
+
+      return {
+        ...p,
+        name: updatedName,
+        slug: updatedSlug,
+        elements,
+        pageSettings,
+      };
+    }
+
+    return p;
+  });
+}
+
+/**
+ * The page the preview opens from the URL (?page= or ?previewPage=, matched by id, slug with or without
+ * "/", or case-insensitive name), otherwise the home page (by id, isHome, "/" slug or id "home"), otherwise
+ * the first page; undefined when there are no pages. Moved from the preview URL sync effect.
+ */
+export function previewPageIdFromUrl(pages: PageConfig[], homePageId: string, search: string): string | undefined {
+  const searchParams = new URLSearchParams(search);
+  const urlPageParam =
+    searchParams.get("page") || searchParams.get("previewPage");
+
+  if (urlPageParam) {
+    const found = pages.find(
+      (p) =>
+        p.id === urlPageParam ||
+        p.slug === urlPageParam ||
+        p.slug === `/${urlPageParam}` ||
+        p.name.toLowerCase() === urlPageParam.toLowerCase()
+    );
+
+    if (found) {
+      return found.id;
+    }
+  }
+
+  const homePage =
+    pages.find(
+      (p) => p.id === homePageId || p.isHome || p.slug === "/" || p.id === "home"
+    ) || pages[0];
+
+  return homePage ? homePage.id : undefined;
+}

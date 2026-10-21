@@ -173,7 +173,6 @@ import {
   isControlStyleConfigured,
   getEffectiveLayout,
   getMergedStyles,
-  getMergedLayout,
   getInnerStyles,
   generateElementsHoverCSS,
   getElementBreadcrumbPath,
@@ -319,13 +318,6 @@ import {
 
 import { SpacingControl } from "./inspector";
 import { DefaultWebsiteNavbar } from "./components/DefaultWebsiteNavbar";
-import {
-  createDefaultHeaderElements,
-  createDefaultSinglePostElements,
-  createDefaultArchiveElements,
-  createDefault404Elements,
-  createDefaultSearchResultsElements,
-} from "./navigation/navigationDefaults";
 import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./core/elementTree";
 import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
@@ -337,8 +329,22 @@ import { buildTypographySection } from "./inspector/typographySection";
 import { buildPositioningControls } from "./inspector/positioningControls";
 import { buildBackgroundAndBorderControls } from "./inspector/backgroundBorderControls";
 import { buildNavigatorTreeItem } from "./navigator/navigatorTreeItem";
+import { renderTextElements } from "./canvas/elements/textElements";
+import { renderMediaElements } from "./canvas/elements/mediaElements";
+import { renderButtonElement } from "./canvas/elements/buttonElement";
+import { renderDynamicContentElements } from "./canvas/elements/dynamicContentElements";
+import { renderWidgetElements } from "./canvas/elements/widgetElements";
+import { renderNavigationElements } from "./canvas/elements/navigationElements";
+import { renderUtilityElements } from "./canvas/elements/utilityElements";
+import { renderMenuElements } from "./canvas/elements/menuElements";
+import { renderWooCommerceElements } from "./canvas/elements/wooCommerceElements";
+import { renderBasicWidgetElements } from "./canvas/elements/basicWidgetElements";
+import { renderContainerElement } from "./canvas/elements/containerElement";
+import { canvasModeTarget, storeCanvasIntoActivePage } from "./core/canvasMode";
+import { sitePartKeyForScope, withSitePartElements } from "./core/sitePartScopes";
+import { renderAddPageModal } from "./shell/addPageModal";
 import { buildCanonicalPages } from "./core/canonicalPages";
-import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageParam, slugFromName, starterElementsOf } from "./core/pageManagement";
+import { buildNewPage, findStarterPage, newPageId, pageSettingsOf, previewPageIdFromUrl, previewPageParam, slugFromName, starterElementsOf, syncActivePageIntoPages } from "./core/pageManagement";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
 import { useWorkspaceSync } from "./core/useWorkspaceSync";
 import { useManualSave } from "./core/useManualSave";
@@ -1124,72 +1130,14 @@ export default function WebsiteEditor() {
   useEffect(() => {
     if (!activePageId || canvasMode !== "page") return;
 
-    setPages((prevPages) => {
-      if (!prevPages || prevPages.length === 0) return prevPages;
-
-      const exists = prevPages.some((p) => p.id === activePageId);
-      if (!exists) return prevPages;
-
-      return prevPages.map((p) => {
-        if (p.id === activePageId) {
-          const updatedName = pageSettings.title || p.name;
-          const updatedSlug = pageSettings.path || p.slug;
-
-          if (
-            p.elements === elements &&
-            p.pageSettings === pageSettings &&
-            p.name === updatedName &&
-            p.slug === updatedSlug
-          ) {
-            return p;
-          }
-
-          return {
-            ...p,
-            name: updatedName,
-            slug: updatedSlug,
-            elements,
-            pageSettings,
-          };
-        }
-
-        return p;
-      });
-    });
+    setPages((prevPages) => syncActivePageIntoPages(prevPages, activePageId, elements, pageSettings));
   }, [elements, pageSettings, activePageId, canvasMode]);
 
-  // Sync active Theme Builder changes into siteParts when in theme builder canvasMode
+  // Sync active Theme Builder changes into siteParts when in theme builder canvasMode (see core/sitePartScopes)
   useEffect(() => {
-    if (canvasMode === "header") {
-      setSiteParts((prev) => ({
-        ...prev,
-        header: { ...prev.header, elements },
-      }));
-    } else if (canvasMode === "footer") {
-      setSiteParts((prev) => ({
-        ...prev,
-        footer: { ...prev.footer, elements },
-      }));
-    } else if (canvasMode === "single") {
-      setSiteParts((prev) => ({
-        ...prev,
-        single: { ...prev.single, elements },
-      }));
-    } else if (canvasMode === "archive") {
-      setSiteParts((prev) => ({
-        ...prev,
-        archive: { ...prev.archive, elements },
-      }));
-    } else if (canvasMode === "404") {
-      setSiteParts((prev) => ({
-        ...prev,
-        notFound404: { ...prev.notFound404, elements },
-      }));
-    } else if (canvasMode === "search-results") {
-      setSiteParts((prev) => ({
-        ...prev,
-        searchResults: { ...prev.searchResults, elements },
-      }));
+    const part = sitePartKeyForScope(canvasMode);
+    if (part) {
+      setSiteParts((prev) => withSitePartElements(prev, part, elements));
     }
   }, [elements, canvasMode]);
 
@@ -1198,32 +1146,9 @@ export default function WebsiteEditor() {
     if (!isPreview || pages.length === 0) return;
 
     const syncFromUrl = () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const urlPageParam =
-        searchParams.get("page") || searchParams.get("previewPage");
-
-      if (urlPageParam) {
-        const found = pages.find(
-          (p) =>
-            p.id === urlPageParam ||
-            p.slug === urlPageParam ||
-            p.slug === `/${urlPageParam}` ||
-            p.name.toLowerCase() === urlPageParam.toLowerCase()
-        );
-
-        if (found) {
-          setActivePreviewPageId(found.id);
-          return;
-        }
-      }
-
-      const homePage =
-        pages.find(
-          (p) => p.id === homePageId || p.isHome || p.slug === "/" || p.id === "home"
-        ) || pages[0];
-
-      if (homePage) {
-        setActivePreviewPageId(homePage.id);
+      const pageId = previewPageIdFromUrl(pages, homePageId, window.location.search);
+      if (pageId !== undefined) {
+        setActivePreviewPageId(pageId);
       }
     };
 
@@ -1278,115 +1203,31 @@ export default function WebsiteEditor() {
 
     // 1. Save current elements into appropriate model
     if (canvasMode === "page") {
-      setPages((prev) =>
-        prev.map((p) => (p.id === activePageId ? { ...p, elements, pageSettings } : p))
-      );
-    } else if (canvasMode === "header") {
-      setSiteParts((prev) => ({
-        ...prev,
-        header: { ...prev.header, elements },
-      }));
-    } else if (canvasMode === "footer") {
-      setSiteParts((prev) => ({
-        ...prev,
-        footer: { ...prev.footer, elements },
-      }));
-    } else if (canvasMode === "single") {
-      setSiteParts((prev) => ({
-        ...prev,
-        single: { ...prev.single, elements },
-      }));
-    } else if (canvasMode === "archive") {
-      setSiteParts((prev) => ({
-        ...prev,
-        archive: { ...prev.archive, elements },
-      }));
-    } else if (canvasMode === "404") {
-      setSiteParts((prev) => ({
-        ...prev,
-        notFound404: { ...prev.notFound404, elements },
-      }));
-    } else if (canvasMode === "search-results") {
-      setSiteParts((prev) => ({
-        ...prev,
-        searchResults: { ...prev.searchResults, elements },
-      }));
+      setPages((prev) => storeCanvasIntoActivePage(prev, activePageId, elements, pageSettings));
+    } else {
+      const part = sitePartKeyForScope(canvasMode);
+      if (part) setSiteParts((prev) => withSitePartElements(prev, part, elements));
     }
 
     // 2. Clear selections & reset undo/redo for new target
     setSelectedId(null);
     setSelectedIds([]);
 
-    // 3. Load target elements
-    if (mode === "page") {
-      const activePage = pages.find((p) => p.id === activePageId);
-      const targetEls = activePage?.elements || [];
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "header") {
-      let targetEls = siteParts.header?.elements || [];
-      if (targetEls.length === 0) {
-        targetEls = createDefaultHeaderElements(
-          website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio",
-          pages
-        );
-        setSiteParts((prev) => ({
-          ...prev,
-          header: { ...prev.header, elements: targetEls },
-        }));
+    // 3. Load target elements (seeding an empty site part with its defaults first)
+    const target = canvasModeTarget(mode, {
+      pages,
+      activePageId,
+      siteParts,
+      siteName: () => website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio",
+    });
+    if (target) {
+      const { seed } = target;
+      if (seed) {
+        setSiteParts((prev) => withSitePartElements(prev, seed.part, target.elements, seed.extra));
       }
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "footer") {
-      const targetEls = siteParts.footer?.elements || [];
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "single") {
-      let targetEls = siteParts.single?.elements || [];
-      if (targetEls.length === 0) {
-        targetEls = createDefaultSinglePostElements();
-        setSiteParts((prev) => ({
-          ...prev,
-          single: { ...prev.single, elements: targetEls, isEnabled: true },
-        }));
-      }
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "archive") {
-      let targetEls = siteParts.archive?.elements || [];
-      if (targetEls.length === 0) {
-        targetEls = createDefaultArchiveElements();
-        setSiteParts((prev) => ({
-          ...prev,
-          archive: { ...prev.archive, elements: targetEls, isEnabled: true },
-        }));
-      }
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "404") {
-      let targetEls = siteParts.notFound404?.elements || [];
-      if (targetEls.length === 0) {
-        targetEls = createDefault404Elements();
-        setSiteParts((prev) => ({
-          ...prev,
-          notFound404: { ...prev.notFound404, elements: targetEls, isEnabled: true },
-        }));
-      }
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
-    } else if (mode === "search-results") {
-      let targetEls = siteParts.searchResults?.elements || [];
-      if (targetEls.length === 0) {
-        targetEls = createDefaultSearchResultsElements();
-        setSiteParts((prev) => ({
-          ...prev,
-          searchResults: { ...prev.searchResults, elements: targetEls, isEnabled: true },
-        }));
-      }
-      setElements(targetEls);
-      resetHistoryTo(targetEls);
+      setElements(target.elements);
+      resetHistoryTo(target.elements);
     }
-
     setCanvasMode(mode);
     setIsPageSelectorOpen(false);
   };
@@ -3106,285 +2947,41 @@ export default function WebsiteEditor() {
     const stickyStyles = resolveStickyStyles(el);
 
     if (el.type === "container") {
-      const mergedLayout = getMergedLayout(el, activeDevice);
-      const isHovered = hoveredId === el.id && !isSelected && !isPreview;
-      const path = isSelected ? getElementBreadcrumbPath(elements, el.id) : null;
-
-      const isDropTarget = dropTargetId === el.id && !isPreview;
-
-      return (
-        <div
-          key={el.id}
-          id={el.customId || undefined}
-          {...customAttrProps}
-          {...(isPreview ? motionAttrs : {})}
-          data-el-id={el.id}
-          draggable={!isPreview}
-          onDragStart={(e) => {
-            e.stopPropagation();
-            e.dataTransfer.setData("application/json", JSON.stringify({ type: "move", id: el.id }));
-            e.dataTransfer.effectAllowed = "move";
-            if (!isPreview) handleSelectElement(el.id, e);
-            setDraggingId(el.id);
-          }}
-          onDragOver={(e) => {
-            handleCanvasAutoScroll(e);
-            handleDragOverElement(e, el.id, true);
-          }}
-          onDragEnter={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-            if (dropTargetId === el.id) {
-              setDropTargetId(null);
-              setDropPosition(null);
-            }
-          }}
-          onDrop={(e) => {
-            handleDropElement(e, el.id, dropPosition);
-          }}
-          onDragEnd={(e) => {
-            e.stopPropagation();
-            setDraggingId(null);
-            setDropTargetId(null);
-            setDropPosition(null);
-          }}
-          {...customAttrProps}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!isPreview) handleSelectElement(el.id, e);
-          }}
-          className={`relative transition-all duration-150 ${el.id} ${el.customClass || ""} ${draggingId === el.id ? "opacity-40 scale-[0.99]" : ""
-            } ${isPreview ? "" : "cursor-grab active:cursor-grabbing hover:outline hover:outline-1 hover:outline-blue-400/60"
-            } ${isSelected ? "border-2 border-blue-500 shadow-sm" : isPreview ? "" : "border border-dashed border-slate-300"}`}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isPreview) {
-              handleSelectElement(el.id, e);
-              setContextMenu({ x: e.clientX, y: e.clientY, elementId: el.id });
-            }
-          }}
-          style={{
-            ...stickyStyles,
-            boxSizing: "border-box",
-            display: mergedLayout.layoutType === "masonry" ? "block" : (mergedLayout.layoutType === "grid" ? "grid" : "flex"),
-            columnCount: mergedLayout.layoutType === "masonry" ? (mergedLayout.masonryColumns || 3) : undefined,
-            columnGap: mergedLayout.layoutType === "masonry"
-              ? `${mergedLayout.masonryGap || mergedLayout.gap || 16}px`
-              : (mergedLayout.layoutType === "grid"
-                ? (mergedLayout.columnGap !== undefined ? (typeof mergedLayout.columnGap === "number" ? `${mergedLayout.columnGap}px` : mergedLayout.columnGap) : `${mergedLayout.gap ?? 10}px`)
-                : undefined),
-            flexDirection: (mergedLayout.layoutType === "grid" || mergedLayout.layoutType === "masonry") ? undefined : (mergedLayout.direction || "column"),
-            flexWrap: (mergedLayout.layoutType === "grid" || mergedLayout.layoutType === "masonry") ? undefined : (mergedLayout.flexWrap || mergedStyles.flexWrap || (mergedLayout.direction === "row" ? "wrap" : "nowrap")) as any,
-            justifyContent: (mergedLayout.layoutType === "grid" || mergedLayout.layoutType === "masonry") ? undefined : (mergedLayout.justifyContent || "flex-start"),
-            gridTemplateColumns: mergedLayout.layoutType === "grid" ? (mergedLayout.gridTemplateColumns || "repeat(2, minmax(0, 1fr))") : undefined,
-            gridTemplateRows: mergedLayout.layoutType === "grid" ? mergedLayout.gridTemplateRows : undefined,
-            gridAutoFlow: mergedLayout.layoutType === "grid" ? (mergedLayout.gridAutoFlow || "row") : undefined,
-            justifyItems: mergedLayout.layoutType === "grid" ? mergedLayout.justifyItems : undefined,
-            alignItems: mergedLayout.layoutType === "masonry" ? undefined : (mergedLayout.alignItems || "stretch"),
-            gap: mergedLayout.layoutType === "masonry" ? undefined : `${mergedLayout.gap ?? 10}px`,
-            rowGap: mergedLayout.rowGap !== undefined && mergedLayout.layoutType !== "masonry" ? (typeof mergedLayout.rowGap === "number" ? `${mergedLayout.rowGap}px` : mergedLayout.rowGap) : undefined,
-            width: mergedStyles.width || "100%",
-            maxWidth: mergedStyles.maxWidth || "100%",
-            minWidth: mergedStyles.minWidth || "0px",
-            flex: mergedStyles.flex || undefined,
-            height: mergedStyles.height || "auto",
-            paddingTop: mergedStyles.paddingTop ?? (mergedStyles.padding || "16px"),
-            paddingRight: mergedStyles.paddingRight ?? (mergedStyles.padding || "16px"),
-            paddingBottom: mergedStyles.paddingBottom ?? (mergedStyles.padding || "16px"),
-            paddingLeft: mergedStyles.paddingLeft ?? (mergedStyles.padding || "16px"),
-            marginTop: mergedStyles.marginTop ?? "8px",
-            marginRight: mergedStyles.marginRight ?? "0px",
-            marginBottom: mergedStyles.marginBottom ?? "8px",
-            marginLeft: mergedStyles.marginLeft ?? "0px",
-            ...compileBackgroundAndBorderStyles(mergedStyles),
-            ...compilePositioningStyles(mergedStyles),
-            ...Object.fromEntries(["display", "gap", "rowGap", "columnGap", "minHeight", "maxHeight", "flexGrow", "flexShrink", "flexBasis", "gridColumn", "gridRow", "overflow", "overflowX", "overflowY", "color", "fontFamily", "fontSize", "lineHeight"].filter(key => mergedStyles[key] !== undefined).map(key => [key, mergedStyles[key]])),
-          }}
-        >
-          {/* Drop Indicators for Container */}
-          {isDropTarget && dropPosition === "before" && (
-            <div className="absolute -top-1.5 left-0 right-0 h-1.5 bg-blue-600 rounded-full z-50 pointer-events-none shadow-md animate-pulse" />
-          )}
-          {isDropTarget && dropPosition === "after" && (
-            <div className="absolute -bottom-1.5 left-0 right-0 h-1.5 bg-blue-600 rounded-full z-50 pointer-events-none shadow-md animate-pulse" />
-          )}
-          {isDropTarget && dropPosition === "inside" && (
-            <div className="absolute inset-0 border-2 border-blue-500 border-dashed bg-blue-500/10 z-40 pointer-events-none rounded-lg flex items-center justify-center">
-              <span className="bg-blue-600 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow pointer-events-none tracking-wide uppercase">
-                Drop Inside Container
-              </span>
-            </div>
-          )}
-
-          {/* F-217: Background Video Layer */}
-          {(el.containerBgType === "video" || el.containerVideoUrl) && (
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-              <video
-                src={el.containerVideoUrl || "https://assets.mixkit.co/videos/preview/mixkit-set-of-plateaus-seen-from-the-sky-in-a-sunset-26070-large.mp4"}
-                autoPlay={el.containerVideoAutoplay ?? true}
-                loop={el.containerVideoLoop ?? true}
-                muted={el.containerVideoMuted ?? true}
-                playsInline
-                className="w-full h-full object-cover"
-                style={{
-                  objectFit: el.containerVideoFit || "cover",
-                  objectPosition: el.containerVideoPosition || "center",
-                }}
-              />
-              {el.containerVideoOverlay && (
-                <div className="absolute inset-0" style={{ backgroundColor: el.containerVideoOverlay }} />
-              )}
-            </div>
-          )}
-
-          {/* F-218: Background Slideshow Layer */}
-          {(el.containerBgType === "slideshow" || (el.containerSlideshowImages && el.containerSlideshowImages.length > 0)) && (
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-              {el.containerSlideshowImages?.map((img, idx) => (
-                <img
-                  key={img.id || idx}
-                  src={img.url}
-                  alt="Background Slide"
-                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-                  style={{ opacity: 1 }}
-                />
-              )) || (
-                  <img
-                    src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&auto=format&fit=crop&q=80"
-                    alt="Background Slide"
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                )}
-              {el.containerSlideshowOverlay && (
-                <div className="absolute inset-0 z-1" style={{ backgroundColor: el.containerSlideshowOverlay }} />
-              )}
-            </div>
-          )}
-
-          {!isSelected && !isPreview && (
-            <span className="absolute top-1 left-2 text-[9px] font-bold text-slate-300 uppercase pointer-events-none select-none z-10">
-              Container
-            </span>
-          )}
-
-          {isSelected && (
-            <div className="absolute -top-3.5 right-3 z-30 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-0.5 text-[11px] font-semibold text-white shadow">
-              {path && path.length > 1 ? (
-                <span className="flex items-center gap-1">
-                  {path.map((item, idx) => (
-                    <span key={item.id} className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedId(item.id);
-                        }}
-                        className={`capitalize hover:underline ${item.id === el.id ? "font-bold text-white" : "text-blue-200"
-                          }`}
-                      >
-                        {item.type}
-                      </button>
-                      {idx < path.length - 1 && <span>›</span>}
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <span>Container</span>
-              )}
-              <span>•</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReorderElement(el.id, "up");
-                }}
-                className="hover:underline"
-                title="Move Section Up"
-              >
-                ▲
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReorderElement(el.id, "down");
-                }}
-                className="hover:underline"
-                title="Move Section Down"
-              >
-                ▼
-              </button>
-              <span>•</span>
-              <button
-                onClick={(e) => handleCopyElement(el.id, e)}
-                className="hover:underline"
-              >
-                Copy
-              </button>
-              <span>•</span>
-              <button
-                onClick={(e) => handleCopyStyle(el.id, e)}
-                className="hover:underline"
-                title="Copy Element Style"
-              >
-                Copy Style
-              </button>
-              {copiedStyles && (
-                <>
-                  <span>•</span>
-                  <button
-                    onClick={(e) => handlePasteStyle(el.id, e)}
-                    className="hover:underline text-emerald-200 hover:text-white"
-                    title="Paste Copied Style"
-                  >
-                    Paste Style
-                  </button>
-                </>
-              )}
-              <span>•</span>
-              <button
-                onClick={(e) => handleDuplicateElement(el.id, e)}
-                className="hover:underline"
-              >
-                Duplicate
-              </button>
-              <span>•</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSaveAsComponent(el.id);
-                }}
-                className={`hover:underline ${el.isComponent ? "text-purple-200 font-bold" : "text-blue-100"
-                  }`}
-                title={el.isComponent ? `Component: ${el.componentName}` : "Save as Reusable Component"}
-              >
-                {el.isComponent ? "Component 🧩" : "Save Comp"}
-              </button>
-              <span>•</span>
-              <button
-                onClick={(e) => handleDeleteElement(el.id, e)}
-                className="hover:underline text-red-200 hover:text-white"
-              >
-                Delete
-              </button>
-            </div>
-          )}
-
-          {(!el.children || el.children.length === 0) && !isPreview ? (
-            <div className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center">
-              <span className="text-xs font-bold text-slate-500">Empty Container</span>
-              <span className="text-[10px] text-slate-400 mt-0.5">
-                Click an element on the left panel to add inside
-              </span>
-            </div>
-          ) : (
-            el.children?.map((child) => renderElementTree(child))
-          )}
-        </div>
-      );
+      // See canvas/elements/containerElement (moved verbatim)
+      return renderContainerElement({
+        customAttrProps,
+        el,
+        isSelected,
+        mergedStyles,
+        motionAttrs,
+        stickyStyles,
+        activeDevice,
+        compileBackgroundAndBorderStyles,
+        copiedStyles,
+        draggingId,
+        dropPosition,
+        dropTargetId,
+        elements,
+        handleCanvasAutoScroll,
+        handleCopyElement,
+        handleCopyStyle,
+        handleDeleteElement,
+        handleDragOverElement,
+        handleDropElement,
+        handleDuplicateElement,
+        handlePasteStyle,
+        handleReorderElement,
+        handleSaveAsComponent,
+        handleSelectElement,
+        hoveredId,
+        isPreview,
+        renderElementTree,
+        setContextMenu,
+        setDraggingId,
+        setDropPosition,
+        setDropTargetId,
+        setSelectedId,
+      });
     }
 
     const path = isSelected ? getElementBreadcrumbPath(elements, el.id) : null;
@@ -3592,1587 +3189,118 @@ export default function WebsiteEditor() {
         )}
 
         {/* Element Renderers */}
-        {el.type === "heading" && (() => {
-          const Tag = (el.headingLevel || "h2") as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-          const displayContent = resolveDynamicTokens(el.content || "", {
-            siteName: website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio",
-            pageTitle: pages.find((p) => p.id === activePageId)?.name || pageSettings?.title || "Page",
-            post: {
-              title: "Sample Blog Post Title",
-              excerpt: "This is a preview excerpt of your dynamic post content.",
-              date: new Date().toLocaleDateString(),
-              author: "Editorial Team",
-              featuredImage: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800",
-            },
-            request: { q: "Design Systems", search: "Design Systems", tag: "Tech" },
-            query: { q: "Design Systems", search: "Design Systems", tag: "Tech" },
-          });
-
-          return (
-            <Tag
-              id={`heading-${el.id}`}
-              contentEditable={!isPreview}
-              suppressContentEditableWarning
-              onFocus={() => handleSelectElement(el.id)}
-              onBlur={(e) => updateElementContent(el.id, e.currentTarget.textContent || "")}
-              className="focus:ring-2 focus:ring-blue-400/60 focus:bg-blue-50/20 rounded-sm cursor-text transition-all"
-              style={{
-                margin: 0,
-                padding: 0,
-                boxSizing: "border-box",
-                outline: "none",
-                color: mergedStyles.color || "#0f172a",
-                fontSize: mergedStyles.fontSize || (el.headingLevel === "h1" ? "36px" : el.headingLevel === "h3" ? "24px" : el.headingLevel === "h4" ? "20px" : el.headingLevel === "h5" ? "16px" : el.headingLevel === "h6" ? "14px" : "32px"),
-                fontWeight: mergedStyles.fontWeight || "700",
-                textAlign: mergedStyles.textAlign || "left",
-                lineHeight: mergedStyles.lineHeight || "1.2",
-                fontFamily: mergedStyles.fontFamily,
-                fontStyle: mergedStyles.fontStyle,
-                textTransform: mergedStyles.textTransform,
-                textDecoration: mergedStyles.textDecoration,
-                letterSpacing: mergedStyles.letterSpacing,
-                textShadow: mergedStyles.textShadow,
-              }}
-            >
-              {isSelected ? el.content : displayContent}
-            </Tag>
-          );
-        })()}
-
-        {el.type === "text" && (() => {
-          const displayContent = resolveDynamicTokens(el.content || "", {
-            siteName: website?.name || globalSettings?.siteIdentity?.name || "ForgeStudio",
-            pageTitle: pages.find((p) => p.id === activePageId)?.name || pageSettings?.title || "Page",
-            post: {
-              title: "Sample Blog Post Title",
-              excerpt: "This is a preview excerpt of your dynamic post content.",
-              date: new Date().toLocaleDateString(),
-              author: "Editorial Team",
-              featuredImage: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800",
-            },
-            request: { q: "Design Systems", search: "Design Systems", tag: "Tech" },
-            query: { q: "Design Systems", search: "Design Systems", tag: "Tech" },
-          });
-
-          return (
-            <p
-              contentEditable={!isPreview}
-              suppressContentEditableWarning
-              onFocus={() => handleSelectElement(el.id)}
-              onBlur={(e) => updateElementContent(el.id, e.currentTarget.textContent || "")}
-              className="focus:ring-2 focus:ring-blue-400/60 focus:bg-blue-50/20 rounded-sm cursor-text transition-all"
-              style={{
-                margin: 0,
-                padding: 0,
-                boxSizing: "border-box",
-                outline: "none",
-                color: mergedStyles.color || "#475569",
-                fontSize: mergedStyles.fontSize || "16px",
-                fontWeight: mergedStyles.fontWeight || "400",
-                textAlign: mergedStyles.textAlign || "left",
-                lineHeight: mergedStyles.lineHeight || "1.6",
-                fontFamily: mergedStyles.fontFamily,
-                fontStyle: mergedStyles.fontStyle,
-                textTransform: mergedStyles.textTransform,
-                textDecoration: mergedStyles.textDecoration,
-                letterSpacing: mergedStyles.letterSpacing,
-                textShadow: mergedStyles.textShadow,
-              }}
-            >
-              {isSelected ? el.content : displayContent}
-            </p>
-          );
-        })()}
-
-        {el.type === "video" && (
-          <div
-            style={{
-              textAlign: mergedStyles.textAlign || "left",
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          >
-            {(() => {
-              const srcUrl = el.src?.trim() || "";
-              if (!srcUrl) {
-                return (
-                  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 py-10 px-6 text-center transition hover:border-blue-400">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xl font-bold">
-                      🎬
-                    </div>
-                    <h4 className="mt-3 text-xs font-bold text-slate-700">
-                      No video selected
-                    </h4>
-                    <p className="mt-1 text-[11px] text-slate-400 mb-4 max-w-xs">
-                      Enter a YouTube, Vimeo, or HTML5 video link, or upload a video file
-                    </p>
-                    {!isPreview && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectElement(el.id);
-                          triggerImagePicker((url) => {
-                            setElements((prev) =>
-                              updateTreeElement(prev, el.id, (item) => ({ ...item, src: url }))
-                            );
-                          });
-                        }}
-                        className="rounded-lg bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-blue-700 transition cursor-pointer flex items-center gap-1.5"
-                      >
-                        <span>🎬</span> Select Video
-                      </button>
-                    )}
-                  </div>
-                );
-              }
-
-              const ytId = getYouTubeId(srcUrl);
-              const vimeoId = getVimeoId(srcUrl);
-              const isControls = el.videoControls !== false;
-              const isAutoplay = Boolean(el.videoAutoplay);
-              const isLoop = Boolean(el.videoLoop);
-              const isMuted = Boolean(el.videoMuted);
-
-              const alignMarginLeft =
-                mergedStyles.textAlign === "center"
-                  ? "auto"
-                  : mergedStyles.textAlign === "right"
-                    ? "auto"
-                    : "0";
-              const alignMarginRight =
-                mergedStyles.textAlign === "center"
-                  ? "auto"
-                  : mergedStyles.textAlign === "left"
-                    ? "auto"
-                    : "0";
-
-              const containerStyle: React.CSSProperties = {
-                width: mergedStyles.width || "100%",
-                maxWidth: "100%",
-                height: mergedStyles.height && mergedStyles.height !== "auto" ? mergedStyles.height : undefined,
-                borderRadius: mergedStyles.borderRadius || "8px",
-                overflow: "hidden",
-                boxSizing: "border-box",
-                marginLeft: alignMarginLeft,
-                marginRight: alignMarginRight,
-                ...compileBackgroundAndBorderStyles(mergedStyles),
-              };
-
-              if (ytId) {
-                const embedParams = new URLSearchParams({
-                  autoplay: isAutoplay ? "1" : "0",
-                  controls: isControls ? "1" : "0",
-                  loop: isLoop ? "1" : "0",
-                  mute: isMuted ? "1" : "0",
-                  playlist: isLoop ? ytId : "",
-                }).toString();
-
-                return (
-                  <div style={containerStyle} className="inline-block shadow-sm">
-                    <div className="relative w-full aspect-video bg-black overflow-hidden rounded-[inherit]">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${ytId}?${embedParams}`}
-                        title="YouTube video player"
-                        className="absolute inset-0 w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  </div>
-                );
-              }
-
-              if (vimeoId) {
-                const embedParams = new URLSearchParams({
-                  autoplay: isAutoplay ? "1" : "0",
-                  controls: isControls ? "1" : "0",
-                  loop: isLoop ? "1" : "0",
-                  muted: isMuted ? "1" : "0",
-                }).toString();
-
-                return (
-                  <div style={containerStyle} className="inline-block shadow-sm">
-                    <div className="relative w-full aspect-video bg-black overflow-hidden rounded-[inherit]">
-                      <iframe
-                        src={`https://player.vimeo.com/video/${vimeoId}?${embedParams}`}
-                        title="Vimeo video player"
-                        className="absolute inset-0 w-full h-full border-0"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  </div>
-                );
-              }
-
-              // Direct Video / HTML5 Video file fallback
-              return (
-                <div style={containerStyle} className="inline-block shadow-sm">
-                  <video
-                    src={resolveImageUrl(srcUrl, apiUrl)}
-                    poster={el.videoPoster ? resolveImageUrl(el.videoPoster, apiUrl) : undefined}
-                    controls={isControls}
-                    autoPlay={isAutoplay}
-                    loop={isLoop}
-                    muted={isMuted}
-                    playsInline
-                    className="w-full h-full object-cover rounded-[inherit]"
-                    style={{
-                      maxHeight: mergedStyles.height && mergedStyles.height !== "auto" ? mergedStyles.height : "500px",
-                    }}
-                  >
-                    Your browser does not support HTML5 video playback.
-                  </video>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {el.type === "video-playlist" && (
-          <div
-            style={{
-              textAlign: mergedStyles.textAlign || "left",
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          >
-            {(() => {
-              const items = el.playlistItems || [];
-              if (items.length === 0) {
-                return (
-                  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 py-10 px-6 text-center transition hover:border-blue-400">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xl font-bold">
-                      📺
-                    </div>
-                    <h4 className="mt-3 text-xs font-bold text-slate-700">
-                      No video playlist items
-                    </h4>
-                    <p className="mt-1 text-[11px] text-slate-400 mb-4 max-w-xs">
-                      Add videos to this playlist from the properties sidebar
-                    </p>
-                    {!isPreview && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectElement(el.id);
-                        }}
-                        className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
-                      >
-                        Manage Playlist
-                      </button>
-                    )}
-                  </div>
-                );
-              }
-
-              // Determine active item
-              const activeIndex = Math.max(
-                0,
-                items.findIndex((item) => item.id === el.playlistActiveId)
-              );
-              const activeItem = items[activeIndex] || items[0];
-              const isRightPosition = (el.playlistPosition || "right") === "right";
-              const playerWidthPercentage = el.playlistPlayerWidth || "65%";
-
-              // Navigation Handlers
-              const handlePrev = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                const prevIndex = (activeIndex - 1 + items.length) % items.length;
-                const prevItem = items[prevIndex];
-                if (prevItem) {
-                  setElements((prev) =>
-                    updateTreeElement(prev, el.id, (item) => ({ ...item, playlistActiveId: prevItem.id }))
-                  );
-                }
-              };
-
-              const handleNext = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                const nextIndex = (activeIndex + 1) % items.length;
-                const nextItem = items[nextIndex];
-                if (nextItem) {
-                  setElements((prev) =>
-                    updateTreeElement(prev, el.id, (item) => ({ ...item, playlistActiveId: nextItem.id }))
-                  );
-                }
-              };
-
-              const handleSelectItem = (itemId: string, e: React.MouseEvent) => {
-                e.stopPropagation();
-                setElements((prev) =>
-                  updateTreeElement(prev, el.id, (item) => ({ ...item, playlistActiveId: itemId }))
-                );
-              };
-
-              // Helper for embedding active video
-              const renderActivePlayer = () => {
-                const srcUrl = (activeItem?.url || activeItem?.videoUrl || "").trim();
-                const posterUrl = activeItem?.thumbnailUrl || activeItem?.thumbnail;
-                const ytId = getYouTubeId(srcUrl);
-                const vimeoId = getVimeoId(srcUrl);
-
-                if (!srcUrl) {
-                  return (
-                    <div className="flex h-full min-h-[240px] flex-col items-center justify-center bg-slate-900 text-slate-400 p-6 text-center">
-                      <span className="text-2xl mb-2">🎬</span>
-                      <p className="text-xs font-medium">No video URL provided for this item</p>
-                    </div>
-                  );
-                }
-
-                if (ytId) {
-                  return (
-                    <div className="relative w-full aspect-video bg-black overflow-hidden">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${ytId}?autoplay=1&controls=1`}
-                        title={activeItem.title}
-                        className="absolute inset-0 w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  );
-                }
-
-                if (vimeoId) {
-                  return (
-                    <div className="relative w-full aspect-video bg-black overflow-hidden">
-                      <iframe
-                        src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1&controls=1`}
-                        title={activeItem.title}
-                        className="absolute inset-0 w-full h-full border-0"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="relative w-full aspect-video bg-black overflow-hidden">
-                    <video
-                      src={resolveImageUrl(srcUrl, apiUrl)}
-                      poster={posterUrl ? resolveImageUrl(posterUrl, apiUrl) : undefined}
-                      controls
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                    >
-                      Your browser does not support HTML5 video playback.
-                    </video>
-                  </div>
-                );
-              };
-
-              return (
-                <div
-                  style={{
-                    width: mergedStyles.width || "100%",
-                    borderRadius: mergedStyles.borderRadius || "12px",
-                    overflow: "hidden",
-                    boxSizing: "border-box",
-                    ...compileBackgroundAndBorderStyles(mergedStyles),
-                  }}
-                  className="border border-slate-200 bg-white shadow-md"
-                >
-                  {/* Playlist Layout Container */}
-                  <div
-                    className={
-                      isRightPosition
-                        ? "flex flex-col md:flex-row items-stretch overflow-hidden"
-                        : "flex flex-col overflow-hidden"
-                    }
-                  >
-                    {/* Player Section */}
-                    <div
-                      style={{
-                        width: isRightPosition ? playerWidthPercentage : "100%",
-                      }}
-                      className="flex-1 shrink-0 bg-slate-950 flex flex-col justify-between"
-                    >
-                      {/* Player Top Header Bar */}
-                      <div className="flex items-center justify-between bg-slate-900/90 px-4 py-2.5 text-white border-b border-slate-800 shrink-0">
-                        <div className="flex items-center gap-2 overflow-hidden mr-2">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                            {activeIndex + 1}
-                          </span>
-                          <h4 className="truncate text-xs font-semibold text-slate-100">
-                            {activeItem.title || "Untitled Video"}
-                          </h4>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={handlePrev}
-                            title="Previous Video"
-                            className="rounded px-2 py-1 text-[11px] font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-1"
-                          >
-                            <span>◀</span>
-                            <span className="hidden sm:inline">Prev</span>
-                          </button>
-                          <span className="text-[10px] text-slate-500 px-1">
-                            {activeIndex + 1}/{items.length}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleNext}
-                            title="Next Video"
-                            className="rounded px-2 py-1 text-[11px] font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-1"
-                          >
-                            <span className="hidden sm:inline">Next</span>
-                            <span>▶</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Video Embed Player */}
-                      {renderActivePlayer()}
-                    </div>
-
-                    {/* Playlist Sidebar / Bottom List */}
-                    <div
-                      style={{
-                        width: isRightPosition ? `calc(100% - ${playerWidthPercentage})` : "100%",
-                      }}
-                      className={
-                        isRightPosition
-                          ? "flex flex-col border-t md:border-t-0 md:border-l border-slate-200 bg-slate-50 max-h-[460px]"
-                          : "flex flex-col border-t border-slate-200 bg-slate-50 max-h-[320px]"
-                      }
-                    >
-                      {/* Sidebar Header */}
-                      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shrink-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">📺</span>
-                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                            Playlist ({items.length})
-                          </h4>
-                        </div>
-                        <span className="text-[10px] font-semibold text-slate-400">
-                          Now Playing: #{activeIndex + 1}
-                        </span>
-                      </div>
-
-                      {/* Playlist Items List */}
-                      <div className="flex-1 overflow-y-auto divide-y divide-slate-200/80 p-1 space-y-1">
-                        {items.map((item, idx) => {
-                          const isActive = item.id === (el.playlistActiveId || items[0]?.id);
-                          return (
-                            <button
-                              key={item.id || idx}
-                              type="button"
-                              onClick={(e) => handleSelectItem(item.id, e)}
-                              className={`w-full text-left p-2.5 rounded-lg transition flex items-center gap-3 group ${isActive
-                                ? "bg-blue-600 text-white shadow-sm ring-1 ring-blue-600"
-                                : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60"
-                                }`}
-                            >
-                              {/* Item Index / Active Icon */}
-                              <div
-                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold ${isActive
-                                  ? "bg-white/20 text-white"
-                                  : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
-                                  }`}
-                              >
-                                {isActive ? "▶" : String(idx + 1).padStart(2, "0")}
-                              </div>
-
-                              {/* Thumbnail preview if available */}
-                              {item.thumbnailUrl && (
-                                <img
-                                  src={resolveImageUrl(item.thumbnailUrl, apiUrl)}
-                                  alt={item.title}
-                                  className="h-9 w-14 object-cover rounded border border-black/10 shrink-0"
-                                />
-                              )}
-
-                              {/* Title & Duration */}
-                              <div className="flex-1 min-w-0">
-                                <h5
-                                  className={`truncate text-xs font-semibold ${isActive ? "text-white" : "text-slate-800 group-hover:text-blue-600"
-                                    }`}
-                                >
-                                  {item.title || `Video ${idx + 1}`}
-                                </h5>
-                                {item.duration && (
-                                  <span
-                                    className={`text-[10px] font-mono ${isActive ? "text-blue-100" : "text-slate-400"
-                                      }`}
-                                  >
-                                    ⏱️ {item.duration}
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {el.type === "image" && (() => {
-          const getMaskClipPath = (shape?: string) => {
-            switch (shape) {
-              case "circle": return "circle(50% at 50% 50%)";
-              case "rounded": return "inset(0 round 20%)";
-              case "blob": return "polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)";
-              case "hexagon": return "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
-              case "star": return "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
-              case "diamond": return "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
-              case "squircle": return "inset(0 round 35%)";
-              case "heart": return "polygon(50% 15%, 65% 0%, 85% 0%, 100% 15%, 100% 35%, 50% 90%, 0% 35%, 0% 15%, 15% 0%, 35% 0%)";
-              default: return undefined;
-            }
-          };
-
-          const imageHref = el.href || el.linkUrl || (el.pageId ? `page:${el.pageId}` : "");
-          const imageTarget = el.target || "_self";
-          const imageRel = imageTarget === "_blank" ? (el.rel || "noopener noreferrer") : el.rel;
-
-          const renderedImg = el.src ? (
-            <img
-              src={resolveImageUrl(el.src, apiUrl)}
-              alt={el.alt || "Uploaded Image"}
-              className="inline-block max-w-full"
-              style={{
-                display: "block",
-                width: mergedStyles.width || "100%",
-                height: mergedStyles.height || "auto",
-                objectFit: (mergedStyles.objectFit as any) || "cover",
-                objectPosition: mergedStyles.objectPosition || "center",
-                opacity: mergedStyles.opacity !== undefined ? Number(mergedStyles.opacity) : 1,
-                borderRadius: mergedStyles.borderRadius || "8px",
-                boxSizing: "border-box",
-                clipPath: getMaskClipPath(el.imageMaskShape),
-                marginLeft:
-                  mergedStyles.textAlign === "center"
-                    ? "auto"
-                    : mergedStyles.textAlign === "right"
-                      ? "auto"
-                      : "0",
-                marginRight:
-                  mergedStyles.textAlign === "center"
-                    ? "auto"
-                    : mergedStyles.textAlign === "left"
-                      ? "auto"
-                      : "0",
-                ...compileBackgroundAndBorderStyles(mergedStyles),
-              }}
-            />
-          ) : null;
-
-          const wrappedImage = imageHref && renderedImg ? (
-            <a
-              href={imageHref}
-              target={imageTarget}
-              rel={imageRel}
-              onClick={(e) => {
-                if (!isPreview) {
-                  e.preventDefault();
-                  return;
-                }
-                let targetPage: PageConfig | undefined;
-                if (el.pageId && pages) {
-                  targetPage = pages.find((p) => p.id === el.pageId);
-                }
-                if (!targetPage && imageHref && pages) {
-                  const clean = imageHref.replace(/^\//, "").split("?")[0].split("#")[0];
-                  targetPage = pages.find(
-                    (p) =>
-                      p.slug === imageHref ||
-                      p.slug === `/${clean}` ||
-                      p.slug.replace(/^\//, "") === clean ||
-                      p.id === clean ||
-                      (clean === "" && (p.isHome || p.id === "home"))
-                  );
-                }
-                if (targetPage && imageTarget !== "_blank") {
-                  e.preventDefault();
-                  handlePreviewPageNavigate(targetPage);
-                } else if (imageHref.startsWith("#") && imageHref.length > 1) {
-                  e.preventDefault();
-                  const targetEl = document.querySelector(imageHref);
-                  if (targetEl) targetEl.scrollIntoView({ behavior: "smooth" });
-                }
-              }}
-            >
-              {renderedImg}
-            </a>
-          ) : renderedImg;
-
-          return (
-            <div
-              style={{
-                textAlign: mergedStyles.textAlign || "left",
-                width: "100%",
-                boxSizing: "border-box",
-              }}
-            >
-              {wrappedImage ? (
-                wrappedImage
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 py-8 px-6 text-center transition hover:border-blue-400">
-                  <EmptyPictureIcon />
-                  <h4 className="mt-3 text-xs font-bold text-slate-700">
-                    No image selected
-                  </h4>
-                  <p className="mt-1 text-[11px] text-slate-400 mb-3">
-                    Select or upload an image for this widget
-                  </p>
-                  {!isPreview && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectElement(el.id);
-                        triggerImagePicker((url) => {
-                          setElements((prev) =>
-                            updateTreeElement(prev, el.id, (item) => ({ ...item, src: url }))
-                          );
-                        });
-                      }}
-                      className="rounded-lg bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-blue-700 transition cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>📁</span> Select Image
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {el.type === "button" && (() => {
-          const resolvedHref = resolveButtonHref(el, pages);
-          const target = el.target || "_self";
-          const rel = target === "_blank" ? (el.rel || "noopener noreferrer") : el.rel;
-          const isDownload = el.download;
-
-          const iconName = el.iconName || el.icon || "";
-          const iconPos = el.iconPosition || "left";
-          const gap = el.iconGap ?? el.iconSpacing ?? 8;
-          const iconSize = el.iconSize || 18;
-          const iconColor = el.iconColor || el.buttonColor || "#ffffff";
-          const textLabel = el.content || el.buttonText || "Button";
-
-          const isFlexCol = iconPos === "top" || iconPos === "bottom";
-          const isReverse = iconPos === "right" || iconPos === "bottom";
-
-          const renderIcon = iconName ? (
-            <IconRenderer
-              iconName={iconName}
-              size={iconSize}
-              color={iconColor}
-              rotate={el.iconRotate || 0}
-              flipH={Boolean(el.iconFlipH)}
-              flipV={Boolean(el.iconFlipV)}
-              strokeWidth={el.iconStrokeWidth || 2}
-            />
-          ) : null;
-
-          return (
-            <div style={{ textAlign: mergedStyles.textAlign || "left", width: "100%", boxSizing: "border-box" }}>
-              <a
-                href={resolvedHref}
-                target={target}
-                rel={rel}
-                download={isDownload ? true : undefined}
-                contentEditable={!isPreview}
-                suppressContentEditableWarning
-                onFocus={() => handleSelectElement(el.id)}
-                onBlur={(e) => updateElementContent(el.id, e.currentTarget.textContent || "")}
-                onClick={(e) => {
-                  if (!isPreview) {
-                    e.preventDefault();
-                    return;
-                  }
-
-                  // Preview Mode navigation handler
-                  let targetPage: PageConfig | undefined;
-
-                  if (el.pageId) {
-                    targetPage = pages.find((p) => p.id === el.pageId);
-                  }
-                  if (!targetPage && resolvedHref) {
-                    const clean = resolvedHref.replace(/^\//, "");
-                    targetPage = pages.find(
-                      (p) => p.slug === resolvedHref || p.slug === clean || p.id === clean || (resolvedHref === "/" && (p.isHome || p.id === "home"))
-                    );
-                  }
-
-                  if (targetPage && target !== "_blank") {
-                    e.preventDefault();
-                    handlePreviewPageNavigate(targetPage);
-                  } else if (resolvedHref.startsWith("popup:open(")) {
-                    e.preventDefault();
-                    const popupId = resolvedHref.match(/popup:open\(([^)]+)\)/)?.[1];
-                    if (popupId) setActivePopupId(popupId);
-                  } else if (resolvedHref === "popup:close") {
-                    e.preventDefault();
-                    setActivePopupId(null);
-                  } else if (resolvedHref === "scroll:to(top)") {
-                    e.preventDefault();
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  } else if (resolvedHref.startsWith("scroll:to(")) {
-                    e.preventDefault();
-                    const targetId = resolvedHref.match(/scroll:to\(([^)]+)\)/)?.[1];
-                    if (targetId) {
-                      const targetEl = document.getElementById(targetId);
-                      targetEl?.scrollIntoView({ behavior: "smooth" });
-                    }
-                  }
-                }}
-                className="inline-block rounded-lg px-5 py-2 text-sm font-semibold shadow transition-all duration-200"
-                style={{
-                  backgroundColor: mergedStyles.backgroundColor || el.styles?.backgroundColor || el.buttonBg || "#2563eb",
-                  color: mergedStyles.color || el.styles?.color || el.buttonColor || "#ffffff",
-                  fontSize: mergedStyles.fontSize,
-                  fontFamily: mergedStyles.fontFamily,
-                  fontWeight: mergedStyles.fontWeight,
-                  borderRadius: mergedStyles.borderRadius || "8px",
-                  boxShadow: mergedStyles.boxShadow,
-                }}
-                {...customAttrProps}
-              >
-                <span
-                  className={`inline-flex items-center justify-center ${isFlexCol ? "flex-col" : "flex-row"
-                    } ${isReverse ? "flex-col-reverse" : ""}`}
-                  style={{ gap: `${gap}px` }}
-                >
-                  {!isReverse && renderIcon}
-                  <span>{textLabel}</span>
-                  {isReverse && renderIcon}
-                </span>
-              </a>
-            </div>
-          );
-        })()}
-
-        {el.type === "posts" && (() => {
-          const postsList = el.posts && el.posts.length > 0 ? el.posts : [];
-          const columns = el.postsColumns || 3;
-          const gap = el.postsGap ?? 20;
-          const imageHeight = el.postsImageHeight || "180px";
-          const align = el.postsAlignment || "left";
-          const showImage = el.postsShowImage !== false;
-          const showDate = el.postsShowDate !== false;
-          const showExcerpt = el.postsShowExcerpt !== false;
-          const showReadMore = el.postsShowReadMore !== false;
-
-          let gridColsStyle: React.CSSProperties = {};
-          if (activeDevice === "mobile") {
-            gridColsStyle = { gridTemplateColumns: "repeat(1, minmax(0, 1fr))" };
-          } else if (activeDevice === "tablet") {
-            gridColsStyle = { gridTemplateColumns: `repeat(${Math.min(columns, 2)}, minmax(0, 1fr))` };
-          } else {
-            gridColsStyle = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
-          }
-
-          return (
-            <div style={{ width: "100%", boxSizing: "border-box" }}>
-              {postsList.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 text-center bg-slate-50/50">
-                  <p className="text-xs font-bold text-slate-600">No Posts Configured</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Use the right properties panel to add blog posts.</p>
-                </div>
-              ) : (
-                <div
-                  className="grid"
-                  style={{ gap: `${gap}px`, ...gridColsStyle }}
-                >
-                  {postsList.map((post) => (
-                    <article
-                      key={post.id}
-                      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs transition hover:shadow-md hover:-translate-y-0.5"
-                      style={{ textAlign: align }}
-                    >
-                      {showImage && post.image && (
-                        <div className="relative overflow-hidden bg-slate-100" style={{ height: imageHeight }}>
-                          <img
-                            src={resolveImageUrl(post.image, apiUrl)}
-                            alt={post.title}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                      )}
-                      <div className="flex flex-1 flex-col p-5">
-                        {showDate && (post.date || post.author) && (
-                          <div className="mb-2 flex items-center text-[11px] font-medium text-slate-400 gap-2">
-                            {post.date && <span>{post.date}</span>}
-                            {post.date && post.author && <span>•</span>}
-                            {post.author && <span>By {post.author}</span>}
-                          </div>
-                        )}
-                        <h3 className="text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2">
-                          {post.title}
-                        </h3>
-                        {showExcerpt && post.excerpt && (
-                          <p className="text-xs text-slate-600 leading-relaxed flex-1 mb-4">
-                            {post.excerpt}
-                          </p>
-                        )}
-                        {showReadMore && (
-                          <div className="mt-auto">
-                            <a
-                              href={post.readMoreUrl || "#"}
-                              onClick={(e) => {
-                                if (!isPreview) e.preventDefault();
-                              }}
-                              className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 transition gap-1"
-                            >
-                              <span>{post.readMoreText || "Read More →"}</span>
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {el.type === "loop-grid" && (
-          <LoopGridWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            activeDevice={activeDevice}
-            pages={pages}
-            onSwitchPage={(target) => {
-              if (isPreview) setActivePreviewPageId(target.id);
-              else setActivePageId(target.id);
-            }}
-            apiUrl={apiUrl}
-          />
-        )}
-
-        {el.type === "share-buttons" && (
-          <ShareButtonsWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            pages={pages}
-            activePageId={isPreview ? activePreviewPageId : activePageId}
-          />
-        )}
-
-        {el.type === "portfolio" && (() => {
-          const items = el.portfolioItems && el.portfolioItems.length > 0 ? el.portfolioItems : [];
-          const columns = el.portfolioColumns || 3;
-          const gap = el.portfolioGap ?? 24;
-          const imageHeight = el.portfolioImageHeight || "240px";
-          const align = el.portfolioAlignment || "left";
-          const showCategory = el.portfolioShowCategory !== false;
-          const showDescription = el.portfolioShowDescription !== false;
-          const showLink = el.portfolioShowLink !== false;
-
-          let colClass = "grid-cols-3";
-          if (columns === 1) colClass = "grid-cols-1";
-          else if (columns === 2) colClass = "grid-cols-1 md:grid-cols-2";
-          else if (columns === 3) colClass = "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
-          else if (columns === 4) colClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-
-          if (activeDevice === "mobile") colClass = "grid-cols-1";
-          else if (activeDevice === "tablet" && columns > 2) colClass = "grid-cols-2";
-
-          const textAlignClass = align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
-          const flexJustifyClass = align === "center" ? "justify-center" : align === "right" ? "justify-end" : "justify-start";
-
-          return (
-            <div style={{ width: "100%", boxSizing: "border-box" }}>
-              {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 text-center bg-slate-50/50">
-                  <p className="text-sm font-bold text-slate-600">No Portfolio Items Created</p>
-                  <p className="text-xs text-slate-400 mt-1">Use the right properties panel to add projects & works.</p>
-                </div>
-              ) : (
-                <div
-                  className={`grid ${colClass}`}
-                  style={{ gap: `${gap}px` }}
-                >
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-slate-300"
-                    >
-                      {/* Image Thumbnail with Overlay */}
-                      <div
-                        className="relative overflow-hidden bg-slate-100"
-                        style={{ height: imageHeight }}
-                      >
-                        <img
-                          src={item.image || "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&auto=format&fit=crop&q=80"}
-                          alt={item.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        {showCategory && item.category && (
-                          <div className="absolute top-3 left-3">
-                            <span className="inline-block rounded-full bg-slate-900/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-xs">
-                              {item.category}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Content Card */}
-                      <div className={`flex flex-col flex-1 p-5 ${textAlignClass}`}>
-                        <h4
-                          className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition"
-                          style={{ fontFamily: mergedStyles.fontFamily }}
-                        >
-                          {item.title}
-                        </h4>
-
-                        {showDescription && item.description && (
-                          <p
-                            className="mt-2 text-xs text-slate-600 leading-relaxed flex-1 line-clamp-3"
-                            style={{ fontFamily: mergedStyles.fontFamily }}
-                          >
-                            {item.description}
-                          </p>
-                        )}
-
-                        {showLink && (
-                          <div className={`mt-4 flex items-center ${flexJustifyClass}`}>
-                            <a
-                              href={item.url || "#"}
-                              onClick={(e) => {
-                                if (!isPreview) e.preventDefault();
-                              }}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition"
-                            >
-                              <span>View Project</span>
-                              <svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                                <polyline points="12 5 19 12 12 19" />
-                              </svg>
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {el.type === "slides" && (
-          <SlidesWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "form" && (
-          <FormWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "login" && (
-          <LoginWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "nav-menu" && (
-          <NavMenuWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            pages={pages}
-            homePageId={homePageId}
-            onUpdateElement={(updater) => {
-              setElements((prev) => updateTreeElement(prev, el.id, updater));
-            }}
-            onNavigatePage={(targetIdOrSlug) => {
-              const clean = targetIdOrSlug.replace(/^\//, "");
-              const targetPage = pages.find(
-                (p) =>
-                  p.id === targetIdOrSlug ||
-                  p.slug === targetIdOrSlug ||
-                  p.slug === `/${clean}` ||
-                  p.slug.replace(/^\//, "") === clean ||
-                  p.name.toLowerCase() === targetIdOrSlug.toLowerCase() ||
-                  (clean === "" && (p.isHome || p.id === "home"))
-              );
-              if (targetPage) {
-                handlePreviewPageNavigate(targetPage);
-              }
-            }}
-          />
-        )}
-
-        {el.type === "animated-headline" && (
-          <AnimatedHeadlineWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "price-table" && (
-          <PriceTableWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "price-list" && (
-          <PriceListWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "gallery" && (
-          <GalleryWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "flip-box" && (
-          <FlipBoxWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "call-to-action" && (
-          <CtaWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            pages={pages}
-            onNavigatePage={(targetIdOrSlug) => {
-              const clean = targetIdOrSlug.replace(/^\//, "");
-              const targetPage = pages.find(
-                (p) =>
-                  p.id === targetIdOrSlug ||
-                  p.slug === targetIdOrSlug ||
-                  p.slug === `/${clean}` ||
-                  p.slug.replace(/^\//, "") === clean ||
-                  p.name.toLowerCase() === targetIdOrSlug.toLowerCase() ||
-                  (clean === "" && (p.isHome || p.id === "home"))
-              );
-              if (targetPage) {
-                handlePreviewPageNavigate(targetPage);
-              }
-            }}
-          />
-        )}
-
-        {el.type === "media-carousel" && (
-          <MediaCarouselWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "testimonial-carousel" && (
-          <TestimonialCarouselWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "nested-carousel" && (
-          <NestedCarouselWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            renderElementTree={renderElementTree}
-          />
-        )}
-
-        {el.type === "loop-carousel" && (
-          <LoopCarouselWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "image-carousel" && (
-          <ImageCarouselWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "table-of-contents" && (
-          <TocWidgetRenderer el={el} elements={elements} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "countdown" && (
-          <CountdownWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {(el.type === "facebook-page" || el.type === "facebook-button" || el.type === "facebook-embed" || el.type === "facebook-comments") && (
-          <FacebookPageWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "blockquote" && (
-          <BlockquoteWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "template" && (
-          <TemplateWidgetRenderer
-            el={el}
-            components={components}
-            onUnpackTemplate={handleUnpackTemplate}
-            onSelectTemplate={handleSelectTemplate}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-          />
-        )}
-
-        {el.type === "reviews" && (
-          <ReviewsWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            onUpdateElement={(updatedEl) => {
-              const updateRecursive = (list: EditorElement[]): EditorElement[] => {
-                return list.map((item) => {
-                  if (item.id === updatedEl.id) return updatedEl;
-                  if (item.children) return { ...item, children: updateRecursive(item.children) };
-                  return item;
-                });
-              };
-              setElements((prev) => updateRecursive(prev));
-            }}
-          />
-        )}
-
-        {el.type === "paypal-button" && (
-          <PayPalButtonWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "stripe-button" && (
-          <StripeButtonWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "lottie" && (
-          <LottieWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "code-highlight" && (
-          <CodeHighlightWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {(el.type === "search-bar" || el.type === "search-form") && (
-          <SearchBarWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "site-search" && (
-          <SiteSearchRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-          />
-        )}
-
-        {el.type === "breadcrumbs" && (
-          <BreadcrumbsRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-            pages={pages}
-            homePageId={homePageId}
-          />
-        )}
-
-        {el.type === "wp-menu" && (
-          <WpMenuRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-            pages={pages}
-            homePageId={homePageId}
-          />
-        )}
-
-        {el.type === "menu-anchor" && (
-          <MenuAnchorRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-          />
-        )}
-
-        {el.type === "post-nav" && (
-          <PostNavigationRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-          />
-        )}
-
-        {el.type === "taxonomy-filter" && (
-          <TaxonomyFilterRenderer
-            element={el}
-            activeBreakpointId={activeDevice}
-            breakpoints={breakpoints}
-            isPreview={isPreview}
-          />
-        )}
-
-        {el.type === "import-asset" && (
-          <ImportAssetWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "reusable-components" && (
-          <ReusableComponentWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {(el.type === "favorite-widgets" || (el.type as string) === "favorite") && (
-          <FavoriteWidgetsWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-
-        {el.type === "basic-media-carousel" && (
-          <BasicMediaCarouselWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "basic-gallery" && (
-          <BasicGalleryWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "audio-playlist" && (
-          <AudioPlaylistWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "dynamic-lightbox" && (
-          <DynamicLightboxWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "custom-svg" && (
-          <CustomSvgWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "icon-library" && (
-          <IconLibraryWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "nested-tabs" && (
-          <NestedTabsWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "nested-accordion" && (
-          <NestedAccordionWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "mega-menu" && (
-          <MegaMenuWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            pages={pages}
-            onUpdateElement={(updater) => {
-              setElements((prev) => updateTreeElement(prev, el.id, updater));
-            }}
-            onNavigatePage={(targetIdOrSlug) => {
-              const clean = targetIdOrSlug.replace(/^\//, "");
-              const targetPage = pages.find(
-                (p) =>
-                  p.id === targetIdOrSlug ||
-                  p.slug === targetIdOrSlug ||
-                  p.slug === `/${clean}` ||
-                  p.slug.replace(/^\//, "") === clean ||
-                  p.name.toLowerCase() === targetIdOrSlug.toLowerCase() ||
-                  (clean === "" && (p.isHome || p.id === "home"))
-              );
-              if (targetPage) {
-                handlePreviewPageNavigate(targetPage);
-              }
-            }}
-          />
-        )}
-
-        {el.type === "off-canvas" && (
-          <OffCanvasWidgetRenderer
-            el={el}
-            isPreview={isPreview}
-            mergedStyles={mergedStyles}
-            renderChildren={(childElements) =>
-              (childElements || []).map((child) => renderElementTree(child))
-            }
-          />
-        )}
-
-        {el.type === "wc-product-title" && (
-          <WcProductTitleWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "wc-product-price" && (
-          <WcProductPriceWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "wc-product-images" && (
-          <WcProductImagesWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "wc-add-to-cart" && (
-          <WcAddToCartWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "wc-product-rating" && (
-          <WcProductRatingWidgetRenderer el={el} isPreview={isPreview} mergedStyles={mergedStyles} />
-        )}
-
-        {el.type === "wc-builder" && <WcBuilderWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product" && <WcProductWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-stock" && <WcProductStockWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-meta" && <WcProductMetaWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-content" && <WcProductContentWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-short-description" && <WcShortDescriptionWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-data-tabs" && <WcProductDataTabsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-additional-info" && <WcAdditionalInfoWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-related-products" && <WcRelatedProductsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-upsells" && <WcUpsellsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-products" && <WcProductsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-custom-add-to-cart" && <WcCustomAddToCartWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-categories" && <WcProductCategoriesWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-menu-cart" && <WcMenuCartWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-cart" && <WcCartWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-checkout" && <WcCheckoutWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-my-account" && <WcMyAccountWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-purchase-summary" && <WcPurchaseSummaryWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-notices" && <WcNoticesWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-shop-layouts" && <WcShopLayoutsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-archive" && <WcProductArchiveWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-page-templates" && <WcProductPageTemplatesWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-archive-templates" && <WcProductArchiveTemplatesWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-        {el.type === "wc-product-addons" && <WcProductAddOnsWidgetRenderer el={el} mergedStyles={mergedStyles} />}
-
-        {el.type === "link-in-bio" && (() => {
-          const links = el.bioLinks || [
-            { id: "b1", label: "My Portfolio", url: "https://example.com", icon: "🌐", badge: "New" },
-            { id: "b2", label: "Subscribe to Newsletter", url: "#", icon: "📩" }
-          ];
-          return (
-            <div className="w-full max-w-sm mx-auto p-6 rounded-2xl bg-white shadow-xl border border-slate-100 text-center space-y-4">
-              {el.bioAvatarUrl ? (
-                <img src={resolveImageUrl(el.bioAvatarUrl, apiUrl)} alt="Bio Avatar" className="w-20 h-20 rounded-full mx-auto object-cover ring-4 ring-pink-100 shadow-md" />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500 to-rose-400 text-white flex items-center justify-center text-2xl font-bold mx-auto shadow-md ring-4 ring-pink-100">
-                  {(el.bioName || "@user").charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div>
-                <h3 className="font-bold text-base text-slate-900">{el.bioName || "@username"}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{el.bioTagline || "Digital Creator & Designer"}</p>
-              </div>
-              <div className="space-y-2.5 pt-2">
-                {links.map((link: any) => (
-                  <a
-                    key={link.id}
-                    href={link.url || "#"}
-                    onClick={(e) => { if (!isPreview) e.preventDefault(); }}
-                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 hover:bg-pink-50 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold text-slate-700 hover:text-pink-600 transition shadow-xs group"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>{link.icon || "🔗"}</span>
-                      <span>{link.label}</span>
-                    </span>
-                    {link.badge && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-pink-100 text-pink-700">
-                        {link.badge}
-                      </span>
-                    )}
-                  </a>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {el.type === "image-box" && (() => {
-          const pos = el.imageBoxPosition || "top";
-          const isRow = pos === "left" || pos === "right";
-          const isReverse = pos === "right";
-          return (
-            <div className={`w-full flex ${isRow ? "flex-row" : "flex-col"} ${isReverse ? "flex-row-reverse" : ""} items-center gap-4 p-4 rounded-xl border border-slate-100 bg-white shadow-xs group hover:shadow-md transition`}>
-              {el.src ? (
-                <img src={resolveImageUrl(el.src, apiUrl)} alt={el.title || "Image Box"} className={`${isRow ? "w-1/3" : "w-full"} h-44 object-cover rounded-lg group-hover:scale-102 transition duration-300`} />
-              ) : (
-                <div className={`${isRow ? "w-1/3" : "w-full"} h-36 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 text-xs font-medium`}>
-                  🖼️ Image Box
-                </div>
-              )}
-              <div className="flex-1 text-left space-y-1">
-                <h4 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition">{el.title || "Image Box Feature"}</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">{el.content || "Detailed description of the feature or highlight box element."}</p>
-                {el.href && (
-                  <a href={el.href} onClick={(e) => { if (!isPreview) e.preventDefault(); }} className="inline-block pt-1 text-xs font-bold text-blue-600 hover:underline">
-                    Learn More →
-                  </a>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-        {el.type === "icon-box" && (() => {
-          const pos = el.iconBoxPosition || "top";
-          const isRow = pos === "left" || pos === "right";
-          const isReverse = pos === "right";
-          return (
-            <div className={`w-full flex ${isRow ? "flex-row" : "flex-col"} ${isReverse ? "flex-row-reverse" : ""} items-start gap-3.5 p-5 rounded-xl border border-slate-100 bg-white shadow-xs group hover:shadow-md transition`}>
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition">
-                {el.iconName || el.icon || "⚡"}
-              </div>
-              <div className="space-y-1 text-left">
-                <h4 className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition">{el.title || "Icon Box Heading"}</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">{el.content || "Brief explanatory text about this service, capability, or key benefit."}</p>
-              </div>
-            </div>
-          );
-        })()}
-
-        {el.type === "icon-list" && (() => {
-          const items = el.iconListItems || [
-            { id: "1", text: "High priority SLA support", icon: "✓", color: "#10b981" },
-            { id: "2", text: "Unlimited custom domains", icon: "✓", color: "#10b981" },
-            { id: "3", text: "Advanced analytics dashboard", icon: "✓", color: "#10b981" }
-          ];
-          return (
-            <div className="w-full space-y-2 text-left">
-              {items.map((item: any) => (
-                <div key={item.id} className="flex items-center gap-2.5 text-xs text-slate-700 font-medium">
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {item.icon || "✓"}
-                  </span>
-                  {item.url ? (
-                    <a href={item.url} onClick={(e) => { if (!isPreview) e.preventDefault(); }} className="hover:text-emerald-600 hover:underline">
-                      {item.text}
-                    </a>
-                  ) : (
-                    <span>{item.text}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
-
-        {el.type === "counter" && (
-          <div className="w-full p-5 rounded-xl bg-white border border-slate-100 text-center shadow-xs">
-            <div className="text-3xl font-extrabold text-blue-600 tracking-tight font-mono">
-              <span>{el.counterPrefix || ""}</span>
-              <span>{el.counterEnd ?? 100}</span>
-              <span>{el.counterSuffix || "+"}</span>
-            </div>
-            <p className="text-xs font-semibold text-slate-600 mt-1 uppercase tracking-wider">{el.counterTitle || "Happy Customers"}</p>
-          </div>
-        )}
-
-        {el.type === "progress-bar" && (
-          <div className="w-full space-y-1.5 text-left">
-            <div className="flex justify-between text-xs font-bold text-slate-700">
-              <span>{el.progressLabel || "Skill Level"}</span>
-              <span className="font-mono text-teal-600">{el.progressValue ?? 85}%</span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full overflow-hidden" style={{ height: `${el.progressHeight || 12}px` }}>
-              <div
-                className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-1000"
-                style={{ width: `${el.progressValue ?? 85}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {el.type === "rating" && (() => {
-          const max = el.ratingMax || 5;
-          const score = el.ratingValue ?? 4.8;
-          const stars = Array.from({ length: max }, (_, i) => i + 1);
-          return (
-            <div className="w-full flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                {stars.map((s) => (
-                  <span key={s} style={{ color: s <= Math.round(score) ? (el.ratingColor || "#f59e0b") : "#cbd5e1" }} className="text-lg">
-                    ★
-                  </span>
-                ))}
-              </div>
-              {el.ratingShowText !== false && (
-                <span className="text-xs font-bold text-slate-700 font-mono">
-                  {score} / {max}
-                </span>
-              )}
-            </div>
-          );
-        })()}
-
-        {el.type === "alert" && (() => {
-          const type = el.alertType || "info";
-          const bgMap: Record<string, string> = {
-            info: "bg-blue-50 border-blue-200 text-blue-900",
-            success: "bg-emerald-50 border-emerald-200 text-emerald-900",
-            warning: "bg-amber-50 border-amber-200 text-amber-900",
-            danger: "bg-rose-50 border-rose-200 text-rose-900"
-          };
-          const iconMap: Record<string, string> = {
-            info: "ℹ️",
-            success: "✅",
-            warning: "⚠️",
-            danger: "🚨"
-          };
-          return (
-            <div className={`w-full p-4 rounded-xl border flex items-start justify-between gap-3 text-left ${bgMap[type] || bgMap.info}`}>
-              <div className="flex items-start gap-2.5">
-                <span className="text-base leading-none">{iconMap[type]}</span>
-                <div className="space-y-0.5">
-                  <h5 className="font-bold text-xs">{el.alertTitle || "Notice"}</h5>
-                  <p className="text-xs opacity-90">{el.content || "This is an important alert banner message."}</p>
-                </div>
-              </div>
-              {el.alertDismissible && (
-                <button type="button" className="text-xs opacity-60 hover:opacity-100 font-bold">✕</button>
-              )}
-            </div>
-          );
-        })()}
-
-        {el.type === "google-maps" && (
-          <div className="w-full rounded-xl overflow-hidden border border-slate-200 shadow-xs bg-slate-100 relative" style={{ height: `${el.mapHeight || 350}px` }}>
-            <iframe
-              title="Google Map Location"
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              loading="lazy"
-              allowFullScreen
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(el.mapAddress || "San Francisco, CA")}&t=&z=${el.mapZoom || 14}&ie=UTF8&iwloc=&output=embed`}
-            />
-          </div>
-        )}
-
-        {el.type === "divider" && (
-          <div className="w-full flex justify-center my-3">
-            <hr
-              style={{
-                borderTopStyle: (el.dividerStyle as any) || "solid",
-                borderTopWidth: `${el.dividerWeight || 2}px`,
-                borderTopColor: el.dividerColor || "#cbd5e1",
-                width: el.dividerWidth || "100%",
-                borderBottom: "none",
-                borderLeft: "none",
-                borderRight: "none"
-              }}
-            />
-          </div>
-        )}
-
-        {el.type === "spacer" && (
-          <div
-            className="w-full flex items-center justify-center border border-dashed border-slate-300/60 bg-slate-50/40 rounded my-1 text-[10px] text-slate-400 font-mono select-none"
-            style={{ height: `${el.spacerHeight || 40}px` }}
-          >
-            {!isPreview && `Spacer (${el.spacerHeight || 40}px)`}
-          </div>
-        )}
-
-        {el.type === "html" && (
-          <div
-            dangerouslySetInnerHTML={{
-              __html: sanitizeHtml(
-                el.content || "<p class='p-4 border border-dashed rounded text-xs text-slate-400 text-center font-mono'>Custom HTML Block</p>"
-              ),
-            }}
-            className="w-full h-full"
-          />
-        )}
-
-        {el.type === "shortcode" && (
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded text-xs font-mono text-amber-800 text-center break-all transition">
-            {el.content ? `[ ${el.content} ]` : "Enter Shortcode here"}
-            <div className="opacity-60 text-[9px] mt-1 uppercase font-bold tracking-wider">Renders Dynamically on Publish</div>
-          </div>
-        )}
+        {/* See canvas/elements/textElements (moved verbatim) */}
+        {renderTextElements({
+          el,
+          isSelected,
+          mergedStyles,
+          activePageId,
+          globalSettings,
+          handleSelectElement,
+          isPreview,
+          pageSettings,
+          pages,
+          updateElementContent,
+          website,
+        })}
+
+        {/* See canvas/elements/mediaElements (moved verbatim) */}
+        {renderMediaElements({
+          el,
+          mergedStyles,
+          apiUrl,
+          compileBackgroundAndBorderStyles,
+          handlePreviewPageNavigate,
+          handleSelectElement,
+          isPreview,
+          pages,
+          setElements,
+        })}
+
+        {/* See canvas/elements/buttonElement (moved verbatim) */}
+        {renderButtonElement({
+          customAttrProps,
+          el,
+          mergedStyles,
+          handlePreviewPageNavigate,
+          handleSelectElement,
+          isPreview,
+          pages,
+          setActivePopupId,
+          updateElementContent,
+        })}
+
+        {/* See canvas/elements/dynamicContentElements (moved verbatim) */}
+        {renderDynamicContentElements({
+          el,
+          mergedStyles,
+          activeDevice,
+          activePageId,
+          activePreviewPageId,
+          apiUrl,
+          isPreview,
+          pages,
+          setActivePageId,
+          setActivePreviewPageId,
+        })}
+
+        {/* See canvas/elements/widgetElements (moved verbatim) */}
+        {renderWidgetElements({
+          el,
+          mergedStyles,
+          components,
+          elements,
+          handlePreviewPageNavigate,
+          handleSelectTemplate,
+          handleUnpackTemplate,
+          homePageId,
+          isPreview,
+          pages,
+          renderElementTree,
+          setElements,
+        })}
+
+        {/* See canvas/elements/navigationElements (moved verbatim) */}
+        {renderNavigationElements({
+          el,
+          activeDevice,
+          breakpoints,
+          homePageId,
+          isPreview,
+          pages,
+        })}
+
+        {/* See canvas/elements/utilityElements (moved verbatim) */}
+        {renderUtilityElements({
+          el,
+          mergedStyles,
+          isPreview,
+        })}
+
+        {/* See canvas/elements/menuElements (moved verbatim) */}
+        {renderMenuElements({
+          el,
+          mergedStyles,
+          handlePreviewPageNavigate,
+          isPreview,
+          pages,
+          renderElementTree,
+          setElements,
+        })}
+
+        {/* See canvas/elements/wooCommerceElements (moved verbatim) */}
+        {renderWooCommerceElements({
+          el,
+          mergedStyles,
+          isPreview,
+        })}
+
+        {/* See canvas/elements/basicWidgetElements (moved verbatim) */}
+        {renderBasicWidgetElements({
+          el,
+          apiUrl,
+          isPreview,
+        })}
       </div>
     );
   };
@@ -18747,108 +16875,16 @@ export default function WebsiteEditor() {
       />
 
       {/* Modal for Adding New Page */}
-      {isAddPageModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <span>✨</span>
-                <span>Add New Website Page</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddPageModalOpen(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Quick Presets */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-slate-400">Quick Presets:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { name: "About Us", slug: "/about" },
-                  { name: "Contact", slug: "/contact" },
-                  { name: "Services", slug: "/services" },
-                  { name: "Pricing", slug: "/pricing" },
-                  { name: "Blog", slug: "/blog" },
-                ].map((preset) => (
-                  <button
-                    key={preset.slug}
-                    type="button"
-                    onClick={() => {
-                      setNewPageName(preset.name);
-                      setNewPageSlug(preset.slug);
-                    }}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition font-medium cursor-pointer ${
-                      newPageName === preset.name
-                        ? "bg-blue-600 text-white border-blue-500 font-bold"
-                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
-                    }`}
-                  >
-                    + {preset.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Page Title / Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. About, Services, Contact, Pricing"
-                  value={newPageName}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNewPageName(val);
-                    if (!newPageSlug || newPageSlug === slugFromName(newPageName)) {
-                      setNewPageSlug(slugFromName(val));
-                    }
-                  }}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500 transition"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  URL Path / Slug
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. /about, /services, /contact"
-                  value={newPageSlug}
-                  onChange={(e) => setNewPageSlug(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500 transition font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsAddPageModalOpen(false)}
-                className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateNewPage}
-                disabled={!newPageName.trim()}
-                className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-500 disabled:opacity-50 transition cursor-pointer"
-              >
-                Create Page
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add Page modal: see shell/addPageModal (moved verbatim) */}
+      {renderAddPageModal({
+        handleCreateNewPage,
+        isAddPageModalOpen,
+        newPageName,
+        newPageSlug,
+        setIsAddPageModalOpen,
+        setNewPageName,
+        setNewPageSlug,
+      })}
 
       {/* Modal for Editing Existing Page */}
       {isEditPageModalOpen && (
