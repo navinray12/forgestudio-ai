@@ -1,0 +1,965 @@
+[
+ {
+  "line": 161,
+  "handler": "handleTestIntegration",
+  "method": "POST",
+  "url": "`${apiUrl}/api/integrations/${type}/test`",
+  "shape": {
+   "success": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 207,
+  "handler": "fetchClientBilling",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/client-billing`",
+  "shape": {
+   "success": {},
+   "data": {
+    "config": {
+     "clientEmail": {},
+     "subscriptionStatus": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "baseCostMonthly": {},
+     "clientPriceMonthly": {},
+     "currency": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "billingInterval": {},
+     "marginMonthly": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "clientName": {},
+     "clientInvoiceUrl": {},
+     "lastBilledAt": {}
+    },
+    "metrics": {}
+   }
+  }
+ },
+ {
+  "line": 226,
+  "handler": "handleSaveClientBilling",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/client-billing`",
+  "shape": {
+   "success": {},
+   "data": {
+    "config": {
+     "clientEmail": {},
+     "subscriptionStatus": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "baseCostMonthly": {},
+     "clientPriceMonthly": {},
+     "currency": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "billingInterval": {},
+     "marginMonthly": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "clientName": {},
+     "clientInvoiceUrl": {},
+     "lastBilledAt": {}
+    },
+    "metrics": {}
+   },
+   "message": {}
+  }
+ },
+ {
+  "line": 257,
+  "handler": "handleSendClientInvoice",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/client-billing/invoice`",
+  "shape": {
+   "success": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 398,
+  "handler": "fetchManagedDetails",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/managed-details`",
+  "shape": {
+   "data": {
+    "wpConnection": {},
+    "website": {
+     "pagesCount": {}
+    },
+    "wpPageMappings": {
+     "#type": {
+      "array": {}
+     },
+     "[]": {
+      "id": {},
+      "forgePageId": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "wpPostId": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "wpPostSlug": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "wpPostUrl": {
+       "#type": {
+        "text": {}
+       }
+      }
+     }
+    },
+    "cookieConsent": {
+     "enabled": {},
+     "message": {},
+     "buttonText": {},
+     "theme": {},
+     "policyUrl": {}
+    },
+    "recentLogs": {
+     "#type": {
+      "array": {}
+     },
+     "[]": {
+      "id": {},
+      "sentAt": {},
+      "recipient": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "subject": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "status": {
+       "#type": {
+        "text": {}
+       }
+      }
+     }
+    },
+    "performanceStats": {
+     "latestScore": {},
+     "avgResponseTimeMs": {},
+     "avgTtfbMs": {},
+     "uptimePercentage": {},
+     "metrics": {
+      "[]": {
+       "id": {},
+       "checkedAt": {},
+       "ttfbMs": {
+        "#type": {
+         "text": {}
+        }
+       },
+       "responseTimeMs": {
+        "#type": {
+         "text": {}
+        }
+       },
+       "statusCode": {
+        "#type": {
+         "text": {}
+        }
+       },
+       "score": {
+        "#type": {
+         "text": {}
+        }
+       }
+      }
+     }
+    },
+    "optimizationStats": {
+     "remainingCredits": {},
+     "totalImagesOptimized": {},
+     "totalMbSaved": {},
+     "avgCompressionRatio": {},
+     "recentAssets": {
+      "[]": {
+       "id": {},
+       "originalUrl": {
+        "#type": {
+         "text": {}
+        }
+       },
+       "originalBytes": {},
+       "optimizedBytes": {},
+       "bytesSaved": {},
+       "format": {
+        "#type": {
+         "text": {}
+        }
+       }
+      }
+     }
+    },
+    "staging": {
+     "enabled": {},
+     "stagingDomain": {},
+     "createdAt": {},
+     "lastDeployedAt": {}
+    },
+    "backups": {
+     "#type": {
+      "array": {}
+     },
+     "[]": {
+      "trigger": {},
+      "id": {},
+      "label": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "notes": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "createdAt": {},
+      "sizeBytes": {},
+      "pageCount": {}
+     }
+    },
+    "backupPolicy": {
+     "enabled": {},
+     "cronExpression": {},
+     "retainCount": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 450,
+  "handler": "fetchSiteAuditLogs",
+  "method": "GET",
+  "url": "`${apiUrl}/api/v1/audit-logs?resourceId=${website.id}`",
+  "shape": {
+   "logs": {}
+  }
+ },
+ {
+  "line": 467,
+  "handler": "fetchPerformance",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/performance/metrics`",
+  "shape": {
+   "latestScore": {},
+   "avgResponseTimeMs": {},
+   "avgTtfbMs": {},
+   "uptimePercentage": {},
+   "metrics": {
+    "[]": {
+     "id": {},
+     "checkedAt": {},
+     "ttfbMs": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "responseTimeMs": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "statusCode": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "score": {
+      "#type": {
+       "text": {}
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "line": 487,
+  "handler": "handleRunAudit",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/performance/audit`",
+  "shape": {
+   "summary": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 511,
+  "handler": "fetchOptimization",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/images/stats`",
+  "shape": {
+   "remainingCredits": {},
+   "totalImagesOptimized": {},
+   "totalMbSaved": {},
+   "avgCompressionRatio": {},
+   "recentAssets": {
+    "[]": {
+     "id": {},
+     "originalUrl": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "originalBytes": {},
+     "optimizedBytes": {},
+     "bytesSaved": {},
+     "format": {
+      "#type": {
+       "text": {}
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "line": 531,
+  "handler": "handleRunOptimization",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/images/optimize-image`",
+  "shape": {
+   "bytesSaved": {},
+   "savingsPercentage": {},
+   "remainingCredits": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 562,
+  "handler": "fetchWpAdminOverview",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/wordpress/admin/overview`",
+  "shape": {
+   "wpVersion": {},
+   "phpVersion": {},
+   "activeTheme": {
+    "name": {},
+    "version": {}
+   },
+   "database": {
+    "sizeMb": {},
+    "tablesCount": {},
+    "postRevisions": {},
+    "transients": {},
+    "spamComments": {}
+   },
+   "plugins": {
+    "[]": {
+     "slug": {},
+     "name": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "version": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "author": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "active": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 582,
+  "handler": "handleLaunchSso",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/wordpress/admin/sso`",
+  "shape": {
+   "ssoUrl": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 608,
+  "handler": "handleRunDbCleanup",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/wordpress/database/optimize`",
+  "shape": {
+   "message": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "spaceReclaimedMb": {
+    "#type": {
+     "text": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 634,
+  "handler": "fetchBackups",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups`",
+  "shape": {
+   "backups": {
+    "#type": {
+     "array": {}
+    },
+    "[]": {
+     "trigger": {},
+     "id": {},
+     "label": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "notes": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "createdAt": {},
+     "sizeBytes": {},
+     "pageCount": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 652,
+  "handler": "fetchBackupPolicy",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups/policy`",
+  "shape": {
+   "policy": {
+    "enabled": {},
+    "cronExpression": {},
+    "retainCount": {}
+   }
+  }
+ },
+ {
+  "line": 671,
+  "handler": "handleCreateBackup",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 701,
+  "handler": "handleRestoreBackup",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups/${restoreTargetBackup.id}/restore`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 736,
+  "handler": "handleRenameBackup",
+  "method": "PATCH",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups/${targetBackup.id}`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 764,
+  "handler": "handleDeleteBackup",
+  "method": "DELETE",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups/${deleteTargetBackup.id}`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 788,
+  "handler": "handleSaveBackupPolicy",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/backups/policy`",
+  "shape": {
+   "message": {},
+   "policy": {
+    "enabled": {},
+    "cronExpression": {},
+    "retainCount": {}
+   }
+  }
+ },
+ {
+  "line": 810,
+  "handler": "fetchStagingInfo",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/staging`",
+  "shape": {
+   "staging": {
+    "enabled": {},
+    "stagingDomain": {},
+    "createdAt": {},
+    "lastDeployedAt": {}
+   }
+  }
+ },
+ {
+  "line": 830,
+  "handler": "handleCreateStaging",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/staging`",
+  "shape": {
+   "message": {},
+   "staging": {
+    "enabled": {},
+    "stagingDomain": {},
+    "createdAt": {},
+    "lastDeployedAt": {}
+   }
+  }
+ },
+ {
+  "line": 852,
+  "handler": "handlePromoteStaging",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/staging/promote`",
+  "shape": {
+   "message": {},
+   "staging": {
+    "enabled": {},
+    "stagingDomain": {},
+    "createdAt": {},
+    "lastDeployedAt": {}
+   }
+  }
+ },
+ {
+  "line": 876,
+  "handler": "handleDeleteStaging",
+  "method": "DELETE",
+  "url": "`${apiUrl}/api/websites/${website.id}/staging`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 905,
+  "handler": "fetchDomains",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains`",
+  "shape": {
+   "domains": {
+    "[]": {
+     "status": {},
+     "domain": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "isPrimary": {},
+     "sslStatus": {},
+     "sslEnabled": {},
+     "addedAt": {},
+     "verifiedAt": {},
+     "verificationToken": {},
+     "sslIssuer": {},
+     "sslExpiresAt": {},
+     "dnsPreflight": {
+      "errors": {
+       "#type": {
+        "array": {}
+       },
+       "[]": {}
+      }
+     }
+    },
+    "#type": {
+     "array": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 930,
+  "handler": "handleAddDomain",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains`",
+  "shape": {
+   "message": {},
+   "domain": {
+    "domain": {}
+   }
+  }
+ },
+ {
+  "line": 959,
+  "handler": "handleVerifyDomain",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains/${encodeURIComponent(domainName)}/ssl/provision`",
+  "shape": {
+   "success": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 964,
+  "handler": "handleVerifyDomain",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains/${encodeURIComponent(domainName)}/verify`",
+  "shape": {}
+ },
+ {
+  "line": 995,
+  "handler": "fetchReleases",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/releases`",
+  "shape": {
+   "releases": {
+    "[]": {
+     "releaseId": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "isActive": {},
+     "version": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "deployHash": {
+      "#type": {
+       "string": {}
+      }
+     },
+     "environment": {},
+     "notes": {},
+     "createdAt": {},
+     "createdBy": {
+      "#type": {
+       "text": {}
+      }
+     }
+    },
+    "#type": {
+     "array": {}
+    }
+   },
+   "currentReleaseId": {}
+  }
+ },
+ {
+  "line": 1016,
+  "handler": "handleInstantRollback",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/releases/${releaseId}/rollback`",
+  "shape": {
+   "message": {},
+   "executionTimeMs": {},
+   "releaseId": {}
+  }
+ },
+ {
+  "line": 1044,
+  "handler": "handleSetPrimaryDomain",
+  "method": "PATCH",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains/${encodeURIComponent(domainName)}/primary`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1066,
+  "handler": "handleDeleteDomain",
+  "method": "DELETE",
+  "url": "`${apiUrl}/api/websites/${website.id}/domains/${encodeURIComponent(deleteDomainTarget)}`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1089,
+  "handler": "fetchServerConfig",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/server-config`",
+  "shape": {
+   "config": {
+    "phpMemoryLimit": {},
+    "phpMaxExecutionTime": {}
+   }
+  }
+ },
+ {
+  "line": 1110,
+  "handler": "handleSaveServerConfig",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/server-config`",
+  "shape": {
+   "message": {},
+   "config": {
+    "phpMemoryLimit": {},
+    "phpMaxExecutionTime": {}
+   }
+  }
+ },
+ {
+  "line": 1132,
+  "handler": "fetchSftpDetails",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/sftp`",
+  "shape": {
+   "sftp": {
+    "status": {},
+    "host": {},
+    "port": {},
+    "username": {},
+    "remotePath": {}
+   }
+  }
+ },
+ {
+  "line": 1152,
+  "handler": "handleTestSftp",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/sftp/test`",
+  "shape": {
+   "success": {},
+   "message": {}
+  }
+ },
+ {
+  "line": 1177,
+  "handler": "fetchSecurityOverview",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/security`",
+  "shape": {
+   "siteLock": {
+    "hasPassword": {}
+   },
+   "privacy": {
+    "noIndex": {},
+    "maintenanceMode": {}
+   },
+   "ipFirewall": {
+    "mode": {},
+    "ips": {
+     "#type": {
+      "array": {}
+     }
+    }
+   },
+   "lastSecurityAudit": {
+    "score": {},
+    "status": {},
+    "scannedAt": {},
+    "checks": {
+     "[]": {
+      "id": {},
+      "name": {
+       "#type": {
+        "text": {}
+       }
+      },
+      "status": {},
+      "details": {
+       "#type": {
+        "text": {}
+       }
+      }
+     }
+    }
+   },
+   "cache": {
+    "lastPurgedAt": {}
+   },
+   "cdn": {
+    "cloudflareEnabled": {}
+   }
+  }
+ },
+ {
+  "line": 1217,
+  "handler": "handleSaveSiteLock",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/security/site-lock`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1242,
+  "handler": "handleSavePrivacy",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/security/privacy`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1266,
+  "handler": "handleSaveFirewall",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/security/firewall`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1292,
+  "handler": "handleRunSecurityAudit",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/security/scan`",
+  "shape": {
+   "message": {},
+   "audit": {
+    "score": {},
+    "status": {}
+   }
+  }
+ },
+ {
+  "line": 1316,
+  "handler": "handlePurgeCache",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/cache/purge`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1338,
+  "handler": "handleToggleCdn",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/cdn`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1360,
+  "handler": "fetchHostingLogs",
+  "method": "GET",
+  "url": "`${apiUrl}/api/websites/${website.id}/hosting-logs`",
+  "shape": {
+   "logs": {
+    "#type": {
+     "array": {}
+    },
+    "[]": {
+     "id": {},
+     "timestamp": {},
+     "type": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "method": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "path": {},
+     "action": {},
+     "statusCode": {
+      "#type": {
+       "text": {}
+      }
+     },
+     "latencyMs": {},
+     "ipAddress": {}
+    }
+   }
+  }
+ },
+ {
+  "line": 1380,
+  "handler": "handleTransferOwnership",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/transfer`",
+  "shape": {
+   "message": {},
+   "newOwnerEmail": {}
+  }
+ },
+ {
+  "line": 1433,
+  "handler": "handleWordPressSync",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/wordpress/sync-pages`",
+  "shape": {
+   "message": {},
+   "syncedPagesCount": {}
+  }
+ },
+ {
+  "line": 1455,
+  "handler": "handleVerifyConnection",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/wordpress/verify`",
+  "shape": {
+   "message": {},
+   "wpSiteName": {},
+   "siteUrl": {}
+  }
+ },
+ {
+  "line": 1478,
+  "handler": "handleSaveMailer",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/mailer/config`",
+  "shape": {
+   "message": {},
+   "config": {
+    "isVerified": {}
+   }
+  }
+ },
+ {
+  "line": 1501,
+  "handler": "handleTestMailer",
+  "method": "POST",
+  "url": "`${apiUrl}/api/websites/${website.id}/mailer/test`",
+  "shape": {
+   "message": {}
+  }
+ },
+ {
+  "line": 1526,
+  "handler": "handleSaveCookieConsent",
+  "method": "PUT",
+  "url": "`${apiUrl}/api/websites/${website.id}/cookie-consent`",
+  "shape": {
+   "error": {
+    "message": {}
+   },
+   "detail": {}
+  }
+ }
+]
