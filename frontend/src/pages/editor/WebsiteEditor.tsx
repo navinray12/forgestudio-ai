@@ -23,7 +23,6 @@ import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
 import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
-import { publishingService } from "../../features/publishing/services/publishingService";
 import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
 import { createDocumentSaveCoordinator } from "../../features/editor-access/document-save-coordinator";
 import { ContentOnlyInspector } from "./components/ContentOnlyInspector";
@@ -34,7 +33,7 @@ import { sanitizeHtml } from "../../utils/sanitizeHtml";
 
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { forgeProjectService } from "../../features/developer-workspace/services/forgeProjectService";
-import { syncAcknowledgedSave, describeCanvasSourceSync } from "../../features/developer-workspace/services/canvasSourceSync";
+import { syncAcknowledgedSave } from "../../features/developer-workspace/services/canvasSourceSync";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
@@ -332,13 +331,14 @@ import {
 import { findTreeElement, getAllElementIds, flattenAndSearchElements } from "./core/elementTree";
 import { getYouTubeId, getVimeoId } from "./core/videoEmbed";
 import { createBackgroundAndBorderStylesCompiler, compilePositioningStyles } from "./core/styleCompilers";
-import { buildSavePayload, buildPublishDraftSnapshot } from "./core/documentPayloads";
 import { useEditorHistory } from "./core/useEditorHistory";
 import { useEditorShortcuts } from "./core/useEditorShortcuts";
 import { ScrubbableNumberInput } from "./components/ScrubbableNumberInput";
 import { buildCanonicalPages } from "./core/canonicalPages";
 import { useWebsiteLoader } from "./core/useWebsiteLoader";
 import { useWorkspaceSync } from "./core/useWorkspaceSync";
+import { useManualSave } from "./core/useManualSave";
+import { usePublishWebsite, useRollbackDeployment } from "./core/usePublishWebsite";
 
 // Monaco includes a substantial language runtime; load it only when a developer
 // opens code editing rather than with every editor session.
@@ -1252,19 +1252,7 @@ export default function WebsiteEditor() {
 
     // 1. Sync current page elements if we were editing a page
     if (canvasMode === "page") {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === activePageId
-            ? {
-              ...p,
-              elements,
-              pageSettings,
-              name: pageSettings.title || p.name,
-              slug: pageSettings.path || p.slug,
-            }
-            : p
-        )
-      );
+      setPages((prev) => buildCanonicalPages({ pages: prev, activePageId, canvasMode, elements, pageSettings }));
     }
 
     // 2. Clear element selection to isolate inspector across pages (Comment 18)
@@ -1421,21 +1409,8 @@ export default function WebsiteEditor() {
       return;
     }
 
-    // Sync current page canvas elements if editing a page before switching
-    let currentPagesSnapshot = [...pages];
-    if (canvasMode === "page") {
-      currentPagesSnapshot = currentPagesSnapshot.map((p) =>
-        p.id === activePageId
-          ? {
-              ...p,
-              elements,
-              pageSettings,
-              name: pageSettings.title || p.name,
-              slug: pageSettings.path || p.slug,
-            }
-          : p
-      );
-    }
+    // Sync current page canvas elements if editing a page before switching (a new array in every mode)
+    const currentPagesSnapshot = buildCanonicalPages({ pages, activePageId, canvasMode, elements, pageSettings });
 
     // Check if starter template elements match (About, Contact, Services, etc.)
     const starters = createStarterPages(website?.name || "ForgeStudio");
@@ -1508,21 +1483,8 @@ export default function WebsiteEditor() {
       return;
     }
 
-    // Sync current page canvas elements if editing a page before switching
-    let currentPagesSnapshot = [...pages];
-    if (canvasMode === "page") {
-      currentPagesSnapshot = currentPagesSnapshot.map((p) =>
-        p.id === activePageId
-          ? {
-              ...p,
-              elements,
-              pageSettings,
-              name: pageSettings.title || p.name,
-              slug: pageSettings.path || p.slug,
-            }
-          : p
-      );
-    }
+    // Sync current page canvas elements if editing a page before switching (a new array in every mode)
+    const currentPagesSnapshot = buildCanonicalPages({ pages, activePageId, canvasMode, elements, pageSettings });
 
     const starters = createStarterPages(website?.name || "ForgeStudio");
     const starterMatch = starters.find(
@@ -2247,188 +2209,64 @@ export default function WebsiteEditor() {
 
 
 
-  // F-PUBLISH: Production Publish & Deployment Pipeline Handler (Comment 8)
-  const handlePublishWebsite = async (options?: { destinationType?: "INTERNAL" | "WORDPRESS" }) => {
-    if (!websiteId) return;
+  // F-PUBLISH: see core/usePublishWebsite (same position; a new function on every render, as before)
+  const handlePublishWebsite = usePublishWebsite({
+    websiteId,
+    apiUrl,
+    canvasMode,
+    elements,
+    siteParts,
+    pages,
+    activePageId,
+    pageSettings,
+    homePageId,
+    deployment,
+    breakpoints,
+    globalSettings,
+    popups,
+    pageCss,
+    publishing,
+    setPublishing,
+    setDeployment,
+    publishedDataRef,
+    setSaveMessage,
+  });
 
-    const destType = options?.destinationType || "INTERNAL";
+  // Deployment rollback: see core/usePublishWebsite (same position; a new function on every render, as before)
+  const handleRollbackDeployment = useRollbackDeployment({
+    websiteId,
+    apiUrl,
+    setPublishing,
+    setSaveMessage,
+  });
 
-    const workingDraftSnapshot = buildPublishDraftSnapshot({
-      canvasMode,
-      elements,
-      siteParts,
-      pages,
-      activePageId,
-      pageSettings,
-      homePageId,
-      deployment,
-      breakpoints,
-      globalSettings,
-      popups,
-      pageCss,
-    });
-
-    const payload = {
-      editorData: workingDraftSnapshot,
-      environment: "PRODUCTION" as const,
-      destinationType: destType,
-    };
-
-    try {
-      localStorage.setItem(`forgestudio_editor_${websiteId}`, JSON.stringify(payload.editorData));
-    } catch (e) { }
-
-    // Call server publishing endpoint
-    const result = await publishingService.publishWebsite(websiteId, payload, apiUrl);
-
-    if (!result.success) {
-      throw new Error("Publishing failed on server.");
-    }
-
-    const updatedPub: PublishingState = {
-      ...publishing,
-      status: "PUBLISHED",
-      publishedVersion: result.version,
-      version: result.version,
-      publishedAt: result.publishedAt,
-      deploymentId: result.deploymentId,
-    };
-    setPublishing(updatedPub);
-
-    setDeployment((prev) => ({
-      ...prev,
-      deployedAt: result.publishedAt,
-      productionUrl: result.liveUrl,
-    }));
-
-    publishedDataRef.current = {
-      ...workingDraftSnapshot,
-      version: result.version,
-      publishing: updatedPub,
-    };
-
-    setSaveMessage(`Website successfully published (v${result.version})!`);
-    setTimeout(() => setSaveMessage(""), 3500);
-  };
-
-  const handleRollbackDeployment = async (deploymentId: string) => {
-    if (!websiteId) return;
-    const result = await publishingService.rollbackDeployment(websiteId, deploymentId, apiUrl);
-    if (result.success) {
-      setPublishing((prev) => ({
-        ...prev,
-        status: "PUBLISHED",
-        publishedVersion: result.version,
-        version: result.version,
-        publishedAt: result.publishedAt,
-        deploymentId: result.deploymentId,
-      }));
-      setSaveMessage(`Successfully rolled back to deployment v${result.version}!`);
-      setTimeout(() => setSaveMessage(""), 3500);
-    }
-  };
-
-  // Save Website Data
-  const handleSave = async () => {
-    if (!websiteId || !website || !userAccess.canEditContent) return;
-
-    try {
-      setSaving(true);
-      setSaveMessage("");
-      setErrorMessage("");
-
-      const { payload, canonicalPageElements } = buildSavePayload({
-        canvasMode,
-        elements,
-        siteParts,
-        pages,
-        activePageId,
-        pageSettings,
-        homePageId,
-        publishing,
-        deployment,
-        breakpoints,
-        globalSettings,
-        globalVariables,
-        globalClasses,
-        popups,
-        pageCss,
-        publishedDataRef,
-      });
-
-      // Only a confirmed server response advances the saved baseline.
-      const acknowledged = await persistDocument(payload);
-
-      // Update F-321 Autosave baseline on successful save
-      updateAutosaveBaseline(
-        canonicalPageElements,
-        pageSettings,
-        payload.editorData.pages,
-        homePageId,
-        siteParts,
-        globalSettings,
-        globalSettings?.globalStyles,
-        publishing,
-        deployment,
-        breakpoints,
-        popups,
-        pageCss
-      );
-
-      setSaveMessage("Saved successfully!");
-      setTimeout(() => setSaveMessage(""), 3000);
-
-      try {
-        const channel = new BroadcastChannel("forge_workspace_sync");
-        channel.postMessage({
-          type: "visual_saved",
-          websiteId,
-          documentVersion: acknowledged.documentVersion,
-          timestamp: Date.now(),
-        });
-        channel.close();
-      } catch {}
-      try {
-        localStorage.setItem(
-          "forge_workspace_sync_event",
-          JSON.stringify({
-            type: "visual_saved",
-            websiteId,
-            documentVersion: acknowledged.documentVersion,
-            timestamp: Date.now(),
-          })
-        );
-      } catch {}
-
-      // The design is saved; say so separately if the Code Workspace source could not follow it
-      const codeSync = acknowledged.codeSync;
-      if (codeSync?.stale) {
-        setErrorMessage(
-          `Saved. The Code Workspace source could not be regenerated from this design: ${codeSync.error || "generation failed"}`
-        );
-      } else if (codeSync?.conflicts?.length) {
-        // Hand-written pages are not regenerated; this save's canvas edits were sent to them as
-        // element edits. Say what was applied and, separately, anything that was not.
-        const sourceSync = describeCanvasSourceSync(acknowledged.sourceSync);
-        if (sourceSync?.isProblem) {
-          setErrorMessage(`Saved. ${sourceSync.text}`);
-        } else if (sourceSync) {
-          setSaveMessage(`Saved. ${sourceSync.text}`);
-        } else if (!acknowledged.sourceSync) {
-          setErrorMessage(
-            `Saved. These page files hold hand-written code and were not regenerated: ${codeSync.conflicts.join(", ")}. Resolve them in the Code Workspace.`
-          );
-        }
-      }
-      return acknowledged;
-    } catch (err: any) {
-      setSaveMessage("Save failed — changes remain unsaved");
-      setErrorMessage(err instanceof Error ? err.message : "The server did not confirm this save");
-      setTimeout(() => setSaveMessage(""), 3000);
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Save Website Data: see core/useManualSave (same position; a new function on every render, as before)
+  const handleSave = useManualSave({
+    websiteId,
+    website,
+    userAccess,
+    setSaving,
+    setSaveMessage,
+    setErrorMessage,
+    canvasMode,
+    elements,
+    siteParts,
+    pages,
+    activePageId,
+    pageSettings,
+    homePageId,
+    publishing,
+    deployment,
+    breakpoints,
+    globalSettings,
+    globalVariables,
+    globalClasses,
+    popups,
+    pageCss,
+    publishedDataRef,
+    persistDocument,
+    updateAutosaveBaseline,
+  });
 
   // Element Actions
   const handleAddElement = (type: ElementType, targetId: string | null = null) => {
