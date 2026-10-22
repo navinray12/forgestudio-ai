@@ -42,14 +42,18 @@ describe("Ctrl+S saves the current page settings", () => {
   it("toolbar Save and Ctrl+S send the same page settings", async () => {
     const editor = await mountEditor(site());
     await editDescription("first edit");
+    const beforeButton = editor.backend.saves().length;
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
     await flush(6);
+    // read each save when it happens: an autosave may also run between the two under load
+    expect(editor.backend.saves().length).toBeGreaterThan(beforeButton);
+    expect(savedHome(editor.backend.saves().at(-1)!.body).pageSettings.description).toBe("first edit");
     await editDescription("second edit");
+    const beforeShortcut = editor.backend.saves().length;
     await editor.key("s", { ctrlKey: true });
     await flush(6);
-    const [byButton, byShortcut] = editor.backend.saves().slice(-2);
-    expect(savedHome(byButton.body).pageSettings.description).toBe("first edit");
-    expect(savedHome(byShortcut.body).pageSettings.description).toBe("second edit");
+    expect(editor.backend.saves().length).toBeGreaterThan(beforeShortcut);
+    expect(savedHome(editor.backend.saves().at(-1)!.body).pageSettings.description).toBe("second edit");
   });
 
   it("Ctrl+S with nothing changed still saves once, with the loaded settings", async () => {
