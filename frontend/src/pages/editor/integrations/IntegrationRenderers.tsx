@@ -58,7 +58,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
       setLoading(true);
       try {
         // Use backend dynamic data proxy for CORS safety
-        const proxyUrl = `${apiUrl}/api/integrations/dynamic-data/fetch?url=${encodeURIComponent(dynamicApiEndpoint)}&jsonPath=${encodeURIComponent(dynamicJsonPath)}`;
+        const proxyUrl = `${apiUrl}/api/v1/integrations/dynamic-data/fetch?url=${encodeURIComponent(dynamicApiEndpoint)}&jsonPath=${encodeURIComponent(dynamicJsonPath)}`;
         const res = await fetch(proxyUrl);
         const json = await res.json();
         if (isMounted && json?.value !== undefined) {
@@ -363,7 +363,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
             if (!isPreview) return;
             setPaymentError(null);
             try {
-              const res = await fetch(`${apiUrl}/api/integrations/paypal/create-order`, {
+              const res = await fetch(`${apiUrl}/api/v1/integrations/paypal/create-order`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount, currency, itemName, env }),
@@ -422,7 +422,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
             if (!isPreview) return;
             setPaymentError(null);
             try {
-              const res = await fetch(`${apiUrl}/api/integrations/stripe/create-checkout-session`, {
+              const res = await fetch(`${apiUrl}/api/v1/integrations/stripe/create-checkout-session`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount, currency, itemName }),
@@ -568,7 +568,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
       if (!isPreview) return;
       setCrmError(null);
       try {
-        const res = await fetch(`${apiUrl}/api/integrations/crm/submit-lead`, {
+        const res = await fetch(`${apiUrl}/api/v1/integrations/crm/submit-lead`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ provider, name, email }),
@@ -639,7 +639,7 @@ export const IntegrationElementRenderer: React.FC<IntegrationRendererProps> = ({
       setWebhookError(null);
       setTriggered(false);
       try {
-        const response = await fetch(`${apiUrl}/api/integrations/webhook/dispatch`, {
+        const response = await fetch(`${apiUrl}/api/v1/integrations/webhook/dispatch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",

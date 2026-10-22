@@ -7,6 +7,7 @@ import { requireRecentPlatformReauth } from "../../services/platform-session-aut
 import { applyRuntimeChange, approveRuntimeChange, createRuntimeChange, listChanges } from "./change.service.js";
 import { tenantIsolationPreflight } from "../../operations/tenant-isolation-preflight.js";
 import { listDeadLetters, listReconciliationCases, replayDeadLetter, resolveReconciliationCase } from "../reliability/postgres-queue.js";
+import { mcpRegistryService } from "../../modules/ai/mcp/mcpRegistry.service.js";
 
 const router = Router();
 router.use(requirePlatformAuth);
@@ -98,6 +99,15 @@ router.post("/changes/:id/apply",async(req,res,next)=>{
     requirePlatformRole(res); requireRecentPlatformReauth(res.locals.session);
     const change=await applyRuntimeChange({actorId:res.locals.user.id,changeId:String(req.params.id),expectedDigest:String(req.body?.planDigest||"")});
     res.json({success:true,change});
+  }catch(error){next(error);}
+});
+
+// MCP server trust approval: UNTRUSTED -> VERIFIED only, by a recently re-authenticated platform administrator.
+router.post("/mcp-servers/:id/approve",async(req,res,next)=>{
+  try{
+    requirePlatformRole(res); requireRecentPlatformReauth(res.locals.session);
+    const server=await mcpRegistryService.approveServer({serverId:String(req.params.id),actorId:res.locals.user.id});
+    res.json({success:true,server});
   }catch(error){next(error);}
 });
 
