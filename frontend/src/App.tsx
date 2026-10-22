@@ -262,6 +262,10 @@ function App() {
             path="/site/:websiteId/:pageSlug"
             element={<PublishedSite />}
           />
+          <Route
+            path="/site/:websiteId/:cptSlug/:entrySlug"
+            element={<PublishedSite />}
+          />
 
           {/* ================= AUTHENTICATED DRAFT PREVIEW ================= */}
           <Route
@@ -274,6 +278,14 @@ function App() {
           />
           <Route
             path="/preview/site/:websiteId/:pageSlug"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <PublishedSite isPreviewMode={true} />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/preview/site/:websiteId/:cptSlug/:entrySlug"
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
                 <PublishedSite isPreviewMode={true} />

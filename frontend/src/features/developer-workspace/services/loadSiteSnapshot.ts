@@ -8,7 +8,16 @@ export async function loadSiteSnapshot(
   const response = await fetch(`${apiUrl}/api/v1/websites/public/${encodeURIComponent(websiteId)}`, {
     signal, credentials: "omit",
   });
-  if (!response.ok) throw new Error("This website is unavailable.");
+  if (!response.ok) {
+    let msg = "This website is unavailable.";
+    try {
+      const errJson = await response.json();
+      if (errJson?.detail) msg = errJson.detail;
+      else if (errJson?.error?.message) msg = errJson.error.message;
+      else if (errJson?.message) msg = errJson.message;
+    } catch (_e) {}
+    throw new Error(msg);
+  }
   if (!(response.headers.get("content-type") || "").includes("application/json")) {
     throw new Error("The website server returned an invalid response.");
   }

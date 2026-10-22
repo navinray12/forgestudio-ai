@@ -33,6 +33,14 @@ export default function CustomEntriesList() {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [purgeRequests, setPurgeRequests] = useState<PurgeRequest[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [postTypeName, setPostTypeName] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!websiteId || !cptId) return;
+        api(`/api/cpt/websites/${websiteId}/types`)
+            .then((d) => setPostTypeName(d.data?.find((t: any) => t.id === cptId)?.name ?? null))
+            .catch(() => setPostTypeName(null));
+    }, [websiteId, cptId]);
 
     const load = useCallback(async () => {
         if (!cptId) return;
@@ -99,9 +107,10 @@ export default function CustomEntriesList() {
 
     return (
         <div className="p-8 max-w-5xl mx-auto">
+            <Link to={`/dashboard?tab=cpts&site=${websiteId}`} className="inline-block mb-4 text-xs font-bold text-slate-500 hover:text-slate-900">← Content types</Link>
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Dynamic Entries</h1>
+                    <h1 className="text-2xl font-bold text-slate-800">{postTypeName ? `${postTypeName} entries` : "Dynamic Entries"}</h1>
                     <p className="text-sm text-slate-500 mt-1">Manage content populating custom structures safely mapped.</p>
                 </div>
                 <div className="flex items-center gap-2">

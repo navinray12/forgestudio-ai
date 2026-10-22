@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -36,12 +36,34 @@ type View = "list" | "create" | "fields";
 
 export default function CustomPostTypesPanel() {
     const navigate = useNavigate();
+    // The CMS screen (list / create / fields) and the selected website live in the URL
+    // (`/dashboard?tab=cpts&site=…&cptView=…&cpt=…`) so refresh, back and forward keep them.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const siteId = searchParams.get("site") ?? "";
+    const requestedView = searchParams.get("cptView");
+    const view: View = requestedView === "create" || requestedView === "fields" ? requestedView : "list";
+    const activeCptId = searchParams.get("cpt");
     const [websites, setWebsites] = useState<any[]>([]);
-    const [siteId, setSiteId] = useState("");
+    const [websitesLoaded, setWebsitesLoaded] = useState(false);
     const [cpts, setCpts] = useState<CPT[]>([]);
+    // Website whose post types are currently in `cpts` (null while loading or after a failure).
+    const [cptsSiteId, setCptsSiteId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [view, setView] = useState<View>("list");
     const [activeCpt, setActiveCpt] = useState<CPT | null>(null);
+
+    const updateParams = (patch: Record<string, string | null>, replace = false) => {
+        const next = new URLSearchParams(searchParams);
+        next.set("tab", "cpts");
+        for (const [key, value] of Object.entries(patch)) {
+            if (value) next.set(key, value); else next.delete(key);
+        }
+        setSearchParams(next, { replace });
+    };
+    const setSiteId = (id: string) => updateParams({ site: id, cptView: null, cpt: null });
+    const setView = (next: View, cptId: string | null = null) => {
+        if (next !== "fields" || cptId !== activeCpt?.id) setActiveCpt(null);
+        updateParams({ cptView: next === "list" ? null : next, cpt: next === "fields" ? cptId : null });
+    };
     const [fields, setFields] = useState<CustomField[]>([]);
     const [fieldsLoading, setFieldsLoading] = useState(false);
     const [fieldsRevision, setFieldsRevision] = useState<string | null>(null);
@@ -63,32 +85,54 @@ export default function CustomPostTypesPanel() {
     const [savingFields, setSavingFields] = useState(false);
 
     useEffect(() => { loadWebsites(); }, []);
-    useEffect(() => { if (siteId) loadCpts(); }, [siteId]);
+    useEffect(() => { if (siteId) loadCpts(); else setCpts([]); }, [siteId]);
+
+    // Keep the selected website valid: a missing or inaccessible `site` falls back to the first website.
+    useEffect(() => {
+        if (!websitesLoaded) return;
+        if (websites.length === 0) { if (siteId) updateParams({ site: null, cptView: null, cpt: null }, true); return; }
+        if (!websites.some(w => w.id === siteId)) updateParams({ site: websites[0].id, cpt: null, ...(view === "fields" ? { cptView: null } : {}) }, true);
+    }, [websitesLoaded, websites, siteId]);
+
+    // The field editor is addressed by `cpt` in the URL; load it once the website's post types are known.
+    useEffect(() => {
+        if (view !== "fields" || loading || !siteId || cptsSiteId !== siteId) return;
+        if (!activeCptId) { setView("list"); return; }
+        if (activeCpt?.id === activeCptId) return;
+        const cpt = cpts.find(c => c.id === activeCptId);
+        if (cpt) void loadFields(cpt);
+        else updateParams({ cptView: null, cpt: null }, true);
+    }, [view, activeCptId, cpts, loading, siteId, cptsSiteId]);
 
     const loadWebsites = async () => {
         try {
             const r = await fetch(`${apiUrl}/api/websites`, { credentials: "include" });
-            const d = await r.json();
-            if (r.ok && d.websites) { setWebsites(d.websites); if (d.websites[0]) setSiteId(d.websites[0].id); }
+            const d = await r.json().catch(() => ({}));
+            if (r.ok && Array.isArray(d.websites)) setWebsites(d.websites);
+            else setGlobalError(d.error?.message || d.message || "Could not load websites.");
         } catch { setGlobalError("Could not load websites."); }
+        finally { setWebsitesLoaded(true); }
     };
 
     const loadCpts = async () => {
-        setLoading(true); setGlobalError(null);
+        setLoading(true); setGlobalError(null); setCptsSiteId(null);
         try {
             // Route: GET /api/cpt/websites/:websiteId/types
             const r = await fetch(`${apiUrl}/api/cpt/websites/${siteId}/types`, { credentials: "include" });
-            const d = await r.json();
-            if (r.ok) setCpts(d.data ?? []);
-            else setGlobalError(d.error?.message || d.message || "Failed to load post types.");
-        } catch { setGlobalError("Network error."); }
+            const d = await r.json().catch(() => ({}));
+            if (r.ok) { setCpts(d.data ?? []); setCptsSiteId(siteId); }
+            else { setCpts([]); setGlobalError(d.error?.message || d.message || "Failed to load post types."); }
+        } catch { setCpts([]); setGlobalError("Network error."); }
         finally { setLoading(false); }
     };
 
-    const autoSlug = (val: string) => val.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    // Matches the server rule: lowercase words separated by single hyphens.
+    const autoSlug = (val: string) => val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const typingSlug = (val: string) => val.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-+/, "");
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault(); setCreateError(null);
+        if (!siteId) { setCreateError("Select a website before creating a post type."); return; }
         if (!name.trim() || !slug.trim() || !singular.trim() || !plural.trim()) {
             setCreateError("Name, singular, plural, and slug are all required."); return;
         }
@@ -98,9 +142,9 @@ export default function CustomPostTypesPanel() {
             const r = await fetch(`${apiUrl}/api/cpt/websites/${siteId}/types`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, singular, plural, slug, description, hasArchive }),
+                body: JSON.stringify({ name, singular, plural, slug: autoSlug(slug), description, hasArchive }),
             });
-            const d = await r.json();
+            const d = await r.json().catch(() => ({}));
             if (r.ok) {
                 setView("list"); loadCpts();
                 setName(""); setSingular(""); setPlural(""); setSlug(""); setDescription(""); setHasArchive(false);
@@ -110,7 +154,7 @@ export default function CustomPostTypesPanel() {
     };
 
     const loadFields = async (cpt: CPT) => {
-        setActiveCpt(cpt); setFieldsLoading(true); setView("fields");
+        setActiveCpt(cpt); setFieldsLoading(true);
         setFieldError(null); setFieldNotice(null); setFieldsRevision(null); setFields([]);
         try {
             // Route: GET /api/cpt/types/:cptId/fields
@@ -182,22 +226,26 @@ export default function CustomPostTypesPanel() {
     };
 
     // ── FIELD EDITOR ─────────────────────────────────────────────
-    if (view === "fields" && activeCpt) return (
+    if (view === "fields") return (
         <div className="space-y-6">
             <div className="flex items-center gap-3">
                 <button onClick={() => setView("list")} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition">← Back</button>
                 <div>
-                    <h2 className="text-lg font-bold text-slate-900">Fields: {activeCpt.name}</h2>
-                    <p className="text-xs text-slate-500">/{activeCpt.slug}</p>
+                    <h2 className="text-lg font-bold text-slate-900">Fields: {activeCpt?.name ?? "…"}</h2>
+                    {activeCpt && <p className="text-xs text-slate-500">/{activeCpt.slug}</p>}
                 </div>
+                {activeCpt && (
+                    <button onClick={() => navigate(`/dashboard/cpts/${siteId}/entries/${activeCpt.id}`)} className="ml-auto h-8 px-3 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition">View Entries</button>
+                )}
             </div>
+            {globalError && <p role="alert" className="text-sm text-red-700">{globalError}</p>}
 
             {fieldError && <p role="alert" className="text-sm text-red-700">{fieldError}</p>}
             {fieldNotice && <p role="status" className="text-sm text-emerald-700">{fieldNotice}</p>}
             {fieldError?.includes("changed since this editor") && (
                 <p className="text-xs text-amber-700">A newer schema was saved elsewhere. Copy any unsaved edits before re-opening the field editor to compare.</p>
             )}
-            {fieldsLoading ? (
+            {fieldsLoading || (!activeCpt && !fieldError) ? (
                 <div className="text-xs text-slate-400 text-center py-8">Loading fields…</div>
             ) : (
                 <div className="space-y-3">
@@ -248,7 +296,10 @@ export default function CustomPostTypesPanel() {
         <div className="space-y-6">
             <div className="flex items-center gap-3">
                 <button onClick={() => setView("list")} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition">← Back</button>
-                <h2 className="text-lg font-bold text-slate-900">New Custom Post Type</h2>
+                <div>
+                    <h2 className="text-lg font-bold text-slate-900">New Custom Post Type</h2>
+                    <p className="text-xs text-slate-500">Website: {websites.find(w => w.id === siteId)?.name ?? "—"}</p>
+                </div>
             </div>
 
             <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
@@ -260,7 +311,7 @@ export default function CustomPostTypesPanel() {
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">Slug * (auto-generated)</label>
-                        <input type="text" value={slug} onChange={e => setSlug(autoSlug(e.target.value))}
+                        <input type="text" value={slug} onChange={e => setSlug(typingSlug(e.target.value))} onBlur={() => setSlug(autoSlug(slug))}
                             placeholder="e.g. portfolio" className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" required />
                     </div>
                     <div>
@@ -305,12 +356,15 @@ export default function CustomPostTypesPanel() {
                     <p className="text-sm text-slate-500 mt-1">Create custom content types with dynamic fields and entries.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {websites.length > 1 && (
-                        <select value={siteId} onChange={e => setSiteId(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none">
-                            {websites.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                        </select>
+                    {websites.length > 0 && (
+                        <label className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Website</span>
+                            <select value={siteId} onChange={e => setSiteId(e.target.value)} aria-label="Website" className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none">
+                                {websites.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                        </label>
                     )}
-                    <button onClick={() => setView("create")} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white shadow hover:bg-slate-700 transition">
+                    <button onClick={() => setView("create")} disabled={!siteId} className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white shadow hover:bg-slate-700 transition disabled:opacity-50">
                         + New Post Type
                     </button>
                 </div>
@@ -318,7 +372,15 @@ export default function CustomPostTypesPanel() {
 
             {globalError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{globalError}</div>}
 
-            {loading ? (
+            {!websitesLoaded ? (
+                <div className="flex items-center justify-center py-16 text-xs font-semibold text-slate-400">Loading websites…</div>
+            ) : websites.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center">
+                    <p className="text-sm font-bold text-slate-700">No website yet</p>
+                    <p className="text-xs text-slate-400 mt-1">Custom post types belong to a website. Create a website first.</p>
+                    <button onClick={() => navigate("/dashboard")} className="mt-4 h-8 px-4 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-700 transition">Go to Websites</button>
+                </div>
+            ) : loading ? (
                 <div className="flex items-center justify-center py-16 text-xs font-semibold text-slate-400">Loading…</div>
             ) : cpts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center">
@@ -344,7 +406,7 @@ export default function CustomPostTypesPanel() {
                                 </div>
                             </div>
                             <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
-                                <button onClick={() => loadFields(cpt)} className="h-7 px-3 rounded-lg bg-slate-900 text-[11px] font-bold text-white hover:bg-slate-700 transition">Manage Fields</button>
+                                <button onClick={() => setView("fields", cpt.id)} className="h-7 px-3 rounded-lg bg-slate-900 text-[11px] font-bold text-white hover:bg-slate-700 transition">Manage Fields</button>
                                 <button onClick={() => navigate(`/dashboard/cpts/${siteId}/entries/${cpt.id}`)} className="h-7 px-3 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition">View Entries</button>
                                 <button onClick={() => handleDelete(cpt)} className="ml-auto h-7 px-3 rounded-lg border border-red-200 text-[11px] font-bold text-red-500 hover:bg-red-50 transition">Delete</button>
                             </div>

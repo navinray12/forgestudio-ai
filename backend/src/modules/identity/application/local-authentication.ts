@@ -115,7 +115,6 @@ export class LocalAuthentication {
       await tx.updateChallenge(row.id, { status: "READY" });
       await tx.audit(userId, "IDENTITY_CODE_ACCEPTED_BY_PROVIDER", `challenge:${row.id}`);
     });
-    return code;
   }
   async finish(secretInput: unknown, userId: string, purpose: Purpose, code: string) {
     const { secret, row } = await this.lookup(secretInput, userId, purpose);

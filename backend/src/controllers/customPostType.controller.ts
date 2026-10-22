@@ -466,3 +466,227 @@ export async function executePurgeRequestHandler(req: Request, res: Response, ne
         res.status(200).json({ success: true, ...result });
     } catch (e) { next(e); }
 }
+
+// ====== Public Published Runtime CPT Handlers ======
+
+/**
+ * GET /websites/public/:id/cpt
+ * Lists published content types on a published website.
+ */
+export async function getPublicCustomPostTypesHandler(
+    req: Request<{ id?: string; websiteId?: string }>,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const params = req.params as { id?: string; websiteId?: string };
+        const websiteId = String(params.id || params.websiteId || "").trim();
+        const isUuid = UUID_PATTERN.test(websiteId);
+
+        const website = await prisma.website.findFirst({
+            where: isUuid
+                ? { id: websiteId, status: "PUBLISHED", deletedAt: null }
+                : { slug: websiteId, status: "PUBLISHED", deletedAt: null },
+            select: { id: true },
+        });
+
+        if (!website) {
+            throw new AppError("This website is unavailable.", 404, "NOT_FOUND");
+        }
+
+        const cpts = await prisma.customPostType.findMany({
+            where: { websiteId: website.id },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                singular: true,
+                plural: true,
+                hasArchive: true,
+                supports: true,
+            },
+            orderBy: { createdAt: "asc" },
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: cpts,
+        });
+    } catch (e) {
+        next(e);
+    }
+}
+
+/**
+ * GET /websites/public/:id/cpt/:cptSlug/entries
+ * Returns published entries for a specific content type on a published website.
+ */
+export async function getPublicCustomEntriesHandler(
+    req: Request<{ id?: string; websiteId?: string; cptSlug?: string }>,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const params = req.params as { id?: string; websiteId?: string; cptSlug?: string };
+        const websiteId = String(params.id || params.websiteId || "").trim();
+        const cptSlug = String(params.cptSlug || "").trim().toLowerCase();
+        const isUuid = UUID_PATTERN.test(websiteId);
+
+        const website = await prisma.website.findFirst({
+            where: isUuid
+                ? { id: websiteId, status: "PUBLISHED", deletedAt: null }
+                : { slug: websiteId, status: "PUBLISHED", deletedAt: null },
+            select: { id: true },
+        });
+
+        if (!website) {
+            throw new AppError("This website is unavailable.", 404, "NOT_FOUND");
+        }
+
+        const cpt = await prisma.customPostType.findFirst({
+            where: {
+                websiteId: website.id,
+                OR: [
+                    { slug: cptSlug },
+                    ...(cptSlug === "blog" || cptSlug === "posts" || cptSlug === "post"
+                        ? [{ slug: "blog-posts" }, { slug: "posts" }, { slug: "blog" }]
+                        : []),
+                ],
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                singular: true,
+                plural: true,
+                hasArchive: true,
+            },
+        });
+
+        if (!cpt) {
+            throw new AppError("Content type not found on this website.", 404, "NOT_FOUND");
+        }
+
+        const entries = await prisma.customEntry.findMany({
+            where: {
+                postTypeId: cpt.id,
+                status: "PUBLISHED",
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                title: true,
+                slug: true,
+                data: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+                author: {
+                    select: {
+                        fullName: true,
+                    },
+                },
+            },
+            orderBy: { updatedAt: "desc" },
+        });
+
+        return res.status(200).json({
+            success: true,
+            postType: cpt,
+            data: entries.map(toApiEntry),
+        });
+    } catch (e) {
+        next(e);
+    }
+}
+
+/**
+ * GET /websites/public/:id/cpt/:cptSlug/entries/:entrySlug
+ * Returns a single published entry on a published website.
+ */
+export async function getPublicSingleCustomEntryHandler(
+    req: Request<{ id?: string; websiteId?: string; cptSlug?: string; entrySlug?: string }>,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const params = req.params as { id?: string; websiteId?: string; cptSlug?: string; entrySlug?: string };
+        const websiteId = String(params.id || params.websiteId || "").trim();
+        const cptSlug = String(params.cptSlug || "").trim().toLowerCase();
+        const entrySlug = String(params.entrySlug || "").trim();
+        const isUuid = UUID_PATTERN.test(websiteId);
+
+        const website = await prisma.website.findFirst({
+            where: isUuid
+                ? { id: websiteId, status: "PUBLISHED", deletedAt: null }
+                : { slug: websiteId, status: "PUBLISHED", deletedAt: null },
+            select: { id: true },
+        });
+
+        if (!website) {
+            throw new AppError("This website is unavailable.", 404, "NOT_FOUND");
+        }
+
+        const cpt = await prisma.customPostType.findFirst({
+            where: {
+                websiteId: website.id,
+                OR: [
+                    { slug: cptSlug },
+                    ...(cptSlug === "blog" || cptSlug === "posts" || cptSlug === "post"
+                        ? [{ slug: "blog-posts" }, { slug: "posts" }, { slug: "blog" }]
+                        : []),
+                ],
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                singular: true,
+                plural: true,
+            },
+        });
+
+        if (!cpt) {
+            throw new AppError("Content type not found on this website.", 404, "NOT_FOUND");
+        }
+
+        const entry = await prisma.customEntry.findFirst({
+            where: {
+                postTypeId: cpt.id,
+                slug: entrySlug,
+                status: "PUBLISHED",
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                title: true,
+                slug: true,
+                data: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+                author: {
+                    select: {
+                        fullName: true,
+                    },
+                },
+            },
+        });
+
+        if (!entry) {
+            throw new AppError("The requested entry cannot be found or is not currently published.", 404, "NOT_FOUND");
+        }
+
+        return res.status(200).json({
+            success: true,
+            postType: cpt,
+            entry: toApiEntry(entry),
+        });
+    } catch (e) {
+        next(e);
+    }
+}
+
