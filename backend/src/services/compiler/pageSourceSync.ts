@@ -11,6 +11,7 @@
  * This module is pure: it reads and writes no storage.
  */
 import crypto from "node:crypto";
+import { isSitePartEnabled } from "../../utils/site-part-visibility.js";
 import { requireTs } from "./tsCompiler.js";
 import {
   visualDocumentToIR,
@@ -930,7 +931,7 @@ function collectAllIds(editorData: any): Set<string> {
 }
 
 function sitePartElements(part: any): any[] {
-  return part && part.enabled !== false && Array.isArray(part.elements)
+  return part && isSitePartEnabled(part) && Array.isArray(part.elements)
     ? part.elements.filter((el: any) => el && typeof el === "object")
     : [];
 }

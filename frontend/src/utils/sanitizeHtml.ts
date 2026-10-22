@@ -1,11 +1,11 @@
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config } from "dompurify";
 
 /**
  * Standard configuration for HTML sanitization in editor canvas and rendering paths.
  * Allows safe HTML structure, styling classes, and responsive embed attributes
  * while strictly stripping executable scripts, event handlers, and dangerous embedded objects.
  */
-export const EDITOR_DOMPURIFY_CONFIG: DOMPurify.Config = {
+export const EDITOR_DOMPURIFY_CONFIG: Config = {
   FORBID_TAGS: ["script", "embed", "object", "base", "meta", "link", "applet", "frame", "frameset"],
   FORBID_ATTR: [
     "onerror",
@@ -55,8 +55,9 @@ function ensurePurifyHooks() {
   });
 
   DOMPurify.addHook("uponSanitizeElement", (node) => {
-    // 3. Neutralize CSS @import and expression() inside style blocks
-    if (node.tagName === "STYLE" && node.textContent) {
+    // 3. Neutralize CSS @import and expression() inside style blocks. This hook receives any Node;
+    // nodeName equals tagName for elements and is never "STYLE" for other node types.
+    if (node.nodeName === "STYLE" && node.textContent) {
       node.textContent = node.textContent
         .replace(/@import\s+[^;]+;/gi, "/* @import blocked */")
         .replace(/expression\s*\([^)]*\)/gi, "/* expression blocked */")
@@ -69,8 +70,10 @@ function ensurePurifyHooks() {
  * Sanitize untrusted HTML markup before passing to dangerouslySetInnerHTML.
  * Prevents cross-collaborator stored XSS attacks while preserving valid editor layout.
  */
-export function sanitizeHtml(markup: string, config: DOMPurify.Config = EDITOR_DOMPURIFY_CONFIG): string {
+export function sanitizeHtml(markup: string, config: Config = EDITOR_DOMPURIFY_CONFIG): string {
   if (!markup) return "";
   ensurePurifyHooks();
-  return DOMPurify.sanitize(markup, config) as string;
+  // A string unless the config asks for DOM nodes or TrustedHTML; no caller does, and String() covers it.
+  const sanitized: unknown = DOMPurify.sanitize(markup, config);
+  return typeof sanitized === "string" ? sanitized : String(sanitized);
 }

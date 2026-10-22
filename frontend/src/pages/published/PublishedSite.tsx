@@ -10,6 +10,7 @@ import {
 } from "../editor/utils";
 import type { EditorElement, Breakpoint } from "../editor/types";
 import { resolveDynamicTokens } from "../editor/types";
+import { isSitePartEnabled } from "../editor/core/siteParts";
 import type { PopupConfig } from "../../types/popup.types";
 import { readPreviewCommand } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
 import { loadSiteSnapshot } from "../../features/developer-workspace/services/loadSiteSnapshot";
@@ -979,11 +980,11 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     if (matchedPage) {
                         setActivePageId(matchedPage.id || "home");
                         setElements(matchedPage.elements?.length ? matchedPage.elements : (editorData.elements || []));
-                    } else if (isPostRoute && loadedSiteParts?.single?.elements?.length && (loadedSiteParts.single.isEnabled ?? true)) {
+                    } else if (isPostRoute && loadedSiteParts?.single?.elements?.length && isSitePartEnabled(loadedSiteParts.single)) {
                         // F-237: Single Post Template Fallback
                         setActivePageId("single-post-template");
                         setElements(loadedSiteParts.single.elements);
-                    } else if (isTermRoute && loadedSiteParts?.archive?.elements?.length && (loadedSiteParts.archive.isEnabled ?? true)) {
+                    } else if (isTermRoute && loadedSiteParts?.archive?.elements?.length && isSitePartEnabled(loadedSiteParts.archive)) {
                         // F-256: Term / Taxonomy Archive Template Fallback
                         setActivePageId("archive-template");
                         setElements(loadedSiteParts.archive.elements);
@@ -992,7 +993,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                         const archivePage = pagesList.find((p) => p.slug === "/archive" || p.slug === "archive" || p.slug === "/blog" || p.slug === "blog") || pagesList.find((p: any) => p.isHome || p.slug === "/") || pagesList[0];
                         setActivePageId(archivePage?.id || "home");
                         setElements(archivePage?.elements?.length ? archivePage.elements : (editorData.elements || []));
-                    } else if (initialSlug && loadedSiteParts?.notFound404?.elements?.length && (loadedSiteParts.notFound404.isEnabled ?? true)) {
+                    } else if (initialSlug && loadedSiteParts?.notFound404?.elements?.length && isSitePartEnabled(loadedSiteParts.notFound404)) {
                         // F-239: 404 Template Fallback for unmatched route
                         setActivePageId("404-template");
                         setElements(loadedSiteParts.notFound404.elements);
@@ -1487,7 +1488,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             )}
 
             {/* Configured Global Header */}
-            {sitePartsState?.header?.elements && sitePartsState.header.elements.length > 0 && (sitePartsState.header.isEnabled ?? true) && (
+            {sitePartsState?.header?.elements && sitePartsState.header.elements.length > 0 && isSitePartEnabled(sitePartsState.header) && (
                 <header className="site-global-header w-full">
                     {sitePartsState.header.elements.map((el: EditorElement, index: number) => (
                         <RenderNode
@@ -1844,7 +1845,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             />
 
             {/* Configured Global Footer */}
-            {sitePartsState?.footer?.elements && sitePartsState.footer.elements.length > 0 && (sitePartsState.footer.isEnabled ?? true) && (
+            {sitePartsState?.footer?.elements && sitePartsState.footer.elements.length > 0 && isSitePartEnabled(sitePartsState.footer) && (
                 <footer className="site-global-footer w-full">
                     {sitePartsState.footer.elements.map((el: EditorElement, index: number) => (
                         <RenderNode

@@ -2,13 +2,33 @@
  * ForgeStudio Module 24: Model Context Protocol (MCP) Client
  * Connects to external MCP servers via JSON-RPC 2.0 / Streamable HTTP,
  * discovers tools/prompts/resources, and invokes remote tools with audit tracking.
+ *
+ * All outbound calls go through the shared safe-egress helper: public HTTPS on port 443 only,
+ * validated and pinned DNS answers, no redirects, and bounded time and response size.
  */
 
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
+import { parseJsonEgress, safeEgressRequest } from "../../../platform/integrations/safe-egress.js";
 import { McpInvocationResult, McpToolSchema } from "./mcpTypes.js";
 
 const db = prisma as any;
+
+const MCP_TIMEOUT_MS = 15000;
+const MCP_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/** POST a JSON-RPC request to an MCP endpoint under the egress policy. */
+function postJsonRpc(endpoint: string, payload: Record<string, unknown>) {
+  return safeEgressRequest({
+    url: endpoint,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    timeoutMs: MCP_TIMEOUT_MS,
+    maxResponseBytes: MCP_MAX_RESPONSE_BYTES,
+    allowedPorts: [443],
+  });
+}
 
 export class McpClientService {
   /**
@@ -20,19 +40,15 @@ export class McpClientService {
 
     if (server.endpoint.startsWith("http")) {
       try {
-        const res = await fetch(server.endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "tools/list",
-            params: {},
-          }),
+        const res = await postJsonRpc(server.endpoint, {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
         });
 
-        if (res.ok) {
-          const json = await res.json();
+        if (res.status >= 200 && res.status < 300) {
+          const json = parseJsonEgress<any>(res);
           const tools = json.result?.tools || [];
           await db.forgeMcpServer.update({
             where: { id: serverId },
@@ -58,7 +74,11 @@ export class McpClientService {
     ctx: { projectId: string; userId?: string; traceId?: string }
   ): Promise<McpInvocationResult> {
     const server = await db.forgeMcpServer.findUnique({ where: { id: serverId } });
-    if (!server) throw new AppError("MCP Server not found", 404, "MCP_SERVER_NOT_FOUND");
+    // A server registered on another project (or on none), or a disabled one, is indistinguishable
+    // from a missing one; the check runs before any network activity.
+    if (!server || server.projectId !== ctx.projectId || server.isEnabled === false) {
+      throw new AppError("MCP Server not found", 404, "MCP_SERVER_NOT_FOUND");
+    }
 
     if (server.trustLevel === "UNTRUSTED") {
       // Untrusted servers require verified permission
@@ -77,27 +97,25 @@ export class McpClientService {
 
     if (server.endpoint.startsWith("http")) {
       try {
-        const res = await fetch(server.endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: Date.now(),
-            method: "tools/call",
-            params: { name: toolName, arguments: argumentsPayload },
-          }),
+        const res = await postJsonRpc(server.endpoint, {
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "tools/call",
+          params: { name: toolName, arguments: argumentsPayload },
         });
 
-        if (res.ok) {
-          const json = await res.json();
+        if (res.status >= 200 && res.status < 300) {
+          const json = parseJsonEgress<any>(res);
           if (json.result) {
             result = json.result;
           }
         }
       } catch (err: any) {
+        // Egress policy errors carry safe, fixed messages; anything else may expose internal hosts.
+        const message = err instanceof AppError ? err.message : "The MCP endpoint request failed";
         result = {
           isError: true,
-          content: [{ type: "text", text: `Error calling MCP endpoint: ${err.message}` }],
+          content: [{ type: "text", text: `Error calling MCP endpoint: ${message}` }],
         };
       }
     }

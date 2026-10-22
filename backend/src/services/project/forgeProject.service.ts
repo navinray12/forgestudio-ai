@@ -272,7 +272,11 @@ export async function getForgeProjectById(
   // Tenant / permission verification:
   // Allowed if owner, workspace member, or admin
   const isPrivileged = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role || "");
-  if (!isPrivileged && user.id && project.ownerId !== user.id) {
+  // Fail closed: a non-privileged user without a usable id must never skip the ownership check.
+  if (!isPrivileged && (typeof user.id !== "string" || user.id === "")) {
+    throw new AppError("You do not have permission to view this project", 403, "FORBIDDEN");
+  }
+  if (!isPrivileged && project.ownerId !== user.id) {
     if (project.workspaceId) {
       const isMember = await db.workspaceMember?.findUnique?.({
         where: {
