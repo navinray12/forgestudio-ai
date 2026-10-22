@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { EditorElement } from "../types";
 
 /**
@@ -64,6 +64,12 @@ export function useEditorShortcuts({
   handleDuplicateElement,
   handleReorderElement,
 }: EditorShortcutsInput) {
+  // Ctrl/Cmd+S calls the latest render's handleSave. The listener below is only re-registered when its
+  // dependency list changes, and page settings (among other save inputs) are not in it, so calling the
+  // captured handleSave saved stale page settings (Phase 7C, known issue #1).
+  const latestHandleSave = useRef(handleSave);
+  latestHandleSave.current = handleSave;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -97,7 +103,7 @@ export function useEditorShortcuts({
         setIsShortcutsHelpOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        handleSave();
+        latestHandleSave.current();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setIsPreview((prev) => !prev);

@@ -51,7 +51,12 @@ export const TemplateWidgetRenderer = ({
             {onUnpackTemplate && (
               <button
                 type="button"
-                onClick={() => onUnpackTemplate(el.id)}
+                onClick={(e) => {
+                  // The template element is replaced by the unpack: a click reaching its own onClick
+                  // would re-select its old id over the new root the handler selects (Phase 7C).
+                  e.stopPropagation();
+                  onUnpackTemplate(el.id);
+                }}
                 className="text-[10px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-md transition shadow-2xs"
                 title="Expand this template into editable elements"
               >

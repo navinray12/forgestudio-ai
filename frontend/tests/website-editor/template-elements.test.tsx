@@ -4,9 +4,9 @@
  * Template elements on the canvas (handleSelectTemplate, handleUnpackTemplate), driven through the real
  * Template widget and characterised before the template tree transformations moved to
  * core/templateElements: choosing a preset records it on the element; unpacking replaces the template
- * element in place (same position, siblings untouched) with the preset's elements under fresh ids. The
- * handler selects the new root, but the button click then reaches the removed template element (current
- * behaviour), so no element is selected afterwards.
+ * element in place (same position, siblings untouched) with the preset's elements under fresh ids, and
+ * the new root is selected (Phase 7C fix: before it, the button click reached the removed template
+ * element and left nothing selected).
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { flush, heading, mountEditor, siteFixture } from "./editor-harness";
@@ -39,7 +39,7 @@ describe("template elements", () => {
     expect(els[1].templateId).toBeUndefined(); // templateId: undefined (dropped from the JSON payload)
   });
 
-  it("unpacking replaces the template element in place with fresh ids (selection: see note)", async () => {
+  it("unpacking replaces the template element in place with fresh ids and selects the new root", async () => {
     const editor = await mountEditor(site());
     fireEvent.click(screen.getAllByText("Hero Section")[0].closest("button")!);
     await flush(3);
@@ -55,9 +55,10 @@ describe("template elements", () => {
     expect(new Set(ids).size).toBe(ids.length); // all fresh and distinct
     expect(ids).not.toContain("tpl1");
     expect(editor.canvasIds()).not.toContain("tpl1");
-    // CURRENT BEHAVIOUR: the handler selects the new root, but the button click also reaches the template
-    // element (removed by the unpack), which selects its old id: no existing element ends up selected.
-    expect(screen.queryAllByPlaceholderText("Home").length).toBeGreaterThan(0); // the no-selection inspector
+    // Phase 7C: the unpack button no longer lets its click reach the removed template element, so the new
+    // root the handler selects stays selected (was: nothing selected). See template-unpack-selection.test.tsx.
+    expect(editor.canvasEl(root.id)!.className).toContain("border-2 border-blue-500");
+    expect(screen.queryAllByPlaceholderText("Home")).toHaveLength(0); // not the no-selection inspector
     const { PRESET_SECTION_TEMPLATES } = await import("../../src/pages/editor/defaults");
     let n = 0; const fresh = PRESET_SECTION_TEMPLATES.hero.getElements(() => `g${n++}`);
     expect(shape(root)).toEqual(shape(fresh)); // the preset's element structure

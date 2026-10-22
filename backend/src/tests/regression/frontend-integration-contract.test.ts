@@ -130,6 +130,22 @@ describe("image upload route used by the shared image picker", () => {
   });
 });
 
+describe("design-notes routes used by DesignNotesOverlay (Phase 7C)", () => {
+  for (const [method, path] of [
+    ["GET", "/api/design-notes?websiteId=site-1"],
+    ["POST", "/api/design-notes"],
+    ["POST", "/api/design-notes/n1/resolve"],
+    ["POST", "/api/design-notes/n1/reopen"],
+    ["DELETE", "/api/design-notes/n1"],
+  ] as const) {
+    it(`${method} ${path} without credentials -> 401`, async () => {
+      const r = await send(method, path, method === "POST" ? { json: {} } : {});
+      expect(r.status).toBe(401);
+      expect(expressDefault404(r)).toBe(false);
+    });
+  }
+});
+
 describe("old frontend paths stay unmapped (no alias was added)", () => {
   for (const [method, path] of [
     ["POST", "/api/integrations/paypal/create-order"],
