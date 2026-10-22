@@ -28,6 +28,8 @@ export const PayPalButtonWidgetRenderer = ({
   const bgColor = el.paypalBgColor || "#FFC439";
   const textColor = el.paypalTextColor || "#003087";
   const hoverBgColor = el.paypalHoverBgColor || "#f2b522";
+  // Same API base as FormWidgetRenderer: the backend serves these routes only at /api/v1/integrations.
+  const apiUrl = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) || "http://localhost:5000";
 
   const [isHovered, setIsHovered] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "processing" | "success" | "cancelled" | "error">("idle");
@@ -62,7 +64,7 @@ export const PayPalButtonWidgetRenderer = ({
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/integrations/paypal/create-order", {
+      const res = await fetch(`${apiUrl}/api/v1/integrations/paypal/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -90,7 +92,7 @@ export const PayPalButtonWidgetRenderer = ({
       }
 
       // Execute capture API
-      const captureRes = await fetch("/api/integrations/paypal/capture-order", {
+      const captureRes = await fetch(`${apiUrl}/api/v1/integrations/paypal/capture-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: orderData.orderId }),

@@ -3,7 +3,7 @@
   "line": 161,
   "handler": "handleTestIntegration",
   "method": "POST",
-  "url": "`${apiUrl}/api/integrations/${type}/test`",
+  "url": "`${apiUrl}/api/v1/integrations/${type}/test`",
   "shape": {
    "success": {},
    "message": {}

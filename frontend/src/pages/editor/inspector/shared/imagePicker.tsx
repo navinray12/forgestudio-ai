@@ -2,6 +2,9 @@
  * imagePicker. Moved verbatim from DynamicWidgetInspectors.tsx, which re-exports it for compatibility.
  */
 import React from "react";
+import { assetFileError, IMAGE_UPLOAD_RULE, uploadOrReadAsDataUrl } from "../../core/assetUpload";
+
+const getPickerApiUrl = () => (import.meta as any).env?.VITE_API_URL || "http://localhost:5000";
 
 // Programmatically opens the OS File Picker dialog (100% reliable click trigger)
 export const triggerImagePicker = (callback: (url: string) => void) => {
@@ -13,24 +16,18 @@ export const triggerImagePicker = (callback: (url: string) => void) => {
     const file = target.files?.[0];
     if (!file) return;
 
-    // 1. Attempt server upload first for backend persistence
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) {
-        const data = await res.json();
-        const serverUrl = data.url || data?.data?.url;
-        if (serverUrl) {
-          callback(serverUrl);
-          return;
-        }
+    // 1. Images the backend accepts (JPG, PNG, WEBP, GIF, SVG up to 5 MB) go through the editor's asset
+    //    upload: authenticated POST to /api/v1/uploads/image, falling back to a data URL on any failure.
+    if (assetFileError(file, IMAGE_UPLOAD_RULE) === null) {
+      try {
+        callback(await uploadOrReadAsDataUrl(getPickerApiUrl(), file, IMAGE_UPLOAD_RULE));
+      } catch {
+        // The file could not be read
       }
-    } catch {
-      // Backend upload endpoint unavailable or offline mode
+      return;
     }
 
-    // 2. Fallback to instant local Data URL
+    // 2. Other files (video, audio, JSON) have no upload route: use an instant local Data URL
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (ev.target?.result) {

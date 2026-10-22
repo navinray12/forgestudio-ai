@@ -495,13 +495,13 @@
         [
           [
             "fetch",
-            "/api/integrations/paypal/create-order",
+            "http://localhost:5000/api/v1/integrations/paypal/create-order",
             "POST",
             "{\"amount\":\"19.99\",\"currency\":\"USD\",\"itemName\":\"Digital Product\",\"itemDescription\":\"\",\"quantity\":1,\"env\":\"sandbox\"}"
           ],
           [
             "fetch",
-            "/api/integrations/paypal/capture-order",
+            "http://localhost:5000/api/v1/integrations/paypal/capture-order",
             "POST",
             "{\"orderId\":\"orderprobe1\"}"
           ]

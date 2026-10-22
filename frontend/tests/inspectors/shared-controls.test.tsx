@@ -93,9 +93,12 @@ describe("ImagePickerControl", () => {
     await act(async () => { await (input.onchange as any)({ target: input }); });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/upload");
+    // Phase 7B: the picker used POST /api/upload (field "file"), which no backend route serves; it now
+    // uses the editor's authenticated image upload route and field.
+    expect(url).toBe("http://localhost:5000/api/v1/uploads/image");
     expect(init.method).toBe("POST");
-    expect((init.body as FormData).get("file")).toBe(file);
+    expect(init.credentials).toBe("include");
+    expect((init.body as FormData).get("image")).toBe(file);
     expect(onChange.mock.calls).toEqual([["https://cdn.example.com/up.png"]]);
   });
 

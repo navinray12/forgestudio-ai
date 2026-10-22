@@ -137,7 +137,7 @@ export const ManagedSiteModal: React.FC<ManagedSiteModalProps> = ({
         body = { zapierUrl: integrationsForm.zapierWebhookUrl };
       }
 
-      const res = await fetch(`${apiUrl}/api/integrations/${type}/test`, {
+      const res = await fetch(`${apiUrl}/api/v1/integrations/${type}/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
