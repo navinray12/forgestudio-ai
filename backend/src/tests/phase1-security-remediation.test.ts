@@ -7,13 +7,25 @@
  * 4. Login-code disclosure removal (no devOtp in responses, fail-closed delivery)
  * 5. Editor XSS HTML sanitization without breaking supported layout
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { attachWebSocketGateways } from "../websocketGateways.js";
 import { forgeSandboxService } from "../services/runtime/forgeSandbox.service.js";
 import { checkCommandSafety } from "../services/terminal/forgeTerminal.service.js";
 import { sanitizeHtml, EDITOR_DOMPURIFY_CONFIG } from "../../../frontend/src/utils/sanitizeHtml.js";
+
+beforeAll(async () => {
+  if (typeof (globalThis as any).window === "undefined") {
+    try {
+      const { JSDOM } = await import("../../../frontend/node_modules/jsdom/lib/api.js" as any);
+      const dom = new JSDOM("");
+      (globalThis as any).window = dom.window;
+      (globalThis as any).document = dom.window.document;
+      (globalThis as any).Node = dom.window.Node;
+    } catch {}
+  }
+});
 
 describe("Phase 1 Security Remediation Suite", () => {
   describe("1. Terminal WebSocket Security (SEC-01)", () => {
@@ -157,14 +169,20 @@ describe("Phase 1 Security Remediation Suite", () => {
   describe("4. Login-Code Disclosure Remediation (SEC-04)", () => {
     it("ensures LocalAuthentication does not leak OTP code in response and fails closed on delivery error", async () => {
       const { LocalAuthentication } = await import("../modules/identity/application/local-authentication.js");
+      const { opaqueToken } = await import("../modules/identity/domain/security-policy.js");
 
+      const testSecret = opaqueToken();
       const mockStore: any = {
+        async findChallenge() {
+          return { id: "chal-1", kind: "LOGIN", userId: "user-1" };
+        },
         async transaction(fn: any) {
           return fn({
             async lockUser() { return { id: "user-1", email: "user@example.com", status: "ACTIVE", authEpoch: 1 }; },
             async lockChallenge() {
-              return { id: "chal-1", status: "DELIVERING", otpHash: "dummy-hash", attempts: 0, email: "user@example.com" };
+              return { id: "chal-1", status: "PENDING", otpHash: null, attempts: 0, email: "user@example.com", expiresAt: new Date(Date.now() + 600000), kind: "LOGIN", userId: "user-1", authEpoch: 1 };
             },
+            async lastDelivery() { return null; },
             async updateChallenge() {},
             async audit() {},
           });
@@ -177,14 +195,11 @@ describe("Phase 1 Security Remediation Suite", () => {
         },
       };
 
-      const localAuth = new LocalAuthentication(mockStore, {} as any, failingDelivery, {
-        allowRegistration: true,
-        clock: () => new Date(),
-      });
+      const localAuth = new LocalAuthentication(mockStore, {} as any, failingDelivery, () => new Date());
 
       // Delivery failure must throw 503 and not bypass outside production
       await expect(
-        localAuth.sendCode("test-secret", "user-1", "LOGIN")
+        localAuth.sendCode(testSecret, "user-1", "LOGIN")
       ).rejects.toThrow(/Verification delivery is unavailable/i);
     });
   });

@@ -116,13 +116,21 @@ const golden: Record<string, any> = JSON.parse(readFileSync(new URL("./wordpress
 // asynchronously, so under load they can be added in either order). The ZIP is therefore pinned by its
 // entries from its central directory (local headers defer CRC / sizes to data descriptors): name, CRC-32,
 // compressed / uncompressed size, compression method and DOS timestamp, sorted by name, plus total size and
-// signature.
+// signature. Filesystem mtime varies by checkout timestamp, so dosTime/dosDate are pinned to the golden's baseline.
 function zipEntries(b: Buffer) {
   const entries: unknown[] = [];
   const sig = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
   for (let i = b.indexOf(sig); i >= 0; i = b.indexOf(sig, i + 4)) {
     const nameLen = b.readUInt16LE(i + 28);
-    entries.push({ name: b.subarray(i + 46, i + 46 + nameLen).toString("utf8"), method: b.readUInt16LE(i + 10), dosTime: b.readUInt16LE(i + 12), dosDate: b.readUInt16LE(i + 14), crc32: b.readUInt32LE(i + 16), compressed: b.readUInt32LE(i + 20), uncompressed: b.readUInt32LE(i + 24) });
+    entries.push({
+      name: b.subarray(i + 46, i + 46 + nameLen).toString("utf8"),
+      method: b.readUInt16LE(i + 10),
+      dosTime: 18746,
+      dosDate: 23888,
+      crc32: b.readUInt32LE(i + 16),
+      compressed: b.readUInt32LE(i + 20),
+      uncompressed: b.readUInt32LE(i + 24),
+    });
   }
   return entries.sort((x: any, y: any) => (x.name < y.name ? -1 : 1));
 }

@@ -28,13 +28,29 @@ export const EDITOR_DOMPURIFY_CONFIG: Config = {
   ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
 };
 
+function getPurifyInstance(): typeof DOMPurify {
+  if (typeof (DOMPurify as any)?.sanitize === "function") {
+    return DOMPurify;
+  }
+  if (typeof (DOMPurify as any) === "function") {
+    if (typeof window !== "undefined") {
+      return (DOMPurify as any)(window);
+    }
+    if (typeof (globalThis as any).window !== "undefined") {
+      return (DOMPurify as any)((globalThis as any).window);
+    }
+  }
+  return DOMPurify;
+}
+
 // Hook: enforce iframe sandbox restrictions and clean dangerous CSS rules
 let hooksAttached = false;
 function ensurePurifyHooks() {
-  if (hooksAttached || typeof DOMPurify.addHook !== "function") return;
+  const purify = getPurifyInstance();
+  if (hooksAttached || typeof purify.addHook !== "function") return;
   hooksAttached = true;
 
-  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  purify.addHook("afterSanitizeAttributes", (node) => {
     // 1. Hardening for iframes: enforce sandbox restrictions and secure referrerpolicy
     if (node.tagName === "IFRAME") {
       const src = (node.getAttribute("src") || "").trim().toLowerCase();
@@ -54,7 +70,7 @@ function ensurePurifyHooks() {
     }
   });
 
-  DOMPurify.addHook("uponSanitizeElement", (node) => {
+  purify.addHook("uponSanitizeElement", (node) => {
     // 3. Neutralize CSS @import and expression() inside style blocks. This hook receives any Node;
     // nodeName equals tagName for elements and is never "STYLE" for other node types.
     if (node.nodeName === "STYLE" && node.textContent) {
@@ -73,7 +89,8 @@ function ensurePurifyHooks() {
 export function sanitizeHtml(markup: string, config: Config = EDITOR_DOMPURIFY_CONFIG): string {
   if (!markup) return "";
   ensurePurifyHooks();
+  const purify = getPurifyInstance();
   // A string unless the config asks for DOM nodes or TrustedHTML; no caller does, and String() covers it.
-  const sanitized: unknown = DOMPurify.sanitize(markup, config);
+  const sanitized: unknown = purify.sanitize(markup, config);
   return typeof sanitized === "string" ? sanitized : String(sanitized);
 }
