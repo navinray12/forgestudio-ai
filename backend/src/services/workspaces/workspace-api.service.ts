@@ -82,7 +82,10 @@ export async function readTenantWorkspace(actorId: string, workspaceId: string) 
     const { workspace, membership, organization } = await requireWorkspace(tx, workspaceId, actorId);
     const members = await tx.workspaceMember.findMany({
       where: { workspaceId }, take: 200, orderBy: { createdAt: "asc" },
-      select: { id: true, userId: true, role: true, user: { select: { fullName: true } } },
+      select: { id: true, userId: true, role: true, createdAt: true, user: { select: {
+        fullName: true, email: true, status: true, emailVerified: true,
+        organizationMemberships: { where: { organizationId: organization.id }, select: { role: true } },
+      } } },
     });
     const websites = await tx.website.findMany({
       where: { workspaceId, organizationId: organization.id,
@@ -90,7 +93,14 @@ export async function readTenantWorkspace(actorId: string, workspaceId: string) 
       }, select: safeWebsiteFields, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 101,
     });
     return { id: workspace.id, name: workspace.name, slug: workspace.slug, organizationId: organization.id,
-      organizationName: organization.name, userRole: membership.role, members,
+      organizationName: organization.name, userRole: membership.role, members: members.map(member => {
+        const { organizationMemberships, ...user } = member.user;
+        const validOrganization = organizationMemberships.some(row => ["OWNER", "ADMIN", "MEMBER"].includes(row.role) &&
+          (row.role !== "OWNER" || organization.ownerId === member.userId));
+        const validWorkspace = ["OWNER", "ADMIN", "MEMBER"].includes(member.role) &&
+          (member.role !== "OWNER" || workspace.ownerId === member.userId);
+        return { ...member, user, membershipStatus: user.status !== "ACTIVE" ? user.status : validOrganization && validWorkspace ? "ACTIVE" : "INACTIVE" };
+      }),
       lifecycleStatus: workspace.lifecycleStatus, version: workspace.version, archivedAt: workspace.archivedAt, settings: publicWorkspaceSettings(workspace.settings),
       websites: websites.slice(0,100), hasMoreWebsites: websites.length > 100,
     };
