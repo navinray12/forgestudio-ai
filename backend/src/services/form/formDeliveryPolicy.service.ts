@@ -60,7 +60,7 @@ export function validateDeliveryActions(raw: unknown): FormActions {
 }
 
 async function requireFormAdministrator(websiteId: string, actorId: string): Promise<void> {
-  if (!FORM_ID.test(actorId) && actorId.length === 0) {
+  if (typeof actorId !== "string" || !actorId) {
     throw new AppError("Authentication required", 401, "UNAUTHORIZED");
   }
   const access = await verifyProjectAccess(websiteId, actorId);
