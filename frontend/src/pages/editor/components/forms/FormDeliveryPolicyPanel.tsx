@@ -92,6 +92,21 @@ export function FormDeliveryPolicyPanel({
 
   const save = async () => {
     if (!websiteId || saving || loading) return;
+    // A persisted policy intentionally never returns existing destinations or
+    // secrets. Reject partial replacements locally to avoid silently removing
+    // a working integration when a user changes only one field.
+    const missing = [
+      actions.includes("email") && !draft.email.trim() ? "notification email" : "",
+      actions.includes("webhook") && !draft.webhookUrl.trim() ? "webhook HTTPS URL" : "",
+      actions.includes("google_sheets") && !draft.sheetsUrl.trim() ? "Google Sheets HTTPS URL" : "",
+      actions.includes("mailchimp") && !draft.mailchimpKey.trim() ? "Mailchimp API key" : "",
+      actions.includes("mailchimp") && !draft.mailchimpList.trim() ? "Mailchimp audience ID" : "",
+      actions.includes("zapier") && !draft.zapierUrl.trim() ? "Zapier HTTPS URL" : "",
+    ].filter(Boolean);
+    if (missing.length) {
+      setError("Enter all selected destinations and credentials before replacing this policy: " + missing.join(", "));
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
