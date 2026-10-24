@@ -1,211 +1,168 @@
-import type { GlobalWidget, CreateGlobalWidgetPayload, UpdateGlobalWidgetPayload } from "../types/globalWidget.types";
+import type {
+  GlobalWidget,
+  CreateGlobalWidgetPayload,
+  UpdateGlobalWidgetPayload,
+} from "../types/globalWidget.types";
 
-const LOCAL_STORAGE_KEY = "forgestudio_global_widgets";
+type JsonObject = Record<string, unknown>;
 
-function getLocalGlobalWidgets(): GlobalWidget[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is GlobalWidget =>
-      typeof item === "object" && item !== null &&
-      "id" in item && typeof item.id === "string" &&
-      "name" in item && typeof item.name === "string" &&
-      "elements" in item && Array.isArray(item.elements)
-    );
-  } catch {
-    return [];
-  }
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function saveLocalGlobalWidgets(widgets: GlobalWidget[]): void {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(widgets));
-  } catch {
-    // Ignore quota errors
+function stringField(value: JsonObject, field: string): string {
+  const item = value[field];
+  if (typeof item !== "string" || item.length === 0) {
+    throw new Error(`Invalid Global Widget response: missing ${field}.`);
   }
+  return item;
 }
 
 /**
- * Creates a new Global Widget
+ * Templates are the existing server-side source of truth for Global Widgets.
+ * Never synthesize widget IDs or claim a mutation succeeded when the request
+ * failed: an offline localStorage fallback could leak data between accounts.
  */
+function fromTemplate(value: unknown): GlobalWidget {
+  if (!isObject(value) || !isObject(value.templateData)) {
+    throw new Error("Invalid Global Widget response from server.");
+  }
+  const elements = value.templateData.elements;
+  if (!Array.isArray(elements)) {
+    throw new Error("Invalid Global Widget elements from server.");
+  }
+  return {
+    id: stringField(value, "id"),
+    userId: stringField(value, "userId"),
+    name: stringField(value, "name"),
+    description: typeof value.description === "string" ? value.description : "",
+    category: "Global Widget",
+    elements,
+    isGlobalWidget: true,
+    createdAt: stringField(value, "createdAt"),
+    updatedAt: stringField(value, "updatedAt"),
+  };
+}
+
+function errorMessage(body: unknown, fallback: string): string {
+  if (isObject(body)) {
+    if (isObject(body.error) && typeof body.error.message === "string") {
+      return body.error.message;
+    }
+    if (typeof body.message === "string") return body.message;
+  }
+  return fallback;
+}
+
+async function templateRequest(
+  apiUrl: string,
+  path: string,
+  init: RequestInit,
+): Promise<JsonObject> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/templates${path}`, {
+      credentials: "include",
+      ...init,
+    });
+  } catch {
+    throw new Error("Unable to connect to the server. No Global Widget changes were saved.");
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    if (!response.ok) {
+      throw new Error(`Global Widget request failed (HTTP ${response.status}).`);
+    }
+    throw new Error("Invalid Global Widget response from server.");
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("Your session has expired. Sign in again.");
+    if (response.status === 403) throw new Error("You do not have permission to modify this Global Widget.");
+    throw new Error(errorMessage(body, `Global Widget request failed (HTTP ${response.status}).`));
+  }
+  if (!isObject(body) || body.success === false) {
+    throw new Error(errorMessage(body, "Invalid Global Widget response from server."));
+  }
+  return body;
+}
+
+const jsonHeaders = { "Content-Type": "application/json" };
+
+/** Creates a durable server-owned Global Widget. */
 export async function saveGlobalWidget(
   apiUrl: string,
-  payload: CreateGlobalWidgetPayload
+  payload: CreateGlobalWidgetPayload,
 ): Promise<GlobalWidget> {
-  const trimmedName = payload.name?.trim();
-  if (!trimmedName) {
-    throw new Error("Global Widget name is required.");
+  const name = payload.name?.trim();
+  if (!name) throw new Error("Global Widget name is required.");
+  if (!Array.isArray(payload.elements) || payload.elements.length === 0) {
+    throw new Error("Select at least one element to save as a Global Widget.");
   }
 
-  const clonedElements = JSON.parse(JSON.stringify(payload.elements || []));
-  const newWidget: GlobalWidget = {
-    id: `gw-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    userId: "user-current",
-    name: trimmedName,
-    description: payload.description?.trim() || "",
-    category: payload.category || "Global Widget",
-    elements: clonedElements,
-    isGlobalWidget: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  try {
-    // Try backend persistence if API route exists
-    const res = await fetch(`${apiUrl}/api/templates`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        name: trimmedName,
-        description: payload.description || "",
-        type: "GLOBAL_WIDGET",
-        category: "Global Widget",
-        templateData: { elements: clonedElements, pageSettings: {} },
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.template) {
-        newWidget.id = data.template.id;
-      }
-    }
-  } catch {
-    // Fallback to local storage
-  }
-
-  const local = getLocalGlobalWidgets();
-  saveLocalGlobalWidgets([newWidget, ...local.filter((w) => w.id !== newWidget.id)]);
-
-  return newWidget;
+  const body = await templateRequest(apiUrl, "", {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify({
+      name,
+      description: payload.description?.trim() || "",
+      type: "GLOBAL_WIDGET",
+      category: "Global Widget",
+      templateData: { elements: payload.elements, pageSettings: {} },
+    }),
+  });
+  return fromTemplate(body.template);
 }
 
-/**
- * Retrieves all user Global Widgets
- */
+/** Lists only the authenticated user's server-persisted Global Widgets. */
 export async function getGlobalWidgets(apiUrl: string): Promise<GlobalWidget[]> {
-  let remoteWidgets: GlobalWidget[] = [];
-
-  try {
-    const res = await fetch(`${apiUrl}/api/templates`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-
-    if (res.ok) {
-      const data: unknown = await res.json();
-      const rawTemplates: unknown = Array.isArray(data)
-        ? data
-        : typeof data === "object" && data !== null && "templates" in data
-          ? data.templates
-          : [];
-      if (Array.isArray(rawTemplates)) {
-        const isTemplate = (value: unknown): value is Record<string, unknown> =>
-          typeof value === "object" && value !== null &&
-          "id" in value && typeof value.id === "string" &&
-          "name" in value && typeof value.name === "string";
-
-        remoteWidgets = rawTemplates
-          .filter(isTemplate)
-          .filter((template) => template.type === "GLOBAL_WIDGET" || template.category === "Global Widget")
-          .map((template): GlobalWidget => {
-            const templateData = template.templateData;
-            const elements = typeof templateData === "object" && templateData !== null &&
-              "elements" in templateData && Array.isArray(templateData.elements)
-              ? templateData.elements
-              : [];
-            return {
-              id: template.id as string,
-              userId: typeof template.userId === "string" ? template.userId : "user-current",
-              name: template.name as string,
-              description: typeof template.description === "string" ? template.description : "",
-              category: typeof template.category === "string" ? template.category : "Global Widget",
-              elements,
-              isGlobalWidget: true,
-              createdAt: typeof template.createdAt === "string" ? template.createdAt : new Date().toISOString(),
-              updatedAt: typeof template.updatedAt === "string" ? template.updatedAt : new Date().toISOString(),
-            };
-          });
-      }
-    }
-  } catch {
-    // Fallback to local
+  const body = await templateRequest(apiUrl, "", { method: "GET" });
+  if (!Array.isArray(body.templates)) {
+    throw new Error("Invalid Global Widget list from server.");
   }
-
-  const localWidgets = getLocalGlobalWidgets();
-  const mergedMap = new Map<string, GlobalWidget>();
-
-  localWidgets.forEach((w) => mergedMap.set(w.id, w));
-  remoteWidgets.forEach((w) => mergedMap.set(w.id, w));
-
-  return Array.from(mergedMap.values());
+  return body.templates
+    .filter((template): template is JsonObject =>
+      isObject(template) && (
+        template.type === "GLOBAL_WIDGET" ||
+        template.category === "Global Widget"
+      ),
+    )
+    .map(fromTemplate);
 }
 
-/**
- * Updates an existing Global Widget
- */
+/** Updates a widget only after the server confirms ownership and persistence. */
 export async function updateGlobalWidgetService(
   apiUrl: string,
   id: string,
-  payload: UpdateGlobalWidgetPayload
+  payload: UpdateGlobalWidgetPayload,
 ): Promise<GlobalWidget> {
-  const localWidgets = getLocalGlobalWidgets();
-  const target = localWidgets.find((w) => w.id === id);
-
-  const updated: GlobalWidget = {
-    id,
-    userId: target?.userId || "user-current",
-    name: payload.name?.trim() || target?.name || "Global Widget",
-    description: payload.description !== undefined ? payload.description : target?.description || "",
-    category: target?.category || "Global Widget",
-    elements: payload.elements ? JSON.parse(JSON.stringify(payload.elements)) : target?.elements || [],
-    isGlobalWidget: true,
-    createdAt: target?.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  try {
-    await fetch(`${apiUrl}/api/templates/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        name: updated.name,
-        description: updated.description,
-        type: "GLOBAL_WIDGET",
-        category: "Global Widget",
-        templateData: { elements: updated.elements, pageSettings: {} },
-      }),
-    });
-  } catch {
-    // Local fallback
+  if (!id) throw new Error("Global Widget ID is required.");
+  const name = payload.name === undefined ? undefined : payload.name.trim();
+  if (name === "") throw new Error("Global Widget name cannot be empty.");
+  if (payload.elements !== undefined &&
+      (!Array.isArray(payload.elements) || payload.elements.length === 0)) {
+    throw new Error("Global Widget must contain at least one element.");
   }
 
-  // Remote-only widgets also need a local copy for the offline fallback.
-  saveLocalGlobalWidgets([
-    updated,
-    ...localWidgets.filter((widget) => widget.id !== id),
-  ]);
-  return updated;
+  const patch: JsonObject = {};
+  if (name !== undefined) patch.name = name;
+  if (payload.description !== undefined) patch.description = payload.description.trim();
+  if (payload.elements !== undefined) {
+    patch.templateData = { elements: payload.elements, pageSettings: {} };
+  }
+  const body = await templateRequest(apiUrl, `/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: jsonHeaders,
+    body: JSON.stringify(patch),
+  });
+  return fromTemplate(body.template);
 }
 
-/**
- * Deletes a Global Widget
- */
+/** Deletes only after the server confirms that the authenticated user owns it. */
 export async function deleteGlobalWidgetService(apiUrl: string, id: string): Promise<void> {
-  try {
-    await fetch(`${apiUrl}/api/templates/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-  } catch {
-    // Local fallback
-  }
-
-  const local = getLocalGlobalWidgets();
-  saveLocalGlobalWidgets(local.filter((w) => w.id !== id));
+  if (!id) throw new Error("Global Widget ID is required.");
+  await templateRequest(apiUrl, `/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
