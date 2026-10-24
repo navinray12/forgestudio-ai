@@ -31,10 +31,14 @@ jobs:
           node-version: '22.16.0'
       - name: Produce source-and-test checksum manifest at exact commit
         run: node scripts/phase2-source-inventory.mjs phase2-audit-inventory.json
+      - name: Cross-check WP-03 to WP-10 feature source, tests, and unverified acceptance
+        run: node scripts/saas-feature-crosscheck.mjs saas-feature-crosscheck.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: phase2-source-inventory-${{ github.sha }}
-          path: phase2-audit-inventory.json
+          path: |
+            phase2-audit-inventory.json
+            saas-feature-crosscheck.json
           if-no-files-found: error
           retention-days: 30
 
