@@ -103,9 +103,23 @@ describe("WP-05 honest HTTPS certificate lifecycle", () => {
     expect(verified).toMatchObject({ success: true, method: "TXT" });
   });
 
+  it("never invents DNS ownership readiness in a developer environment", async () => {
+    process.env.NODE_ENV = "development";
+    vi.mocked(dns.resolveTxt).mockRejectedValue(new Error("No TXT record"));
+    vi.mocked(dns.resolveCname).mockResolvedValue(["cname.forgestudio.app"]);
+    vi.mocked(dns.resolve4).mockResolvedValue(["76.76.21.21"]);
+    const checked = await runDnsPreflightCheck(domain.domain, "t".repeat(40));
+    expect(checked.passed).toBe(false);
+    expect(checked.aRecordValid).toBe(true);
+    expect(checked.cnameValid).toBe(true);
+    expect(checked.errors.join(" ")).toContain("TXT challenge");
+  });
+
   it("fails closed when no real ACME issuance/edge installer is configured", async () => {
-    process.env.NODE_ENV = "development"; // successful local-only DNS fixture
-    await expect(initiateSslProvisioning(domain, "website-1"))
+    process.env.NODE_ENV = "development";
+    const token = "t".repeat(40);
+    vi.mocked(dns.resolveTxt).mockResolvedValue([[token]]);
+    await expect(initiateSslProvisioning({ ...domain, verificationToken: token }, "website-1"))
       .rejects.toMatchObject({ statusCode: 503, code: "SSL_ISSUANCE_UNAVAILABLE" });
   });
 
