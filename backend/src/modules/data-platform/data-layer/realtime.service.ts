@@ -19,6 +19,10 @@ const channelSubscriptions = new Map<string, Set<WebSocket>>();
 // Set of all channels a specific WebSocket is subscribed to: WebSocket -> Set<channelKey>
 const socketChannels = new Map<WebSocket, Set<string>>();
 
+// Authenticated principal bound to the live socket. Membership is rechecked
+// before every outgoing tenant notification, so revocation fails closed.
+const socketPrincipals = new Map<WebSocket, string>();
+
 // Active persistent LISTEN clients: projectId -> pg.PoolClient
 const activeListeners = new Map<string, { client: pg.PoolClient; refCount: number }>();
 
@@ -63,9 +67,21 @@ async function ensureProjectListener(
             });
 
             for (const ws of subscribers) {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(outgoing);
+              if (ws.readyState !== WebSocket.OPEN) continue;
+              const principal = socketPrincipals.get(ws);
+              if (!principal) {
+                ws.close(1008, "Authentication required");
+                continue;
               }
+              // Permission may have been revoked after the subscription was
+              // opened. The DB lookup must succeed before every transmission.
+              void verifyProjectAccess(projectId, principal).then(() => {
+                if (ws.readyState === WebSocket.OPEN && socketChannels.get(ws)?.has(channelKey)) {
+                  ws.send(outgoing);
+                }
+              }).catch(() => {
+                if (ws.readyState === WebSocket.OPEN) ws.close(1008, "Access revoked");
+              });
             }
           }
         } catch (err) {
@@ -137,8 +153,6 @@ export async function enableTableRealtime(
         PERFORM pg_notify('forge_realtime', json_build_object(
           'table', TG_TABLE_NAME,
           'action', TG_OP,
-          'record', CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE row_to_json(NEW) END,
-          'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
           'commit_timestamp', clock_timestamp()
         )::text);
         RETURN NEW;
@@ -173,6 +187,7 @@ export function handleRealtimeWebSocketConnection(
   user?: { id?: string; role?: string }
 ): void {
   socketChannels.set(ws, new Set());
+  if (user?.id) socketPrincipals.set(ws, user.id);
 
   // Ping-pong liveness
   let isAlive = true;
@@ -209,6 +224,7 @@ export function handleRealtimeWebSocketConnection(
       }
       socketChannels.delete(socket);
     }
+    socketPrincipals.delete(socket);
   }
 
   ws.on("close", () => {
