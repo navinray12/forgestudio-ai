@@ -99,14 +99,23 @@ The blueprint's **12–18-week** figure assumes a coordinated ~6–8 engineer te
 
 **Dependency remediation evidence:** an isolated GitHub Actions run [#40074045740](https://github.com/navinray12/forgestudio-ai/actions/runs/40074045740) updated direct/transitive dependencies and their lockfiles. Both `npm audit --audit-level high` runs reported **0 vulnerabilities**; both production builds and 26 targeted tests passed before the dependency commit `84853153251bcd2ce12b43c5f465ceeff7409f58`. Existing identity CI must be rechecked on a normal authenticated commit because workflow runs on the bot push showed `action_required`, not test outcomes. The temporary write-enabled remediation workflow must be removed from the development branch after use.\n\n**Remaining release blockers:** real PostgreSQL clean migration and deployed-site validation remain unverified. Real PostgreSQL clean migration, full project ownership/tenancy matrix, J01–J08 browser journeys, production origin, domains/TLS, CMS/forms/assets, AI provider qualification and backup/restore have **not** passed release gates. There are **zero fully certified work packages** in this iteration.
 
-**Post-remediation cleanup:** the temporary write-enabled dependency remediation workflow has been deleted. The normal identity dependency gate has subsequently reported success on a human-authored branch commit. All future dependency changes must use ordinary reviewed manifests/lockfiles and CI, without auto-push workflows.\n\n## Current code ledger (GitHub)
+**Post-remediation cleanup:** the temporary write-enabled dependency remediation workflow has been deleted. The normal identity dependency gate has subsequently reported success on a human-authored branch commit. All future dependency changes must use ordinary reviewed manifests/lockfiles and CI, without auto-push workflows.\n\n## WP-00 and WP-01 security delivery evidence (24 October 2026)
+
+The active audit and per-file remediation log is [WP00_WP01_SECURITY_EVIDENCE.md](./WP00_WP01_SECURITY_EVIDENCE.md). This is the source of truth for the Wave 0 checkpoint alongside the user's approved Phase 2 blueprint.
+
+- **WP-00 — IN PROGRESS.** Dedicated CI now runs disposable PostgreSQL `prisma migrate deploy` and `prisma migrate status`, frontend/backend builds, targeted runtime/data-plane tests, and existing MCP/XSS suites. The fresh migration and core security CI passed on checked SHA; current feature inventory and real staging journey evidence remain open.
+- **WP-01 — IN PROGRESS.** Verified code remediations include false container-isolation claims, terminal session/project authorization, cross-project sandbox termination, realtime LISTEN subscription lifecycle, forged service API keys, unsigned JWTs, project-scoped data access, API scopes, FORCE RLS, and shared platform-admin tenant DB fallback (including historical READY records).
+- **Release security gate remains blocked** until real Postgres cross-tenant policy/role tests, isolated developer execution infrastructure or explicit product removal, and external API/browser/WS negative integration coverage are complete. Quarantined features are **unavailable**, not implemented.
+- Exact CI links, decisions and remaining attack surfaces: [security evidence](./WP00_WP01_SECURITY_EVIDENCE.md) and draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42).
+
+## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
 | --- | --- | --- | --- |
 | Align global widget update from PUT to backend PATCH | `frontend/src/features/global-widget/services/globalWidgetService.ts` | Route/controller contract inspected | Committed; integration tests pending |
 | Quarantine unauthenticated legacy deployment serving | `backend/src/routes/hosted.routes.ts` | Source inspected; no runtime test | Committed; **legacy endpoint intentionally 404** until owner-verified resolver implemented |
 
-A dedicated CI workflow at `.github/workflows/phase2-qualification.yml` now runs backend/frontend production builds and the legacy-hosting access regression on branch pushes and pull requests. Latest run was **queued** when inspected, so qualification is not yet complete.\n\nSee draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42). Do not merge while compiler/tests, hosted consumers and production configuration are unverified.
+A dedicated PR CI workflow at `.github/workflows/phase2-qualification.yml` now runs backend/frontend builds, real disposable PostgreSQL migrations, legacy hosting and data-plane security tests, global-widget regressions, and MCP/HTML security suites. Check the exact latest SHA before merging.\n\nSee draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42). Do not merge while compiler/tests, hosted consumers and production configuration are unverified.
 
 ### Next small reviewable tasks
 
