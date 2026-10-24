@@ -69,3 +69,32 @@
 ## Definition of done for these two scopes
 
 WP-00 is certifiable only after the final commit has a reproducible compile, migration, route inventory, security fixture/journey matrix, required checks and documented outstanding issues. WP-01 is certifiable only after every public runtime/data-plane security entry point passes anonymous, forged credential, foreign-tenant, production-mode, injected SQL/XSS, stale session and recovery tests **on both isolated unit and real disposable integration environments**, with blocked features explicitly treated as unavailable rather than as completed functionality.
+
+
+## Verified Wave-0 incremental gate — 24 October 2026
+
+**Development verification commit:** `b2d32fb2d4cef0f98469e434d925f693573a97f5`.
+**CI:** [GitHub Actions 40078109973](https://github.com/navinray12/forgestudio-ai/actions/runs/40078109973) — six of six jobs passed: backend/frontend production builds, 42 clean PostgreSQL migrations, live data-plane integration, 71 focused contract tests, 247 MCP/security/XSS tests and 13 global-widget regression tests. The database job reports 7 real HTTP/PostgreSQL integration tests passed. These results apply to that commit, not automatically to later documentation or code commits.
+
+### WP-00: verified fresh-install migration defects and remediations
+
+1. A 40-migration clean installation did not contain the Prisma Website field `websites.deletedAt`; normal website creation failed with `P2022`. Versioned migration `backend/prisma/migrations/20261024000000_websites_fresh_install_alignment/migration.sql` adds the missing Website fields with backwards-compatible defaults and indexes.
+2. `public.project_databases` and related data-platform catalog tables existed only in an automatic runtime `CREATE TABLE IF NOT EXISTS` path. On a clean migrated database, tenant provisioning failed with `P2021`. Versioned migration `20261024001000_data_platform_catalog_baseline/migration.sql` moves those existing DDL definitions into Prisma's migration ledger.
+3. `ensureDataPlatformTables` in `backend/src/modules/data-platform/common/pool-manager.ts` now **checks** for migrated tables and fails closed; it no longer mutates schema at runtime or suppresses DDL failure.
+4. Clean disposable PostgreSQL CI now applies **42 migrations** and checks status *then actually provisions tenant databases*, eliminating the false-positive "all migrations applied" signal.
+
+### WP-01: executed real database, role and HTTP contracts
+
+The guarded `backend/src/tests/wp01-real-data-plane.integration.test.ts` runs only with `FORGE_DISPOSABLE_TEST_DB=1`, `NODE_ENV=test`, localhost and the exact `forge_phase2_fresh` database. It creates two actual customers and dedicated PostgreSQL databases/roles, applies a FORCE RLS table policy, and tests both live HTTP endpoints and on-disk isolated state. The 7 passing scenarios cover separate-tenant reads, foreign/missing credentials, environment mismatch, read-only writes, verified session ownership, denied non-FORCE-RLS table access, identifier injection and revoked credentials. Dedicated role verification checks actual database name, owner, current user and absence of SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE privileges before the pool enters cache.
+
+Additional security changes: API keys are bound to the exact requested environment; realtime channels broadcast **table invalidation metadata only**, not unfiltered NEW/OLD row contents (clients must refetch via authorized data API); and local sandbox workspace materialization checks sibling-prefix traversal, symlink containment and file path validity rather than naive `startsWith`.
+
+### Explicit release blockers
+
+- **WP-00 not yet fully certified:** complete current-source route/feature mapping and repeatability evidence for all pre-existing entry points and customer journeys are still required. The old 263-feature audit is a historical backlog, not a fresh verified inventory.
+- **WP-01 not yet fully certified:** no independently attested container/VM executor for untrusted customer code; production command execution remains intentionally disabled. There is no completed adversarial review of every API, webhook, SQL/SQL-editor, WebSocket, media and third-party connector path against a running deployed stack.
+- The tests were executed on **ephemeral GitHub Actions PostgreSQL**, not production tenant data, live DNS, HTTPS certificates or an actual deployed public site. Deployment/hosting belongs to WP-05 and must not be described as done.
+- Real key rotation / IAM least-privilege, operational secrets management, network isolation, concurrency/load, account revocation and restore drills need deployment-specific evidence.
+- `sconfigtesting` has not been modified or merged. Draft PR #42 requires an independent review; no formal go-live authorization is implied.
+
+**Status after this checkpoint:** verified engineering improvements and passing CI, but **WP-00 = IN PROGRESS**, **WP-01 = IN PROGRESS**, overall **PRODUCTION GO/NO-GO = NO-GO**. Do not proceed to other scopes until these two are certified or their release exceptions formally accepted.
