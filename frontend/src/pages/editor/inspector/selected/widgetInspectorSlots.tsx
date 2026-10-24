@@ -5,6 +5,8 @@ import { AlertWidgetInspector, AnimatedTextWidgetInspector, AudioPlaylistInspect
 
 /** What renderWidgetInspectorSlots reads: the editor values and callbacks the inline JSX used. */
 export interface WidgetInspectorSlotsDeps {
+  websiteId?: string;
+  apiUrl?: string;
   activeDevice: DeviceMode;
   activePageId: string;
   breakpoints: any[];
@@ -27,6 +29,8 @@ export interface WidgetInspectorSlotsDeps {
  * element tree, element identity, focus and handlers are unchanged.
  */
 export function renderWidgetInspectorSlots({
+  websiteId,
+  apiUrl,
   activeDevice,
   activePageId,
   breakpoints,
@@ -90,6 +94,8 @@ export function renderWidgetInspectorSlots({
                       <FormWidgetInspector
                         el={selectedElementAny}
                         updateProp={updateSelectedProp}
+                        websiteId={websiteId}
+                        apiUrl={apiUrl}
                       />
                     )}
 
