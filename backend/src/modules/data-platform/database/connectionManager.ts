@@ -31,6 +31,17 @@ export class CustomerConnectionManager {
     schemaName: string,
     callback: (client: pg.PoolClient) => Promise<T>
   ): Promise<T> {
+    // The legacy schema manager uses the SaaS control-plane pgPool. Merely
+    // changing search_path does NOT restrict access to other schemas when the
+    // session is an administrator. This path cannot safely serve production
+    // customer queries until per-tenant low-privilege credentials are available.
+    if (process.env.NODE_ENV === "production") {
+      throw new AppError(
+        "Legacy shared-schema data access is unavailable without tenant-scoped database roles",
+        503,
+        "LEGACY_DATABASE_ISOLATION_REQUIRED"
+      );
+    }
     if (!schemaName) {
       throw new AppError("Schema name is required", 400, "INVALID_SCHEMA_NAME");
     }
@@ -39,7 +50,7 @@ export class CustomerConnectionManager {
     try {
       // Set the isolated search_path for this connection
       const quotedSchema = this.quoteIdent(schemaName);
-      await client.query(`SET search_path = ${quotedSchema}, public;`);
+      await client.query(`SET search_path = ${quotedSchema};`);
       await client.query(`SET statement_timeout = 30000;`); // 30s max query execution
 
       return await callback(client);
