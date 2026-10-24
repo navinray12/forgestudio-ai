@@ -23,6 +23,7 @@ export const GlobalWidgetLibrary: React.FC<GlobalWidgetLibraryProps> = ({
     previewWidget,
     setPreviewWidget,
     removeWidget,
+    refetchGlobalWidgets,
   } = useGlobalWidgets({ apiUrl });
 
   const [deleteCandidate, setDeleteCandidate] = useState<GlobalWidget | null>(null);
@@ -99,8 +100,11 @@ export const GlobalWidgetLibrary: React.FC<GlobalWidgetLibraryProps> = ({
 
       {/* Error State */}
       {error && !isLoading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-          {error}
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+          <p>{error}</p>
+          <button type="button" onClick={() => void refetchGlobalWidgets()} className="mt-2 rounded-md border border-red-300 px-3 py-1 font-semibold hover:bg-red-100">
+            Retry loading widgets
+          </button>
         </div>
       )}
 
@@ -226,7 +230,7 @@ export const GlobalWidgetLibrary: React.FC<GlobalWidgetLibraryProps> = ({
               <h3>DELETE GLOBAL WIDGET?</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              This Global Widget is currently used on your website. Deleting it will remove the source definition.
+              Deleting this widget removes its reusable library definition. Existing page elements are not automatically updated.
             </p>
             {deleteError && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-700">
