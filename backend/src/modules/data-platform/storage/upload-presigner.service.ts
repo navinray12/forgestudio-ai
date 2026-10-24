@@ -5,6 +5,7 @@ import {
   deleteObject,
   getStorageConfig,
   getPresignedPutUrl,
+  headObject,
 } from "./s3-client.js";
 import type { StorageBucket, StorageObject } from "../../../generated/prisma/client.js";
 
@@ -146,6 +147,7 @@ export async function generateUploadPresignedUrl(
 }
 
 export interface ConfirmUploadParams {
+  websiteId: string;
   bucketId: string;
   objectKey: string;
   originalName: string;
@@ -162,6 +164,23 @@ export interface ConfirmUploadParams {
 export async function confirmUpload(
   params: ConfirmUploadParams
 ): Promise<StorageObject> {
+  if (!Number.isSafeInteger(params.sizeBytes) || params.sizeBytes <= 0 ||
+      !params.websiteId || !params.objectKey.startsWith(params.websiteId + "/") ||
+      params.objectKey.includes("..") || params.objectKey.includes("\\") ||
+      params.mimeType.length > 128) {
+    throw new AppError("Invalid upload confirmation", 400, "INVALID_UPLOAD_CONFIRMATION");
+  }
+  const assignedBucket = await prisma.storageBucket.findUnique({
+    where: { id: params.bucketId },
+  });
+  if (!assignedBucket || assignedBucket.websiteId !== params.websiteId) {
+    throw new AppError("Storage bucket not found for this website", 404, "BUCKET_NOT_FOUND");
+  }
+  const observed = await headObject(assignedBucket.name, params.objectKey);
+  if (observed.contentLength !== params.sizeBytes ||
+      (observed.contentType && observed.contentType.toLowerCase() !== params.mimeType.toLowerCase())) {
+    throw new AppError("Upload metadata does not match the stored object", 409, "UPLOAD_METADATA_MISMATCH");
+  }
   const bytes = BigInt(params.sizeBytes);
 
   return await prisma.$transaction(async (tx) => {
@@ -169,8 +188,11 @@ export async function confirmUpload(
       where: { id: params.bucketId },
     });
 
-    if (!bucket) {
+    if (!bucket || bucket.websiteId !== params.websiteId) {
       throw new AppError("Storage bucket not found", 404, "BUCKET_NOT_FOUND");
+    }
+    if (bucket.usedSizeBytes + bytes > bucket.maxSizeBytes) {
+      throw new AppError("Storage quota exceeded", 413, "STORAGE_QUOTA_EXCEEDED");
     }
 
     const createdObject = await tx.storageObject.create({
