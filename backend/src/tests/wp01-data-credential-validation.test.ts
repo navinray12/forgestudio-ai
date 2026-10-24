@@ -144,6 +144,21 @@ describe("WP-01 public data API credential validation", () => {
     }, "data:write")).toThrow(/does not permit/);
   });
 
+  it("blocks production writes for a read-only collaborator's verified session", () => {
+    expect(() => assertDataScope({
+      role: "authenticated", sub: "collaborator", canAdminister: false,
+    }, "data:write", "PRODUCTION")).toThrow(/Production writes require/);
+    expect(() => assertDataScope({
+      role: "authenticated", sub: "collaborator", canAdminister: false,
+    }, "data:read", "PRODUCTION")).not.toThrow();
+    expect(() => assertDataScope({
+      role: "authenticated", sub: "owner", canAdminister: true,
+    }, "data:write", "PRODUCTION")).not.toThrow();
+    expect(() => assertDataScope({
+      role: "authenticated", sub: "collaborator", canAdminister: false,
+    }, "data:write", "DEVELOPMENT")).not.toThrow();
+  });
+
   it("blocks public key table queries unless FORCE RLS is enabled", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ enabled: true, forced: false }] });
     await expect(assertPublicTableRls({ query } as never, "private_orders", {
