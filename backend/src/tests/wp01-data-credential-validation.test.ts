@@ -45,42 +45,51 @@ beforeEach(() => {
 
 describe("WP-01 public data API credential validation", () => {
   it("does not authorize a plausible-looking forged service API key", async () => {
-    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ statusCode: 401, code: "INVALID_API_KEY" });
     const filter = h.find.mock.calls[0][0].where;
     expect(filter).toEqual({
       tokenHash: crypto.createHash("sha256").update(SEC_KEY).digest("hex"),
-      database: { websiteId: projectId },
+      database: { websiteId: projectId, environment: "PRODUCTION" },
     });
+  });
+
+  it("rejects a development key submitted for a production database", async () => {
+    const devKeyRecord = { ...record, keyType: "SERVICE_ROLE" };
+    h.find.mockImplementation(async ({ where }) => where.database.environment === "DEVELOPMENT" ? devKeyRecord : null);
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
+      .rejects.toMatchObject({ code: "INVALID_API_KEY" });
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "DEVELOPMENT"))
+      .resolves.toMatchObject({ isServiceRole: true, apiKeyId: "key-1" });
   });
 
   it("fails closed when the API key database is offline", async () => {
     h.find.mockRejectedValue(new Error("database unavailable"));
-    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ statusCode: 503, code: "API_KEY_VALIDATION_UNAVAILABLE" });
   });
 
   it("rejects revoked and expired registered keys", async () => {
     h.find.mockResolvedValueOnce({ ...record, revokedAt: new Date() });
-    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ code: "REVOKED_API_KEY" });
     h.find.mockResolvedValueOnce({ ...record, expiresAt: new Date("2000-01-01") });
-    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ code: "EXPIRED_API_KEY" });
   });
 
   it("rejects credentials whose prefix conflicts with their stored privileges", async () => {
     h.find.mockResolvedValueOnce({ ...record, keyType: "ANON" });
-    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ code: "INVALID_API_KEY" });
     h.find.mockResolvedValueOnce(record);
-    await expect(resolveAuthClaims(req({ apikey: ANON_KEY }), projectId))
+    await expect(resolveAuthClaims(req({ apikey: ANON_KEY }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ code: "INVALID_API_KEY" });
   });
 
   it("grants service role only to a verified stored service key", async () => {
     h.find.mockResolvedValue(record);
-    const claims = await resolveAuthClaims(req({ apikey: SEC_KEY }), projectId);
+    const claims = await resolveAuthClaims(req({ apikey: SEC_KEY }), projectId, "PRODUCTION");
     expect(claims).toMatchObject({ isServiceRole: true, role: "service_role", apiKeyId: "key-1" });
     expect(h.update).toHaveBeenCalledWith({
       where: { id: "key-1" }, data: { lastUsedAt: expect.any(Date) },
@@ -89,36 +98,36 @@ describe("WP-01 public data API credential validation", () => {
 
   it("does not promote a verified anonymous key to a service role", async () => {
     h.find.mockResolvedValue({ ...record, keyType: "ANON" });
-    const claims = await resolveAuthClaims(req({ apikey: ANON_KEY }), projectId);
+    const claims = await resolveAuthClaims(req({ apikey: ANON_KEY }), projectId, "PRODUCTION");
     expect(claims).toMatchObject({ isServiceRole: false, role: "anon" });
   });
 
   it("rejects unsigned JWT payloads and does not trust embedded role claims", async () => {
     const forged = ["e30", Buffer.from(JSON.stringify({ sub: "intruder", role: "service_role" })).toString("base64url"), "x"].join(".");
-    await expect(resolveAuthClaims(req({ authorization: `Bearer ${forged}` }), projectId))
+    await expect(resolveAuthClaims(req({ authorization: `Bearer ${forged}` }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ statusCode: 401, code: "INVALID_SESSION" });
     expect(h.session).toHaveBeenCalledWith(forged);
   });
 
   it("never promotes a platform ADMIN session into a database service role", async () => {
     h.session.mockResolvedValue({ user: { id: "owner", role: "ADMIN", email: "owner@example.test" } });
-    const claims = await resolveAuthClaims(req({ authorization: "Bearer real-session" }), projectId);
+    const claims = await resolveAuthClaims(req({ authorization: "Bearer real-session" }), projectId, "PRODUCTION");
     expect(claims).toMatchObject({
       sub: "owner", role: "authenticated", email: "owner@example.test", isServiceRole: false,
     });
   });
 
   it("rejects missing credentials rather than handing unverified callers an SQL identity", async () => {
-    await expect(resolveAuthClaims(req({}), projectId))
+    await expect(resolveAuthClaims(req({}), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ statusCode: 401, code: "PROJECT_AUTH_REQUIRED" });
-    await expect(resolveAuthClaims(req({ authorization: "Basic abc" }), projectId))
+    await expect(resolveAuthClaims(req({ authorization: "Basic abc" }), projectId, "PRODUCTION"))
       .rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
   });
 
   it("denies a valid session access to another website's database", async () => {
     h.session.mockResolvedValue({ user: { id: "other-user", role: "USER" } });
     h.access.mockRejectedValue(new Error("Project not found or access denied"));
-    await expect(resolveAuthClaims(req({ authorization: "Bearer valid-but-foreign" }), projectId))
+    await expect(resolveAuthClaims(req({ authorization: "Bearer valid-but-foreign" }), projectId, "PRODUCTION"))
       .rejects.toThrow("Project not found or access denied");
     expect(h.access).toHaveBeenCalledWith(projectId, "other-user");
   });
