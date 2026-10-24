@@ -20,83 +20,36 @@ const BACKUP_BUCKET = "internal-backups";
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
+  let bytes = 0;
   for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += part.length;
+    if (bytes > MAX_BACKUP_COMPRESSED_BYTES) {
+      throw new AppError("Stored backup exceeds the safe restore size", 413, "BACKUP_TOO_LARGE");
+    }
+    chunks.push(part);
   }
   return Buffer.concat(chunks);
 }
 
-/**
- * Fallback SQL generator if pg_dump CLI is not present in the runtime environment.
- */
-async function generateLogicalSqlDump(
-  projectId: string,
-  environment: DatabaseEnvironment
-): Promise<string> {
-  const pool = await TenantPoolManager.getTenantPool(projectId, environment);
-  const client = await pool.connect();
+const MAX_BACKUP_COMPRESSED_BYTES = 256 * 1024 * 1024; // bounded in-memory backup/restore
+const MAX_BACKUP_SQL_BYTES = 512 * 1024 * 1024;
 
-  try {
-    let sql = `-- ForgeStudio Logical Backup for project ${projectId}\n`;
-    sql += `-- Generated at ${new Date().toISOString()}\n\n`;
-
-    // Query all user tables in public schema
-    const tablesRes = await client.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables 
-       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-       ORDER BY table_name;`
-    );
-
-    for (const { table_name } of tablesRes.rows) {
-      sql += `-- Table: ${table_name}\n`;
-      sql += `DROP TABLE IF EXISTS "${table_name}" CASCADE;\n`;
-
-      // Get columns
-      const colsRes = await client.query<{
-        column_name: string;
-        data_type: string;
-        is_nullable: string;
-        column_default: string | null;
-      }>(
-        `SELECT column_name, data_type, is_nullable, column_default 
-         FROM information_schema.columns 
-         WHERE table_schema = 'public' AND table_name = $1 
-         ORDER BY ordinal_position;`,
-        [table_name]
-      );
-
-      const colDefs = colsRes.rows.map((col) => {
-        let def = `"${col.column_name}" ${col.data_type.toUpperCase()}`;
-        if (col.column_default) def += ` DEFAULT ${col.column_default}`;
-        if (col.is_nullable === "NO") def += ` NOT NULL`;
-        return def;
-      });
-
-      sql += `CREATE TABLE "${table_name}" (\n  ${colDefs.join(",\n  ")}\n);\n`;
-
-      // Dump row data
-      const dataRes = await client.query(`SELECT * FROM "${table_name}";`);
-      for (const row of dataRes.rows) {
-        const columns = Object.keys(row).map((c) => `"${c}"`).join(", ");
-        const values = Object.values(row)
-          .map((v) => {
-            if (v === null) return "NULL";
-            if (typeof v === "number" || typeof v === "boolean") return String(v);
-            if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
-            return `'${String(v).replace(/'/g, "''")}'`;
-          })
-          .join(", ");
-
-        if (columns.length > 0) {
-          sql += `INSERT INTO "${table_name}" (${columns}) VALUES (${values});\n`;
-        }
-      }
-      sql += "\n";
-    }
-
-    return sql;
-  } finally {
-    client.release();
+/** Compare the S3 payload to the control-plane checksum BEFORE any restore SQL. */
+export function verifyBackupIntegrity(
+  data: Buffer,
+  expectedSha256: string,
+  expectedSizeBytes: bigint | number | string
+): void {
+  const declaredSize = BigInt(expectedSizeBytes);
+  if (data.length === 0 || data.length > MAX_BACKUP_COMPRESSED_BYTES ||
+      BigInt(data.length) !== declaredSize || !/^[0-9a-f]{64}$/i.test(expectedSha256)) {
+    throw new AppError("Stored backup metadata does not match payload", 409, "BACKUP_INTEGRITY_FAILED");
+  }
+  const actual = crypto.createHash("sha256").update(data).digest();
+  const expected = Buffer.from(expectedSha256, "hex");
+  if (!crypto.timingSafeEqual(actual, expected)) {
+    throw new AppError("Stored backup checksum mismatch", 409, "BACKUP_INTEGRITY_FAILED");
   }
 }
 
@@ -158,26 +111,43 @@ export async function createBackup(
       const chunks: Buffer[] = [];
       const errChunks: Buffer[] = [];
 
-      proc.stdout.on("data", (chunk) => chunks.push(chunk));
-      proc.stderr.on("data", (chunk) => errChunks.push(chunk));
+      let bytes = 0;
+      let oversized = false;
+      proc.stdout.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+        if (bytes > MAX_BACKUP_SQL_BYTES) {
+          oversized = true;
+          proc.kill();
+          return;
+        }
+        chunks.push(chunk);
+      });
+      proc.stderr.on("data", (chunk: Buffer) => {
+        if (errChunks.length < 8) errChunks.push(chunk.subarray(0, 1024));
+      });
 
       proc.on("error", (err) => reject(err));
       proc.on("close", (code) => {
-        if (code === 0) {
+        if (oversized) {
+          reject(new AppError("Tenant backup exceeds bounded backup size", 413, "BACKUP_TOO_LARGE"));
+        } else if (code === 0 && bytes > 0) {
           resolve(Buffer.concat(chunks));
         } else {
-          reject(new Error(`pg_dump failed (code ${code}): ${Buffer.concat(errChunks).toString()}`));
+          // Do not leak database error output (which may contain tenant values).
+          reject(new AppError("PostgreSQL pg_dump failed", 503, "BACKUP_DUMP_FAILED"));
         }
       });
     });
 
     const rawDump = await rawDumpPromise;
     compressedBuffer = zlib.gzipSync(rawDump);
-  } catch (err: any) {
-    // If pg_dump CLI is missing (e.g. minimal Node container or Windows dev), use resilient fallback
-    console.warn(`[BackupService] pg_dump CLI unavailable or failed (${err.message}), utilizing logical SQL generator fallback.`);
-    const sqlScript = await generateLogicalSqlDump(projectId, environment);
-    compressedBuffer = zlib.gzipSync(Buffer.from(sqlScript, "utf8"));
+  } catch {
+    // A hand-built dump omits database constraints, RLS, triggers and indexes.
+    // Missing/failed pg_dump must NEVER become a reported successful backup.
+    throw new AppError("Verified PostgreSQL backup unavailable; pg_dump is required", 503, "BACKUP_DUMP_FAILED");
+  }
+  if (compressedBuffer.length > MAX_BACKUP_COMPRESSED_BYTES) {
+    throw new AppError("Tenant backup exceeds the supported size", 413, "BACKUP_TOO_LARGE");
   }
 
   // 3. Compute checksum & file metadata
@@ -251,12 +221,30 @@ export async function restoreBackup(backupId: string): Promise<void> {
     throw new AppError("Backup record not found", 404, "BACKUP_NOT_FOUND");
   }
 
-  // 1. Fetch compressed backup from S3
+  // Never use an object key that points outside this tenant's backup prefix.
+  if (backup.database.status !== "READY" ||
+      !backup.storageKey.startsWith(`backups/${backup.database.websiteId}/`) ||
+      !backup.storageKey.endsWith(".sql.gz")) {
+    throw new AppError("Backup tenant association is invalid", 409, "BACKUP_TENANT_MISMATCH");
+  }
+
+  // 1. Download a bounded snapshot, then verify checksum and DB-record size.
   const { stream } = await getObjectStream(BACKUP_BUCKET, backup.storageKey);
   const compressedBuffer = await streamToBuffer(stream);
+  verifyBackupIntegrity(compressedBuffer, backup.checksumSha256, backup.sizeBytes);
 
-  // 2. Decompress GZIP payload
-  const sqlScript = zlib.gunzipSync(compressedBuffer).toString("utf8");
+  // 2. Decompress only after integrity verification. Never run unverified SQL.
+  let sqlScript: string;
+  try {
+    sqlScript = zlib.gunzipSync(compressedBuffer, {
+      maxOutputLength: MAX_BACKUP_SQL_BYTES,
+    }).toString("utf8");
+    if (!sqlScript.startsWith("--") || !sqlScript.includes("PostgreSQL database dump")) {
+      throw new Error("Unknown backup format");
+    }
+  } catch {
+    throw new AppError("Backup archive is invalid or exceeds restore limits", 409, "BACKUP_ARCHIVE_INVALID");
+  }
 
   // 3. Connect to tenant database and execute restore script
   const pool = await TenantPoolManager.getTenantPool(
