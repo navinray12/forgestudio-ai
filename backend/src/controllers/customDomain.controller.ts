@@ -4,6 +4,7 @@
  */
 import { Request, Response } from "express";
 import { prisma } from "../config/prisma.js";
+import { verifyProjectAccess } from "../modules/data-platform/common/project-access.js";
 import {
   validateDomain,
   createDomainRecord,
@@ -22,17 +23,15 @@ import {
 // Helper
 // ---------------------------------------------------------------------------
 
-async function getAuthorizedWebsite(websiteId: string, userId?: string) {
-  const website = await prisma.website.findUnique({ where: { id: websiteId } });
-  if (!website) return null;
-  if (userId && website.userId !== userId) {
-    const collab = await (prisma as any).websiteCollaborator?.findFirst?.({ where: { websiteId, userId } });
-    if (!collab) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role as string)) return null;
-    }
-  }
-  return website;
+async function getAuthorizedWebsite(websiteId: string, userId?: string, requireAdmin = false) {
+  // Neither missing identity nor a collaborator with read-only access may
+  // claim, verify, delete, or change a website's public DNS/TLS ownership.
+  if (!userId) return null;
+  let access;
+  try { access = await verifyProjectAccess(websiteId, userId); }
+  catch { return null; }
+  if (requireAdmin && !access.canAdminister) return null;
+  return prisma.website.findUnique({ where: { id: websiteId } });
 }
 
 function readDomains(website: any): any[] {
@@ -75,7 +74,7 @@ export async function addDomain(req: Request, res: Response) {
   try {
     const websiteId = String(req.params.websiteId || "");
     const userId = res.locals.user?.id || (req as any).user?.id;
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domain = validateDomain(String(req.body.domain || ""));
@@ -111,7 +110,7 @@ export async function verifyDomain(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -150,7 +149,7 @@ export async function setDomainPrimary(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -176,7 +175,7 @@ export async function removeDomain(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -225,7 +224,7 @@ export async function provisionDomainSsl(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
