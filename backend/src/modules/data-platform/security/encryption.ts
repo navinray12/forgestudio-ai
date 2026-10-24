@@ -6,8 +6,14 @@
 import crypto from "node:crypto";
 
 function getMasterKey(): Buffer {
-  const secret = process.env.FORGE_DATA_PLATFORM_SECRET || process.env.JWT_SECRET || "forge-studio-data-platform-master-encryption-key-32b";
-  return crypto.createHash("sha256").update(secret).digest();
+  // An encryption key must be managed independently of the JWT signing key.
+  // Production credentials must never be encrypted with a public default.
+  const secret = process.env.FORGE_DATA_PLATFORM_SECRET;
+  if (process.env.NODE_ENV === "production" && (!secret || secret.length < 32)) {
+    throw new Error("FORGE_DATA_PLATFORM_SECRET (minimum 32 characters) is required in production");
+  }
+  const effective = secret || "forge-studio-data-platform-master-encryption-key-32b";
+  return crypto.createHash("sha256").update(effective).digest();
 }
 
 /**
@@ -31,21 +37,29 @@ export function decryptCredential(ciphertext: string): string {
   if (!ciphertext) return "";
   try {
     const parts = ciphertext.split(".");
-    if (parts.length !== 3) return ciphertext; // Fallback if plain
+    if (parts.length !== 3) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Plaintext credentials are not permitted in production");
+      }
+      return ciphertext; // Development-only compatibility with legacy data
+    }
 
     const [ivB64, tagB64, encryptedB64] = parts;
     const iv = Buffer.from(ivB64, "base64");
     const tag = Buffer.from(tagB64, "base64");
     const encrypted = Buffer.from(encryptedB64, "base64");
+    if (iv.length !== 12 || tag.length !== 16 || !encryptedB64) {
+      throw new Error("Invalid encrypted credential format");
+    }
     const key = getMasterKey();
 
     const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
     decipher.setAuthTag(tag);
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString("utf8");
-  } catch (err) {
-    console.warn("[DataPlatform Security] Decryption error, returning sanitized placeholder");
-    return "";
+  } catch {
+    // Never turn a corrupted credential into an empty success response.
+    throw new Error("Credential could not be authenticated or decrypted");
   }
 }
 
