@@ -233,6 +233,17 @@ describe("WP-01 live tenant database + data endpoint isolation", () => {
     expect((await denied.json()).error.code).toBe("PUBLIC_RLS_REQUIRED");
   });
 
+  it("coalesces concurrent tenant pool initialization to one verified pool", async () => {
+    await TenantPoolManager.closeTenantPool(sites[1], "PRODUCTION");
+    const [left, right, third] = await Promise.all([
+      TenantPoolManager.getTenantPool(sites[1], "PRODUCTION"),
+      TenantPoolManager.getTenantPool(sites[1], "PRODUCTION"),
+      TenantPoolManager.getTenantPool(sites[1], "PRODUCTION"),
+    ]);
+    expect(left).toBe(right);
+    expect(right).toBe(third);
+  });
+
   it("never silently provisions a tenant database on an HTTP read", async () => {
     const unprovisioned = await prisma.website.create({
       data: { userId: owners[0], name: "Nonprovisioned tenant",
