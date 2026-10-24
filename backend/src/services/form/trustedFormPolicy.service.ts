@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
+import { getServerFormDeliveryActions } from "./formDeliveryPolicy.service.js";
 
 type JsonRecord = Record<string, unknown>;
 const object = (value: unknown): value is JsonRecord =>
@@ -54,8 +55,14 @@ export async function getTrustedFormPolicy(websiteId: string, formId: string): P
         Array.isArray(node.formFields) ? node.formFields : undefined;
       const logic = config && Array.isArray(config.conditionalLogic) ? config.conditionalLogic : undefined;
       const spam = config && object(config.spamProtection) ? config.spamProtection : undefined;
+      // Production outbound destinations/credentials must exist only in the
+      // dedicated encrypted control-plane table. Editor JSON can be published,
+      // copied or returned to browsers and is never a credential authority.
+      const deliveryActions = process.env.NODE_ENV === "production"
+        ? await getServerFormDeliveryActions(websiteId, formId)
+        : actions;
       return {
-        actions,
+        actions: deliveryActions,
         fieldConfigs: fields,
         conditionalLogic: logic,
         spamProtection: spam,
@@ -67,6 +74,12 @@ export async function getTrustedFormPolicy(websiteId: string, formId: string): P
       if (["data", "fields", "actions", "metadata", "settings", "content", "style"].includes(key)) continue;
       if (Array.isArray(child) || object(child)) queue.push(child);
     }
+  }
+  // An explicitly configured server-only policy remains valid for older form
+  // renderers that do not serialize their widgets in the modern editor format.
+  if (process.env.NODE_ENV === "production") {
+    const actions = await getServerFormDeliveryActions(websiteId, formId);
+    return actions ? { actions } : {};
   }
   return {};
 }
