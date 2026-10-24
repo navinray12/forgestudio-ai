@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   bucketFind: vi.fn(),
   objectCreate: vi.fn(),
+  objectFind: vi.fn(),
   bucketUpdate: vi.fn(),
   head: vi.fn(),
   tx: vi.fn(),
@@ -38,10 +39,11 @@ beforeEach(() => {
   h.bucketFind.mockResolvedValue(bucket);
   h.head.mockResolvedValue({ contentLength: 1200, contentType: "image/png" });
   h.objectCreate.mockResolvedValue({ id: "object-1" });
-  h.bucketUpdate.mockResolvedValue({});
+  h.objectFind.mockResolvedValue(null);
+  h.bucketUpdate.mockResolvedValue({ count: 1 });
   h.tx.mockImplementation(async (fn) => fn({
-    storageBucket: { findUnique: h.bucketFind, update: h.bucketUpdate },
-    storageObject: { create: h.objectCreate },
+    storageBucket: { findUnique: h.bucketFind, updateMany: h.bucketUpdate },
+    storageObject: { create: h.objectCreate, findUnique: h.objectFind },
   }));
 });
 
@@ -75,8 +77,36 @@ describe("WP-04 confirmed storage object trust boundary", () => {
 
   it("rechecks tenant bucket and quota inside the database transaction", async () => {
     h.bucketFind.mockResolvedValueOnce(bucket).mockResolvedValueOnce({ ...bucket, usedSizeBytes: 9000n });
+    h.bucketUpdate.mockResolvedValueOnce({ count: 0 });
     await expect(confirmUpload(params)).rejects.toMatchObject({ code: "STORAGE_QUOTA_EXCEEDED" });
     expect(h.objectCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not reserve quota again for an already confirmed object", async () => {
+    const prior = { id: "existing-object", sizeBytes: 1200n, mimeType: "image/png" };
+    h.objectFind.mockResolvedValue(prior);
+    await expect(confirmUpload(params)).resolves.toEqual(prior);
+    expect(h.bucketUpdate).not.toHaveBeenCalled();
+    expect(h.objectCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a changed object metadata claim on repeat confirmation", async () => {
+    h.objectFind.mockResolvedValue({ id: "previous", sizeBytes: 500n, mimeType: "image/png" });
+    await expect(confirmUpload(params))
+      .rejects.toMatchObject({ code: "UPLOAD_CONFIRMATION_CONFLICT", statusCode: 409 });
+    expect(h.bucketUpdate).not.toHaveBeenCalled();
+  });
+
+  it("atomically reserves capacity before registering an object", async () => {
+    await confirmUpload(params);
+    expect(h.bucketUpdate).toHaveBeenCalledWith({
+      where: {
+        id: "bucket-1", websiteId: site,
+        usedSizeBytes: { lte: 8800n },
+      },
+      data: { usedSizeBytes: { increment: 1200n } },
+    });
+    expect(h.bucketUpdate.mock.invocationCallOrder[0]).toBeLessThan(h.objectCreate.mock.invocationCallOrder[0]);
   });
 
   it("persists a verified upload scoped to the owning website", async () => {
