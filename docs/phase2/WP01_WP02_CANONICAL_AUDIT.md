@@ -43,6 +43,10 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 | WP02-08 | P1 | Shared-schema `forgeDatabase.service.ts#getDatabase()` auto-provisions and `connectionManager.ts` executes on `pgPool` with tenant-specific search_path | Separate focused security review: bind dbId to owner, eliminate unsafe implicit creation, test schema isolation under two tenants | OPEN — requires independent integration path |
 | WP02-09 | P0 | `api-layer/dataApi.service.ts`: absent API exposure config granted access and new customer tables started `isExposed=true` | Fail closed with HTTP 403 unless explicit enabled config permits operation; new tables default private; unit tests `wp02-api-exposure-defaults.test.ts` | **FIXED — CI VERIFIED** at `d3bbfb35`; 4/4 tests passed |
 
+## Recovery integrity checkpoint — 24 October 2026
+
+**WP02-10 — BACKUP/RESTORE INTEGRITY (FIXED — CI VERIFIED):** `modules/data-platform/database/database-backup.service.ts` no longer replaces failed/missing `pg_dump` with the incomplete SQL fallback that omitted constraints/indexes/RLS. Backup generation fails closed; sizes are bounded; restore refuses foreign-tenant object prefixes, size mismatch, checksum mismatch and invalid gzip/SQL before acquiring a tenant DB connection; SQL errors roll back. Tests `wp02-backup-integrity.test.ts` and `wp02-backup-fail-closed.test.ts` cover corruption, tenancy, rollback, missing executable and dump failures. The **real staging backup and restore drill remains OPEN**; a mock test is not backup recoverability evidence. The backup role also needs qualification against PostgreSQL FORCE RLS.
+
 ## Test evidence and regression location
 
 **Baseline last proven before this work:** GitHub [Phase 2 qualification 40078291534](https://github.com/navinray12/forgestudio-ai/actions/runs/40078291534), 6/6 jobs; 42 migrations, 7 live HTTP+PostgreSQL tests, 71 focused tests, 247 MCP/XSS tests, frontend build/lint and identity/AI qualification checks.
