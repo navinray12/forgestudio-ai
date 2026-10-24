@@ -49,13 +49,16 @@ async function ensureProjectListener(
           const subscribers = channelSubscriptions.get(channelKey);
 
           if (subscribers && subscribers.size > 0) {
+            // Project membership is not row-level authorization. Never stream the
+            // trigger's full NEW/OLD records to subscribers: a collaborator could
+            // otherwise read rows that PostgreSQL RLS would deny through HTTP.
+            // Deliver a table invalidation only; clients must refetch via the
+            // authenticated, scope-checked data API.
             const outgoing = JSON.stringify({
               event: "REALTIME_EVENT",
               projectId,
               table: payload.table,
               action: payload.action,
-              record: payload.record,
-              oldRecord: payload.old_record,
               timestamp: payload.commit_timestamp,
             });
 
