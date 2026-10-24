@@ -29,6 +29,8 @@ export function validateDeliveryActions(raw: unknown): FormActions {
   const value = raw as FormActions;
   const bytes = Buffer.byteLength(JSON.stringify(value), "utf8");
   if (bytes > 32768) throw new AppError("Form action configuration is too large", 413, "FORM_POLICY_TOO_LARGE");
+  // Strip obsolete/inactive integration configs before encryption. Otherwise
+  // disabled secrets remain at rest and can be copied into future policies.
   const active = value.activeActions;
   if (!Array.isArray(active) || active.length > 12 ||
       active.some((a) => typeof a !== "string" || !ACTION_TYPES.has(a))) {
@@ -84,7 +86,22 @@ export function validateDeliveryActions(raw: unknown): FormActions {
       assertSafeUrl(redirect, "Form redirect");
     }
   }
-  return value;
+  const enabled = new Set(active);
+  const knownConfigs: Record<string, string> = {
+    emailConfig: "email",
+    webhookConfig: "webhook",
+    googleSheetsConfig: "google_sheets",
+    mailchimpConfig: "mailchimp",
+    zapierConfig: "zapier",
+    redirectConfig: "redirect",
+    popupConfig: "popup",
+  };
+  const cleaned: FormActions = { activeActions: [...enabled] };
+  for (const [key, action] of Object.entries(knownConfigs)) {
+    if (enabled.has(action) && value[key] !== undefined) cleaned[key] = value[key];
+  }
+  if (typeof value.successMessage === "string") cleaned.successMessage = value.successMessage;
+  return cleaned;
 }
 
 async function requireFormAdministrator(websiteId: string, actorId: string): Promise<void> {
