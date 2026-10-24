@@ -62,6 +62,19 @@ export function validateDeliveryActions(raw: unknown): FormActions {
       throw new AppError("Mailchimp configuration is invalid", 400, "INVALID_FORM_POLICY");
     }
   }
+  if (active.includes("redirect")) {
+    const url = (value.redirectConfig as Record<string, unknown> | undefined)?.url;
+    if (typeof url !== "string" || !url.startsWith("https://")) {
+      throw new AppError("Active form redirect requires an HTTPS URL", 400, "INVALID_FORM_POLICY");
+    }
+    assertSafeUrl(url, "Form redirect");
+  }
+  if (active.includes("popup")) {
+    const popupId = (value.popupConfig as Record<string, unknown> | undefined)?.popupId;
+    if (typeof popupId !== "string" || !FORM_ID.test(popupId)) {
+      throw new AppError("Active form popup requires a valid ID", 400, "INVALID_FORM_POLICY");
+    }
+  }
   if (value.redirectConfig && typeof value.redirectConfig === "object") {
     const redirect = (value.redirectConfig as Record<string, unknown>).url;
     if (redirect !== undefined) {
