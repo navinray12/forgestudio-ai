@@ -92,11 +92,11 @@ The blueprint's **12–18-week** figure assumes a coordinated ~6–8 engineer te
 | Align global widget update from PUT to backend PATCH | `frontend/src/features/global-widget/services/globalWidgetService.ts` | Route/controller contract inspected | Committed; integration tests pending |
 | Quarantine unauthenticated legacy deployment serving | `backend/src/routes/hosted.routes.ts` | Source inspected; no runtime test | Committed; **legacy endpoint intentionally 404** until owner-verified resolver implemented |
 
-See draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42). Do not merge while compiler/tests, hosted consumers and production configuration are unverified.
+A dedicated CI workflow at `.github/workflows/phase2-qualification.yml` now runs backend/frontend production builds and the legacy-hosting access regression on branch pushes and pull requests. Latest run was **queued** when inspected, so qualification is not yet complete.\n\nSee draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42). Do not merge while compiler/tests, hosted consumers and production configuration are unverified.
 
 ### Next small reviewable tasks
 
-1. **WP-00:** establish branch CI and focused route/service regression tests.
+1. **WP-00:** await green branch CI (build + hosted-access suite); expand baseline to clean PostgreSQL migration and journey test matrix.
 2. **WP-01:** verify hosted route mounting, secure deployment owner lookup, traversal containment, and denied foreign project; preserve existing hosting implementation.
 3. **WP-01:** audit unauthenticated realtime and terminal route mounting; test before security changes.
 4. **WP-02:** clean PostgreSQL migration test; document project-to-database ownership.
