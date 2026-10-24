@@ -55,7 +55,7 @@ jobs:
       - name: Existing workspace and document PostgreSQL contracts
         working-directory: backend
         run: |
-          npx --no-install prisma db push
+          npx --no-install prisma migrate deploy
           node --import tsx --test src/tests/workspace-integration.test.ts 2>&1 | tee "$RUNNER_TEMP/workspace-contracts.tap"
       - name: Identity migration and negative HTTP contracts
         env:
@@ -63,7 +63,7 @@ jobs:
         working-directory: backend
         run: |
           createdb -h 127.0.0.1 -U postgres forge_identity
-          npx --no-install prisma db push
+          npx --no-install prisma migrate deploy
           node --import tsx --test src/tests/identity-security.test.ts 2>&1 | tee "$RUNNER_TEMP/identity-security.tap"
       - name: Actual WebSocket authorization and revocation
         env:
@@ -71,7 +71,7 @@ jobs:
         working-directory: backend
         run: |
           createdb -h 127.0.0.1 -U postgres forge_presence
-          npx --no-install prisma db push
+          npx --no-install prisma migrate deploy
           node --import tsx --test src/tests/presence-security.test.ts 2>&1 | tee "$RUNNER_TEMP/presence-security.tap"
       - name: Prepare browser runner
         run: |
@@ -85,7 +85,7 @@ jobs:
           FORGE_BROWSER_REPORT_DIR: ${{ runner.temp }}/workspace-browser-report
         run: |
           createdb -h 127.0.0.1 -U postgres forge_browser
-          (cd backend && npx --no-install prisma db push && node --import tsx src/tests/fixtures/workspace-browser-fixture.ts)
+          (cd backend && npx --no-install prisma migrate deploy && node --import tsx src/tests/fixtures/workspace-browser-fixture.ts)
           (cd backend && exec node dist/server.js) > "$RUNNER_TEMP/workspace-browser-api.log" 2>&1 &
           api_pid=$!
           (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
@@ -108,7 +108,7 @@ jobs:
           FORGE_IDENTITY_BROWSER_REPORT: ${{ runner.temp }}/identity-browser-report
         run: |
           createdb -h 127.0.0.1 -U postgres forge_identity_browser
-          (cd backend && npx --no-install prisma db push)
+          (cd backend && npx --no-install prisma migrate deploy)
           (cd backend && exec node --import tsx src/tests/fixtures/identity-browser-server.ts) > "$RUNNER_TEMP/identity-browser-api.log" 2>&1 &
           api_pid=$!
           (cd frontend && exec node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173) > "$RUNNER_TEMP/browser-ui.log" 2>&1 &
