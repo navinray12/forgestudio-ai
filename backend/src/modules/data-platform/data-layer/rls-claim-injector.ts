@@ -142,11 +142,12 @@ export function assertDataScope(claims: RlsClaims, operation: "data:read" | "dat
 
 /**
  * Tenant table owner roles can bypass ordinary RLS unless FORCE is enabled.
- * Public API keys never get table access until PostgreSQL itself guarantees
- * that a configured row-level policy applies to the owner connection.
+ * All non-service credentials (including verified user sessions) must see a
+ * forced row policy, not merely a valid table owner connection. Without FORCE
+ * RLS, the owner role can read every record regardless of claim.sub.
  */
 export async function assertPublicTableRls(client: pg.PoolClient, table: string, claims: RlsClaims): Promise<void> {
-  if (claims.role !== "anon" || claims.isServiceRole) return;
+  if (claims.isServiceRole === true) return;
   const result = await client.query<{
     enabled: boolean;
     forced: boolean;
@@ -158,6 +159,6 @@ export async function assertPublicTableRls(client: pg.PoolClient, table: string,
   );
   const policy = result.rows[0];
   if (!policy?.enabled || !policy?.forced) {
-    throw new AppError("Public data access requires enforced row-level security on the table", 403, "PUBLIC_RLS_REQUIRED");
+    throw new AppError("Data access requires enforced row-level security on the table", 403, "PUBLIC_RLS_REQUIRED");
   }
 }
