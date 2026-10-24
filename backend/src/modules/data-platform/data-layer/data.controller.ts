@@ -109,7 +109,7 @@ export async function insertTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId, environment);
-    assertDataScope(claims, "data:write");
+    assertDataScope(claims, "data:write", environment);
     const compiled = compileInsert(table, req.body);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -158,7 +158,7 @@ export async function updateTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId, environment);
-    assertDataScope(claims, "data:write");
+    assertDataScope(claims, "data:write", environment);
     const compiled = compileUpdate(table, req.query, req.body);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -207,7 +207,7 @@ export async function deleteTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId, environment);
-    assertDataScope(claims, "data:write");
+    assertDataScope(claims, "data:write", environment);
     const compiled = compileDelete(table, req.query);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
