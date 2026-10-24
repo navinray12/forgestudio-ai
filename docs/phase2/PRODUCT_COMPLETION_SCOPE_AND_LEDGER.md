@@ -127,6 +127,14 @@ The permanent issue register is [WP03_WP04_CANONICAL_AUDIT.md](./WP03_WP04_CANON
 
 Current implementation commits: WP03-01 template API contract validation; WP04-01 media website ownership checks; WP04-02 CSV export injection protection; WP04-03 image signature checks, false-success removal and local storage quarantine. The dedicated backend/frontend tests passed in [Phase 2 run 40081631402](https://github.com/navinray12/forgestudio-ai/actions/runs/40081631402) on code SHA `de5498d4`: 7/7 jobs, 102 focused backend, 21 frontend and 247 broader security tests, plus 42 migrations and 25 PostgreSQL integration/RLS tests. Every later commit requires fresh exact-SHA verification. Legacy public form integration destinations supplied in client requests (WP04-05), durable production asset upload (WP04-04), CMS/kit complete journeys and editor/public parity remain **OPEN**. The temporary production local-upload rejection is a **security restriction**, not delivery of a production media feature.
 
+## Six-task implementation and verification checkpoint — 24 October 2026
+
+[Detailed evidence, code ownership and blockers](./SIX_TASK_DELIVERY_EVIDENCE.md) is the latest six-task release report. The source commit `e2956e0d` passed [9/9 Phase 2 CI jobs](https://github.com/navinray12/forgestudio-ai/actions/runs/40084498359), including 42 migrations, 11 real HTTP tenant tests, 14 RLS integration tests, 126 focused backend tests, 41 editor journey tests, 21 frontend contracts, 247 security regressions, and a source-inventory artifact.
+
+Changes: visitor-supplied form integration secrets/destinations are ignored in favor of owner-saved form policy; unsafe shared-admin legacy schema access and provisioning are unavailable in production; realtime event delivery checks live membership; editor history/save/publish are regression gated; S3 confirmations require real object/tenant evidence; source inventory is SHA-hashed and migration-only startup is enforced.
+
+**Remaining security and product gates:** outbound integration credentials must move to encrypted server-only storage, legacy DB requires real per-tenant principals, actual isolated code runner is unimplemented, real S3/MinIO delivery not deployed, editor/CMS/widget parity and published HTTPS flows not certified, and WP-00 full business feature matrix not signed off. **WP-00–WP-04 still IN PROGRESS / NO-GO.**
+
 ## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
