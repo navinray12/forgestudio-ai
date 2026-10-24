@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { decryptCredential, encryptCredential } from "../modules/data-platform/security/encryption.js";
+import { assertProductionEncryptionConfigured, decryptCredential, encryptCredential } from "../modules/data-platform/security/encryption.js";
 
 const prev = {
   secret: process.env.FORGE_DATA_PLATFORM_SECRET,
@@ -19,6 +19,14 @@ afterEach(() => {
 });
 
 describe("WP-01 production credential encryption", () => {
+  it("fails production boot preflight when encryption key is missing", () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.FORGE_DATA_PLATFORM_SECRET;
+    expect(() => assertProductionEncryptionConfigured()).toThrow(/FORGE_DATA_PLATFORM_SECRET/);
+    process.env.FORGE_DATA_PLATFORM_SECRET = "a-valid-independent-production-encryption-key";
+    expect(() => assertProductionEncryptionConfigured()).not.toThrow();
+  });
+
   it("requires a separate encryption key, not JWT_SECRET", () => {
     process.env.NODE_ENV = "production";
     delete process.env.FORGE_DATA_PLATFORM_SECRET;
