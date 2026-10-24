@@ -46,7 +46,7 @@ export async function getTableDataHandler(
     }
 
     validateIdentifier(table);
-    const claims = await resolveAuthClaims(req, projectId);
+    const claims = await resolveAuthClaims(req, projectId, environment);
     assertDataScope(claims, "data:read");
     const compiled = compileSelect(table, req.query);
 
@@ -108,7 +108,7 @@ export async function insertTableDataHandler(
     }
 
     validateIdentifier(table);
-    const claims = await resolveAuthClaims(req, projectId);
+    const claims = await resolveAuthClaims(req, projectId, environment);
     assertDataScope(claims, "data:write");
     const compiled = compileInsert(table, req.body);
 
@@ -157,7 +157,7 @@ export async function updateTableDataHandler(
     }
 
     validateIdentifier(table);
-    const claims = await resolveAuthClaims(req, projectId);
+    const claims = await resolveAuthClaims(req, projectId, environment);
     assertDataScope(claims, "data:write");
     const compiled = compileUpdate(table, req.query, req.body);
 
@@ -206,7 +206,7 @@ export async function deleteTableDataHandler(
     }
 
     validateIdentifier(table);
-    const claims = await resolveAuthClaims(req, projectId);
+    const claims = await resolveAuthClaims(req, projectId, environment);
     assertDataScope(claims, "data:write");
     const compiled = compileDelete(table, req.query);
 
