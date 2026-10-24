@@ -160,7 +160,7 @@ export async function getUserTemplates(userId: string) {
     return rawTemplates || [];
   } catch (error) {
     console.error("Error fetching user templates:", error);
-    return [];
+    throw new AppError("Unable to load templates", 503, "TEMPLATE_LIST_UNAVAILABLE");
   }
 }
 
