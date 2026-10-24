@@ -159,7 +159,7 @@ export const SaveGlobalWidgetDialog: React.FC<SaveGlobalWidgetDialogProps> = ({
 
           {/* Info Banner */}
           <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 text-[11px] text-purple-800 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-300 leading-relaxed">
-            💡 Global Widgets auto-sync across all instances on your website when updated.
+            💡 Your Global Widget is saved to your account and can be reused on other pages.
           </div>
 
           {/* Action Buttons */}
