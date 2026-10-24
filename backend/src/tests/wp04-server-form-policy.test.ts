@@ -123,6 +123,19 @@ describe("WP-04 production form policy management", () => {
     expect(h.query).not.toHaveBeenCalled();
   });
 
+  it("rejects duplicate outbound actions and empty provider credentials before encryption/write", async () => {
+    const invalid = [
+      { activeActions: ["webhook", "webhook"], webhookConfig: { endpointUrl: "https://hooks.example.org/submit" } },
+      { activeActions: ["mailchimp"], mailchimpConfig: { apiKey: " ", listId: "customers" } },
+      { activeActions: ["mailchimp"], mailchimpConfig: { apiKey: "valid-key", listId: "" } },
+    ];
+    for (const policy of invalid) {
+      await expect(upsertFormDeliveryPolicy(site, formId, user, policy))
+        .rejects.toMatchObject({ statusCode: 400, code: "INVALID_FORM_POLICY" });
+    }
+    expect(h.query).not.toHaveBeenCalled();
+  });
+
   it("deleting a policy disables delivery without deleting the form itself", async () => {
     await upsertFormDeliveryPolicy(site, formId, user, { activeActions: ["database"] });
     await deleteFormDeliveryPolicy(site, formId, user);
