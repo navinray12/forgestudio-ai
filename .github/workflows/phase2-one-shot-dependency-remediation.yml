@@ -39,7 +39,7 @@ jobs:
           change('frontend/package.json', (pkg) => {
             pkg.dependencies['monaco-editor'] = '0.57.0';
             pkg.dependencies.dompurify = '3.4.17';
-            pkg.overrides = { ...pkg.overrides, zod: '4.6.6' };
+            pkg.overrides = { ...pkg.overrides, zod: '4.6.6', dompurify: '$dompurify' };
           });
           NODE
       - name: Regenerate locked package trees using npm, no forced upgrades
