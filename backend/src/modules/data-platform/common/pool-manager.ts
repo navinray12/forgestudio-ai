@@ -13,6 +13,7 @@ interface CachedTenantPool {
 
 const MAX_ACTIVE_POOLS = 50;
 const poolCache = new Map<string, CachedTenantPool>();
+const pendingPoolInitializations = new Map<string, Promise<pg.Pool>>();
 
 let dataTablesEnsured = false;
 /**
@@ -113,6 +114,32 @@ async function pruneLruPools(): Promise<void> {
 export async function getTenantPool(
   projectId: string,
   environment: DatabaseEnvironment = "PRODUCTION"
+): Promise<pg.Pool> {
+  const key = cacheKey(projectId, environment);
+  const cached = poolCache.get(key);
+  if (cached) {
+    cached.lastAccessedAt = Date.now();
+    return cached.pool;
+  }
+  const pending = pendingPoolInitializations.get(key);
+  if (pending) return pending;
+
+  // Single-flight initialization: concurrent requests for the same website and
+  // environment must share one verified connection pool, not create N pools.
+  const initialization = initializeTenantPool(projectId, environment);
+  pendingPoolInitializations.set(key, initialization);
+  try {
+    return await initialization;
+  } finally {
+    if (pendingPoolInitializations.get(key) === initialization) {
+      pendingPoolInitializations.delete(key);
+    }
+  }
+}
+
+async function initializeTenantPool(
+  projectId: string,
+  environment: DatabaseEnvironment
 ): Promise<pg.Pool> {
   const key = cacheKey(projectId, environment);
   const now = Date.now();
@@ -265,6 +292,9 @@ export async function closeTenantPool(
   environment: DatabaseEnvironment = "PRODUCTION"
 ): Promise<void> {
   const key = cacheKey(projectId, environment);
+  // Drain even if initialization is still in progress, to avoid a late pool
+  // being cached after deletion/deprovisioning begins.
+  await pendingPoolInitializations.get(key)?.catch(() => undefined);
   const entry = poolCache.get(key);
 
   if (entry) {
