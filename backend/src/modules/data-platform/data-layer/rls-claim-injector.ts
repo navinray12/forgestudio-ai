@@ -4,6 +4,7 @@ import type pg from "pg";
 import { prisma } from "../../../config/prisma.js";
 import { authenticateSession } from "../../../services/session-authentication.js";
 import { AppError } from "../../../utils/app-error.js";
+import { verifyProjectAccess } from "../common/project-access.js";
 
 export interface RlsClaims {
   sub?: string;
@@ -116,6 +117,8 @@ export async function resolveAuthClaims(req: Request, projectId: string): Promis
     if (!session?.user?.id) {
       throw new AppError("Invalid or expired session", 401, "INVALID_SESSION");
     }
+    // A valid platform session is NOT permission to access every tenant database.
+    await verifyProjectAccess(projectId, session.user.id);
     return {
       sub: session.user.id,
       role: "authenticated",
@@ -124,6 +127,14 @@ export async function resolveAuthClaims(req: Request, projectId: string): Promis
     };
   }
 
-  // An anonymous visitor has no implicit service role. Tenant RLS must apply.
-  return { sub: "anon", role: "anon", email: "", isServiceRole: false };
+  // Browser callers must use a registered project API key or an authenticated
+  // and authorized session. A missing credential must never reach owner-scoped SQL.
+  throw new AppError("A verified project API key or session is required", 401, "PROJECT_AUTH_REQUIRED");
+}
+
+/** Enforce stored key scopes independently of the SQL execution path. */
+export function assertDataScope(claims: RlsClaims, operation: "data:read" | "data:write"): void {
+  if (claims.apiKeyId && (!Array.isArray(claims.scopes) || !claims.scopes.includes(operation))) {
+    throw new AppError("API key does not permit this data operation", 403, "API_KEY_SCOPE_FORBIDDEN");
+  }
 }
