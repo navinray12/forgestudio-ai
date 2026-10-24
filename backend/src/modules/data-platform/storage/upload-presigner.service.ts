@@ -191,8 +191,38 @@ export async function confirmUpload(
     if (!bucket || bucket.websiteId !== params.websiteId) {
       throw new AppError("Storage bucket not found", 404, "BUCKET_NOT_FOUND");
     }
-    if (bucket.usedSizeBytes + bytes > bucket.maxSizeBytes) {
+    // Duplicate confirmations for the same S3 key are safe and idempotent.
+    // They must not double-charge bucket quota.
+    const existing = await tx.storageObject.findUnique({
+      where: {
+        bucketId_objectKey: {
+          bucketId: params.bucketId,
+          objectKey: params.objectKey,
+        },
+      },
+    });
+    if (existing) {
+      if (existing.sizeBytes !== bytes || existing.mimeType !== params.mimeType) {
+        throw new AppError("Confirmed object metadata cannot be changed", 409, "UPLOAD_CONFIRMATION_CONFLICT");
+      }
+      return existing;
+    }
+
+    // Reserve quota with one atomic conditional UPDATE. A read-then-write
+    // guard is unsafe when multiple uploads finish simultaneously.
+    if (bucket.maxSizeBytes < bytes) {
       throw new AppError("Storage quota exceeded", 413, "STORAGE_QUOTA_EXCEEDED");
+    }
+    const reservation = await tx.storageBucket.updateMany({
+      where: {
+        id: params.bucketId,
+        websiteId: params.websiteId,
+        usedSizeBytes: { lte: bucket.maxSizeBytes - bytes },
+      },
+      data: { usedSizeBytes: { increment: bytes } },
+    });
+    if (reservation.count !== 1) {
+      throw new AppError("Storage quota exceeded or changed concurrently", 413, "STORAGE_QUOTA_EXCEEDED");
     }
 
     const createdObject = await tx.storageObject.create({
@@ -204,15 +234,6 @@ export async function confirmUpload(
         sizeBytes: bytes,
         checksumSha256: params.checksumSha256 || "",
         eTag: params.eTag || null,
-      },
-    });
-
-    await tx.storageBucket.update({
-      where: { id: params.bucketId },
-      data: {
-        usedSizeBytes: {
-          increment: bytes,
-        },
       },
     });
 
