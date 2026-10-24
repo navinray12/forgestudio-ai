@@ -9,6 +9,8 @@ import {
   executeInSandbox,
   getSandboxWorkspaceDir,
   isVerifiedIsolationAvailable,
+  isWithinWorkspace,
+  resolveWorkspacePath,
 } from "../services/runtime/forgeSandbox.service.js";
 
 const original = {
@@ -63,6 +65,23 @@ describe("WP-01 host-execution isolation gate", () => {
       expect(() => getSandboxWorkspaceDir(projectId)).toThrow(/Invalid sandbox project identifier/);
     },
   );
+
+  it("rejects sibling-prefix escapes that pass a naive startsWith check", () => {
+    const root = "/tmp/forgestudio_sandboxes/tenant_a";
+    const escape = "/tmp/forgestudio_sandboxes/tenant_a_other/secrets";
+    expect(escape.startsWith(root)).toBe(true);
+    expect(isWithinWorkspace(root, escape)).toBe(false);
+    expect(() => resolveWorkspacePath(root, "../tenant_a_other/secrets"))
+      .toThrow(/escapes the sandbox root/);
+    expect(resolveWorkspacePath(root, "src/index.ts"))
+      .toBe("/tmp/forgestudio_sandboxes/tenant_a/src/index.ts");
+  });
+
+  it("rejects backslashes and Windows drive paths in stored project filenames", () => {
+    const root = "/tmp/forgestudio_sandboxes/tenant_a";
+    expect(() => resolveWorkspacePath(root, "C:\\\\Windows\\\\system.ini")).toThrow();
+    expect(() => resolveWorkspacePath(root, "..\\\\private")).toThrow();
+  });
 
   it("rejects path traversal before attempting any execution", async () => {
     process.env.NODE_ENV = "development";
