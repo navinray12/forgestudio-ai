@@ -119,12 +119,13 @@ export async function resolveAuthClaims(req: Request, projectId: string, environ
       throw new AppError("Invalid or expired session", 401, "INVALID_SESSION");
     }
     // A valid platform session is NOT permission to access every tenant database.
-    await verifyProjectAccess(projectId, session.user.id);
+    const access = await verifyProjectAccess(projectId, session.user.id);
     return {
       sub: session.user.id,
       role: "authenticated",
       email: session.user.email || "",
       isServiceRole: false,
+      canAdminister: access.canAdminister,
     };
   }
 
@@ -134,9 +135,20 @@ export async function resolveAuthClaims(req: Request, projectId: string, environ
 }
 
 /** Enforce stored key scopes independently of the SQL execution path. */
-export function assertDataScope(claims: RlsClaims, operation: "data:read" | "data:write"): void {
+export function assertDataScope(
+  claims: RlsClaims,
+  operation: "data:read" | "data:write",
+  environment?: DatabaseEnvironment
+): void {
   if (claims.apiKeyId && (!Array.isArray(claims.scopes) || !claims.scopes.includes(operation))) {
     throw new AppError("API key does not permit this data operation", 403, "API_KEY_SCOPE_FORBIDDEN");
+  }
+  // Platform sessions only get PRODUCTION mutations with admin-level website
+  // access. API keys retain their explicit, independently restricted scopes
+  // for visitor-facing forms and application integrations.
+  if (environment === "PRODUCTION" && operation === "data:write" &&
+      claims.role === "authenticated" && claims.canAdminister !== true) {
+    throw new AppError("Production writes require website owner/admin access", 403, "PRODUCTION_WRITE_FORBIDDEN");
   }
 }
 
