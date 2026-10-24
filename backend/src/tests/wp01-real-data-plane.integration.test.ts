@@ -37,6 +37,7 @@ describe("WP-01 live tenant database + data endpoint isolation", () => {
   let devOnlyA = "";
   let ownerSession = "";
   let outsiderSession = "";
+  let collaboratorSession = "";
 
   async function request(method: string, site: string, path: string, key?: string, body?: unknown) {
     const headers: Record<string, string> = {};
@@ -134,6 +135,15 @@ describe("WP-01 live tenant database + data endpoint isolation", () => {
     devOnlyA = devIssued.key;
     ownerSession = await sessionFor(alice.id);
     outsiderSession = await sessionFor(bob.id);
+    const editor = await prisma.user.create({
+      data: { email: "wp01-editor-" + marker + "@example.test",
+        fullName: "Website Collaborator", status: "ACTIVE", authEpoch: 1 },
+    });
+    owners.push(editor.id);
+    await prisma.websiteCollaborator.create({
+      data: { websiteId: sites[0], userId: editor.id, permission: "EDITOR" },
+    });
+    collaboratorSession = await sessionFor(editor.id);
 
     const app = express();
     app.use(express.json());
@@ -198,6 +208,42 @@ describe("WP-01 live tenant database + data endpoint isolation", () => {
     const own = await fetch(origin + "/api/v1/data/" + sites[0] + "/orders?environment=PRODUCTION",
       { headers: { Authorization: "Bearer " + ownerSession } });
     expect(own.status).toBe(200);
+  });
+
+  it("rejects production writes from authenticated read-only collaborators", async () => {
+    const baseUrl = origin + "/api/v1/data/" + sites[0] + "/orders?environment=PRODUCTION";
+    const read = await fetch(baseUrl, { headers: { Authorization: "Bearer " + collaboratorSession } });
+    expect(read.status).toBe(200);
+    expect((await read.json()).data).toEqual([]); // RLS hides rows owned by anon
+    const write = await fetch(baseUrl, {
+      method: "POST", headers: { Authorization: "Bearer " + collaboratorSession,
+        "Content-Type": "application/json" },
+      body: JSON.stringify({ owner_id: "anon", note: "unauthorized" }),
+    });
+    expect(write.status).toBe(403);
+    expect((await write.json()).error.code).toBe("PRODUCTION_WRITE_FORBIDDEN");
+  });
+
+  it("does not let authenticated sessions read tables without FORCE RLS", async () => {
+    const pool = await TenantPoolManager.getTenantPool(sites[0], "PRODUCTION");
+    await pool.query("CREATE TABLE IF NOT EXISTS public.session_unprotected (id int, secret text)");
+    const denied = await fetch(origin + "/api/v1/data/" + sites[0] + "/session_unprotected?environment=PRODUCTION",
+      { headers: { Authorization: "Bearer " + ownerSession } });
+    expect(denied.status).toBe(403);
+    expect((await denied.json()).error.code).toBe("PUBLIC_RLS_REQUIRED");
+  });
+
+  it("never silently provisions a tenant database on an HTTP read", async () => {
+    const unprovisioned = await prisma.website.create({
+      data: { userId: owners[0], name: "Nonprovisioned tenant",
+        slug: "wp01-unprovisioned-" + marker },
+    });
+    sites.push(unprovisioned.id);
+    const response = await fetch(origin + "/api/v1/data/" + unprovisioned.id +
+      "/orders?environment=PRODUCTION", { headers: { Authorization: "Bearer " + ownerSession } });
+    expect(response.status).toBe(404);
+    const row = await prisma.projectDatabase.findFirst({ where: { websiteId: unprovisioned.id } });
+    expect(row).toBeNull();
   });
 
   it("rejects non-FORCE-RLS tables despite a valid anonymous project API key", async () => {
