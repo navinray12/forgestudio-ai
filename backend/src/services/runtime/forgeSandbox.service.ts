@@ -154,6 +154,9 @@ export async function getOrCreateRuntimeSession(
  * Get or initialize project sandbox directory on the isolated filesystem
  */
 export function getSandboxWorkspaceDir(projectId: string): string {
+  if (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(projectId)) {
+    throw new AppError("Invalid sandbox project identifier", 400, "INVALID_PROJECT_ID");
+  }
   const baseDir = path.join(os.tmpdir(), "forgestudio_sandboxes", projectId);
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
@@ -202,8 +205,11 @@ export async function materializeProjectWorkspace(projectId: string): Promise<st
  * Check if a verified container/VM isolation runtime (Docker/gVisor/Firecracker) is configured.
  */
 export function isVerifiedIsolationAvailable(): boolean {
-  const runtime = (process.env.FORGE_CONTAINER_RUNTIME || "").toLowerCase();
-  return runtime === "docker" || runtime === "gvisor" || runtime === "firecracker";
+  // This execution path uses node:child_process.spawn on the API host.
+  // Selecting "docker", "gvisor" or "firecracker" via an environment variable
+  // does not create a container or establish an isolation boundary.
+  // Only a separately implemented, attested remote/container runner may report true.
+  return false;
 }
 
 /**
@@ -239,12 +245,14 @@ export async function executeInSandbox(params: {
     throw new AppError("Invalid working directory: Sandbox path escape forbidden", 400, "SANDBOX_PATH_ESCAPE");
   }
 
-  // SEC-02: Prevent tenant commands from executing unsafely on the application host
+  // SEC-02: spawn() below always runs on the application host, even when
+  // FORGE_CONTAINER_RUNTIME is set. Permit it only for explicit local development.
+  // NODE_ENV must be "development" (not merely "not production") to opt in.
   const hasIsolation = isVerifiedIsolationAvailable();
-  const allowUnsafeDev = process.env.NODE_ENV !== "production" &&
+  const allowUnsafeDev = process.env.NODE_ENV === "development" &&
     (process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "true" || process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "1");
 
-  if (!hasIsolation && !allowUnsafeDev) {
+  if (!allowUnsafeDev) {
     throw new AppError(
       "Host command execution is disabled: verified container isolation is not configured. Tenant commands cannot execute on the application host.",
       403,
