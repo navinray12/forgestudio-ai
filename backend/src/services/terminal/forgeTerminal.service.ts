@@ -127,9 +127,15 @@ export async function executeTerminalCommand(
   command: string,
   options: {
     userId?: string;
+    userRole?: string;
     confirmedByUser?: boolean;
   } = {}
 ): Promise<CommandExecutionResult> {
+  // Direct service callers must supply an authenticated principal; this is not
+  // just a route-level guarantee. Never allow an unspecified identity to run code.
+  if (!options.userId?.trim()) {
+    throw new AppError("Authentication required for terminal commands", 401, "UNAUTHORIZED");
+  }
   let session = ACTIVE_TERMINALS.get(sessionId);
   if (!session) {
     const record = await db.forgeTerminalSession.findUnique({ where: { id: sessionId } });
@@ -147,6 +153,17 @@ export async function executeTerminalCommand(
       lastActivityAt: record.lastActivityAt.toISOString(),
     };
     ACTIVE_TERMINALS.set(sessionId, session);
+  }
+
+  // The session ID is not an authorization credential. Check the actual
+  // session's project before executing *or* returning an apparently successful
+  // empty command. An owner/member/admin decision stays in the existing service.
+  await getForgeProjectById(session.projectId, { id: options.userId, role: options.userRole });
+  if (session.status !== "ACTIVE") {
+    throw new AppError("Terminal session is closed", 409, "TERMINAL_CLOSED");
+  }
+  if (typeof command !== "string") {
+    throw new AppError("Terminal command must be a string", 400, "INVALID_COMMAND");
   }
 
   const trimmedCmd = command.trim();
