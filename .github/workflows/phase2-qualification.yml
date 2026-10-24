@@ -80,7 +80,7 @@ jobs:
       - name: Generate Prisma client for real tenant integration tests
         run: npx --no-install prisma generate
       - name: Qualify real project database roles and HTTP tenant boundaries
-        run: npx --no-install vitest run src/tests/wp01-real-data-plane.integration.test.ts
+        run: npx --no-install vitest run src/tests/wp01-real-data-plane.integration.test.ts src/tests/wp04-real-form-delivery.integration.test.ts
 
   tenant-rls:
     name: Real PostgreSQL restricted-role RLS qualification
