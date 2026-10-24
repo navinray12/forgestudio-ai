@@ -4,6 +4,7 @@ import { effectiveCapability } from "../permissions/effective-capability.js";
 import { workspaceCommand } from "../workspaces/command.js";
 import { getScopedWebsiteInTransaction } from "./scoped-access.js";
 import { authorizeDocumentEdit, canonicalDocumentJson, documentObject, expectedDocumentVersion } from "./document-policy.js";
+import { assertNoInlineFormCredentials } from "./formEditorSecrets.guard.js";
 import type { WorkspaceTransaction } from "../workspaces/access.js";
 
 export interface DocumentWriteContext { key: string; expectedVersion: number; }
@@ -61,7 +62,11 @@ function normalizePatch(input: DocumentPatch): DocumentPatch {
     patch.slug = input.slug;
   }
   if (input.status !== undefined) patch.status = input.status;
-  if (input.editorData !== undefined) patch.editorData = documentObject(input.editorData);
+  if (input.editorData !== undefined) {
+    const editorData = documentObject(input.editorData);
+    if (process.env.NODE_ENV === "production") assertNoInlineFormCredentials(editorData);
+    patch.editorData = editorData;
+  }
   if (input.performanceSettings !== undefined) {
     const settings = documentObject(input.performanceSettings);
     const flags = new Set(["lazyLoadImages", "optimizeImages", "minifyCss", "minifyJs", "enableCaching", "preloadFonts", "enableGzip", "deferScripts", "lazyLoadVideos", "enableImageOptimization", "enableLazyLoading", "enableMinification", "enableCdn", "reducedDom", "optimizedMedia", "reducedCss", "reducedJs", "lazyLoading", "fasterFonts", "assetDefer", "elementCaching", "performanceMode", "imageOptimization"]);
