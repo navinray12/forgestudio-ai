@@ -4,6 +4,7 @@ import { getWebsiteById } from "../website.service.js";
 import { enqueueJob } from "../jobs/jobRunner.js";
 import { assertSafeUrl, isSafeUrl } from "../../utils/ssrf.guard.js";
 import { IntegrationService } from "../integration.service.js";
+import { getTrustedFormPolicy } from "./trustedFormPolicy.service.js";
 import { acceptSubmission, isKnownSubmissionKey, type LeadNotification } from "../leads/leadIntake.service.js";
 import nodemailer from "nodemailer";
 
@@ -108,6 +109,12 @@ export function checkRateLimit(ip: string, maxPerMin = 5): boolean {
   recent.push(now);
   rateLimitMap.set(ip, recent);
   return true;
+}
+
+/** Escape visitor fields before constructing notification HTML. */
+export function escapeFormHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 export interface FormSubmitPayload {
@@ -270,13 +277,8 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
   const {
     websiteId,
     formId,
-    formName,
     fields,
-    actions,
-    spamProtection,
     honeypotValue,
-    conditionalLogic,
-    fieldConfigs,
     metadata,
     idempotencyKey,
   } = payload;
@@ -284,6 +286,16 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
   if (!websiteId || !formId) {
     throw new AppError("Website ID and Form ID are required", 400, "INVALID_FORM_SUBMISSION");
   }
+
+  // NEVER trust a visitor-supplied actions, destination, token, conditional
+  // validation rule or spam-rate threshold. Owner-saved editorData is the
+  // source of truth; unrecognised form layouts accept only database leads.
+  const trustedForm = await getTrustedFormPolicy(websiteId, formId);
+  const actions = trustedForm.actions as FormSubmitPayload["actions"];
+  const formName = trustedForm.formName || "Website Form";
+  const spamProtection = trustedForm.spamProtection as FormSubmitPayload["spamProtection"];
+  const conditionalLogic = trustedForm.conditionalLogic as FormSubmitPayload["conditionalLogic"];
+  const fieldConfigs = trustedForm.fieldConfigs as FormSubmitPayload["fieldConfigs"];
 
   // 1. Honeypot Spam Check
   if (spamProtection?.enableHoneypot !== false && honeypotValue && honeypotValue.trim().length > 0) {
@@ -297,7 +309,7 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
   // 2. IP Rate Limiter Check. A retry of an already-committed submission (same idempotency key)
   // is not a new submission: it must be able to recover its original receipt (blueprint §12).
   const clientIp = metadata?.ip || "unknown";
-  const rateLimit = spamProtection?.rateLimitPerMinute ?? 5;
+  const rateLimit = Math.max(1, Math.min(20, Number(spamProtection?.rateLimitPerMinute) || 5));
   const isRetry = await isKnownSubmissionKey(websiteId, idempotencyKey);
   if (!isRetry && !checkRateLimit(clientIp, rateLimit)) {
     throw new AppError(
@@ -374,15 +386,15 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
     const rowsHtml = Object.entries(sanitizedFields)
       .map(
         ([k, v]) =>
-          `<tr><td style="padding:6px;font-weight:bold;border:1px solid #ddd">${k}</td><td style="padding:6px;border:1px solid #ddd">${String(
+          `<tr><td style="padding:6px;font-weight:bold;border:1px solid #ddd">${escapeFormHtml(k)}</td><td style="padding:6px;border:1px solid #ddd">${escapeFormHtml(String(
             v
-          )}</td></tr>`
+          ))}</td></tr>`
       )
       .join("");
 
     const htmlBody = `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;">
-        <h2 style="color:#333;margin-top:0;">New Lead from ${formName || "Website Form"}</h2>
+        <h2 style="color:#333;margin-top:0;">New Lead from ${escapeFormHtml(formName || "Website Form")}</h2>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
           ${rowsHtml}
         </table>
