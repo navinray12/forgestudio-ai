@@ -103,6 +103,26 @@ describe("WP-01 realtime subscription isolation", () => {
     expect(ws.sent.some((x) => x.event === "subscribed")).toBe(false);
     expect(h.release).toHaveBeenCalledExactlyOnceWith(true);
   });
+  it("closes a socket and withholds event metadata if website membership was revoked", async () => {
+    let onNotification: ((msg: unknown) => void) | undefined;
+    h.connect.mockResolvedValue({
+      on: vi.fn((event: string, cb: (msg: unknown) => void) => {
+        if (event === "notification") onNotification = cb;
+      }),
+      query: h.query, release: h.release,
+    });
+    const ws = socket("revoked-member");
+    ws.receive({ event: "subscribe", projectId: "proj-a", table: "orders" });
+    await untilFrame(ws, "subscribed");
+    h.authorize.mockRejectedValue(new Error("membership revoked"));
+    onNotification!({
+      channel: "forge_realtime",
+      payload: JSON.stringify({ table: "orders", action: "UPDATE" }),
+    });
+    await vi.waitFor(() => expect(ws.readyState).toBe(3));
+    expect(ws.sent.some((item) => item.event === "REALTIME_EVENT")).toBe(false);
+  });
+
   it("never broadcasts NEW/OLD row bodies to project-wide subscribers", async () => {
     let notification: ((payload: unknown) => void) | undefined;
     h.connect.mockResolvedValue({
