@@ -72,6 +72,13 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 - `WP00`: versioned form submissions migration is now checked at startup rather than modified silently when `form.service` is imported. Build/migration qualification passed.
 - [Evidence](./SIX_TASK_DELIVERY_EVIDENCE.md) and [CI](https://github.com/navinray12/forgestudio-ai/actions/runs/40084498359), exact code SHA `e2956e0d`: 9/9 jobs passed. Both WP-01 and WP-02 have unresolved P0 release infrastructure dependencies; never label the quarantine as a delivered DB or runtime feature.
 
+## New WP-01 ownership/encryption controls — 24 October 2026
+
+- **WP01-08 — FIXED / CI VERIFIED:** `services/project/forgeProject.service.ts#createForgeProject` now denies binding a newly created project to a foreign website, mismatched workspace or organization. Negative tests `wp01-project-website-ownership.test.ts` exercise cross-user/mismatched membership.
+- **WP01-09 — FIXED / CI VERIFIED:** `modules/data-platform/security/encryption.ts` no longer uses `JWT_SECRET` or public development defaults in production. A dedicated `FORGE_DATA_PLATFORM_SECRET` (minimum 32 chars) is checked at server startup; decrypt rejects plaintext and invalid authentication tags. `wp01-credential-encryption.test.ts` verifies refusal and roundtrip.
+- **WP00 migration gate — VERIFIED:** a missing `form_delivery_policies` table now stops HTTP startup; the table is present in all **43 disposable clean-install migrations**. [9/9 Phase 2 jobs](https://github.com/navinray12/forgestudio-ai/actions/runs/40088546404) succeeded at `a0b0cfeb` with 165 focused tests, 247 security regressions and 16 dedicated real-DB tests.
+- **Open operational requirement:** existing values encrypted with older JWT-derived master keys need controlled key rotation/migration. Neither secrets-management access nor production key rotation has been verified. This is not a go-live approval.
+
 ## Release decision and acceptance boundary
 
 Do not call WP-01 or WP-02 `DONE` until the high-priority OPEN rows are resolved or the disabled features explicitly removed from release scope, AND their real-environment acceptance evidence exists. In particular, no product manager should interpret a safe 404 or disabled shell as a functional website publishing/developer execution feature.
