@@ -184,8 +184,10 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
     try {
       const challengeHost = `_forgestudio-challenge.${record.domain}`;
       const txtRecords = await dns.resolveTxt(challengeHost);
-      const flattened = txtRecords.flat().join("");
-      if (txtRecords.flat().some((entry) => entry === record.verificationToken)) {
+      // DNS TXT values can be split into multiple character strings per record.
+      // Match each complete TXT resource record, never substrings or strings
+      // accidentally joined across two separate resource records.
+      if (txtRecords.some((chunks) => chunks.join("") === record.verificationToken)) {
         return { success: true, method: "TXT" };
       }
     } catch {
@@ -352,19 +354,17 @@ export async function runDnsPreflightCheck(domain: string, token: string): Promi
   // Check TXT record
   try {
     const txtRecords = await dns.resolveTxt(`_forgestudio-challenge.${domain}`);
-    const flattened = txtRecords.flat().join("");
-    if (token && flattened.includes(token)) {
+    if (token && txtRecords.some((chunks) => chunks.join("") === token)) {
       txtValid = true;
     }
   } catch {
     // Optional
   }
 
-  let passed = cnameValid || aRecordValid || txtValid;
-
-  // Test-mode DNS fixtures may be used locally only; production may never
-  // claim verified ownership through a fallback environment switch.
+  // CNAME and A confirm routing only, not proof of control over this
+  // customer domain. In production an exact TXT challenge is mandatory.
   const isDev = process.env.NODE_ENV !== "production";
+  let passed = isDev ? cnameValid || aRecordValid || txtValid : txtValid;
   if (!passed && isDev) {
     passed = true;
     cnameValid = true;
