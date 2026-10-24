@@ -137,6 +137,29 @@ export async function ensureDataPlatformTables(): Promise<void> {
   }
 }
 
+/**
+ * Reject records left by the historical admin-database fallback.
+ * A READY flag is not proof of tenant database isolation.
+ */
+export function assertDedicatedTenantDatabase(record: { dbName: string; dbUser: string }): void {
+  const adminConnection = process.env.DATABASE_URL;
+  if (!adminConnection) {
+    throw new AppError("Platform database configuration is missing", 503, "TENANT_DATABASE_ISOLATION_UNAVAILABLE");
+  }
+  const controlPlane = new URL(adminConnection);
+  const controlPlaneDatabase = decodeURIComponent(controlPlane.pathname.replace(/^\//, ""));
+  const controlPlaneUser = decodeURIComponent(controlPlane.username);
+  if (!record.dbName || !record.dbUser ||
+      record.dbName === controlPlaneDatabase ||
+      record.dbUser === controlPlaneUser) {
+    throw new AppError(
+      "Tenant database has not been isolated from the platform database",
+      503,
+      "TENANT_DATABASE_ISOLATION_UNAVAILABLE"
+    );
+  }
+}
+
 function cacheKey(projectId: string, environment: DatabaseEnvironment): string {
   return `${projectId}:${environment}`;
 }
@@ -252,6 +275,8 @@ export async function getTenantPool(
       "DATABASE_NOT_READY"
     );
   }
+
+  assertDedicatedTenantDatabase(dbRecord);
 
   // 2. Decrypt database password
   const password = decryptCredential(dbRecord.encryptedPassword);
