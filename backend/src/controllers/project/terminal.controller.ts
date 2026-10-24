@@ -34,6 +34,7 @@ export async function executeTerminalHandler(req: Request, res: Response, next: 
     const { forgeTerminalService } = await import("../../services/terminal/forgeTerminal.service.js");
     const result = await forgeTerminalService.executeTerminalCommand(sessionId, command, {
       userId: user.id,
+      userRole: user.role,
       confirmedByUser,
     });
     res.status(200).json({ success: true, ...result });
