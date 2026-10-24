@@ -66,7 +66,7 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   }
   if (p.startsWith("generate image") || p.startsWith("create image") ||
       p.includes("illustration for") ||
-      /^(?:generate|create|draw|design)\\b[\\s\\S]*\\b(?:image|photo|illustration)\\b/.test(p)) {
+      /^(?:generate|create|draw|design)\b[\s\S]*\b(?:image|photo|illustration)\b/.test(p)) {
     return "GENERATE_IMAGE";
   }
 
@@ -82,8 +82,8 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
 
   // 7. Code explanation vs generation
   if (p.startsWith("explain code") || p.includes("explain this snippet") ||
-      /^explain\\s+(?:how|why|what|this|the|a|an)\\b/.test(p) &&
-      /\\b(?:code|javascript|typescript|html|css|function|method|snippet|algorithm)\\b/.test(p)) {
+      /^explain\s+(?:how|why|what|this|the|a|an)\b/.test(p) &&
+      /\b(?:code|javascript|typescript|html|css|function|method|snippet|algorithm)\b/.test(p)) {
     return "EXPLAIN_CODE";
   }
   if (p.includes("code") || p.includes("css") || p.includes("javascript") || p.includes("html snippet")) {
@@ -98,15 +98,15 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   // 9. Full website generation
   if (p.startsWith("build a whole website") || p.startsWith("create website") ||
       p.startsWith("generate site") || p.startsWith("generate website") ||
-      /^\\s*(?:build|create|generate|design)\\s+(?:a|an|the)\\s+(?:(?:complete|full|entire|modern|responsive)\\s+)*[\\s\\S]*\\b(?:website|landing page)\\b/.test(p)) {
+      /^\s*(?:build|create|generate|design)\s+(?:a|an|the)\s+(?:(?:complete|full|entire|modern|responsive)\s+)*[\s\S]*\b(?:website|landing page)\b/.test(p)) {
     return "GENERATE_WEBSITE";
   }
 
   // 10. Container / Layout
-  if (!/\\bsection\\b/.test(p) &&
+  if (!/\bsection\b/.test(p) &&
       (p.includes("grid layout") || p.includes("flex container") ||
        p.includes("columns") || p.includes("2-column") || p.includes("3-column") ||
-       /\\b\\d+-column\\s+grid\\s+container\\b/.test(p))) {
+       /\b\d+-column\s+grid\s+container\b/.test(p))) {
     return "GENERATE_CONTAINER";
   }
   if (p.includes("reorganize layout") || p.includes("page layout") ||
