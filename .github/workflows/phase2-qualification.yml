@@ -1,0 +1,72 @@
+name: Phase 2 qualification
+on:
+  push:
+    branches:
+      - phase2/production-hardening
+  pull_request:
+    branches:
+      - sconfigtesting
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docs/phase2/**'
+      - '.github/workflows/phase2-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase2-qualification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.component }}
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: ${{ matrix.component }}/package-lock.json
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Compile production build
+        run: npm run build
+
+  hosted-access:
+    name: Legacy hosting isolation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify legacy artifact endpoint denies unverified access
+        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts
