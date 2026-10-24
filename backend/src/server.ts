@@ -5,9 +5,11 @@ import { startScheduler } from "./services/scheduleWorker.js";
 import { pgPool, prisma } from "./config/prisma.js";
 
 import { validateIdentityConfiguration } from "./modules/identity/composition.js";
+import { assertProductionEncryptionConfigured } from "./modules/data-platform/security/encryption.js";
 import { ensureDatabaseTables } from "./config/ensure-schema.js";
 import { reconcileInterruptedRuns } from "./services/appGeneration/appGeneration.service.js";
 validateIdentityConfiguration();
+assertProductionEncryptionConfigured();
 
 const PORT = process.env.PORT || 5000;
 
