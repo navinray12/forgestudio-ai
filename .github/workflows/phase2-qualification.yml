@@ -292,3 +292,37 @@ jobs:
         run: npm ci
       - name: Validate global widget server persistence
         run: npx --no-install vitest run tests/global-widget-service.test.ts tests/global-widget-library-recovery.test.tsx tests/wp03-template-service.test.ts
+
+  wp03-wp10-integration-contracts:
+    name: WP-03 through WP-10 coordinated implementation regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_contract:unused@127.0.0.1:5432/forge_contract
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client for cross-scope test imports
+        run: npx --no-install prisma generate
+      - name: Run hosting, AI, commerce, provider, operations and worker contracts
+        run: >-
+          npx --no-install vitest run
+          src/tests/wp05-ssl-truthfulness.test.ts
+          src/tests/wp05-domain-instructions.test.ts
+          src/tests/ai-platform-capabilities.test.ts
+          src/tests/licensing-billing.test.ts
+          src/tests/regression/wordpress-connector-characterization.test.ts
+          src/tests/point48-acceptance-register-metrics.test.ts
+          src/tests/ai-worker-smoke.test.ts
