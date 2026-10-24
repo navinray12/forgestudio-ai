@@ -34,6 +34,10 @@ export function validateDeliveryActions(raw: unknown): FormActions {
       active.some((a) => typeof a !== "string" || !ACTION_TYPES.has(a))) {
     throw new AppError("Unknown form delivery action", 400, "INVALID_FORM_POLICY");
   }
+  // Duplicate action IDs can cause repeated outbound notifications and billing.
+  if (new Set(active).size !== active.length) {
+    throw new AppError("Duplicate form delivery actions are not allowed", 400, "INVALID_FORM_POLICY");
+  }
   for (const action of ["webhook", "google_sheets", "zapier"]) {
     if (!active.includes(action)) continue;
     const key = action === "webhook" ? "webhookConfig" : action === "google_sheets" ? "googleSheetsConfig" : "zapierConfig";
@@ -53,6 +57,7 @@ export function validateDeliveryActions(raw: unknown): FormActions {
   if (active.includes("mailchimp")) {
     const config = value.mailchimpConfig as Record<string, unknown> | undefined;
     if (typeof config?.apiKey !== "string" || typeof config?.listId !== "string" ||
+        config.apiKey.trim().length === 0 || config.listId.trim().length === 0 ||
         config.apiKey.length > 512 || config.listId.length > 128) {
       throw new AppError("Mailchimp configuration is invalid", 400, "INVALID_FORM_POLICY");
     }
