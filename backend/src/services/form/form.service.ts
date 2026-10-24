@@ -32,43 +32,21 @@ function getMailTransporter() {
 }
 
 /**
- * Ensure form_submissions table exists in PostgreSQL
+ * Verify schema provisioned by the durable_lead_intake Prisma migration.
+ * Do not CREATE/ALTER tables when importing a service or serving requests.
  */
-export async function initFormSubmissionsTable() {
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS form_submissions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
-        "formId" VARCHAR(255) NOT NULL,
-        "formName" VARCHAR(255) NOT NULL,
-        data JSONB NOT NULL DEFAULT '{}'::jsonb,
-        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS idx_form_submissions_website_id ON form_submissions("websiteId");
-    `);
-    await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS idx_form_submissions_form_id ON form_submissions("formId");
-    `);
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "formName" VARCHAR(255) DEFAULT 'Contact Form';
-    `);
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
-    `);
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS data JSONB NOT NULL DEFAULT '{}'::jsonb;
-    `);
-  } catch (error) {
-    console.error("Form submissions table initialization log:", error);
+export async function initFormSubmissionsTable(): Promise<void> {
+  const found = await prisma.$queryRaw<Array<{ form_submissions: string | null }>>`
+    SELECT to_regclass('public.form_submissions')::text AS form_submissions
+  `;
+  if (!found[0]?.form_submissions) {
+    throw new AppError(
+      "Form submission migration is missing; run prisma migrate deploy",
+      503,
+      "FORM_SUBMISSION_MIGRATION_REQUIRED"
+    );
   }
 }
-
-// Auto-run table initialization
-initFormSubmissionsTable();
 
 /**
  * XSS & HTML string sanitization
