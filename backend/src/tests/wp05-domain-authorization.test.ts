@@ -85,6 +85,33 @@ describe("WP-05 custom domain cross-tenant and admin authorization", () => {
     expect(h.updateWebsite).not.toHaveBeenCalled();
   });
 
+  it("does not offer unsupported CNAME/FILE ownership methods", async () => {
+    h.verify.mockResolvedValue({ website: { id: SITE, userId: "owner" }, canAdminister: true });
+    for (const method of ["CNAME", "FILE"]) {
+      const { req, res } = args("owner", {}, { domain: "mybrand.org", method });
+      await addDomain(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        message: expect.stringContaining("TXT"),
+      }));
+    }
+    expect(h.updateWebsite).not.toHaveBeenCalled();
+  });
+
+  it("returns the exact TXT challenge used by the actual DNS verifier", async () => {
+    h.verify.mockResolvedValue({ website: { id: SITE, userId: "owner" }, canAdminister: true });
+    const { req, res } = args("owner", {}, { domain: "mybrand.org", method: "TXT" });
+    await addDomain(req, res);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      instructions: expect.objectContaining({
+        type: "DNS TXT Record",
+        host: "_forgestudio-challenge.mybrand.org",
+      }),
+    }));
+  });
+
   it("owner/admin can register a valid domain without changing route semantics", async () => {
     h.verify.mockResolvedValue({ website: { id: SITE, userId: "owner" }, canAdminister: true });
     const { req, res } = args("owner", {}, { domain: "mybrand.org", method: "TXT" });
