@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   find: vi.fn(),
   update: vi.fn(),
   session: vi.fn(),
+  access: vi.fn(),
 }));
 
 vi.mock("../config/prisma.js", () => ({
@@ -14,8 +15,12 @@ vi.mock("../config/prisma.js", () => ({
 vi.mock("../services/session-authentication.js", () => ({
   authenticateSession: h.session,
 }));
+vi.mock("../modules/data-platform/common/project-access.js", () => ({
+  verifyProjectAccess: h.access,
+}));
 
 import {
+  assertDataScope,
   injectRlsClaims,
   resolveAuthClaims,
 } from "../modules/data-platform/data-layer/rls-claim-injector.js";
@@ -34,6 +39,7 @@ beforeEach(() => {
   h.find.mockResolvedValue(null);
   h.update.mockResolvedValue({});
   h.session.mockResolvedValue(null);
+  h.access.mockResolvedValue({ canAdminister: true });
 });
 
 describe("WP-01 public data API credential validation", () => {
@@ -101,12 +107,31 @@ describe("WP-01 public data API credential validation", () => {
     });
   });
 
-  it("returns anonymous claims only when no credential was supplied", async () => {
-    expect(await resolveAuthClaims(req({}), projectId)).toMatchObject({
-      sub: "anon", role: "anon", isServiceRole: false,
-    });
+  it("rejects missing credentials rather than handing unverified callers an SQL identity", async () => {
+    await expect(resolveAuthClaims(req({}), projectId))
+      .rejects.toMatchObject({ statusCode: 401, code: "PROJECT_AUTH_REQUIRED" });
     await expect(resolveAuthClaims(req({ authorization: "Basic abc" }), projectId))
       .rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+  });
+
+  it("denies a valid session access to another website's database", async () => {
+    h.session.mockResolvedValue({ user: { id: "other-user", role: "USER" } });
+    h.access.mockRejectedValue(new Error("Project not found or access denied"));
+    await expect(resolveAuthClaims(req({ authorization: "Bearer valid-but-foreign" }), projectId))
+      .rejects.toThrow("Project not found or access denied");
+    expect(h.access).toHaveBeenCalledWith(projectId, "other-user");
+  });
+
+  it("restricts keys to scopes recorded on the server", () => {
+    expect(() => assertDataScope({
+      apiKeyId: "key-1", scopes: ["data:read"], isServiceRole: false,
+    }, "data:write")).toThrow(/does not permit/);
+    expect(() => assertDataScope({
+      apiKeyId: "key-1", scopes: ["data:read"], isServiceRole: false,
+    }, "data:read")).not.toThrow();
+    expect(() => assertDataScope({
+      apiKeyId: "key-2", scopes: null, isServiceRole: true,
+    }, "data:write")).toThrow(/does not permit/);
   });
 
   it("does not set rls.bypass for an untrusted service_role string", async () => {
