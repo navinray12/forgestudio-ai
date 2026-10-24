@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
 import { prisma, pgPool } from "../../config/prisma.js";
 import { createTenantWorkspace } from "../../services/workspaces/workspace-api.service.js";
@@ -14,10 +14,9 @@ if (!output) throw new Error("An explicit temporary fixture output path is requi
 
 try {
   if (await prisma.user.count() !== 0) throw new Error("Browser fixture database must be empty");
-  await pgPool.query('DROP TABLE IF EXISTS workspace_invitations, workspace_outbox, workspace_command_journal; ALTER TABLE workspaces DROP COLUMN "lifecycleStatus", DROP COLUMN version, DROP COLUMN "archivedAt"');
-  for (const name of ["20260928090000_workspace_command_journal", "20260928122000_workspace_lifecycle", "20260928140000_document_concurrency"]) {
-    await pgPool.query(await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"));
-  }
+  // The browser database was migrated by the identity qualification job.
+  // Do not DROP live tables or replay old migrations inside a fixture. Doing so
+  // masks drift, duplicates constraints and invalidates RLS migration evidence.
   const plan = await prisma.subscriptionPlan.create({ data: {
     name: "Browser fixture free plan", slug: "free", price: 0, websiteLimit: 20,
     features: [], isActive: true,
