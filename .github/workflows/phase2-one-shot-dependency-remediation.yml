@@ -1,0 +1,76 @@
+name: Phase 2 one-shot dependency remediation
+on:
+  push:
+    branches: [phase2/production-hardening]
+    paths:
+      - '.github/workflows/phase2-one-shot-dependency-remediation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.repository == 'navinray12/forgestudio-ai' && github.ref == 'refs/heads/phase2/production-hardening'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Update vulnerable direct dependencies and constrained transitive overrides
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          function change(file, edit) {
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            edit(pkg);
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+          }
+          change('backend/package.json', (pkg) => {
+            pkg.dependencies.nodemailer = '10.2.1';
+            pkg.dependencies.zod = '4.6.6';
+            pkg.overrides = { ...pkg.overrides, 'fast-uri': '3.1.9', 'body-parser': '2.4.0', 'undici': '7.30.1' };
+          });
+          change('frontend/package.json', (pkg) => {
+            pkg.dependencies['monaco-editor'] = '0.57.0';
+            pkg.dependencies.dompurify = '3.4.17';
+            pkg.overrides = { ...pkg.overrides, zod: '4.6.6' };
+          });
+          NODE
+      - name: Regenerate locked package trees using npm, no forced upgrades
+        run: |
+          npm install --prefix backend --package-lock-only --ignore-scripts --no-audit
+          npm install --prefix frontend --package-lock-only --ignore-scripts --no-audit
+      - name: Install reproducibly
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Enforce high-severity dependency audit
+        run: |
+          npm audit --prefix backend --audit-level high
+          npm audit --prefix frontend --audit-level high
+      - name: Verify production builds
+        run: |
+          npm run build --prefix backend
+          npm run build --prefix frontend
+      - name: Verify Phase 1/2 regression
+        run: |
+          cd backend
+          npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts src/tests/phase2-template-list-contract.test.ts
+          cd ../frontend
+          npx --no-install vitest run tests/global-widget-service.test.ts tests/global-widget-library-recovery.test.tsx
+      - name: Commit only audited and verified dependency files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/package.json backend/package-lock.json frontend/package.json frontend/package-lock.json
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(dependencies): update audited Phase 1/2 dependency graph"
+            git push origin HEAD:refs/heads/phase2/production-hardening
+          fi
