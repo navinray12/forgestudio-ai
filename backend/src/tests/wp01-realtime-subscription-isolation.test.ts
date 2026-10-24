@@ -102,4 +102,34 @@ describe("WP-01 realtime subscription isolation", () => {
     expect(ws.sent.some((x) => x.event === "subscribed")).toBe(false);
     expect(h.release).toHaveBeenCalledExactlyOnceWith(true);
   });
+  it("never broadcasts NEW/OLD row bodies to project-wide subscribers", async () => {
+    let notification: ((payload: unknown) => void) | undefined;
+    h.connect.mockResolvedValue({
+      on: vi.fn((event: string, handler: (payload: unknown) => void) => {
+        if (event === "notification") notification = handler;
+      }),
+      query: h.query,
+      release: h.release,
+    });
+    const ws = socket("collaborator-without-row-access");
+    ws.receive({ event: "subscribe", projectId: "proj-a", table: "orders" });
+    await untilFrame(ws, "subscribed");
+    expect(notification).toBeTypeOf("function");
+    notification!({
+      channel: "forge_realtime",
+      payload: JSON.stringify({
+        table: "orders",
+        action: "UPDATE",
+        record: { id: 1, private_email: "secret@example.test" },
+        old_record: { id: 1, private_email: "older-secret@example.test" },
+        commit_timestamp: "2026-10-24T10:00:00Z",
+      }),
+    });
+    const event = await untilFrame(ws, "REALTIME_EVENT");
+    expect(event).toMatchObject({ projectId: "proj-a", table: "orders", action: "UPDATE" });
+    expect(event).not.toHaveProperty("record");
+    expect(event).not.toHaveProperty("oldRecord");
+    expect(JSON.stringify(event)).not.toContain("secret@example.test");
+  });
+
 });
