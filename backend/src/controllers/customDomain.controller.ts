@@ -78,9 +78,15 @@ export async function addDomain(req: Request, res: Response) {
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domain = validateDomain(String(req.body.domain || ""));
-    const method: DomainVerificationMethod = ["TXT", "CNAME", "FILE"].includes(req.body.method)
-      ? req.body.method
-      : "TXT";
+    // Ownership verification requires a domain-specific TXT challenge.
+    // A/CNAME routing and file methods cannot satisfy the production verifier.
+    if (req.body.method !== undefined && req.body.method !== "TXT") {
+      return res.status(400).json({
+        success: false,
+        message: "TXT is the only supported domain ownership verification method",
+      });
+    }
+    const method: DomainVerificationMethod = "TXT";
 
     const domains = readDomains(website);
     if (domains.some((d: any) => d.domain === domain)) {
@@ -268,28 +274,12 @@ export async function provisionDomainSsl(req: Request, res: Response) {
 // ---------------------------------------------------------------------------
 
 function buildVerificationInstructions(record: any): Record<string, string> {
-  switch (record.verificationMethod) {
-    case "TXT":
-      return {
-        type: "DNS TXT Record",
-        host: `_forgestudio-challenge.${record.domain}`,
-        value: record.verificationToken,
-        ttl: "300",
-      };
-    case "CNAME":
-      return {
-        type: "DNS CNAME Record",
-        host: `verify.${record.domain}`,
-        value: record.cnamTarget || "verify.forgestudio.app",
-        ttl: "300",
-      };
-    case "FILE":
-      return {
-        type: "File Verification",
-        url: `http://${record.domain}/.well-known/forgestudio-verify.txt`,
-        content: record.verificationToken,
-      };
-    default:
-      return {};
-  }
+  // Existing CNAME/FILE records also receive the real TXT instruction.
+  // Routing records are optional hints and never prove domain ownership.
+  return {
+    type: "DNS TXT Record",
+    host: `_forgestudio-challenge.${record.domain}`,
+    value: record.verificationToken,
+    ttl: "300",
+  };
 }
