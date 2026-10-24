@@ -175,6 +175,30 @@ export async function putObject(
 }
 
 /**
+ * Confirm actual object existence and server-observed metadata before a
+ * client-supplied upload confirmation can create a durable database record.
+ */
+export async function headObject(
+  bucketName: string,
+  key: string
+): Promise<{ contentLength: number; contentType?: string }> {
+  const sdk = await getS3Sdk();
+  const client = await getS3Client();
+  try {
+    const result = await client.send(new sdk.HeadObjectCommand({
+      Bucket: bucketName, Key: key,
+    }));
+    if (!Number.isSafeInteger(result.ContentLength) || result.ContentLength < 0) {
+      throw new AppError("Uploaded object metadata is incomplete", 409, "UPLOAD_NOT_VERIFIED");
+    }
+    return { contentLength: result.ContentLength, contentType: result.ContentType };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError("Uploaded object could not be verified in storage", 409, "UPLOAD_NOT_VERIFIED");
+  }
+}
+
+/**
  * Retrieves a readable object stream from S3/MinIO.
  */
 export async function getObjectStream(
