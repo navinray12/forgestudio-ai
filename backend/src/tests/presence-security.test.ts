@@ -33,8 +33,13 @@ test("authenticated presence channel and revocation contracts", {timeout:45000},
     {organizationId:organization.id,userId:sibling.id,role:"MEMBER"}]});
   const sites: Array<{id:string}>=[];
   for(const name of ["A","B"]){
-    const workspace=await prisma.workspace.create({data:{name,slug:randomUUID(),organizationId:organization.id,ownerId:owner.id}});
-    await prisma.workspaceMember.create({data:{workspaceId:workspace.id,userId:owner.id,role:"OWNER"}});
+    // Production invariant requires exactly one OWNER at COMMIT. Create the
+    // workspace and its owner membership atomically, not in separate commits.
+    const workspace=await prisma.$transaction(async tx=>{
+      const created=await tx.workspace.create({data:{name,slug:randomUUID(),organizationId:organization.id,ownerId:owner.id}});
+      await tx.workspaceMember.create({data:{workspaceId:created.id,userId:owner.id,role:"OWNER"}});
+      return created;
+    });
     sites.push(await prisma.website.create({data:{name,slug:randomUUID(),userId:owner.id,organizationId:organization.id,workspaceId:workspace.id}}));
   }
   async function token(userId:string){
