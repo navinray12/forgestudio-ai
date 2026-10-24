@@ -7,6 +7,17 @@ import {
 } from "../services/form/form.service.js";
 
 /**
+ * Quote CSV values and neutralize spreadsheet formula payloads. This applies
+ * to submitted field names as well as data, which both come from visitors.
+ */
+export function csvCell(value: unknown): string {
+  const text = value == null ? "" :
+    typeof value === "string" ? value : JSON.stringify(value);
+  const safe = /^[\s\u0000-\u001f]*[=+@-]/.test(text) ? "'" + text : text;
+  return '"' + safe.replace(/"/g, '""') + '"';
+}
+
+/**
  * POST /api/forms/submit
  * Public endpoint to accept visitor form submissions
  */
@@ -125,7 +136,7 @@ export async function exportSubmissionsHandler(
       if (submissions.length === 0) {
         res.setHeader("Content-Type", "text/csv");
         res.setHeader("Content-Disposition", `attachment; filename=submissions-${websiteId}.csv`);
-        return res.status(200).send("id,formId,formName,submittedAt,data\n");
+        return res.status(200).send(["ID", "Form Name", "Submitted At"].map(csvCell).join(",") + "\n");
       }
 
       // Collect all field keys
@@ -137,19 +148,13 @@ export async function exportSubmissionsHandler(
       });
       const keyList = Array.from(allKeys);
 
-      const header = ["ID", "Form Name", "Submitted At", ...keyList].join(",");
-      const rows = submissions.map((s) => {
-        const fieldValues = keyList.map((k) => {
-          const val = s.data?.[k] !== undefined ? String(s.data[k]).replace(/"/g, '""') : "";
-          return `"${val}"`;
-        });
-        return [
-          `"${s.id}"`,
-          `"${s.formName || ""}"`,
-          `"${s.createdAt ? new Date(s.createdAt).toISOString() : ""}"`,
-          ...fieldValues,
-        ].join(",");
-      });
+      const header = ["ID", "Form Name", "Submitted At", ...keyList].map(csvCell).join(",");
+      const rows = submissions.map((record) => [
+        record.id,
+        record.formName || "",
+        record.createdAt ? new Date(record.createdAt).toISOString() : "",
+        ...keyList.map((key) => record.data?.[key]),
+      ].map(csvCell).join(","));
 
       const csvContent = [header, ...rows].join("\n");
       res.setHeader("Content-Type", "text/csv");
