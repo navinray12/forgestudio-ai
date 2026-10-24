@@ -37,6 +37,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.modify.mockReset();
   h.verify.mockResolvedValue({ website: { id: "site-a", userId: "owner" }, canAdminister: true });
   h.sdk.mockResolvedValue("export type Tables = {};");
 });
