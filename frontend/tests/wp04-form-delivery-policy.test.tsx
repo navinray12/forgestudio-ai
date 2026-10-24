@@ -39,6 +39,19 @@ describe("WP04 server-only form delivery settings", () => {
     expect(screen.queryByText("do-not-publish")).toBeNull();
   });
 
+  it("does not overwrite an existing provider policy with blank redacted credentials", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(response({
+      success: true, data: { configured: true, formId: "form_4", activeActions: ["mailchimp"] },
+    }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<FormDeliveryPolicyPanel websiteId="site_1" formId="form_4" />);
+    await screen.findByText("Configured actions: mailchimp");
+    fireEvent.click(screen.getByRole("button", { name: "Save secure delivery" }));
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("Mailchimp API key"));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Disable delivery" })).toBeTruthy();
+  });
+
   it("does not offer saving when owner access is denied", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({ success: false }, 403));
     vi.stubGlobal("fetch", fetcher);
