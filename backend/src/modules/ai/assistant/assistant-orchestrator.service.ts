@@ -56,12 +56,15 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   }
 
   // 3. Background Removal
-  if (p.includes("remove background") || p.includes("transparent background") || p.includes("no background")) {
+  if (p.includes("remove background") || p.includes("remove the background") ||
+      p.includes("transparent background") || p.includes("no background")) {
     return "REMOVE_BACKGROUND";
   }
 
   // 4. Image Replacement / Generation
-  if ((context?.elementType === "image" || context?.elementId) && (p.includes("replace image") || p.includes("change image") || p.includes("new photo"))) {
+  if ((context?.elementType === "image" || context?.elementId) &&
+      (p.includes("replace image") || p.includes("replace this image") ||
+       p.includes("change image") || p.includes("new photo"))) {
     return "REPLACE_IMAGE";
   }
   if (p.startsWith("generate image") || p.startsWith("create image") ||
