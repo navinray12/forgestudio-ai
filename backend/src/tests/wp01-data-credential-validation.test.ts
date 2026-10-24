@@ -159,6 +159,14 @@ describe("WP-01 public data API credential validation", () => {
     })).resolves.toBeUndefined();
   });
 
+  it("requires FORCE RLS for authenticated browser sessions as well as anonymous keys", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ enabled: true, forced: false }] });
+    await expect(assertPublicTableRls({ query } as never, "private_orders", {
+      role: "authenticated", sub: "owner", isServiceRole: false,
+    })).rejects.toMatchObject({ code: "PUBLIC_RLS_REQUIRED", statusCode: 403 });
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("does not open a separate table policy query for the verified service key", async () => {
     const query = vi.fn();
     await assertPublicTableRls({ query } as never, "orders", {
