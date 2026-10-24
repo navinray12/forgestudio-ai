@@ -31,6 +31,9 @@ import { ContentOnlyInspector } from "./components/ContentOnlyInspector";
 import { ExperimentManagerModal } from "./components/experiments/ExperimentManagerModal";
 import { useCanvasPresence } from "../../features/collaboration/hooks/useCanvasPresence";
 import { WooCommerceProvider } from "../../context/WooCommerceContext";
+import { EditorTopHeader } from "./components/EditorTopHeader";
+import { EditorLeftRail, type LeftRailActiveItem } from "./components/EditorLeftRail";
+import { DesignTokensPanel } from "./inspector/DesignTokensPanel";
 
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { forgeProjectService } from "../../features/developer-workspace/services/forgeProjectService";
@@ -44,7 +47,7 @@ import {
   Mail, MessageSquare, Phone, User, Calendar, MapPin, Search, Star, Share2,
   AlertCircle, Info, Download, Upload, Zap, Shield, Sparkles, Layout, Compass,
   Terminal, ShieldCheck, StickyNote, FormInput, Link as LinkIcon, Navigation, ArrowRight, Menu,
-  ArrowLeft, Keyboard, Code2, Rocket, History as HistoryIcon
+  ArrowLeft, Keyboard, Code2, Rocket, History as HistoryIcon, Home
 } from "lucide-react";
 
 // ==========================================
@@ -380,7 +383,7 @@ export default function WebsiteEditor() {
   const [activeCanvasMode, setActiveCanvasMode] = useState<"page" | "popup">("page");
   const [activePopupId, setActivePopupId] = useState<string | null>(null);
   const [devModalMode, setDevModalMode] = useState<DeveloperModalMode | null>(null);
-  const [activeSidebarTab, setActiveSidebarTab] = useState<string>("widgets");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<string>("style");
   const [pageCss, setPageCss] = useState<string>("");
 
   const handleSelectPopupForEdit = (popup: any) => {
@@ -807,8 +810,11 @@ export default function WebsiteEditor() {
     if (!id) {
       setSelectedId(null);
       setSelectedIds([]);
+      setInspectorViewMode("tokens");
       return;
     }
+
+    setInspectorViewMode("element");
 
     if (e && (e.ctrlKey || e.metaKey)) {
       setSelectedIds((prev) => {
@@ -880,6 +886,13 @@ export default function WebsiteEditor() {
   const [leftSidebarTab, setLeftSidebarTab] = useState<"elements" | "navigator" | "templates">("elements");
   const [collapsedContainers, setCollapsedContainers] = useState<Record<string, boolean>>({});
   const [structureSearchQuery, setStructureSearchQuery] = useState("");
+
+  // PDF UI Redesign State (Zoom, Left Rail, Sub-Tabs, Inspector Mode)
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [leftRailTab, setLeftRailTab] = useState<LeftRailActiveItem>("pages");
+  const [sidebarSubTab, setSidebarSubTab] = useState<"pages" | "blocks" | "assets">("pages");
+  const [inspectorViewMode, setInspectorViewMode] = useState<"element" | "tokens">("tokens");
+  const [isLayersCollapsed, setIsLayersCollapsed] = useState<boolean>(false);
 
 
   // Element Manager & Widget Visibility State
@@ -3101,20 +3114,25 @@ export default function WebsiteEditor() {
         return;
       }
 
-      if (isInput) return;
-
       if (e.key === "Escape") {
         if (isShortcutsHelpOpen) {
           e.preventDefault();
           setIsShortcutsHelpOpen(false);
+          return;
         } else if (isFinderOpen) {
           e.preventDefault();
           setIsFinderOpen(false);
+          return;
         } else if (isFullScreenCanvas) {
           e.preventDefault();
           setIsFullScreenCanvas(false);
+          return;
         }
-      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+      }
+
+      if (isInput) return;
+
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
         setIsShortcutsHelpOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -7250,600 +7268,69 @@ export default function WebsiteEditor() {
 
   return (
     <WooCommerceProvider websiteId={websiteId}>
-    <div className="flex h-screen flex-col overflow-hidden bg-[#f1f5f9] text-slate-800 font-sans">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#0e0f19] text-slate-100 font-['Plus_Jakarta_Sans',sans-serif]">
       {/* ========================================== */}
-      {/* Top Header Bar */}
+      {/* Top Header Bar (PDF Exact Redesign)        */}
       {/* ========================================== */}
       {!isFullScreenCanvas && (
-        <header
-          className={`relative w-full h-13 shrink-0 flex items-center justify-between px-3 md:px-4 shadow-md transition overflow-x-auto ${userPreferences.themeMode === "light"
-            ? "bg-white border-b border-slate-200 text-slate-800"
-            : "bg-[#0b1329] text-white"
-            }`}
-        >
-          {/* 1. Left Region: Brand / Back / Breadcrumb & Page Selector */}
-          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 min-w-0">
-            {/* Quit Editor Button */}
-            <button
-              type="button"
-              onClick={handleQuitEditor}
-              className="w-8 h-8 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-sm cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500"
-              title="Back to Dashboard"
-              aria-label="Back to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-
-            {/* Project Title / Breadcrumb */}
-            <span className="text-xs font-bold text-white tracking-wide border-l border-slate-700/80 pl-2.5 hidden sm:inline-block max-w-[90px] md:max-w-[130px] truncate">
-              {website?.name || "ForgeStudio"}
-            </span>
-
-            {/* Page Selector Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsPageSelectorOpen(!isPageSelectorOpen)}
-                className="h-8 px-2.5 text-xs font-semibold text-white bg-slate-800/90 hover:bg-slate-700/90 rounded-lg border border-slate-700/80 transition flex items-center gap-1.5 shadow-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500"
-                title="Switch Active Page or Manage Site Pages"
-                aria-label="Switch Active Page"
-                aria-expanded={isPageSelectorOpen}
-                aria-haspopup="listbox"
-              >
-                <span className="text-amber-400 text-xs">📄</span>
-                <span className="max-w-[70px] sm:max-w-[110px] truncate font-bold">
-                  {pages.find((p) => p.id === activePageId)?.name || "Page"}
-                </span>
-                {homePageId === activePageId && (
-                  <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded font-bold hidden md:inline">Home</span>
-                )}
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-
-              {isPageSelectorOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
-                  <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
-                    <span>Site Pages ({pages.length})</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPageSelectorOpen(false);
-                        setIsPageManagerModalOpen(true);
-                      }}
-                      className="text-blue-400 hover:text-blue-300 font-semibold cursor-pointer text-[10px]"
-                    >
-                      Manage All ⚙️
-                    </button>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto py-1">
-                    {pages.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          handleSwitchEditingPage(p.id);
-                          setIsPageSelectorOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer ${p.id === activePageId ? "bg-blue-600/20 text-blue-300 font-bold" : "text-slate-300"
-                          }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <span>{p.id === homePageId ? "🏠" : "📄"}</span>
-                          <span className="truncate">{p.name}</span>
-                          {p.id === homePageId && (
-                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-bold">Home</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono">{p.slug}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Quick Add Presets: About, Contact, Services, Pricing */}
-                  <div className="p-2 border-t border-slate-800 bg-slate-950/60">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Quick Add Page</span>
-                      <span className="text-[9px] text-slate-500 font-normal">1-click create</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("About Us", "/about")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to About Us page"
-                      >
-                        <span className="text-blue-400">ℹ️</span>
-                        <span>+ About</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Contact", "/contact")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Contact page"
-                      >
-                        <span className="text-emerald-400">✉️</span>
-                        <span>+ Contact</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Services", "/services")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Services page"
-                      >
-                        <span className="text-purple-400">🛠️</span>
-                        <span>+ Services</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickCreateOrSwitchPage("Pricing", "/pricing")}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-200 bg-slate-800/80 hover:bg-blue-600 hover:text-white rounded-lg border border-slate-700/70 transition flex items-center gap-1.5 cursor-pointer justify-start"
-                        title="Create or switch to Pricing page"
-                      >
-                        <span className="text-amber-400">🏷️</span>
-                        <span>+ Pricing</span>
-                      </button>
-                    </div>
-
-                    <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPageSelectorOpen(false);
-                          setNewPageName("");
-                          setNewPageSlug("");
-                          setIsAddPageModalOpen(true);
-                        }}
-                        className="flex-1 text-center px-2 py-1 text-xs text-blue-400 hover:bg-blue-900/30 rounded-lg flex items-center justify-center gap-1 transition font-semibold cursor-pointer border border-blue-500/20"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Custom Page...</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPageSelectorOpen(false);
-                          setIsPageManagerModalOpen(true);
-                        }}
-                        className="px-2 py-1 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition font-medium cursor-pointer border border-slate-700/60"
-                        title="Open full page manager"
-                      >
-                        All Pages
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Direct Quick Add Page Button beside abc Home */}
-            <button
-              type="button"
-              onClick={() => {
-                setNewPageName("");
-                setNewPageSlug("");
-                setIsAddPageModalOpen(true);
-              }}
-              className="h-8 px-2 text-xs font-semibold text-blue-400 bg-blue-950/40 hover:bg-blue-900/60 hover:text-blue-300 rounded-lg border border-blue-500/30 transition flex items-center gap-1 shadow-sm cursor-pointer"
-              title="Add New Website Page (About, Contact, etc.)"
-              aria-label="Add New Page"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline font-bold">Page</span>
-            </button>
-
-            {/* Scope Switcher Dropdown (Page / Header / Footer / Single / Archive / 404 / Search Results) */}
-            <div className="relative" ref={scopeDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsScopeDropdownOpen((prev) => !prev)}
-                className="h-8 px-2 text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 hover:text-white rounded-lg border border-slate-700/80 transition flex items-center gap-1 shadow-sm cursor-pointer"
-                title="Switch Canvas Scope (Page / Header / Footer / Single / Archive / 404 / Search)"
-                aria-label="Switch Canvas Scope"
-              >
-                <span className="text-xs">
-                  {canvasMode === "page" && "📄"}
-                  {canvasMode === "header" && "🌐"}
-                  {canvasMode === "footer" && "🌐"}
-                  {canvasMode === "single" && "📰"}
-                  {canvasMode === "archive" && "📚"}
-                  {canvasMode === "404" && "⚠️"}
-                  {canvasMode === "search-results" && "🔍"}
-                </span>
-                <span className="capitalize font-semibold hidden md:inline">
-                  {canvasMode === "404" ? "404 Page" : canvasMode === "search-results" ? "Search Results" : canvasMode}
-                </span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-
-              {isScopeDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-44 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-fadeIn">
-                  {(
-                    [
-                      { mode: "page", label: "Page Content", icon: "📄" },
-                      { mode: "header", label: "Global Header", icon: "🌐" },
-                      { mode: "footer", label: "Global Footer", icon: "🌐" },
-                      { mode: "single", label: "Single Post Template", icon: "📰" },
-                      { mode: "archive", label: "Archive Template", icon: "📚" },
-                      { mode: "404", label: "404 Not Found Page", icon: "⚠️" },
-                      { mode: "search-results", label: "Search Results Layout", icon: "🔍" },
-                    ] as const
-                  ).map(({ mode, label, icon }) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        handleSwitchCanvasMode(mode as ThemeBuilderScope);
-                        setIsScopeDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition cursor-pointer hover:bg-slate-800 ${canvasMode === mode
-                        ? "bg-blue-600/20 text-blue-300 font-bold"
-                        : "text-slate-300 hover:text-white"
-                        }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{icon}</span>
-                        <span>{label}</span>
-                      </div>
-                      {canvasMode === mode && (
-                        <span className="text-blue-400 text-xs">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 2. Center Region: Viewport Switcher */}
-          <div className="hidden lg:flex items-center justify-center pointer-events-auto">
-            <div className="flex items-center gap-0.5 bg-slate-900/80 p-0.5 rounded-lg border border-slate-700/80 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setActiveDevice("desktop")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "desktop"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Desktop View"
-                aria-label="Desktop View"
-              >
-                <Monitor className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDevice("tablet")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "tablet"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Tablet View"
-                aria-label="Tablet View"
-              >
-                <Tablet className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDevice("mobile")}
-                className={`w-7 h-7 flex items-center justify-center rounded-md transition cursor-pointer ${activeDevice === "mobile"
-                  ? "bg-blue-600 text-white shadow-xs font-bold"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-                  }`}
-                title="Mobile View"
-                aria-label="Mobile View"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* 3. Right Region: Compact Tools, History, Primary Actions */}
-          <div className="flex items-center justify-end gap-1.5 md:gap-2 shrink-0">
-            {/* Status Messages */}
-            {saveMessage && <span role="status" aria-live="polite" className={`text-xs font-medium shrink-0 ${saveMessage.startsWith("Save failed") ? "text-red-400" : "text-emerald-400"}`}>{saveMessage}</span>}
-            {errorMessage && <span role="alert" className="text-xs font-medium text-red-400 shrink-0 max-w-sm">{errorMessage}</span>}
-
-            {/* History Controls Group (Undo / Redo / History) */}
-            <div className="flex items-center gap-0.5 bg-[#16203a] p-0.5 rounded-lg border border-slate-700/80 shrink-0">
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo"
-              >
-                <Undo className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
-                title="Redo (Ctrl+Y)"
-                aria-label="Redo"
-              >
-                <Redo className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsRevisionHistoryOpen(true)}
-                className="w-7 h-7 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 transition border-l border-slate-700/80 cursor-pointer"
-                title="Revision History"
-                aria-label="Revision History"
-              >
-                <HistoryIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Selected Element Quick Actions (Only active when element selected) */}
-            {selectedId && (
-              <div className="hidden xl:flex items-center gap-0.5 bg-[#16203a] p-0.5 rounded-lg border border-blue-500/40 shrink-0">
-                <button
-                  onClick={() => handleReorderElement(selectedId, "up")}
-                  className="w-6 h-6 flex items-center justify-center text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Move Up"
-                  aria-label="Move Up"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => handleReorderElement(selectedId, "down")}
-                  className="w-6 h-6 flex items-center justify-center text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Move Down"
-                  aria-label="Move Down"
-                >
-                  ▼
-                </button>
-                <button
-                  onClick={(e) => handleCopyElement(selectedId, e)}
-                  className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Copy (Ctrl+C)"
-                  aria-label="Copy Element"
-                >
-                  <Copy className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={(e) => handleDuplicateElement(selectedId, e)}
-                  className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded cursor-pointer"
-                  title="Duplicate (Ctrl+D)"
-                  aria-label="Duplicate Element"
-                >
-                  <Layers className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => handleSaveAsComponent(selectedId)}
-                  className="w-6 h-6 flex items-center justify-center text-purple-300 bg-purple-900/40 hover:bg-purple-800 rounded cursor-pointer"
-                  title="Save as Reusable Component"
-                  aria-label="Save Component"
-                >
-                  🧩
-                </button>
-                <button
-                  onClick={handleOpenReplaceTemplate}
-                  className="w-6 h-6 flex items-center justify-center text-amber-300 bg-amber-900/40 hover:bg-amber-800 rounded cursor-pointer"
-                  title="Replace with Template"
-                  aria-label="Replace with Template"
-                >
-                  🔄
-                </button>
-              </div>
-            )}
-
-            {/* Icon-Based Utility Tools Group */}
-            <div className="flex items-center gap-1 border-l border-slate-700/80 pl-1.5 shrink-0">
-              {/* Search */}
-              <button
-                type="button"
-                onClick={() => setIsFinderOpen(true)}
-                className="w-7 h-7 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Search (Ctrl+K)"
-                aria-label="Search"
-              >
-                <Search className="w-3.5 h-3.5" />
-              </button>
-
-              {/* SEO & Quality Audit */}
-              <button
-                type="button"
-                onClick={() => setIsSeoModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="SEO & Quality Audit"
-                aria-label="SEO & Quality Audit"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              </button>
-
-              {/* Tokens */}
-              <button
-                type="button"
-                onClick={() => setIsVariablesModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Design Variables & CSS Tokens"
-                aria-label="Tokens"
-              >
-                <Palette className="w-3.5 h-3.5 text-indigo-400" />
-              </button>
-
-              {/* F-339: Dynamic Multi-Mode Theme Toggle */}
-              <button
-                type="button"
-                onClick={() => setCanvasTheme((t) => (t === "light" ? "dark" : "light"))}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 cursor-pointer ${canvasTheme === "dark"
-                  ? "bg-indigo-950/60 text-indigo-300 border-indigo-700/80 shadow-sm"
-                  : "bg-amber-950/30 text-amber-300 border-amber-700/60"
-                  }`}
-                title="Toggle Dynamic Canvas Theme (☀️ Light / 🌙 Dark)"
-              >
-                <span>{canvasTheme === "dark" ? "🌙 Dark" : "☀️ Light"}</span>
-              </button>
-
-              {/* Live Real-time Collaborators Avatar Stack */}
-              {canvasPeers.length > 0 && (
-                <div className="flex items-center -space-x-1.5 overflow-hidden pl-1 pr-1" title={`${canvasPeers.length} other collaborator(s) online`}>
-                  {canvasPeers.map((peer) => (
-                    <div
-                      key={peer.socketId}
-                      title={`${peer.user.name} is currently editing`}
-                      className="relative flex items-center justify-center w-6 h-6 rounded-full text-[9px] font-extrabold text-white ring-2 ring-slate-900 shadow-sm transition hover:z-20 hover:scale-110"
-                      style={{ backgroundColor: peer.user.color }}
-                    >
-                      {peer.user.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Client Restricted Mode Badge */}
-              {isRestrictedMode && (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-xs">
-                  <Lock className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Client Editor Mode (Content Only)</span>
-                </div>
-              )}
-
-              {/* F-339: Variables Manager (Tokens) */}
-              <button
-                type="button"
-                onClick={() => setIsVariablesModalOpen(true)}
-                className="px-3 py-1 text-xs font-semibold rounded-lg border text-indigo-300 bg-indigo-950/40 hover:bg-indigo-900/60 border-indigo-800/60 transition flex items-center gap-1.5 cursor-pointer"
-                title="Design Variables & CSS Tokens (F-339)"
-              >
-                <span>🎨</span>
-                <span>Tokens</span>
-              </button>
-
-
-              {/* Classes */}
-              <button
-                type="button"
-                onClick={() => setIsClassModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Global Utility Classes"
-                aria-label="Classes"
-              >
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-              </button>
-
-              {/* Notes */}
-              <button
-                type="button"
-                onClick={() => setIsDesignNotesOpen(!isDesignNotesOpen)}
-                className={`w-7 h-7 rounded-lg border transition flex items-center justify-center shadow-xs cursor-pointer ${isDesignNotesOpen
-                  ? "bg-purple-600/30 text-purple-200 border-purple-500/60"
-                  : "text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80"
-                  }`}
-                title="Collaborative Design Notes"
-                aria-label="Notes"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Dev Mode */}
-              <button
-                type="button"
-                onClick={() => setDevModalMode((prev) => (prev === "export-code" ? null : "export-code"))}
-                className={`w-7 h-7 rounded-lg border transition flex items-center justify-center shadow-xs cursor-pointer ${devModalMode === "export-code"
-                  ? "bg-blue-600 text-white border-blue-500"
-                  : "text-blue-300 bg-blue-900/40 hover:bg-blue-800/60 border-blue-700/60"
-                  }`}
-                title="Developer Mode"
-                aria-label="Developer Mode"
-              >
-                <Code2 className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Phase 3: A/B Split Testing */}
-              <button
-                type="button"
-                onClick={() => setIsExperimentModalOpen(true)}
-                className="px-3 py-1 text-xs font-semibold rounded-lg border text-purple-300 bg-purple-950/40 hover:bg-purple-900/60 border-purple-800/60 transition flex items-center gap-1.5 cursor-pointer"
-                title="A/B Split Testing & Conversion Experiments"
-              >
-                <span>🧪</span>
-                <span>A/B Tests</span>
-              </button>
-
-
-              {/* Fullscreen Canvas */}
-              <button
-                type="button"
-                onClick={() => setIsFullScreenCanvas(!isFullScreenCanvas)}
-                className="w-7 h-7 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white transition flex items-center justify-center shadow-xs cursor-pointer"
-                title="Toggle Full Screen Canvas"
-                aria-label="Toggle Full Screen Canvas"
-              >
-                <span className="text-xs leading-none">⛶</span>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="h-4 w-px bg-slate-700/80 mx-0.5 shrink-0" />
-
-            {/* Primary Actions: Preview, Save, Publish */}
-            {/* Preview Button */}
-            <button
-              type="button"
-              onClick={() => setIsPreview(!isPreview)}
-              className={`w-8 h-8 rounded-lg border transition flex items-center justify-center shadow-sm cursor-pointer shrink-0 ${isPreview
-                ? "bg-amber-500/20 text-amber-300 border-amber-500/60 hover:bg-amber-500/30"
-                : "bg-slate-800/80 text-slate-300 border-slate-700/80 hover:bg-slate-700/80 hover:text-white"
-                }`}
-              title={isPreview ? "Exit Preview (Ctrl+P)" : "Preview"}
-              aria-label={isPreview ? "Exit Preview" : "Preview"}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-
-            {/* Save Button */}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="h-8 px-3 rounded-lg border border-blue-500 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Save (Ctrl+S)"
-              aria-label="Save"
-            >
-              {saving ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              <span className="hidden sm:inline">Save</span>
-            </button>
-
-            {/* Code Workspace Button */}
-            <button
-              type="button"
-              onClick={async () => {
-                // The workspace generates code from the saved document, so an unconfirmed
-                // save must not navigate: handleSave reports the failure in the editor.
-                if (userAccess.canEditContent) {
-                  const saved = await handleSave();
-                  if (!saved) return;
-                }
-                navigate(`/workspace/website/${websiteId}`);
-              }}
-              className="h-8 px-3 rounded-lg border border-purple-500/60 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 hover:text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              title="Open Developer Code Workspace (Full Project IDE, React & Next.js Generation)"
-              aria-label="Developer Code Workspace"
-            >
-              <Code2 className="w-3.5 h-3.5 text-purple-400" />
-              <span className="hidden sm:inline">Code Workspace</span>
-            </button>
-
-            {/* Publish Button */}
-            <button
-              type="button"
-              onClick={() => setIsPublishModalOpen(true)}
-              className="h-8 px-3.5 relative rounded-lg border border-emerald-500/50 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              title="Publish Website"
-              aria-label="Publish"
-            >
-              <Rocket className="w-3.5 h-3.5" />
-              <span>Publish</span>
-              {publishing.status === "PUBLISHED" && (
-                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse ring-1 ring-emerald-950"></span>
-              )}
-            </button>
-          </div>
-        </header>
+        <EditorTopHeader
+          website={website}
+          activePage={pages.find((p) => p.id === activePageId) || { id: activePageId || "home", name: pageSettings.title || "Summer Sale Landing", slug: pageSettings.slug || "/" }}
+          pages={pages}
+          homePageId={homePageId}
+          onSwitchPage={(id) => handleSwitchEditingPage(id)}
+          onOpenPageManager={() => setIsPageManagerModalOpen(true)}
+          onQuit={handleQuitEditor}
+          publishing={publishing}
+          activeDevice={activeDevice}
+          onSelectDevice={(device) => setActiveDevice(device)}
+          zoomLevel={zoomLevel}
+          onSelectZoom={(zoom) => setZoomLevel(zoom)}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
+          isPreview={isPreview}
+          onTogglePreview={() => setIsPreview(!isPreview)}
+          onOpenPublishModal={() => setIsPublishModalOpen(true)}
+          onSave={handleSave}
+          saving={saving}
+          autosaveText={typeof autosaveStatus === "string" ? autosaveStatus : "Saved"}
+          onOpenDevModal={(mode) => setDevModalMode(mode)}
+          devModalMode={devModalMode}
+          onOpenAiAssistant={() => setIsUnifiedAiOpen(true)}
+          onOpenSeoModal={() => setIsSeoModalOpen(true)}
+          onOpenExperimentModal={() => setIsExperimentModalOpen(true)}
+          onOpenVariablesModal={() => setIsVariablesModalOpen(true)}
+          onOpenClassModal={() => setIsClassModalOpen(true)}
+          isDesignNotesOpen={isDesignNotesOpen}
+          onToggleDesignNotes={() => setIsDesignNotesOpen(!isDesignNotesOpen)}
+          isFullScreenCanvas={isFullScreenCanvas}
+          onToggleFullScreenCanvas={() => setIsFullScreenCanvas(!isFullScreenCanvas)}
+          canvasPeers={canvasPeers}
+          isRestrictedMode={isRestrictedMode}
+          onNavigateWorkspace={async () => {
+            if (userAccess.canEditContent) {
+              const saved = await handleSave();
+              if (!saved) return;
+            }
+            navigate(`/workspace/website/${websiteId}`);
+          }}
+          onOpenRevisionHistory={() => setIsRevisionHistoryOpen(true)}
+          onOpenFinder={() => setIsFinderOpen(true)}
+          onOpenPopupManager={() => setIsPopupManagerOpen(true)}
+          onOpenMultilingual={() => setIsMultilingualModalOpen(true)}
+          onOpenAddPageModal={() => setIsAddPageModalOpen(true)}
+          onQuickCreatePage={handleQuickCreateOrSwitchPage}
+          canvasMode={canvasMode}
+          onSwitchCanvasMode={handleSwitchCanvasMode}
+          selectedElementId={selectedId}
+          onReorderElement={handleReorderElement}
+          onCopyElement={(id) => handleCopyElement(id)}
+          onDuplicateElement={(id) => handleDuplicateElement(id)}
+          onSaveAsComponent={handleSaveAsComponent}
+          onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+        />
       )}
 
       {/* ========================================== */}
@@ -7854,60 +7341,206 @@ export default function WebsiteEditor() {
         {/* Left Sidebar: ELEMENTS                     */}
         {/* ========================================== */}
         {!isPreview && !isFullScreenCanvas && (
-          <aside className="w-64 md:w-72 shrink-0 border-r border-slate-200 bg-white p-3.5 overflow-y-auto shadow-sm flex flex-col">
-            <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 pb-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("elements")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "elements"
-                  ? "bg-slate-100 text-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("elements", "Elements")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("navigator")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "navigator"
-                  ? "bg-slate-100 text-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("navigator", "Navigator")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("templates")}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === "templates"
-                  ? "bg-purple-100 text-purple-700 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                {t("templates", "Templates")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLeftSidebarTab("atomic" as any)}
-                className={`flex-1 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition ${leftSidebarTab === ("atomic" as any)
-                  ? "bg-purple-100 text-purple-700 font-bold"
-                  : "text-slate-400 hover:text-slate-600"
-                  }`}
-              >
-                ⚛️ Atomic
-              </button>
-            </div>
+          <>
+            {/* Left Narrow Icon Rail matching PDF */}
+            <EditorLeftRail
+              activeItem={leftRailTab}
+              onSelectItem={(item) => {
+                setLeftRailTab(item);
+                if (item === "pages") {
+                  setSidebarSubTab("pages");
+                } else if (item === "blocks" || item === "elements") {
+                  setSidebarSubTab("blocks");
+                  setLeftSidebarTab("elements");
+                } else if (item === "templates") {
+                  setSidebarSubTab("blocks");
+                  setLeftSidebarTab("templates");
+                } else if (item === "ai") {
+                  setIsUnifiedAiOpen(true);
+                } else if (item === "settings") {
+                  handleSelectElement(null);
+                  setInspectorViewMode("tokens");
+                  setActiveSidebarTab("style");
+                }
+              }}
+              onAddClick={() => {
+                setLeftRailTab("elements");
+                setSidebarSubTab("blocks");
+                setLeftSidebarTab("elements");
+              }}
+            />
 
-            {isRestrictedMode ? (
-              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-center my-4 space-y-2">
-                <Lock className="w-6 h-6 text-amber-600 mx-auto" />
-                <span className="block text-xs font-bold text-amber-800">Widget Drawer Locked</span>
-                <p className="text-[11px] text-amber-700 leading-snug">
-                  Your Client Editor role allows editing text, images, and links directly on the canvas without adding new layout blocks.
-                </p>
+            {/* Expandable Sidebar Panel matching PDF */}
+            <aside className="w-[260px] md:w-[275px] shrink-0 border-r border-[#202235] bg-[#161726] p-3 overflow-y-auto shadow-sm flex flex-col text-slate-200 select-none">
+              {/* Top Sub-tabs: Pages | Blocks | Assets */}
+              <div className="flex items-center gap-1 bg-[#12131f] border border-[#23253b] p-1 rounded-xl mb-3 shrink-0">
+                {(["pages", "blocks", "assets"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => {
+                      setSidebarSubTab(tab);
+                      if (tab === "pages") {
+                        setLeftRailTab("pages");
+                      } else if (tab === "blocks") {
+                        setLeftRailTab("blocks");
+                        setLeftSidebarTab("elements");
+                      }
+                    }}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition cursor-pointer ${
+                      sidebarSubTab === tab
+                        ? "bg-[#252740] text-purple-300 shadow-xs"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
-            ) : leftSidebarTab === "elements" ? (
-              <div className="space-y-3">
+
+              {/* PDF Pages & Layer View when Pages tab is active */}
+              {sidebarSubTab === "pages" && leftRailTab === "pages" ? (
+                <div className="space-y-4 mb-3">
+                  {/* SECTION 1: PAGES */}
+                  <div>
+                    <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>PAGES</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsPageManagerModalOpen(true)}
+                        className="text-purple-400 hover:text-purple-300 text-[10px] font-semibold cursor-pointer"
+                      >
+                        Manage
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {pages.map((p) => {
+                        const isHome = p.id === homePageId;
+                        const isActive = p.id === activePageId;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSwitchEditingPage(p.id)}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition cursor-pointer ${
+                              isActive
+                                ? "bg-[#252740] text-purple-200 font-bold border-l-2 border-purple-500 shadow-xs"
+                                : "text-slate-300 hover:bg-[#1d1f35] hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              {isHome ? <Home className="w-3.5 h-3.5 text-slate-400" /> : <Box className="w-3.5 h-3.5 text-slate-400" />}
+                              <span className="truncate">{p.name}</span>
+                            </div>
+                            {isHome && (
+                              <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded font-bold">
+                                Home
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setIsPageManagerModalOpen(true)}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-purple-400 hover:text-purple-300 hover:bg-[#1d1f35] flex items-center gap-1.5 font-semibold transition cursor-pointer mt-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add page</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: Layer */}
+                  <div className="pt-2 border-t border-[#23253b]">
+                    <div
+                      onClick={() => setIsLayersCollapsed(!isLayersCollapsed)}
+                      className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between cursor-pointer hover:text-slate-200 transition"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Layer</span>
+                      </div>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isLayersCollapsed ? "-rotate-90" : ""}`} />
+                    </div>
+                    {!isLayersCollapsed && (
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        <div className="px-2 py-1 text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <span className="text-purple-400">•</span>
+                          <span>{pages.find(p => p.id === activePageId)?.name || "Homepage"}</span>
+                        </div>
+                        {elements.length === 0 ? (
+                          <div className="py-4 text-center text-xs text-slate-500 italic">
+                            No elements on canvas.
+                          </div>
+                        ) : (
+                          elements.map((el, idx) =>
+                            renderNavigatorTreeItem(el, 0, idx === elements.length - 1)
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : sidebarSubTab === "assets" ? (
+                /* ASSETS & MEDIA UPLOADS DRAWER */
+                <div className="space-y-4">
+                  <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>MEDIA & ASSETS</span>
+                    <span className="text-[10px] text-purple-400 font-semibold">Uploads</span>
+                  </div>
+
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.json,.svg"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleImportAsset(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => importFileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-purple-500/50 bg-[#1c1d30] p-3 text-xs font-bold text-purple-300 hover:border-purple-400 hover:bg-[#23253d] transition disabled:opacity-50 shadow-xs cursor-pointer"
+                  >
+                    <span>📁</span>
+                    <span>{isUploading ? "Uploading Asset..." : "Upload New Asset"}</span>
+                  </button>
+
+                  {uploadError && (
+                    <div className="p-2 rounded-lg bg-red-900/30 border border-red-700/50 text-[11px] text-red-300">
+                      {uploadError}
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-xl bg-[#131422] border border-[#23253b] space-y-2 text-xs text-slate-300">
+                    <span className="font-semibold text-slate-200 block text-[11px]">Supported formats</span>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Images (PNG, JPG, SVG, WebP, GIF), Videos, Icons and Audio. Maximum file size is 5MB.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => triggerImagePicker(() => {})}
+                      className="w-full mt-2 py-1.5 rounded-lg bg-[#202237] hover:bg-[#2a2c48] text-purple-300 text-xs font-semibold transition cursor-pointer"
+                    >
+                      Browse Media Lightbox 🖼️
+                    </button>
+                  </div>
+                </div>
+              ) : isRestrictedMode ? (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-center my-4 space-y-2">
+                  <Lock className="w-6 h-6 text-amber-600 mx-auto" />
+                  <span className="block text-xs font-bold text-amber-800">Widget Drawer Locked</span>
+                  <p className="text-[11px] text-amber-700 leading-snug">
+                    Your Client Editor role allows editing text, images, and links directly on the canvas without adding new layout blocks.
+                  </p>
+                </div>
+              ) : leftSidebarTab === "elements" ? (
+                <div className="space-y-3">
                 {/* Main Widget Library Search Input */}
                 {!disabledWidgets.includes("search-bar") && (
                   <div className="relative">
@@ -9231,6 +8864,7 @@ export default function WebsiteEditor() {
             )}
 
           </aside>
+          </>
         )}
 
         {/* ========================================== */}
@@ -9250,8 +8884,9 @@ export default function WebsiteEditor() {
             e.dataTransfer.dropEffect = draggingId ? "move" : "copy";
           }}
           onDrop={(e) => (isRestrictedMode ? undefined : handleDropElement(e, null, "after"))}
-          className={`relative flex flex-1 justify-center items-start overflow-y-auto overflow-x-auto min-w-0 max-w-full ${canvasTheme === "dark" ? "bg-slate-950 text-slate-100" : "bg-[#f1f5f9]"
-            } p-4 sm:p-8 box-border`}
+          className={`relative flex flex-1 justify-center items-start overflow-y-auto overflow-x-auto min-w-0 max-w-full ${
+            canvasTheme === "dark" ? "bg-[#090a13] text-slate-100" : "bg-[#0d0e17]"
+          } p-4 sm:p-8 box-border`}
         >
           {/* Dynamic Hover Styles Block (F-036) */}
           <style dangerouslySetInnerHTML={{ __html: generateElementsHoverCSS(elements, activeDevice) }} />
@@ -9316,10 +8951,14 @@ export default function WebsiteEditor() {
                 : undefined,
               backgroundSize: userPreferences.gridOverlay ? "20px 20px" : undefined,
               width: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "520px" : "100%",
-              maxWidth: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "min(520px, 90%)" : "100%",
+              maxWidth: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "min(520px, 90%)" : "1200px",
+              transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
+              transformOrigin: "top center",
+              transition: "transform 0.15s ease-out, width 0.3s ease-in-out",
             }}
-            className={`relative transition-all duration-300 ease-in-out min-h-[750px] h-auto shrink-0 my-2 rounded-2xl border border-slate-200 p-6 sm:p-8 pb-20 box-border overflow-x-hidden ${activeDevice !== "desktop" ? "ring-1 ring-slate-300 shadow-md" : "shadow-sm"
-              }`}
+            className={`relative min-h-[750px] h-auto shrink-0 my-2 rounded-2xl border border-[#23253b] p-6 sm:p-8 pb-20 box-border overflow-x-hidden ${
+              activeDevice !== "desktop" ? "ring-1 ring-purple-500/40 shadow-2xl" : "shadow-xl"
+            }`}
           >
             {/* Global Design Tokens / CSS Variables (Comment 14) */}
             <style>{`
@@ -9777,10 +9416,88 @@ export default function WebsiteEditor() {
         {/* Right Sidebar: SETTINGS & STYLING           */}
         {/* ========================================== */}
         {!isPreview && (
-          <aside className="w-80 shrink-0 border-l border-slate-200 bg-white p-5 overflow-y-auto shadow-sm">
-            <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
-              {isRestrictedMode ? "CONTENT-ONLY SANDBOX" : "SETTINGS & STYLING"}
-            </h2>
+          <aside className="w-[340px] md:w-[360px] shrink-0 border-l border-[#202235] bg-[#161726] p-4 overflow-y-auto shadow-sm flex flex-col text-slate-200 select-none">
+            {/* Top Inspector Tabs matching PDF: Style | Animation | Advanced */}
+            <div className="flex items-center gap-1 bg-[#12131f] border border-[#23253b] p-1 rounded-xl mb-4 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveSidebarTab("style")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                  activeSidebarTab !== "animation" && activeSidebarTab !== "advanced"
+                    ? "bg-[#252740] text-purple-300 shadow-xs"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
+                }`}
+              >
+                Style
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSidebarTab("animation")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                  activeSidebarTab === "animation"
+                    ? "bg-[#252740] text-purple-300 shadow-xs"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
+                }`}
+              >
+                Animation
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSidebarTab("advanced")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                  activeSidebarTab === "advanced"
+                    ? "bg-[#252740] text-purple-300 shadow-xs"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
+                }`}
+              >
+                Advanced
+              </button>
+            </div>
+
+            {/* Mode Switcher when Element is selected: Element vs Tokens */}
+            {selectedElementAny && activeSidebarTab === "style" && (
+              <div className="flex items-center gap-1.5 p-1 bg-[#141524] border border-[#272942] rounded-lg mb-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setInspectorViewMode("element")}
+                  className={`flex-1 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
+                    inspectorViewMode === "element"
+                      ? "bg-purple-600/30 text-purple-200 border border-purple-500/50"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  ✦ Element
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorViewMode("tokens")}
+                  className={`flex-1 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
+                    inspectorViewMode === "tokens"
+                      ? "bg-purple-600/30 text-purple-200 border border-purple-500/50"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  ❖ Design Tokens
+                </button>
+              </div>
+            )}
+
+            {/* PDF Design Tokens Panel when no element selected or when Tokens chosen */}
+            {(!selectedElementAny || inspectorViewMode === "tokens") && activeSidebarTab === "style" ? (
+              <DesignTokensPanel
+                globalSettings={globalSettings}
+                onUpdateGlobalSettings={setGlobalSettings}
+                globalVariables={globalVariables}
+                onSaveVariables={(updated) => setGlobalVariables(updated)}
+                onOpenFontManager={() => setIsFontPickerModalOpen(true)}
+                onOpenVariablesManager={() => setIsVariablesModalOpen(true)}
+                onOpenAccessibilityStatement={() => setIsStatementOpen(true)}
+                onSaveTokens={handleSave}
+                saving={saving}
+                canvasTheme={canvasTheme}
+                onToggleCanvasTheme={() => setCanvasTheme((t) => (t === "light" ? "dark" : "light"))}
+              />
+            ) : null}
 
             {isRestrictedMode ? (
               <ContentOnlyInspector
@@ -9800,7 +9517,66 @@ export default function WebsiteEditor() {
                   </div>
                 )}
 
-                {selectedElementAny ? (
+                {activeSidebarTab === "animation" ? (
+                  selectedElementAny ? (
+                    <div className="space-y-4">
+                      <div className="px-1 text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5 pb-2 border-b border-[#23253b]">
+                        <span>✨ Motion & Interaction</span>
+                      </div>
+                      <MotionInteractionInspector
+                        selectedElement={selectedElementAny}
+                        updateSelectedProp={updateSelectedProp}
+                        updateSelectedStyle={updateSelectedStyle}
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-[#23253b] bg-[#1a1b2d] p-6 text-center space-y-3 my-4">
+                      <div className="w-10 h-10 rounded-full bg-purple-900/30 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto text-lg">
+                        ✨
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-200">No Element Selected</h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Select an element on the canvas to configure entrance animations, hover transitions, and scroll effects.
+                      </p>
+                    </div>
+                  )
+                ) : activeSidebarTab === "advanced" ? (
+                  selectedElementAny ? (
+                    <div className="space-y-4">
+                      {/* Developer Options for Element (F-102, F-105 to F-109) */}
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4 text-slate-800">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700">Custom CSS ID (F-105)</label>
+                          <input type="text" value={selectedElementAny.customId || ""} onChange={e => updateSelectedProp("customId", e.target.value)} placeholder="e.g. hero-section" className="w-full rounded border px-2 py-1.5 text-xs font-mono mt-1" />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700">Additional CSS Classes (F-106)</label>
+                          <input type="text" value={selectedElementAny.customClass || ""} onChange={e => updateSelectedProp("customClass", e.target.value)} placeholder="e.g. shadow-lg hover:shadow-xl" className="w-full rounded border px-2 py-1.5 text-xs font-mono mt-1" />
+                        </div>
+                        <hr className="border-slate-200" />
+                        <button onClick={() => setDevModalMode("element-css")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
+                          <span className="text-blue-500">{"</>"}</span> Edit Element CSS (F-102)
+                        </button>
+                        <button onClick={() => setDevModalMode("css-selectors")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
+                          <span className="text-pink-500">{""}</span> Edit Selectors & Pseudo (F-107)
+                        </button>
+                        <button onClick={() => setDevModalMode("custom-attributes")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
+                          <span className="text-emerald-500">{""}</span> Manage DOM Attributes (F-108 & F-109)
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-[#23253b] bg-[#1a1b2d] p-6 text-center space-y-3 my-4">
+                      <div className="w-10 h-10 rounded-full bg-purple-900/30 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto text-lg">
+                        ⚙️
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-200">No Element Selected</h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Select an element on the canvas to configure custom CSS IDs, classes, DOM attributes, and developer selectors.
+                      </p>
+                    </div>
+                  )
+                ) : selectedElementAny && inspectorViewMode === "element" ? (
                   <div className="space-y-5">
                     {/* Element Type Header & Quick Actions */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -11631,9 +11407,7 @@ export default function WebsiteEditor() {
                         updateSelectedStyle={updateSelectedStyle}
                       />
                     )}
-                  </div>
-                ) : activeSidebarTab === "advanced" && selectedElementAny ? (
-                  <div className="space-y-4">
+
                     {/* Developer Options for Element (F-102, F-105 to F-109) */}
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
                       <div>
@@ -19976,8 +19750,14 @@ export default function WebsiteEditor() {
 
       {/* Finder Command Palette Modal (F-027) */}
       {isFinderOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 px-4 backdrop-blur-sm"
+          onClick={() => setIsFinderOpen(false)}
+        >
+          <div
+            className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Search Header Input */}
             <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/50">
               <span className="text-slate-400 text-lg">🔍</span>
@@ -19986,6 +19766,12 @@ export default function WebsiteEditor() {
                 autoFocus
                 value={finderQuery}
                 onChange={(e) => setFinderQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setIsFinderOpen(false);
+                  }
+                }}
                 placeholder="Search pages, templates, settings and features... (Esc to close)"
                 className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
               />
@@ -20324,6 +20110,7 @@ export default function WebsiteEditor() {
               </div>
               <button
                 type="button"
+                data-testid="close-shortcuts-help-btn"
                 onClick={() => setIsShortcutsHelpOpen(false)}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
               >

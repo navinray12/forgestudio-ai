@@ -25,7 +25,7 @@ export class GeminiProvider implements AiProvider {
         : JSON.stringify({ prompt: request.prompt, ...request.context });
       const schema = request.schema || (request.operation === "SITE_GENERATION" ? SITE_BLUEPRINT_JSON_SCHEMA : undefined);
 
-      const response = await this.fetcher(
+      let response = await this.fetcher(
         `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent`,
         {
           method: "POST", signal,
@@ -41,6 +41,24 @@ export class GeminiProvider implements AiProvider {
           }),
         },
       );
+      if (!response.ok && response.status === 404 && activeModel !== "gemini-1.5-flash") {
+        response = await this.fetcher(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`,
+          {
+            method: "POST", signal,
+            headers: { "x-goog-api-key": this.apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemText }] },
+              contents: [{ role: "user", parts: [{ text: userContent }] }],
+              generationConfig: {
+                maxOutputTokens: 8192,
+                responseMimeType: "application/json",
+                ...(schema ? { responseJsonSchema: schema } : {}),
+              },
+            }),
+          },
+        );
+      }
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
         console.error(`[GEMINI ERROR ${response.status}]:`, errorText);

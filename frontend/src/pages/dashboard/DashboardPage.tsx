@@ -21,12 +21,14 @@ import {
   Search,
   Sparkles,
   Star,
+  Settings,
   Plug,
   Undo2,
   Users,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { HeaderUserDropdown } from "../../components/HeaderUserDropdown";
 import MembersView from "../../features/workspaces/MembersView";
 import UsageView from "../../features/usage/UsageView";
 import "./DashboardPage.css";
@@ -165,8 +167,9 @@ function DashboardPage() {
     if (name?.trim() && !folders.includes(name.trim())) setFolders((current) => [...current, name.trim()]);
   };
 
-  const displayName = user?.fullName?.trim() || user?.email?.split("@")[0] || "Partha";
+  const displayName = user?.fullName?.trim() || user?.email?.split("@")[0] || "User";
   const currentSites = section === "archive" ? archivedWebsites : websites;
+  const workspaceTitle = user?.fullName ? `${user.fullName.split(" ")[0]}'s Workspace` : user?.email ? `${user.email.split("@")[0]}'s Workspace` : "My Workspace";
 
   return (
     <div className="studio-dashboard">
@@ -178,14 +181,14 @@ function DashboardPage() {
           <button className="icon-button header-undo" aria-label="Redo"><Undo2 size={16} className="redo-icon" /></button>
           <button className="icon-button notification-button" aria-label="Notifications"><Bell size={16} /><span className="notification-dot" /></button>
           <Link className="upgrade-button" to="/subscriptions">Upgrade <span>→</span></Link>
-          <button className="profile-button" aria-label="Open profile"><span className="profile-avatar">{initials(displayName).slice(0, 1)}</span><span className="profile-name">{displayName}</span><ChevronDown size={13} /></button>
+          <HeaderUserDropdown />
           <button className="mobile-menu" onClick={() => setMobileNavOpen((open) => !open)} aria-label="Toggle navigation"><Menu size={20} /></button>
         </div>
       </header>
 
       <div className="studio-layout">
         <aside className={`studio-sidebar ${mobileNavOpen ? "is-open" : ""}`}>
-          <div className="workspace-select"><span className="workspace-icon">▤</span><span>Parth&apos;s Workspace</span><ChevronDown size={14} /></div>
+          <div className="workspace-select"><span className="workspace-icon">▤</span><span>{workspaceTitle}</span><ChevronDown size={14} /></div>
           <nav className="sidebar-nav" aria-label="Workspace navigation">
             {navItems.map(({ label, icon: Icon, section: itemSection }) => (
               <button key={label} className={`sidebar-link ${section === itemSection ? "is-active" : ""}`} onClick={() => { setSection(itemSection); setActiveFolder("All sites"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span></button>
@@ -193,7 +196,11 @@ function DashboardPage() {
             <div className="sidebar-rule" />
             {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
           </nav>
-          <div className="sidebar-footer"><button className="sidebar-link"><CircleHelp size={16} /><span>Help center</span></button><button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button></div>
+          <div className="sidebar-footer">
+            <button className="sidebar-link" onClick={() => navigate("/settings/account")}><Settings size={16} /><span>Settings</span></button>
+            <button className="sidebar-link" onClick={() => navigate("/settings/help-support")}><CircleHelp size={16} /><span>Help center</span></button>
+            <button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button>
+          </div>
         </aside>
 
         <main className="studio-main">

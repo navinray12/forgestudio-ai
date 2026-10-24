@@ -95,6 +95,9 @@ export function UnifiedAiAssistant({
 
   // Fetch current website document version
   async function getCurrentVersion(): Promise<number> {
+    if (prepare) {
+      return await prepare();
+    }
     const res = await fetch(`${apiUrl}/api/websites/${websiteId}`, {
       credentials: "include",
       headers: { ...getAuthHeaders() },
@@ -116,7 +119,13 @@ export function UnifiedAiAssistant({
       const expectedVersion = await getCurrentVersion();
       const res = await fetch(`${apiUrl}/api/v1/ai/websites/${websiteId}/assistant`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `ast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          "If-Match": `"${websiteId}:document:${expectedVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({
           prompt: textToSubmit,
@@ -129,14 +138,20 @@ export function UnifiedAiAssistant({
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data.message || data.error?.message || "AI action failed");
+        if (data?.code === "DOCUMENT_VERSION_CONFLICT") {
+          throw new Error("The website was updated concurrently. Please reload and try again.");
+        } else if (data?.code === "DOCUMENT_PRECONDITION_REQUIRED") {
+          throw new Error("Authoritative document version required. Please reload the website.");
+        } else {
+          throw new Error(data?.detail || data?.error?.message || data?.message || "AI action failed");
+        }
       }
 
       if (data.result?.changeset) {
         setChangeset(data.result.changeset);
-        setSuccessMessage(`Changeset generated for ${data.intent.replace(/_/g, " ")}. Review and apply below.`);
+        setSuccessMessage(`Changeset generated for ${data.intent ? data.intent.replace(/_/g, " ") : "proposal"}. Review and apply below.`);
       } else if (data.intent === "ANALYZE_SITE") {
         setAuditResult(data.result);
         setActiveTab("audit");
@@ -192,15 +207,32 @@ export function UnifiedAiAssistant({
     setError(null);
 
     try {
+      const commandKey = `apply:${changeset.id}:${Date.now()}`;
+      if (apply) {
+        await apply(changeset, commandKey);
+        setSuccessMessage("Changes applied successfully to your website!");
+        setChangeset(null);
+        setTimeout(() => {
+          onApplied();
+        }, 700);
+        return;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": commandKey,
+          "If-Match": `"${websiteId}:document:${changeset.expectedDocumentVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || err.error?.message || "Failed to apply changeset");
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail || err?.message || err?.error?.message || "Failed to apply changeset");
       }
 
       setSuccessMessage("Changes applied successfully to your website!");
@@ -209,7 +241,7 @@ export function UnifiedAiAssistant({
         onApplied();
       }, 700);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to apply changeset");
     } finally {
       setBusy(false);
     }
@@ -222,13 +254,17 @@ export function UnifiedAiAssistant({
     try {
       await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
         method: "POST",
-        headers: { ...getAuthHeaders() },
+        headers: {
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `cancel:${changeset.id}:${Date.now()}`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
       setChangeset(null);
       setSuccessMessage("Changeset discarded.");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to discard changeset");
     } finally {
       setBusy(false);
     }

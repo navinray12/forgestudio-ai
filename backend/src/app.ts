@@ -124,8 +124,6 @@ export function createApplication(
     })
   );
 
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
   const configuredOrigin = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : undefined;
   const allowedOrigins = new Set([
     "http://localhost:5173",
@@ -147,6 +145,8 @@ export function createApplication(
       credentials: true,
     })
   );
+
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   // Billing provider signatures are calculated over exact raw bytes. Mount this
   // route before any JSON parser; successful verification never trusts a body-supplied tenant alone.
@@ -183,7 +183,7 @@ export function createApplication(
   app.use(["/api/v1/auth", "/api/auth"], signupRoutes);
   app.use(["/api/v1/auth", "/api/auth"], authRoutes);
   app.use(["/api/v1/auth", "/api/auth"], oauthRoutes);
-  app.use(["/api/v1/auth", "/api/auth"], meRoutes);
+  app.use(["/api/v1/auth", "/api/auth", "/api/v1", "/api"], meRoutes);
 
   // Organization-scoped commercial SaaS boundary. Legacy user subscriptions remain
   // available during migration but cannot be used to bypass verified provider state.
