@@ -18,6 +18,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fresh-migrations:
+    name: Empty PostgreSQL migration qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_phase2_fresh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d forge_phase2_fresh"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_phase2_fresh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install pinned backend dependencies
+        run: npm ci
+      - name: Apply versioned migrations to a fresh disposable database
+        run: npx --no-install prisma migrate deploy
+      - name: Verify migration ledger has no pending entries
+        run: npx --no-install prisma migrate status
+
   build:
     name: Build ${{ matrix.component }}
     runs-on: ubuntu-24.04
