@@ -16,8 +16,8 @@ A new customer can sign up, verify identity, start a website via blank/template/
 | --- | --- | --- | --- | --- | --- |
 | **WP-00 Evidence baseline** | P0 / 0 | Inventory existing routes, modules and data contracts; clean checkout, compiler, tests, CI, issue reproduction | Reproducible baseline for current SHA with build/migration/test evidence | None | **IN PROGRESS** |
 | **WP-01 Execution/data security** | P0 / 0 | Revalidate terminal, WebSocket, hosted runtime, public data APIs, user SQL and HTML trust boundaries; close exploitable access | Unauthorized, cross-tenant, traversal and injection tests fail safely | WP-00 | **IN PROGRESS** (legacy hosted route quarantined pending tests) |
-| **WP-02 Database and tenancy** | P0 / 1 | One schema migration authority; fresh PostgreSQL install; bind principal/project/database in every sensitive operation | Clean migration and negative tenant tests | WP-00/01 | NOT STARTED |
-| **WP-03 Editor reliability** | P0 / 1 | Versioned editor saves, widget catalog and rendering parity, responsive breakpoints, recovery | Advertised widgets survive save/reopen/preview/publish; concurrency tests | WP-00/02 | NOT STARTED |
+| **WP-02 Database and tenancy** | P0 / 1 | One schema migration authority; fresh PostgreSQL install; bind principal/project/database in every sensitive operation | Clean migration and negative tenant tests | WP-00/01 | **IN PROGRESS** (template startup sequencing and DB-read error fixes; real database validation pending) |
+| **WP-03 Editor reliability** | P0 / 1 | Versioned editor saves, widget catalog and rendering parity, responsive breakpoints, recovery | Advertised widgets survive save/reopen/preview/publish; concurrency tests | WP-00/02 | **IN PROGRESS** (global widget server-backed CRUD and error/retry contract tests; published parity pending) |
 | **WP-04 Functional business website** | P1 / 2 | Templates/kits, CMS list/detail, durable media, live forms/leads/notifications | Real visitor submissions and CMS updates on published URL | WP-02/03/05 | NOT STARTED |
 | **WP-05 Hosting and release** | P0 / 2 | Authorized artifact resolving, staging, immutable releases, domains, TLS and rollback | Live HTTP/DNS/TLS and rollback checks; no fake health | WP-01/02/03 | NOT STARTED |
 | **WP-06 Complete AI workflow** | P1 / 2 | Provider-backed job/proposal/preview/apply, concurrency safety, quota/budget | Real sandbox provider flow and generated-site publish tests | WP-02/03/05 | NOT STARTED |
@@ -84,6 +84,20 @@ The blueprint's **12–18-week** figure assumes a coordinated ~6–8 engineer te
 - Definitive supported widget registry versus UI-advertised types.
 - WordPress connector scope and whether J09 commerce is mandatory.
 - Provider accounts, budget, sandbox credentials and staging ownership.
+
+## Wave 1 and Wave 2 focused audit, 24 October 2026
+
+**Source of truth:** Phase 2 Product Completion Blueprint (all J01–J12 and WP-00–WP-10 remain applicable). This iteration does not complete either wave.
+
+**Reproduced source defects and remediation:**
+- **Wave 1 / WP-02:** `backend/src/services/template.service.ts` previously converted database read failure into an empty template list; it now raises a typed service error. Source also performed asynchronous schema DDL during module import and suppressed errors; bootstrap now runs as awaited initialization inside existing `backend/src/server.ts` startup gate, which aborts startup on failure.
+- **Wave 1 / WP-03 and Wave 2 UI:** `frontend/src/features/global-widget/services/globalWidgetService.ts` previously returned success from create/update/delete on server/network failure by updating local browser storage and inventing IDs/user ownership; it now accepts only confirmed backend responses and surfaces auth, permission, validation and availability errors. Existing legacy local-only data requires a separately approved migration plan rather than cross-account auto-upload.
+- **Wave 2 / WP-03 and WP-04 user experience:** the library exposes retry on failed load and no longer falsely shows an empty catalog on server failure. Messaging no longer promises automatic synchronization of all inserted element instances; this capability is not currently qualified.
+- **Wave 2 / WP-05 security dependency:** the legacy `/api/hosted/:projectId/:deploymentId` file route remains deliberately unavailable until the existing control plane verifies project/deployment ownership and a safe artifact path. Do not call live publishing complete.
+
+**Regression and build evidence:** GitHub Actions [Phase 2 qualification #40073623398](https://github.com/navinray12/forgestudio-ai/actions/runs/40073623398) finished with 4/4 jobs passed (backend build, frontend build, global widget service/UI tests, backend hosted and template tests). These are build/unit/HTTP mocked tests, not a real PostgreSQL deployment test or visitor E2E test. Review the latest SHA run before merging; a new commit invalidates the old SHA as final evidence.
+
+**Remaining release blockers:** existing identity `npm audit --audit-level high` dependency gate fails on the branch; provider-specific vulnerabilities need review and updates. Real PostgreSQL clean migration, full project ownership/tenancy matrix, J01–J08 browser journeys, production origin, domains/TLS, CMS/forms/assets, AI provider qualification and backup/restore have **not** passed release gates. There are **zero fully certified work packages** in this iteration.
 
 ## Current code ledger (GitHub)
 
