@@ -58,6 +58,10 @@ The independent [AI/worker qualification](https://github.com/navinray12/forgestu
 
 **Product certification remains NO-GO:** site publishing parity, trusted form integration configuration, complete CMS/template/kit journeys and durable production media storage remain open P0 work. The quarantine on production legacy disk uploads is safety containment, not delivery of the production upload feature.
 
+## Upload quota integrity checkpoint — 24 October 2026
+
+**WP04-09 — UPLOAD CONFIRMATION REPLAY/QUOTA (FIXED — CI VERIFIED):** `storage/upload-presigner.service.ts#confirmUpload` now treats matching already-recorded S3 keys idempotently, blocks conflicting claims and uses an atomic conditional bucket quota reservation before insertion. `wp04-confirm-upload-authorization.test.ts` covers retries, concurrent reservation denial, ownership and metadata. S3 HEAD evidence is retained. Real concurrent S3+PostgreSQL upload/load and CDN-publication tests are **still OPEN**; this does not complete WP04-04.
+
 ## Verification plan
 
 Targeted CI is wired into `.github/workflows/phase2-qualification.yml`:
