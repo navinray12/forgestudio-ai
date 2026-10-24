@@ -78,6 +78,19 @@ describe("WP-04 production form policy management", () => {
     expect(h.authorize).toHaveBeenCalledWith(site, user);
   });
 
+  it("does not persist disabled providers or their credentials", async () => {
+    await upsertFormDeliveryPolicy(site, formId, user, {
+      activeActions: ["database"],
+      mailchimpConfig: { apiKey: "disabled-mailchimp-secret", listId: "old-audience" },
+      webhookConfig: { endpointUrl: "https://hooks.example.org/old", secretKey: "old-secret" },
+    });
+    const clear = decryptCredential(stored!);
+    expect(clear).not.toContain("disabled-mailchimp-secret");
+    expect(clear).not.toContain("old-secret");
+    expect(clear).not.toContain("webhookConfig");
+    expect(JSON.parse(clear)).toEqual({ activeActions: ["database"] });
+  });
+
   it("never uses editor-stored webhook credentials in production", async () => {
     expect(await getTrustedFormPolicy(site, formId)).toMatchObject({
       actions: undefined,
