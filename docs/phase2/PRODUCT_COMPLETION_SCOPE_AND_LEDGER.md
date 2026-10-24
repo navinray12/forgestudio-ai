@@ -141,6 +141,14 @@ Two additional narrow code corrections: (1) `database-backup.service.ts` removed
 
 These fixes **do not** prove production recoverability or public media delivery. Live cloud object storage, restricted backup role with RLS-qualified `pg_dump`, real restore drill, isolated execution runner, browser-published parity, server-only encrypted form integration settings and full staging acceptance remain required. WP-00–WP-04 are **IN PROGRESS; RELEASE NO-GO**.
 
+## Production credential and form-delivery security checkpoint — 24 October 2026
+
+[Phase 2 qualification run 40088546404](https://github.com/navinray12/forgestudio-ai/actions/runs/40088546404), code SHA `a0b0cfeb`, passed **9/9 jobs**: **43 migrations**, **165 focused backend tests**, **16 real tenant/form delivery PostgreSQL tests**, 14 separate restricted-role tests, 247 security regressions, 41 editor workflow tests and 21 frontend contract tests. The actual latest documentation HEAD must be checked separately.
+
+**Implemented:** foreign-site ForgeProject association denied, separate production encryption key mandatory, invalid/plaintext ciphertext refused, encrypted server-only form policy table/owner-only management endpoints, production forms ignore client/editor delivery secrets, production editor writes reject newly embedded form credentials, and startup verifies schema and key requirements.
+
+**Still OPEN / NO-GO:** secure editor UI for managing form policies; remediation of existing editor-stored raw credentials; real external provider delivery and encrypted rotating secret references; isolated untrusted-code runner; legacy schema database replacement, live backup/restore; fully deployed publishing and CMS/kit/media browser E2E. The draft PR remains unmerged. **WP-00–WP-04 are not yet production-certified.**
+
 ## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
