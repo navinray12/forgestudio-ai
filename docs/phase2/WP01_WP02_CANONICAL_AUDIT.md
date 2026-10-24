@@ -26,15 +26,15 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 
 | ID | Priority | Root cause and precise owner file | Remediation / acceptance | Status |
 | --- | --- | --- | --- | --- |
-| WP01-01 | P0 | `rls-claim-injector.ts`: authenticated users bypassed FORCE RLS check, while tenant database login owns tables | Require `relrowsecurity` and `relforcerowsecurity` on **all non-service credentials**; denial against live unprotected table | FIX COMMITTED; exact-head CI pending |
-| WP01-02 | P0 | `rls-claim-injector.ts`, `data.controller.ts`: valid read-only website member could mutate production tables | Carry website `canAdminister` from authenticated session; deny `data:write` for non-admin in PRODUCTION; real editor POST=403 test | FIX COMMITTED; exact-head CI pending |
-| WP01-03 | P0 | `data-layer/realtime.service.ts`: WebSocket used ForgeProject resolver despite Website-scoped data API | Authorize realtime via `verifyProjectAccess(websiteId,userId)`; retain listener lifecycle tests | FIX COMMITTED; exact-head CI pending |
+| WP01-01 | P0 | `rls-claim-injector.ts`: authenticated users bypassed FORCE RLS check, while tenant database login owns tables | Require `relrowsecurity` and `relforcerowsecurity` on **all non-service credentials**; denial against live unprotected table | FIXED — CI VERIFIED on `bb4fd9c1` |
+| WP01-02 | P0 | `rls-claim-injector.ts`, `data.controller.ts`: valid read-only website member could mutate production tables | Carry website `canAdminister` from authenticated session; deny `data:write` for non-admin in PRODUCTION; real editor POST=403 test | FIXED — CI VERIFIED on `bb4fd9c1` |
+| WP01-03 | P0 | `data-layer/realtime.service.ts`: WebSocket used ForgeProject resolver despite Website-scoped data API | Authorize realtime via `verifyProjectAccess(websiteId,userId)`; retain listener lifecycle tests | FIXED — CI VERIFIED on `bb4fd9c1` |
 | WP01-04 | P0 | `realtime.service.ts` previously broadcast unfiltered `record` and `oldRecord` | Publish only invalidation metadata, refetch via project/API/RLS | FIXED on earlier tested commit |
 | WP01-05 | P0 | Developer shell `forgeSandbox.service.ts` uses host `spawn`; env flag was mistaken for VM proof | Fail closed in production; build and attest separate container/microVM runner before enabling feature | **RELEASE BLOCKED** — host runtime disabled; secure runner not implemented |
 | WP01-06 | P1 | WebSocket sessions may outlive membership revocation; listener recovery and concurrent subscribe semantics need real network qualification | Auth epoch/membership revalidation on long-lived sockets, LISTEN retry and disconnect harness | OPEN — not release-certified |
 | WP01-07 | P1 | Service-role project key deliberately bypasses row policies through per-request GUC | Independently review service credential scope, key storage/rotation, audit and network exposure with least-privilege live roles | OPEN — security review required |
-| WP02-01 | P0 | `common/pool-manager.ts`: any missing pool on a read triggered privileged tenant database provisioning | Remove implicit provisioning from reads; 404 without inserted `ProjectDatabase`; explicit authenticated management route provisions | FIX COMMITTED; exact-head CI pending |
-| WP02-02 | P1 | `common/pool-manager.ts`: simultaneous cache misses created multiple independent connection pools | Single-flight pending promise per website/environment; integration asserts same pool | FIX COMMITTED; exact-head CI pending |
+| WP02-01 | P0 | `common/pool-manager.ts`: any missing pool on a read triggered privileged tenant database provisioning | Remove implicit provisioning from reads; 404 without inserted `ProjectDatabase`; explicit authenticated management route provisions | FIXED — CI VERIFIED on `bb4fd9c1` |
+| WP02-02 | P1 | `common/pool-manager.ts`: simultaneous cache misses created multiple independent connection pools | Single-flight pending promise per website/environment; integration asserts same pool | FIXED — CI VERIFIED on `bb4fd9c1` |
 | WP02-03 | P0 | `pool-manager.ts`: historical database record pointed at platform DB/admin login | Reject record and attest real PostgreSQL user, owner, database, superuser/bypass/DDL flags before caching | FIXED on earlier tested commit |
 | WP02-04 | P0 | Clean migrations omitted `websites.deletedAt` and data-platform catalog; lazy request-time DDL hid drift | 42 versioned migrations; migrate deploy/status and 7 live provision/API cross-tenant tests on disposable PostgreSQL | FIXED, CI verified |
 | WP02-05 | P1 | `database/database-provisioner.service.ts`: historical admin-DB fallback | Fail closed and mark FAILED; do not return control-plane database on tenant provisioning failure | FIXED, tested |
@@ -45,6 +45,8 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 ## Test evidence and regression location
 
 **Baseline last proven before this work:** GitHub [Phase 2 qualification 40078291534](https://github.com/navinray12/forgestudio-ai/actions/runs/40078291534), 6/6 jobs; 42 migrations, 7 live HTTP+PostgreSQL tests, 71 focused tests, 247 MCP/XSS tests, frontend build/lint and identity/AI qualification checks.
+
+**Current code + audit evidence:** [Phase 2 qualification 40079386681](https://github.com/navinray12/forgestudio-ai/actions/runs/40079386681) on commit `bb4fd9c1bb10d1da20e2e641032a3b4a9e527939` — all six jobs passed. Fresh PostgreSQL: 42 migrations and **11/11 live tenant HTTP tests**; source-level checks include 247 MCP/security/XSS tests plus backend/frontend builds. This report-only document update is not itself covered by that earlier commit; recheck the exact branch head after updates.
 
 **Added in this issue pass:**
 - `backend/src/tests/wp01-data-credential-validation.test.ts`: authenticated session FORCE RLS + editor write restriction
