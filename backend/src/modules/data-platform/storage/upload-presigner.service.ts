@@ -183,7 +183,8 @@ export async function confirmUpload(
   }
   const bytes = BigInt(params.sizeBytes);
 
-  return await prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const bucket = await tx.storageBucket.findUnique({
       where: { id: params.bucketId },
     });
@@ -238,7 +239,28 @@ export async function confirmUpload(
     });
 
     return createdObject;
-  });
+    });
+  } catch (error) {
+    // Two callers may HEAD the same object before either commits. The loser
+    // sees the composite (bucketId, objectKey) unique constraint. Prisma rolls
+    // back its quota reservation; return the existing matching object on retry.
+    if ((error as { code?: string } | null)?.code === "P2002") {
+      const existing = await prisma.storageObject.findUnique({
+        where: {
+          bucketId_objectKey: {
+            bucketId: params.bucketId,
+            objectKey: params.objectKey,
+          },
+        },
+      });
+      if (existing && existing.sizeBytes === bytes && existing.mimeType === params.mimeType) {
+        return existing;
+      }
+      throw new AppError("Uploaded object metadata conflicts with an existing confirmation",
+        409, "UPLOAD_CONFIRMATION_CONFLICT");
+    }
+    throw error;
+  }
 }
 
 /**
