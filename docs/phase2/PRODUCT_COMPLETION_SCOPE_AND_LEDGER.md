@@ -99,7 +99,7 @@ The blueprint's **12–18-week** figure assumes a coordinated ~6–8 engineer te
 
 **Dependency remediation evidence:** an isolated GitHub Actions run [#40074045740](https://github.com/navinray12/forgestudio-ai/actions/runs/40074045740) updated direct/transitive dependencies and their lockfiles. Both `npm audit --audit-level high` runs reported **0 vulnerabilities**; both production builds and 26 targeted tests passed before the dependency commit `84853153251bcd2ce12b43c5f465ceeff7409f58`. Existing identity CI must be rechecked on a normal authenticated commit because workflow runs on the bot push showed `action_required`, not test outcomes. The temporary write-enabled remediation workflow must be removed from the development branch after use.\n\n**Remaining release blockers:** real PostgreSQL clean migration and deployed-site validation remain unverified. Real PostgreSQL clean migration, full project ownership/tenancy matrix, J01–J08 browser journeys, production origin, domains/TLS, CMS/forms/assets, AI provider qualification and backup/restore have **not** passed release gates. There are **zero fully certified work packages** in this iteration.
 
-## Current code ledger (GitHub)
+**Post-remediation cleanup:** the temporary write-enabled dependency remediation workflow has been deleted. The normal identity dependency gate has subsequently reported success on a human-authored branch commit. All future dependency changes must use ordinary reviewed manifests/lockfiles and CI, without auto-push workflows.\n\n## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
 | --- | --- | --- | --- |
