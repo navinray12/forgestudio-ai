@@ -23,6 +23,9 @@ vi.mock("../services/project/forgeManifest.service.js", () => ({
 
 import { executeTerminalCommand } from "../services/terminal/forgeTerminal.service.js";
 
+let sessionCounter = 0;
+const freshSession = () => `session_${++sessionCounter}`;
+
 const terminal = {
   id: "session_2", projectId: "project_b", name: "Restricted", cwd: "/",
   status: "ACTIVE", history: [], lastActivityAt: new Date(),
@@ -39,7 +42,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("WP-01 terminal project authorization", () => {
   it("rejects requests without an authenticated identity before reading a session", async () => {
-    await expect(executeTerminalCommand("session_2", "ls")).rejects.toMatchObject({
+    await expect(executeTerminalCommand(freshSession(), "ls")).rejects.toMatchObject({
       statusCode: 401, code: "UNAUTHORIZED",
     });
     expect(h.sessionFind).not.toHaveBeenCalled();
@@ -48,7 +51,7 @@ describe("WP-01 terminal project authorization", () => {
 
   it("rejects commands against another user's session before executing code", async () => {
     h.getProject.mockRejectedValue(new AppError("Forbidden", 403, "FORBIDDEN"));
-    await expect(executeTerminalCommand("session_2", "echo secret", { userId: "intruder" }))
+    await expect(executeTerminalCommand(freshSession(), "echo secret", { userId: "intruder" }))
       .rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
     expect(h.getProject).toHaveBeenCalledWith("project_b", { id: "intruder", role: undefined });
     expect(h.executeInSandbox).not.toHaveBeenCalled();
@@ -57,19 +60,19 @@ describe("WP-01 terminal project authorization", () => {
 
   it("does not leak success for an empty command on a foreign project", async () => {
     h.getProject.mockRejectedValue(new AppError("Forbidden", 403, "FORBIDDEN"));
-    await expect(executeTerminalCommand("session_2", "", { userId: "intruder" }))
+    await expect(executeTerminalCommand(freshSession(), "", { userId: "intruder" }))
       .rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("rejects execution on closed sessions", async () => {
     h.sessionFind.mockResolvedValue({ ...terminal, status: "CLOSED" });
-    await expect(executeTerminalCommand("session_2", "ls", { userId: "owner" }))
+    await expect(executeTerminalCommand(freshSession(), "ls", { userId: "owner" }))
       .rejects.toMatchObject({ statusCode: 409, code: "TERMINAL_CLOSED" });
     expect(h.executeInSandbox).not.toHaveBeenCalled();
   });
 
   it("delegates authorized execution to the existing sandbox with a scoped principal", async () => {
-    const result = await executeTerminalCommand("session_2", "npm test", {
+    const result = await executeTerminalCommand(freshSession(), "npm test", {
       userId: "owner", userRole: "USER",
     });
     expect(result.exitCode).toBe(0);
@@ -80,7 +83,7 @@ describe("WP-01 terminal project authorization", () => {
   });
 
   it("requires a string command before touching the sandbox", async () => {
-    await expect(executeTerminalCommand("session_2", null as unknown as string, { userId: "owner" }))
+    await expect(executeTerminalCommand(freshSession(), null as unknown as string, { userId: "owner" }))
       .rejects.toMatchObject({ statusCode: 400, code: "INVALID_COMMAND" });
     expect(h.executeInSandbox).not.toHaveBeenCalled();
   });
