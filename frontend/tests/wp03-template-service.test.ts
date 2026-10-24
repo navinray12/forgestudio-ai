@@ -17,7 +17,8 @@ const template = {
 };
 
 function mockServer(status: number, body: unknown) {
-  const mock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), {
+  // Every HTTP request receives its own readable response body.
+  const mock = vi.fn().mockImplementation(async () => new Response(JSON.stringify(body), {
     status, headers: { "content-type": "application/json" },
   }));
   vi.stubGlobal("fetch", mock);
