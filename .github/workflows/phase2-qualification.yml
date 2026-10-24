@@ -103,7 +103,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Verify legacy artifact endpoint denies unverified access
-        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts src/tests/phase2-template-list-contract.test.ts src/tests/wp01-host-execution-isolation.test.ts src/tests/wp01-terminal-authorization.test.ts src/tests/wp01-realtime-subscription-isolation.test.ts
+        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts src/tests/phase2-template-list-contract.test.ts src/tests/wp01-host-execution-isolation.test.ts src/tests/wp01-terminal-authorization.test.ts src/tests/wp01-realtime-subscription-isolation.test.ts src/tests/wp01-sandbox-termination-authorization.test.ts
 
   global-widget-contract:
     name: Global widget persistence and failure handling
