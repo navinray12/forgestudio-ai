@@ -135,6 +135,12 @@ Changes: visitor-supplied form integration secrets/destinations are ignored in f
 
 **Remaining security and product gates:** outbound integration credentials must move to encrypted server-only storage, legacy DB requires real per-tenant principals, actual isolated code runner is unimplemented, real S3/MinIO delivery not deployed, editor/CMS/widget parity and published HTTPS flows not certified, and WP-00 full business feature matrix not signed off. **WP-00–WP-04 still IN PROGRESS / NO-GO.**
 
+## Current WP-02 / WP-04 recovery and upload hardening checkpoint — 24 October 2026
+
+Two additional narrow code corrections: (1) `database-backup.service.ts` removed the incomplete generated SQL backup fallback and verifies compressed snapshot checksum, size, tenant prefix and archive before any restore SQL; rollback/failure paths are regression-gated. (2) `upload-presigner.service.ts` makes repeated upload confirmations idempotent and reserves bucket quota atomically under contention. Review the permanent [WP-01/02 audit](./WP01_WP02_CANONICAL_AUDIT.md) and [WP-03/04 audit](./WP03_WP04_CANONICAL_AUDIT.md) for named issues and remaining acceptance gates.
+
+These fixes **do not** prove production recoverability or public media delivery. Live cloud object storage, restricted backup role with RLS-qualified `pg_dump`, real restore drill, isolated execution runner, browser-published parity, server-only encrypted form integration settings and full staging acceptance remain required. WP-00–WP-04 are **IN PROGRESS; RELEASE NO-GO**.
+
 ## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
