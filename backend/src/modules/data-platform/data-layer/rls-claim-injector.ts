@@ -4,6 +4,7 @@ import type pg from "pg";
 import { prisma } from "../../../config/prisma.js";
 import { authenticateSession } from "../../../services/session-authentication.js";
 import { AppError } from "../../../utils/app-error.js";
+import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 import { verifyProjectAccess } from "../common/project-access.js";
 
 export interface RlsClaims {
@@ -55,7 +56,7 @@ export async function injectRlsClaims(
  * Browser session tokens must pass the existing session authentication service.
  * Unverified JWT payloads and syntactically plausible API keys confer NO access.
  */
-export async function resolveAuthClaims(req: Request, projectId: string): Promise<RlsClaims> {
+export async function resolveAuthClaims(req: Request, projectId: string, environment: DatabaseEnvironment): Promise<RlsClaims> {
   const rawKey = req.headers["apikey"] ?? req.headers["x-api-key"];
   const authorization = req.headers.authorization;
 
@@ -70,7 +71,7 @@ export async function resolveAuthClaims(req: Request, projectId: string): Promis
       dbKey = await prisma.projectApiKey.findFirst({
         where: {
           tokenHash,
-          database: { websiteId: projectId },
+          database: { websiteId: projectId, environment },
         },
       });
     } catch {
