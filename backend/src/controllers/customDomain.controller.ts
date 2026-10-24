@@ -272,7 +272,7 @@ function buildVerificationInstructions(record: any): Record<string, string> {
     case "TXT":
       return {
         type: "DNS TXT Record",
-        host: `_forgestudio-verify.${record.domain}`,
+        host: `_forgestudio-challenge.${record.domain}`,
         value: record.verificationToken,
         ttl: "300",
       };
