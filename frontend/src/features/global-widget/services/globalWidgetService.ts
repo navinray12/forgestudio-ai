@@ -170,7 +170,7 @@ export async function updateGlobalWidgetService(
 
   try {
     await fetch(`${apiUrl}/api/templates/${id}`, {
-      method: "PUT",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
