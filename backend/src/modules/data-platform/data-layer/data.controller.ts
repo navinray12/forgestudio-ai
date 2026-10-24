@@ -7,7 +7,7 @@ import {
   compileDelete,
   validateIdentifier,
 } from "./query-compiler.js";
-import { assertDataScope, injectRlsClaims, resolveAuthClaims } from "./rls-claim-injector.js";
+import { assertDataScope, assertPublicTableRls, injectRlsClaims, resolveAuthClaims } from "./rls-claim-injector.js";
 import { enableTableRealtime } from "./realtime.service.js";
 import { generateProjectTypeScriptSdk } from "./sdk-generator.service.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
@@ -56,6 +56,7 @@ export async function getTableDataHandler(
     try {
       await client.query("BEGIN;");
       await injectRlsClaims(client, claims);
+      await assertPublicTableRls(client, table, claims);
 
       const dataResult = await client.query(compiled.sql, compiled.values);
       const countResult = compiled.countSql
@@ -117,6 +118,7 @@ export async function insertTableDataHandler(
     try {
       await client.query("BEGIN;");
       await injectRlsClaims(client, claims);
+      await assertPublicTableRls(client, table, claims);
 
       const result = await client.query(compiled.sql, compiled.values);
       await client.query("COMMIT;");
@@ -165,6 +167,7 @@ export async function updateTableDataHandler(
     try {
       await client.query("BEGIN;");
       await injectRlsClaims(client, claims);
+      await assertPublicTableRls(client, table, claims);
 
       const result = await client.query(compiled.sql, compiled.values);
       await client.query("COMMIT;");
@@ -213,6 +216,7 @@ export async function deleteTableDataHandler(
     try {
       await client.query("BEGIN;");
       await injectRlsClaims(client, claims);
+      await assertPublicTableRls(client, table, claims);
 
       const result = await client.query(compiled.sql, compiled.values);
       await client.query("COMMIT;");
