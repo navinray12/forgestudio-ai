@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import dns from "node:dns/promises";
 import type { CustomDomain } from "../services/domains/customDomain.service.js";
 
 vi.mock("node:dns/promises", () => ({
@@ -13,6 +14,7 @@ import {
   initiateSslProvisioning,
   getDomainDiagnosticStatus,
   runDnsPreflightCheck,
+  verifyDomainDns,
 } from "../services/domains/customDomain.service.js";
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -51,6 +53,27 @@ describe("WP-05 honest HTTPS certificate lifecycle", () => {
     process.env.ALLOW_LOCAL_DNS_FALLBACK = "true";
     const checked = await runDnsPreflightCheck(domain.domain, domain.verificationToken);
     expect(checked.passed).toBe(false);
+  });
+
+  it("rejects CNAME/A-only records as proof of domain ownership in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.ALLOW_LOCAL_DNS_FALLBACK = "true";
+    vi.mocked(dns.resolveTxt).mockRejectedValue(new Error("TXT not present"));
+    vi.mocked(dns.resolveCname).mockResolvedValue(["cname.forgestudio.app"]);
+    vi.mocked(dns.resolve4).mockResolvedValue(["76.76.21.21"]);
+    const result = await verifyDomainDns({ ...domain, verificationToken: "x".repeat(40) });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts only an exact TXT ownership token rather than substring matching", async () => {
+    process.env.NODE_ENV = "production";
+    const token = "t".repeat(40);
+    vi.mocked(dns.resolveTxt).mockResolvedValue([["prefix" + token + "suffix"]]);
+    let result = await verifyDomainDns({ ...domain, verificationToken: token });
+    expect(result.success).toBe(false);
+    vi.mocked(dns.resolveTxt).mockResolvedValue([[token]]);
+    result = await verifyDomainDns({ ...domain, verificationToken: token });
+    expect(result).toMatchObject({ success: true, method: "TXT" });
   });
 
   it("fails closed when no real ACME issuance/edge installer is configured", async () => {
