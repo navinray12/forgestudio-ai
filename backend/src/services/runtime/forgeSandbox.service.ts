@@ -165,6 +165,29 @@ export function getSandboxWorkspaceDir(projectId: string): string {
 }
 
 /**
+ * Lexical containment rejects sibling-prefix paths (e.g. "project-a-evil")
+ * and traversal. Physical containment is checked after creating directories
+ * because an existing symlink can otherwise escape a lexical path boundary.
+ */
+export function isWithinWorkspace(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === "" ||
+    (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+export function resolveWorkspacePath(root: string, filePath: string): string {
+  if (typeof filePath !== "string" || filePath.includes("\\") ||
+      filePath.includes("\0") || /^[a-zA-Z]:/.test(filePath)) {
+    throw new AppError("Invalid project file path", 400, "SANDBOX_PATH_ESCAPE");
+  }
+  const resolved = path.resolve(root, filePath.replace(/^\/+/, ""));
+  if (!isWithinWorkspace(root, resolved)) {
+    throw new AppError("Project file escapes the sandbox root", 400, "SANDBOX_PATH_ESCAPE");
+  }
+  return resolved;
+}
+
+/**
  * Materialize project files from forge_project_files into the isolated sandbox directory
  */
 export async function materializeProjectWorkspace(projectId: string): Promise<string> {
@@ -177,25 +200,28 @@ export async function materializeProjectWorkspace(projectId: string): Promise<st
     });
 
     for (const file of files) {
-      const fullPath = path.resolve(workspaceDir, file.path.replace(/^\//, ""));
-      // Security check: ensure path stays within workspaceDir
-      if (!fullPath.startsWith(workspaceDir)) continue;
-
+      const fullPath = resolveWorkspacePath(workspaceDir, file.path);
       if (file.isDirectory) {
-        if (!fs.existsSync(fullPath)) {
-          fs.mkdirSync(fullPath, { recursive: true });
+        fs.mkdirSync(fullPath, { recursive: true });
+        if (!isWithinWorkspace(fs.realpathSync(workspaceDir), fs.realpathSync(fullPath))) {
+          throw new AppError("Directory symlink escapes sandbox root", 400, "SANDBOX_PATH_ESCAPE");
         }
       } else {
         const parentDir = path.dirname(fullPath);
-        if (!fs.existsSync(parentDir)) {
-          fs.mkdirSync(parentDir, { recursive: true });
+        fs.mkdirSync(parentDir, { recursive: true });
+        if (!isWithinWorkspace(fs.realpathSync(workspaceDir), fs.realpathSync(parentDir))) {
+          throw new AppError("File symlink parent escapes sandbox root", 400, "SANDBOX_PATH_ESCAPE");
+        }
+        if (fs.existsSync(fullPath) && fs.lstatSync(fullPath).isSymbolicLink()) {
+          throw new AppError("Writing to project symlinks is forbidden", 400, "SANDBOX_PATH_ESCAPE");
         }
         const encoding = (file.encoding as BufferEncoding) || "utf-8";
         fs.writeFileSync(fullPath, file.content || "", { encoding });
       }
     }
   } catch (err) {
-    console.warn(`[forge-sandbox] Error materializing project workspace for ${projectId}:`, err);
+    // A partial workspace must not be reported as a successful sandbox setup.
+    throw err;
   }
 
   return workspaceDir;
@@ -263,7 +289,7 @@ export async function executeInSandbox(params: {
   // Materialize project files to disk sandbox workspace
   const workspaceDir = await materializeProjectWorkspace(projectId);
   const resolvedCwd = path.resolve(workspaceDir, cwd.replace(/^\//, ""));
-  if (!resolvedCwd.startsWith(workspaceDir)) {
+  if (!isWithinWorkspace(workspaceDir, resolvedCwd)) {
     throw new AppError("Invalid working directory: Resolved path is outside sandbox root", 400, "SANDBOX_PATH_ESCAPE");
   }
 
