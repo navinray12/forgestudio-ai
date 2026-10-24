@@ -125,6 +125,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install locked backend dependencies
         run: npm ci
+      - name: Install frontend sanitization dependencies for cross-stack XSS tests
+        run: npm ci --prefix ../frontend
       - name: Generate Prisma client for security tests
         run: npx --no-install prisma generate
       - name: Run existing source-level security regression suites
