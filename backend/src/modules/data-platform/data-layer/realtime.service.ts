@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type pg from "pg";
 import { TenantPoolManager } from "../common/pool-manager.js";
 import { validateIdentifier } from "./query-compiler.js";
-import { getForgeProjectById } from "../../../services/project/forgeProject.service.js";
+import { verifyProjectAccess } from "../common/project-access.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
 // Dedicated WebSocketServer instance for /ws/realtime upgrades
@@ -18,6 +18,10 @@ const channelSubscriptions = new Map<string, Set<WebSocket>>();
 
 // Set of all channels a specific WebSocket is subscribed to: WebSocket -> Set<channelKey>
 const socketChannels = new Map<WebSocket, Set<string>>();
+
+// Authenticated principal bound to the live socket. Membership is rechecked
+// before every outgoing tenant notification, so revocation fails closed.
+const socketPrincipals = new Map<WebSocket, string>();
 
 // Active persistent LISTEN clients: projectId -> pg.PoolClient
 const activeListeners = new Map<string, { client: pg.PoolClient; refCount: number }>();
@@ -35,9 +39,11 @@ async function ensureProjectListener(
     return;
   }
 
+  let listenerClient: pg.PoolClient | null = null;
   try {
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
     const client = await pool.connect();
+    listenerClient = client;
 
     client.on("notification", (msg) => {
       if (msg.channel === "forge_realtime" && msg.payload) {
@@ -47,20 +53,35 @@ async function ensureProjectListener(
           const subscribers = channelSubscriptions.get(channelKey);
 
           if (subscribers && subscribers.size > 0) {
+            // Project membership is not row-level authorization. Never stream the
+            // trigger's full NEW/OLD records to subscribers: a collaborator could
+            // otherwise read rows that PostgreSQL RLS would deny through HTTP.
+            // Deliver a table invalidation only; clients must refetch via the
+            // authenticated, scope-checked data API.
             const outgoing = JSON.stringify({
               event: "REALTIME_EVENT",
               projectId,
               table: payload.table,
               action: payload.action,
-              record: payload.record,
-              oldRecord: payload.old_record,
               timestamp: payload.commit_timestamp,
             });
 
             for (const ws of subscribers) {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(outgoing);
+              if (ws.readyState !== WebSocket.OPEN) continue;
+              const principal = socketPrincipals.get(ws);
+              if (!principal) {
+                ws.close(1008, "Authentication required");
+                continue;
               }
+              // Permission may have been revoked after the subscription was
+              // opened. The DB lookup must succeed before every transmission.
+              void verifyProjectAccess(projectId, principal).then(() => {
+                if (ws.readyState === WebSocket.OPEN && socketChannels.get(ws)?.has(channelKey)) {
+                  ws.send(outgoing);
+                }
+              }).catch(() => {
+                if (ws.readyState === WebSocket.OPEN) ws.close(1008, "Access revoked");
+              });
             }
           }
         } catch (err) {
@@ -81,8 +102,12 @@ async function ensureProjectListener(
 
     await client.query("LISTEN forge_realtime;");
     activeListeners.set(projectId, { client, refCount: 1 });
+    listenerClient = null; // The active-listener registry now owns this connection.
   } catch (err) {
+    // Failed LISTEN must not leak a PostgreSQL pool connection.
+    try { listenerClient?.release(true); } catch { /* already closed */ }
     console.error(`[RealtimeService] Failed to establish listener for project ${projectId}:`, err);
+    throw err; // Do not acknowledge a subscription with no active LISTEN connection.
   }
 }
 
@@ -128,8 +153,6 @@ export async function enableTableRealtime(
         PERFORM pg_notify('forge_realtime', json_build_object(
           'table', TG_TABLE_NAME,
           'action', TG_OP,
-          'record', CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE row_to_json(NEW) END,
-          'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END,
           'commit_timestamp', clock_timestamp()
         )::text);
         RETURN NEW;
@@ -164,6 +187,7 @@ export function handleRealtimeWebSocketConnection(
   user?: { id?: string; role?: string }
 ): void {
   socketChannels.set(ws, new Set());
+  if (user?.id) socketPrincipals.set(ws, user.id);
 
   // Ping-pong liveness
   let isAlive = true;
@@ -200,6 +224,7 @@ export function handleRealtimeWebSocketConnection(
       }
       socketChannels.delete(socket);
     }
+    socketPrincipals.delete(socket);
   }
 
   ws.on("close", () => {
@@ -234,7 +259,8 @@ export function handleRealtimeWebSocketConnection(
 
         // Verify project authorization for authenticated user
         try {
-          await getForgeProjectById(projectId, user);
+          // Realtime subscriptions refer to Website IDs, just like the data API.
+          await verifyProjectAccess(projectId, user.id);
         } catch (authErr: any) {
           ws.send(JSON.stringify({
             event: "error",
@@ -246,21 +272,30 @@ export function handleRealtimeWebSocketConnection(
 
         const safeTable = validateIdentifier(table);
         const channelKey = `${projectId}:${safeTable}`;
+        const existingChannels = socketChannels.get(ws);
+        if (existingChannels?.has(channelKey)) {
+          // Repeated subscribe frames must not acquire additional listener refs.
+          ws.send(JSON.stringify({ event: "subscribed", projectId, table: safeTable, channel: channelKey }));
+          return;
+        }
+
+        // Acquire a DB listener before acknowledging subscription success.
+        await ensureProjectListener(projectId);
+        if (ws.readyState !== WebSocket.OPEN) {
+          releaseProjectListener(projectId);
+          return;
+        }
 
         if (!channelSubscriptions.has(channelKey)) {
           channelSubscriptions.set(channelKey, new Set());
         }
         channelSubscriptions.get(channelKey)!.add(ws);
-
         let userChannels = socketChannels.get(ws);
         if (!userChannels) {
           userChannels = new Set();
           socketChannels.set(ws, userChannels);
         }
         userChannels.add(channelKey);
-
-        // Ensure database listener is active
-        await ensureProjectListener(projectId);
 
         ws.send(
           JSON.stringify({
@@ -277,15 +312,18 @@ export function handleRealtimeWebSocketConnection(
         const safeTable = validateIdentifier(table);
         const channelKey = `${projectId}:${safeTable}`;
 
+        const userChannels = socketChannels.get(ws);
+        if (!userChannels?.has(channelKey)) {
+          ws.send(JSON.stringify({ event: "error", code: "NOT_SUBSCRIBED", message: "No active subscription for this channel" }));
+          return;
+        }
+        userChannels.delete(channelKey);
+
         const subscribers = channelSubscriptions.get(channelKey);
         if (subscribers) {
           subscribers.delete(ws);
           if (subscribers.size === 0) channelSubscriptions.delete(channelKey);
         }
-
-        const userChannels = socketChannels.get(ws);
-        if (userChannels) userChannels.delete(channelKey);
-
         releaseProjectListener(projectId);
 
         ws.send(

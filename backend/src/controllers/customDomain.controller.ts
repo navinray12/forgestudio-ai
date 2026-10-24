@@ -4,6 +4,7 @@
  */
 import { Request, Response } from "express";
 import { prisma } from "../config/prisma.js";
+import { verifyProjectAccess } from "../modules/data-platform/common/project-access.js";
 import {
   validateDomain,
   createDomainRecord,
@@ -22,17 +23,15 @@ import {
 // Helper
 // ---------------------------------------------------------------------------
 
-async function getAuthorizedWebsite(websiteId: string, userId?: string) {
-  const website = await prisma.website.findUnique({ where: { id: websiteId } });
-  if (!website) return null;
-  if (userId && website.userId !== userId) {
-    const collab = await (prisma as any).websiteCollaborator?.findFirst?.({ where: { websiteId, userId } });
-    if (!collab) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role as string)) return null;
-    }
-  }
-  return website;
+async function getAuthorizedWebsite(websiteId: string, userId?: string, requireAdmin = false) {
+  // Neither missing identity nor a collaborator with read-only access may
+  // claim, verify, delete, or change a website's public DNS/TLS ownership.
+  if (!userId) return null;
+  let access;
+  try { access = await verifyProjectAccess(websiteId, userId); }
+  catch { return null; }
+  if (requireAdmin && !access.canAdminister) return null;
+  return prisma.website.findUnique({ where: { id: websiteId } });
 }
 
 function readDomains(website: any): any[] {
@@ -75,13 +74,19 @@ export async function addDomain(req: Request, res: Response) {
   try {
     const websiteId = String(req.params.websiteId || "");
     const userId = res.locals.user?.id || (req as any).user?.id;
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domain = validateDomain(String(req.body.domain || ""));
-    const method: DomainVerificationMethod = ["TXT", "CNAME", "FILE"].includes(req.body.method)
-      ? req.body.method
-      : "TXT";
+    // Ownership verification requires a domain-specific TXT challenge.
+    // A/CNAME routing and file methods cannot satisfy the production verifier.
+    if (req.body.method !== undefined && req.body.method !== "TXT") {
+      return res.status(400).json({
+        success: false,
+        message: "TXT is the only supported domain ownership verification method",
+      });
+    }
+    const method: DomainVerificationMethod = "TXT";
 
     const domains = readDomains(website);
     if (domains.some((d: any) => d.domain === domain)) {
@@ -111,7 +116,7 @@ export async function verifyDomain(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -123,7 +128,12 @@ export async function verifyDomain(req: Request, res: Response) {
 
     const now = new Date().toISOString();
     if (check.success) {
-      domains[idx] = { ...record, status: "active", verifiedAt: now, lastCheckedAt: now, sslEnabled: true };
+      // DNS ownership is verified, not a certificate. Never infer HTTPS.
+      domains[idx] = {
+        ...record, status: "active", verifiedAt: now, lastCheckedAt: now,
+        sslEnabled: false, sslStatus: "PENDING_DNS",
+        sslIssuer: undefined, sslExpiresAt: undefined,
+      };
     } else {
       domains[idx] = { ...record, status: "failed", lastCheckedAt: now };
     }
@@ -136,7 +146,7 @@ export async function verifyDomain(req: Request, res: Response) {
       success: check.success,
       domain: { ...domains[idx], dnsRecords },
       dnsRecords,
-      message: check.success ? "Domain verified and SSL provisioned successfully" : check.reason,
+      message: check.success ? "Domain DNS verified; HTTPS certificate issuance is not yet confirmed" : check.reason,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
@@ -150,7 +160,7 @@ export async function setDomainPrimary(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -176,7 +186,7 @@ export async function removeDomain(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -225,7 +235,7 @@ export async function provisionDomainSsl(req: Request, res: Response) {
     const domainName = decodeURIComponent(String(req.params.domain || "")).toLowerCase();
     const userId = res.locals.user?.id || (req as any).user?.id;
 
-    const website = await getAuthorizedWebsite(websiteId, userId);
+    const website = await getAuthorizedWebsite(websiteId, userId, true);
     if (!website) return res.status(404).json({ success: false, message: "Website not found or unauthorized" });
 
     const domains = readDomains(website);
@@ -251,7 +261,11 @@ export async function provisionDomainSsl(req: Request, res: Response) {
           : "Pre-flight DNS check failed: " + (updatedRecord.dnsPreflight?.errors?.join("; ") || "Check DNS records"),
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({
+      success: false,
+      code: err.code || "SSL_PROVISIONING_FAILED",
+      message: err.message,
+    });
   }
 }
 
@@ -260,28 +274,12 @@ export async function provisionDomainSsl(req: Request, res: Response) {
 // ---------------------------------------------------------------------------
 
 function buildVerificationInstructions(record: any): Record<string, string> {
-  switch (record.verificationMethod) {
-    case "TXT":
-      return {
-        type: "DNS TXT Record",
-        host: `_forgestudio-verify.${record.domain}`,
-        value: record.verificationToken,
-        ttl: "300",
-      };
-    case "CNAME":
-      return {
-        type: "DNS CNAME Record",
-        host: `verify.${record.domain}`,
-        value: record.cnamTarget || "verify.forgestudio.app",
-        ttl: "300",
-      };
-    case "FILE":
-      return {
-        type: "File Verification",
-        url: `http://${record.domain}/.well-known/forgestudio-verify.txt`,
-        content: record.verificationToken,
-      };
-    default:
-      return {};
-  }
+  // Existing CNAME/FILE records also receive the real TXT instruction.
+  // Routing records are optional hints and never prove domain ownership.
+  return {
+    type: "DNS TXT Record",
+    host: `_forgestudio-challenge.${record.domain}`,
+    value: record.verificationToken,
+    ttl: "300",
+  };
 }

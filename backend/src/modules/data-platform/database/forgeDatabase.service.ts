@@ -41,6 +41,13 @@ export class ForgeDatabaseService {
     projectId: string,
     environment: DatabaseEnvironment = "development"
   ): Promise<CustomerDatabaseEntity> {
+    if (process.env.NODE_ENV === "production") {
+      throw new AppError(
+        "Legacy shared-schema database provisioning requires isolated tenant credentials",
+        503,
+        "LEGACY_DATABASE_ISOLATION_REQUIRED"
+      );
+    }
     const project = await db.forgeProject.findUnique({ where: { id: projectId } });
     if (!project) throw new AppError("Project not found", 404, "PROJECT_NOT_FOUND");
 
@@ -83,13 +90,12 @@ export class ForgeDatabaseService {
     projectId: string,
     environment: DatabaseEnvironment = "development"
   ): Promise<CustomerDatabaseEntity> {
-    let database = await db.forgeDatabase.findFirst({
+    // Reading an identifier must never CREATE a privileged database/schema.
+    // Provisioning requires the separate authenticated management workflow.
+    const database = await db.forgeDatabase.findFirst({
       where: { projectId, environment },
     });
-    if (!database) {
-      // Auto-provision default development database if not present
-      database = await this.provisionDatabase(projectId, environment);
-    }
+    if (!database) throw new AppError("Database not provisioned", 404, "DATABASE_NOT_PROVISIONED");
     return database;
   }
 

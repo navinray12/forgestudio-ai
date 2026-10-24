@@ -145,6 +145,7 @@ export async function confirmUploadHandler(
     }
 
     const savedObject = await confirmUpload({
+      websiteId: projectId,
       bucketId,
       objectKey: String(objectKey),
       originalName: String(originalName),
@@ -322,6 +323,25 @@ export async function transformImageHandler(
     const formatRaw = req.query.fmt as string | undefined;
     const quality = req.query.q ? parseInt(req.query.q as string, 10) : undefined;
     const bucketName = (req.query.bucket as string) || "default";
+    if (!/^[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?$/.test(bucketName) ||
+        !objectKey.startsWith(projectId + "/") || objectKey.includes("..") ||
+        objectKey.includes("\\") || objectKey.includes("\0")) {
+      throw new AppError("Image not found", 404, "IMAGE_NOT_FOUND");
+    }
+
+    // Public transforms may only serve a durable, explicitly PUBLIC object
+    // registered for the exact requested website. An arbitrary S3 key or
+    // another site's private bucket must never be used as an authorization key.
+    const registeredObject = await prisma.storageObject.findFirst({
+      where: {
+        objectKey,
+        bucket: { websiteId: projectId, name: bucketName, visibility: "PUBLIC" },
+      },
+      select: { id: true },
+    });
+    if (!registeredObject) {
+      throw new AppError("Image not found", 404, "IMAGE_NOT_FOUND");
+    }
 
     const allowedFormats = new Set(["webp", "jpeg", "png", "avif"]);
     const format = formatRaw && allowedFormats.has(formatRaw.toLowerCase())

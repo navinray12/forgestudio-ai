@@ -56,15 +56,20 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   }
 
   // 3. Background Removal
-  if (p.includes("remove background") || p.includes("transparent background") || p.includes("no background")) {
+  if (p.includes("remove background") || p.includes("remove the background") ||
+      p.includes("transparent background") || p.includes("no background")) {
     return "REMOVE_BACKGROUND";
   }
 
   // 4. Image Replacement / Generation
-  if ((context?.elementType === "image" || context?.elementId) && (p.includes("replace image") || p.includes("change image") || p.includes("new photo"))) {
+  if ((context?.elementType === "image" || context?.elementId) &&
+      (p.includes("replace image") || p.includes("replace this image") ||
+       p.includes("change image") || p.includes("new photo"))) {
     return "REPLACE_IMAGE";
   }
-  if (p.startsWith("generate image") || p.startsWith("create image") || p.includes("illustration for")) {
+  if (p.startsWith("generate image") || p.startsWith("create image") ||
+      p.includes("illustration for") ||
+      /^(?:generate|create|draw|design)\b[\s\S]*\b(?:image|photo|illustration)\b/.test(p)) {
     return "GENERATE_IMAGE";
   }
 
@@ -79,7 +84,9 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   }
 
   // 7. Code explanation vs generation
-  if (p.startsWith("explain code") || p.includes("explain this snippet")) {
+  if (p.startsWith("explain code") || p.includes("explain this snippet") ||
+      /^explain\s+(?:how|why|what|this|the|a|an)\b/.test(p) &&
+      /\b(?:code|javascript|typescript|html|css|function|method|snippet|algorithm)\b/.test(p)) {
     return "EXPLAIN_CODE";
   }
   if (p.includes("code") || p.includes("css") || p.includes("javascript") || p.includes("html snippet")) {
@@ -87,20 +94,26 @@ export function detectIntent(prompt: string, context?: AssistantRequest["context
   }
 
   // 8. Content refinement (if selected content or explicit action)
-  if (context?.selectedContent || p.startsWith("rewrite") || p.startsWith("shorten") || p.startsWith("expand") || p.startsWith("simplify") || p.includes("translate to") || p.includes("fix grammar")) {
+  if (context?.selectedContent || p.startsWith("rewrite") || p.startsWith("shorten") || p.startsWith("expand") || p.startsWith("simplify") || p.includes("translate to") || p.startsWith("translate ") || p.includes("fix grammar")) {
     return "REFINE_CONTENT";
   }
 
   // 9. Full website generation
-  if (p.startsWith("build a whole website") || p.startsWith("create website") || p.startsWith("generate site") || p.startsWith("generate website")) {
+  if (p.startsWith("build a whole website") || p.startsWith("create website") ||
+      p.startsWith("generate site") || p.startsWith("generate website") ||
+      /^\s*(?:build|create|generate|design)\s+(?:a|an|the)\s+(?:(?:complete|full|entire|modern|responsive)\s+)*[\s\S]*\b(?:website|landing page)\b/.test(p)) {
     return "GENERATE_WEBSITE";
   }
 
   // 10. Container / Layout
-  if (p.includes("grid layout") || p.includes("flex container") || p.includes("columns") || p.includes("2-column") || p.includes("3-column")) {
+  if (!/\bsection\b/.test(p) &&
+      (p.includes("grid layout") || p.includes("flex container") ||
+       p.includes("columns") || p.includes("2-column") || p.includes("3-column") ||
+       /\b\d+-column\s+grid\s+container\b/.test(p))) {
     return "GENERATE_CONTAINER";
   }
-  if (p.includes("reorganize layout") || p.includes("page layout")) {
+  if (p.includes("reorganize layout") || p.includes("page layout") ||
+      (p.includes("optimize") && p.includes("layout"))) {
     return "GENERATE_LAYOUT";
   }
 

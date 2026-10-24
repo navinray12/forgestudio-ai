@@ -13,127 +13,63 @@ interface CachedTenantPool {
 
 const MAX_ACTIVE_POOLS = 50;
 const poolCache = new Map<string, CachedTenantPool>();
+const pendingPoolInitializations = new Map<string, Promise<pg.Pool>>();
 
 let dataTablesEnsured = false;
+/**
+ * Runtime is read-only with respect to catalog DDL. Versioned Prisma migrations
+ * are the single schema authority; no request may bootstrap tables with an
+ * administrator connection or swallow an unsuccessful initialization.
+ */
 export async function ensureDataPlatformTables(): Promise<void> {
   if (dataTablesEnsured) return;
+  let result;
   try {
-    await pgPool.query(`
-      DO $$ BEGIN
-        CREATE TYPE "DatabaseEnvironment" AS ENUM ('DEVELOPMENT', 'PREVIEW', 'PRODUCTION', 'STAGING');
-      EXCEPTION WHEN duplicate_object THEN null;
-      END $$;
-      -- Older databases have only one of PREVIEW/STAGING; both labels are kept valid (additive).
-      ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'PREVIEW';
-      ALTER TYPE "DatabaseEnvironment" ADD VALUE IF NOT EXISTS 'STAGING';
-      DO $$ BEGIN
-        CREATE TYPE "DatabaseProvisioningStatus" AS ENUM ('PENDING', 'PROVISIONING', 'READY', 'FAILED', 'SUSPENDED');
-      EXCEPTION WHEN duplicate_object THEN null;
-      END $$;
-      DO $$ BEGIN
-        CREATE TYPE "BucketVisibility" AS ENUM ('PUBLIC', 'PRIVATE');
-      EXCEPTION WHEN duplicate_object THEN null;
-      END $$;
-      DO $$ BEGIN
-        CREATE TYPE "ApiKeyType" AS ENUM ('ANON', 'SERVICE_ROLE');
-      EXCEPTION WHEN duplicate_object THEN null;
-      END $$;
+    result = await pgPool.query<{
+      project_databases: string | null;
+      project_api_keys: string | null;
+      storage_buckets: string | null;
+      storage_objects: string | null;
+      database_migration_records: string | null;
+    }>(`SELECT to_regclass('public.project_databases')::text AS project_databases,
+               to_regclass('public.project_api_keys')::text AS project_api_keys,
+               to_regclass('public.storage_buckets')::text AS storage_buckets,
+               to_regclass('public.storage_objects')::text AS storage_objects,
+               to_regclass('public.database_migration_records')::text AS database_migration_records`);
+  } catch {
+    throw new AppError("Data platform migration verification unavailable", 503, "DATA_PLATFORM_CATALOG_UNAVAILABLE");
+  }
+  const row = result.rows[0];
+  if (!row || Object.values(row).some((value) => !value)) {
+    throw new AppError(
+      "Data platform migrations are missing; run prisma migrate deploy before serving requests",
+      503,
+      "DATA_PLATFORM_MIGRATION_REQUIRED"
+    );
+  }
+  dataTablesEnsured = true;
+}
 
-      CREATE TABLE IF NOT EXISTS project_databases (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
-        environment "DatabaseEnvironment" NOT NULL DEFAULT 'PRODUCTION',
-        status "DatabaseProvisioningStatus" NOT NULL DEFAULT 'PENDING',
-        "dbName" VARCHAR(63) NOT NULL,
-        "dbUser" VARCHAR(63) NOT NULL,
-        "encryptedPassword" VARCHAR(500) NOT NULL,
-        host VARCHAR(255) NOT NULL,
-        port INTEGER NOT NULL DEFAULT 5432,
-        "connectionPoolMax" INTEGER NOT NULL DEFAULT 10,
-        "connectionPoolIdleMs" INTEGER NOT NULL DEFAULT 10000,
-        "storageSizeBytes" BIGINT NOT NULL DEFAULT 0,
-        "lastBackupAt" TIMESTAMPTZ,
-        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        CONSTRAINT uq_project_databases_website_env UNIQUE ("websiteId", environment)
-      );
-      CREATE INDEX IF NOT EXISTS idx_project_databases_status ON project_databases(status);
-
-      CREATE TABLE IF NOT EXISTS project_database_backups (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
-        "backupName" VARCHAR(255) NOT NULL,
-        "storageKey" VARCHAR(1000) NOT NULL,
-        "sizeBytes" BIGINT NOT NULL,
-        "checksumSha256" VARCHAR(64) NOT NULL,
-        "completedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-      CREATE INDEX IF NOT EXISTS idx_project_db_backups_db ON project_database_backups("databaseId", "completedAt");
-
-      CREATE TABLE IF NOT EXISTS database_migration_records (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
-        "migrationName" VARCHAR(255) NOT NULL,
-        "batchNumber" INTEGER NOT NULL DEFAULT 1,
-        "appliedByUserId" UUID REFERENCES users(id) ON DELETE SET NULL,
-        checksum VARCHAR(64) NOT NULL,
-        "sqlScript" TEXT NOT NULL,
-        "executionTimeMs" INTEGER NOT NULL,
-        "appliedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        CONSTRAINT uq_db_mig_records_db_name UNIQUE ("databaseId", "migrationName")
-      );
-      CREATE INDEX IF NOT EXISTS idx_db_mig_records_db_batch ON database_migration_records("databaseId", "batchNumber");
-
-      CREATE TABLE IF NOT EXISTS project_api_keys (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "databaseId" UUID NOT NULL REFERENCES project_databases(id) ON DELETE CASCADE,
-        name VARCHAR(100) NOT NULL,
-        "keyType" "ApiKeyType" NOT NULL DEFAULT 'ANON',
-        "tokenHash" VARCHAR(128) UNIQUE NOT NULL,
-        prefix VARCHAR(16) NOT NULL,
-        scopes JSONB NOT NULL DEFAULT '["data:read", "data:write"]'::jsonb,
-        "rateLimitRpm" INTEGER NOT NULL DEFAULT 120,
-        "expiresAt" TIMESTAMPTZ,
-        "lastUsedAt" TIMESTAMPTZ,
-        "revokedAt" TIMESTAMPTZ,
-        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-      CREATE INDEX IF NOT EXISTS idx_project_api_keys_db_type ON project_api_keys("databaseId", "keyType");
-
-      CREATE TABLE IF NOT EXISTS storage_buckets (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "websiteId" UUID NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
-        name VARCHAR(63) NOT NULL,
-        visibility "BucketVisibility" NOT NULL DEFAULT 'PRIVATE',
-        "maxSizeBytes" BIGINT NOT NULL DEFAULT 524288000,
-        "usedSizeBytes" BIGINT NOT NULL DEFAULT 0,
-        "allowedMimeTypes" JSONB NOT NULL DEFAULT '["*/*"]'::jsonb,
-        "corsRules" JSONB NOT NULL DEFAULT '[]'::jsonb,
-        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        CONSTRAINT uq_storage_buckets_website_name UNIQUE ("websiteId", name)
-      );
-      CREATE INDEX IF NOT EXISTS idx_storage_buckets_website ON storage_buckets("websiteId");
-
-      CREATE TABLE IF NOT EXISTS storage_objects (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "bucketId" UUID NOT NULL REFERENCES storage_buckets(id) ON DELETE CASCADE,
-        "objectKey" VARCHAR(900) NOT NULL,
-        "originalName" VARCHAR(255) NOT NULL,
-        "mimeType" VARCHAR(150) NOT NULL,
-        "sizeBytes" BIGINT NOT NULL,
-        "checksumSha256" VARCHAR(64) NOT NULL,
-        "eTag" VARCHAR(100),
-        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-    `);
-    dataTablesEnsured = true;
-  } catch (err: any) {
-    console.error("[PoolManager] Error ensuring data platform tables:", err?.message || err);
+/**
+ * Reject records left by the historical admin-database fallback.
+ * A READY flag is not proof of tenant database isolation.
+ */
+export function assertDedicatedTenantDatabase(record: { dbName: string; dbUser: string }): void {
+  const adminConnection = process.env.DATABASE_URL;
+  if (!adminConnection) {
+    throw new AppError("Platform database configuration is missing", 503, "TENANT_DATABASE_ISOLATION_UNAVAILABLE");
+  }
+  const controlPlane = new URL(adminConnection);
+  const controlPlaneDatabase = decodeURIComponent(controlPlane.pathname.replace(/^\//, ""));
+  const controlPlaneUser = decodeURIComponent(controlPlane.username);
+  if (!record.dbName || !record.dbUser ||
+      record.dbName === controlPlaneDatabase ||
+      record.dbUser === controlPlaneUser) {
+    throw new AppError(
+      "Tenant database has not been isolated from the platform database",
+      503,
+      "TENANT_DATABASE_ISOLATION_UNAVAILABLE"
+    );
   }
 }
 
@@ -178,6 +114,32 @@ async function pruneLruPools(): Promise<void> {
 export async function getTenantPool(
   projectId: string,
   environment: DatabaseEnvironment = "PRODUCTION"
+): Promise<pg.Pool> {
+  const key = cacheKey(projectId, environment);
+  const cached = poolCache.get(key);
+  if (cached) {
+    cached.lastAccessedAt = Date.now();
+    return cached.pool;
+  }
+  const pending = pendingPoolInitializations.get(key);
+  if (pending) return pending;
+
+  // Single-flight initialization: concurrent requests for the same website and
+  // environment must share one verified connection pool, not create N pools.
+  const initialization = initializeTenantPool(projectId, environment);
+  pendingPoolInitializations.set(key, initialization);
+  try {
+    return await initialization;
+  } finally {
+    if (pendingPoolInitializations.get(key) === initialization) {
+      pendingPoolInitializations.delete(key);
+    }
+  }
+}
+
+async function initializeTenantPool(
+  projectId: string,
+  environment: DatabaseEnvironment
 ): Promise<pg.Pool> {
   const key = cacheKey(projectId, environment);
   const now = Date.now();
@@ -227,15 +189,9 @@ export async function getTenantPool(
     } catch {}
   }
 
-  // Auto-provision tenant database on demand if missing
-  if (!dbRecord) {
-    try {
-      const { provisionDatabase } = await import("../database/database-provisioner.service.js");
-      dbRecord = await provisionDatabase(projectId, environment);
-    } catch (provErr: any) {
-      console.warn(`[PoolManager] Auto-provision on demand failed for ${projectId}:`, provErr?.message);
-    }
-  }
+  // Never create roles, databases or tenant catalog records as a side effect
+  // of a SELECT, API request or background listener. Explicit provisioning is
+  // owned by the authenticated database-management workflow.
 
   if (!dbRecord) {
     throw new AppError(
@@ -252,6 +208,8 @@ export async function getTenantPool(
       "DATABASE_NOT_READY"
     );
   }
+
+  assertDedicatedTenantDatabase(dbRecord);
 
   // 2. Decrypt database password
   const password = decryptCredential(dbRecord.encryptedPassword);
@@ -278,17 +236,42 @@ export async function getTenantPool(
     console.error(`[PoolManager] Background error on tenant pool ${key}:`, err.message);
   });
 
-  // Test connection immediately
+  // An encrypted credential and READY row do not establish role isolation.
+  // Verify the ACTUAL PostgreSQL principal and database before caching this pool.
   try {
     const client = await pool.connect();
-    client.release();
+    try {
+      const verified = await client.query<{
+        database_name: string;
+        role_name: string;
+        is_superuser: boolean;
+        bypass_rls: boolean;
+        can_create_db: boolean;
+        can_create_role: boolean;
+        database_owner: string;
+      }>(`SELECT current_database() AS database_name, current_user AS role_name,
+              r.rolsuper AS is_superuser, r.rolbypassrls AS bypass_rls,
+              r.rolcreatedb AS can_create_db, r.rolcreaterole AS can_create_role,
+              pg_get_userbyid(d.datdba) AS database_owner
+           FROM pg_roles r JOIN pg_database d ON d.datname = current_database()
+          WHERE r.rolname = current_user`);
+      const role = verified.rows[0];
+      if (!role || role.database_name !== dbRecord.dbName ||
+          role.role_name !== dbRecord.dbUser || role.database_owner !== dbRecord.dbUser ||
+          role.is_superuser || role.bypass_rls || role.can_create_db || role.can_create_role) {
+        throw new AppError(
+          "Tenant database connection has an unsafe principal or ownership",
+          503,
+          "TENANT_DATABASE_ISOLATION_UNAVAILABLE"
+        );
+      }
+    } finally {
+      client.release();
+    }
   } catch (err: any) {
     await pool.end().catch(() => undefined);
-    throw new AppError(
-      `Failed to connect to tenant database: ${err.message}`,
-      503,
-      "DATABASE_CONNECTION_FAILED"
-    );
+    if (err instanceof AppError && err.code === "TENANT_DATABASE_ISOLATION_UNAVAILABLE") throw err;
+    throw new AppError("Tenant database connection validation failed", 503, "DATABASE_CONNECTION_FAILED");
   }
 
   poolCache.set(key, {
@@ -309,6 +292,9 @@ export async function closeTenantPool(
   environment: DatabaseEnvironment = "PRODUCTION"
 ): Promise<void> {
   const key = cacheKey(projectId, environment);
+  // Drain even if initialization is still in progress, to avoid a late pool
+  // being cached after deletion/deprovisioning begins.
+  await pendingPoolInitializations.get(key)?.catch(() => undefined);
   const entry = poolCache.get(key);
 
   if (entry) {

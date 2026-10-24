@@ -7,6 +7,7 @@
  * Additive only — stored in Website.editorData.customDomains[].
  */
 import { createHash } from "crypto";
+import { AppError } from "../../utils/app-error.js";
 
 
 export type DomainVerificationMethod = "TXT" | "CNAME" | "FILE";
@@ -183,8 +184,10 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
     try {
       const challengeHost = `_forgestudio-challenge.${record.domain}`;
       const txtRecords = await dns.resolveTxt(challengeHost);
-      const flattened = txtRecords.flat().join("");
-      if (flattened.includes(record.verificationToken)) {
+      // DNS TXT values can be split into multiple character strings per record.
+      // Match each complete TXT resource record, never substrings or strings
+      // accidentally joined across two separate resource records.
+      if (txtRecords.some((chunks) => chunks.join("") === record.verificationToken)) {
         return { success: true, method: "TXT" };
       }
     } catch {
@@ -195,7 +198,7 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
     try {
       const cnames = await dns.resolveCname(`www.${record.domain}`);
       if (cnames.some((c) => c.toLowerCase().includes("forgestudio.app") || c.toLowerCase().includes("cname.forgestudio.app"))) {
-        return { success: true, method: "CNAME" };
+        if (process.env.NODE_ENV !== "production") return { success: true, method: "CNAME" };
       }
     } catch {
       // Record not present or unresolved yet
@@ -206,7 +209,7 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
       const aRecords = await dns.resolve4(record.domain);
       const edgeIp = process.env.EDGE_SERVER_IP || "76.76.21.21";
       if (aRecords.includes(edgeIp)) {
-        return { success: true, method: "A" };
+        if (process.env.NODE_ENV !== "production") return { success: true, method: "A" };
       }
     } catch {
       // Record not present or unresolved yet
@@ -216,7 +219,8 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
   }
 
   // Gracefully fallback to simulated success in local/development/testing environments
-  const isDev = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_DNS_FALLBACK === "true";
+  // No environment flag may promote a synthetic DNS result in production.
+  const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     return { success: true, simulated: true, reason: "Verified via local development DNS resolver" };
   }
@@ -350,18 +354,17 @@ export async function runDnsPreflightCheck(domain: string, token: string): Promi
   // Check TXT record
   try {
     const txtRecords = await dns.resolveTxt(`_forgestudio-challenge.${domain}`);
-    const flattened = txtRecords.flat().join("");
-    if (token && flattened.includes(token)) {
+    if (token && txtRecords.some((chunks) => chunks.join("") === token)) {
       txtValid = true;
     }
   } catch {
     // Optional
   }
 
-  let passed = cnameValid || aRecordValid || txtValid;
-
-  // Development/Test fallback
-  const isDev = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_DNS_FALLBACK === "true";
+  // CNAME and A confirm routing only, not proof of control over this
+  // customer domain. In production an exact TXT challenge is mandatory.
+  const isDev = process.env.NODE_ENV !== "production";
+  let passed = isDev ? cnameValid || aRecordValid || txtValid : txtValid;
   if (!passed && isDev) {
     passed = true;
     cnameValid = true;
@@ -403,24 +406,14 @@ export async function initiateSslProvisioning(
     };
   }
 
-  // Generate ACME challenge
-  const challenge = generateHttp01Challenge(record.domain, websiteId);
-
-  // Provision SSL Certificate (Let's Encrypt / ACME edge)
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-
-  return {
-    ...record,
-    status: "active",
-    sslStatus: "ACTIVE",
-    sslEnabled: true,
-    verifiedAt: now,
-    lastCheckedAt: now,
-    sslIssuer: "Let's Encrypt Authority X3 (ACME v2)",
-    sslExpiresAt: expiresAt,
-    acmeChallengeToken: challenge.token,
-    dnsPreflight: preflight,
-  };
+  // DNS proves domain control only. No ACME order, certificate PEM, issuer
+  // validation, edge installation or renewal worker exists in this service.
+  // It must never create a fictitious Let's Encrypt cert or 90-day expiry.
+  throw new AppError(
+    "DNS preflight succeeded, but verified ACME certificate issuance and edge installation are not configured",
+    503,
+    "SSL_ISSUANCE_UNAVAILABLE"
+  );
 }
 
 /**
@@ -438,14 +431,14 @@ export function getDomainDiagnosticStatus(record: CustomDomain): SslDiagnosticSt
   return {
     domain: record.domain,
     status: record.status,
-    sslStatus: record.sslStatus || (record.status === "active" ? "ACTIVE" : "PENDING_DNS"),
-    sslEnabled: record.sslEnabled || record.status === "active",
-    sslIssuer: record.sslIssuer || (record.status === "active" ? "Let's Encrypt Authority X3 (ACME v2)" : undefined),
+    sslStatus: record.sslStatus || "PENDING_DNS",
+    sslEnabled: record.sslEnabled === true && record.sslStatus === "ACTIVE",
+    sslIssuer: record.sslIssuer,
     sslExpiresAt: record.sslExpiresAt,
     daysUntilExpiry,
-    autoRenew: true,
+    autoRenew: false,
     dnsPreflight: {
-      passed: record.dnsPreflight?.passed ?? (record.status === "active"),
+      passed: record.dnsPreflight?.passed === true,
       cnameValid: record.dnsPreflight?.cnameValid,
       aRecordValid: record.dnsPreflight?.aRecordValid,
       txtValid: record.dnsPreflight?.txtValid,

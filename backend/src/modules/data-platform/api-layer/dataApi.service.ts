@@ -36,7 +36,9 @@ export class DataApiService {
             databaseId,
             projectId,
             tableName: t.name,
-            isExposed: true,
+            // New tables are private until explicitly published via an
+            // authenticated project-owner configuration workflow.
+            isExposed: false,
             allowedOperations: ["GET", "POST", "PATCH", "DELETE"],
             requireAuth: true,
             rateLimitPerMin: 120,
@@ -87,7 +89,9 @@ export class DataApiService {
       where: { databaseId, tableName },
     });
 
-    if (config && (!config.isExposed || !config.allowedOperations.includes(operation))) {
+    // A missing exposure record is NOT permission to access tenant data.
+    if (!config || config.isExposed !== true ||
+        !Array.isArray(config.allowedOperations) || !config.allowedOperations.includes(operation)) {
       throw new AppError(
         `Operation '${operation}' on table '${tableName}' is not permitted by API configuration`,
         403,

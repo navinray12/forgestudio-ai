@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth } from "../../../middlewares/auth.middleware.js";
 import {
   getTableDataHandler,
   insertTableDataHandler,
@@ -12,7 +13,7 @@ export const dataRoutes = Router();
 export const sdkRoutes = Router({ mergeParams: true });
 
 // Realtime trigger enablement
-dataRoutes.post("/:projectId/:table/realtime/enable", enableRealtimeHandler);
+dataRoutes.post("/:projectId/:table/realtime/enable", requireAuth, enableRealtimeHandler);
 
 // PostgREST-style CRUD operations on tenant tables
 dataRoutes.get("/:projectId/:table", getTableDataHandler);
@@ -21,8 +22,8 @@ dataRoutes.patch("/:projectId/:table", updateTableDataHandler);
 dataRoutes.delete("/:projectId/:table", deleteTableDataHandler);
 
 // SDK generation directly under /api/v1/data/:projectId/sdk/typescript
-dataRoutes.get("/:projectId/sdk/typescript", getSdkTypeScriptHandler);
+dataRoutes.get("/:projectId/sdk/typescript", requireAuth, getSdkTypeScriptHandler);
 
 // Dedicated SDK router for /api/v1/projects/:projectId/sdk/typescript
-sdkRoutes.get("/typescript", getSdkTypeScriptHandler);
-sdkRoutes.get("/", getSdkTypeScriptHandler);
+sdkRoutes.get("/typescript", requireAuth, getSdkTypeScriptHandler);
+sdkRoutes.get("/", requireAuth, getSdkTypeScriptHandler);

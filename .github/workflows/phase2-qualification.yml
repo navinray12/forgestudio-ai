@@ -1,0 +1,332 @@
+name: Phase 2 qualification
+on:
+  pull_request:
+    branches:
+      - sconfigtesting
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docs/phase2/**'
+      - '.github/workflows/phase2-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase2-qualification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-inventory:
+    name: Immutable route/editor/CMS source inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Produce source-and-test checksum manifest at exact commit
+        run: node scripts/phase2-source-inventory.mjs phase2-audit-inventory.json
+      - name: Cross-check WP-03 to WP-10 feature source, tests, and unverified acceptance
+        run: node scripts/saas-feature-crosscheck.mjs saas-feature-crosscheck.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase2-source-inventory-${{ github.sha }}
+          path: |
+            phase2-audit-inventory.json
+            saas-feature-crosscheck.json
+          if-no-files-found: error
+          retention-days: 30
+
+  fresh-migrations:
+    name: Empty PostgreSQL migration qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_phase2_fresh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d forge_phase2_fresh"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_phase2_fresh
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+      DATA_PLATFORM_ENCRYPTION_KEY: wp01-ephemeral-test-fixture-not-for-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install pinned backend dependencies
+        run: npm ci
+      - name: Apply versioned migrations to a fresh disposable database
+        run: npx --no-install prisma migrate deploy
+      - name: Verify migration ledger has no pending entries
+        run: npx --no-install prisma migrate status
+      - name: Generate Prisma client for real tenant integration tests
+        run: npx --no-install prisma generate
+      - name: Qualify real project database roles and HTTP tenant boundaries
+        run: npx --no-install vitest run src/tests/wp01-real-data-plane.integration.test.ts src/tests/wp04-real-form-delivery.integration.test.ts
+
+  tenant-rls:
+    name: Real PostgreSQL restricted-role RLS qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: forge_hardening
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d forge_hardening"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_hardening
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+      DATA_PLATFORM_ENCRYPTION_KEY: wp02-rls-ephemeral-fixture-not-for-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked backend dependencies
+        run: npm ci
+      - name: Apply versioned migrations
+        run: npx --no-install prisma migrate deploy
+      - name: Generate version-matched Prisma client
+        run: npx --no-install prisma generate
+      - name: Validate real restricted PostgreSQL roles, RLS and rollback
+        run: npx --no-install vitest run src/tests/tenant-rls.integration.test.ts
+
+  build:
+    name: Build ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.component }}
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: ${{ matrix.component }}/package-lock.json
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Compile production build
+        run: npm run build
+
+  saas-scope-contracts:
+    name: WP-06/WP-08/WP-09/WP-10 source-level SaaS contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_contract:unused@127.0.0.1:5432/forge_contract
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies and generate Prisma client
+        run: |
+          npm ci
+          npx --no-install prisma generate
+      - name: Qualify AI capabilities with actual assertions (WP-06)
+        run: node --import tsx --test src/tests/ai-platform-capabilities.test.ts
+      - name: Qualify connector, telemetry, maintenance and project boundaries
+        run: >-
+          npx --no-install vitest run
+          src/tests/regression/wordpress-connector-characterization.test.ts
+          src/tests/point48-acceptance-register-metrics.test.ts
+          src/tests/point49-maintenance-boundaries.test.ts
+          src/tests/regression/project-authz-user-id.test.ts
+
+  hosted-access:
+    name: Legacy hosting isolation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify legacy artifact endpoint denies unverified access
+        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts src/tests/phase2-template-list-contract.test.ts src/tests/wp01-host-execution-isolation.test.ts src/tests/wp01-terminal-authorization.test.ts src/tests/wp01-realtime-subscription-isolation.test.ts src/tests/wp01-sandbox-termination-authorization.test.ts src/tests/wp01-data-api-authorization.test.ts src/tests/wp01-data-credential-validation.test.ts src/tests/wp01-tenant-database-isolation.test.ts src/tests/wp01-legacy-pool-isolation.test.ts src/tests/wp02-api-exposure-defaults.test.ts src/tests/wp04-media-ownership.test.ts src/tests/wp04-form-csv-export.test.ts src/tests/wp04-upload-safety.test.ts src/tests/wp04-trusted-form-actions.test.ts src/tests/wp04-image-transform-authorization.test.ts src/tests/wp02-legacy-read-provision.test.ts src/tests/wp04-storage-configuration.test.ts src/tests/wp04-confirm-upload-authorization.test.ts src/tests/wp02-backup-integrity.test.ts src/tests/wp02-backup-fail-closed.test.ts src/tests/wp01-credential-encryption.test.ts src/tests/wp01-project-website-ownership.test.ts src/tests/wp04-server-form-policy.test.ts src/tests/wp04-form-editor-secrets.test.ts src/tests/wp05-domain-authorization.test.ts src/tests/wp05-ssl-truthfulness.test.ts src/tests/wp05-domain-instructions.test.ts
+
+  security-regression:
+    name: MCP egress, tenant guard, auth and XSS regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_build:unused@127.0.0.1:5432/forge_build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked backend dependencies
+        run: npm ci
+      - name: Install frontend sanitization dependencies for cross-stack XSS tests
+        run: npm ci --prefix ../frontend
+      - name: Generate Prisma client for security tests
+        run: npx --no-install prisma generate
+      - name: Run existing source-level security regression suites
+        run: >-
+          npx --no-install vitest run
+          src/tests/regression/mcp-egress.test.ts
+          src/tests/regression/mcp-trust-approval.test.ts
+          src/tests/regression/project-mcp-authorization.test.ts
+          src/tests/regression/safe-egress-address.test.ts
+          src/tests/phase1-security-remediation.test.ts
+
+  editor-journeys:
+    name: Editor save, history and publish workflow regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install pinned frontend dependencies
+        run: npm ci
+      - name: Exercise editor history, save and published navigation
+        run: >-
+          npx --no-install vitest run
+          tests/website-editor/editor-history.test.tsx
+          tests/website-editor/manual-save.test.tsx
+          tests/website-editor/publish-flow.test.tsx
+          tests/website-editor/editor-payloads.test.ts
+          tests/website-editor/page-management.test.ts
+          tests/wp04-form-delivery-policy.test.tsx
+
+  global-widget-contract:
+    name: Global widget persistence and failure handling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Validate global widget server persistence
+        run: npx --no-install vitest run tests/global-widget-service.test.ts tests/global-widget-library-recovery.test.tsx tests/wp03-template-service.test.ts
+
+  wp03-wp10-integration-contracts:
+    name: WP-03 through WP-10 coordinated implementation regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://forge_contract:unused@127.0.0.1:5432/forge_contract
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client for cross-scope test imports
+        run: npx --no-install prisma generate
+      - name: Run native Vitest hosting, provider and operations contracts
+        run: >-
+          npx --no-install vitest run
+          src/tests/wp05-ssl-truthfulness.test.ts
+          src/tests/wp05-domain-instructions.test.ts
+          src/tests/regression/wordpress-connector-characterization.test.ts
+          src/tests/point48-acceptance-register-metrics.test.ts
+          src/tests/point49-maintenance-boundaries.test.ts
+          src/tests/regression/project-authz-user-id.test.ts
+      - name: Run Node test-runner AI capability assertions (no database)
+        run: node --import tsx --test src/tests/ai-platform-capabilities.test.ts
+      # Billing integration and AI worker smoke require a migrated disposable DB,
+      # a running worker, and explicit fixture opt-in. They must NOT be executed
+      # against a fake database URL, nor treated as successful production journeys.

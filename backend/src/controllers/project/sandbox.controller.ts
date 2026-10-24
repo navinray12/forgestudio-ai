@@ -55,6 +55,14 @@ export async function stopSandboxProcessHandler(req: Request, res: Response, nex
 
     const { processId } = req.body;
     const { forgeSandboxService } = await import("../../services/runtime/forgeSandbox.service.js");
+    // A process ID must not authorize stopping a process in another project.
+    const process = typeof processId === "string"
+      ? forgeSandboxService.getSandboxProcess(processId)
+      : null;
+    if (!process || process.projectId !== projectId) {
+      res.status(404).json({ success: false, error: { code: "PROCESS_NOT_FOUND", message: "Process not found" } });
+      return;
+    }
     const result = await forgeSandboxService.terminateSandboxProcess(processId);
     res.status(200).json(result);
   } catch (err) {

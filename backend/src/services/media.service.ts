@@ -2,6 +2,25 @@ import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
 
 const db = prisma as any;
+const WEBSITE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Asset ownership does not imply ownership of a requested destination website.
+ * Verify the destination before listing, uploading, or reassigning site media.
+ * A non-existent and a foreign website intentionally share the same 404.
+ */
+async function assertOwnedWebsite(websiteId: string, userId: string): Promise<void> {
+  if (typeof websiteId !== "string" || !WEBSITE_ID.test(websiteId)) {
+    throw new AppError("Website not found", 404, "WEBSITE_NOT_FOUND");
+  }
+  const website = await db.website.findFirst({
+    where: { id: websiteId, userId },
+    select: { id: true },
+  });
+  if (!website) {
+    throw new AppError("Website not found", 404, "WEBSITE_NOT_FOUND");
+  }
+}
 
 /**
  * Legacy compatibility hook.
@@ -166,6 +185,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
   if (!userId || !filename || !url) {
     throw new AppError("Missing required media asset fields", 400, "INVALID_MEDIA_ASSET");
   }
+  if (websiteId) await assertOwnedWebsite(websiteId, userId);
 
   const asset = await db.mediaAsset.create({
     data: {
@@ -202,6 +222,7 @@ export async function listMediaAssets(
   const limit = Math.min(100, Math.max(1, options.limit || 50));
   const skip = (page - 1) * limit;
 
+  if (options.websiteId) await assertOwnedWebsite(options.websiteId, userId);
   const where: any = { userId };
 
   if (options.websiteId) {
@@ -269,8 +290,11 @@ export async function updateMediaAsset(
   userId: string,
   data: { altText?: string; websiteId?: string }
 ) {
-  // Ensure ownership
+  // Verify both the existing asset owner and the *destination* website.
   await getMediaAssetById(id, userId);
+  if (data.websiteId !== undefined && data.websiteId !== "") {
+    await assertOwnedWebsite(data.websiteId, userId);
+  }
 
   const updated = await db.mediaAsset.update({
     where: { id },

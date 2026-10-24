@@ -3417,6 +3417,8 @@ export default function WebsiteEditor() {
                     {/* Image Widget Specific Inspector */}
                     {/* See inspector/selected/widgetInspectorSlots (moved verbatim) */}
                     {renderWidgetInspectorSlots({
+                      websiteId,
+                      apiUrl,
                       activeDevice,
                       activePageId,
                       breakpoints,

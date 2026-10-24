@@ -45,6 +45,9 @@ export async function saveAsTemplate(
     throw new Error(data?.message || data?.error?.message || "Failed to save template.");
   }
 
+  if (data?.success === false || !data?.template || typeof data.template.id !== "string") {
+    throw new Error("Template was not confirmed saved by the server.");
+  }
   return data.template;
 }
 
@@ -103,14 +106,19 @@ export async function getUserTemplates(apiUrl: string): Promise<Template[]> {
     throw new Error(data?.message || data?.error?.message || "Unable to load templates.");
   }
 
-  return data.templates || [];
+  // A successful HTTP status without a valid template collection is a
+  // contract failure, not evidence that the customer's library is empty.
+  if (data?.success === false || !Array.isArray(data?.templates)) {
+    throw new Error(data?.error?.message || data?.message || "Invalid template library response.");
+  }
+  return data.templates;
 }
 
 /**
  * Fetches a public shared template safely without authentication
  */
 export async function getPublicTemplate(apiUrl: string, shareToken: string): Promise<Template> {
-  const res = await fetch(`${apiUrl}/api/templates/public/${shareToken}`, {
+  const res = await fetch(`${apiUrl}/api/templates/public/${encodeURIComponent(shareToken)}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -123,6 +131,9 @@ export async function getPublicTemplate(apiUrl: string, shareToken: string): Pro
     throw new Error(data?.message || data?.error?.message || "This template is no longer available.");
   }
 
+  if (data?.success === false || !data?.template || typeof data.template.id !== "string") {
+    throw new Error("Invalid public template response.");
+  }
   return data.template;
 }
 
@@ -147,7 +158,7 @@ export async function updateTemplate(
   templateId: string,
   payload: UpdateTemplatePayload
 ): Promise<Template> {
-  const res = await fetch(`${apiUrl}/api/templates/${templateId}`, {
+  const res = await fetch(`${apiUrl}/api/templates/${encodeURIComponent(templateId)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -162,6 +173,9 @@ export async function updateTemplate(
     throw new Error(data?.message || data?.error?.message || "Unable to update template.");
   }
 
+  if (data?.success === false || !data?.template || typeof data.template.id !== "string") {
+    throw new Error("Template update was not confirmed by the server.");
+  }
   return data.template;
 }
 
@@ -173,7 +187,7 @@ export async function toggleTemplateSharing(
   templateId: string,
   isShared: boolean
 ): Promise<Template> {
-  const res = await fetch(`${apiUrl}/api/templates/${templateId}/share`, {
+  const res = await fetch(`${apiUrl}/api/templates/${encodeURIComponent(templateId)}/share`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -188,6 +202,9 @@ export async function toggleTemplateSharing(
     throw new Error(data?.message || data?.error?.message || "Unable to update sharing settings.");
   }
 
+  if (data?.success === false || !data?.template || typeof data.template.id !== "string") {
+    throw new Error("Sharing change was not confirmed by the server.");
+  }
   return data.template;
 }
 
@@ -206,7 +223,7 @@ export async function toggleFavorite(
  * Deletes a saved template owned by the authenticated user
  */
 export async function deleteTemplate(apiUrl: string, templateId: string): Promise<void> {
-  const res = await fetch(`${apiUrl}/api/templates/${templateId}`, {
+  const res = await fetch(`${apiUrl}/api/templates/${encodeURIComponent(templateId)}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -216,7 +233,7 @@ export async function deleteTemplate(apiUrl: string, templateId: string): Promis
 
   const data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(data?.message || data?.error?.message || "Unable to delete template.");
+  if (!res.ok || data?.success !== true) {
+    throw new Error(data?.message || data?.error?.message || "Template deletion was not confirmed by the server.");
   }
 }

@@ -48,6 +48,21 @@ export interface StorageConfig {
 }
 
 export function getStorageConfig(): StorageConfig {
+  if (process.env.NODE_ENV === "production") {
+    const explicitEndpoint = process.env.STORAGE_ENDPOINT;
+    const keyId = process.env.STORAGE_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID;
+    const secret = process.env.STORAGE_SECRET_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+    if (!explicitEndpoint || !keyId || !secret ||
+        !/^https:\/\//i.test(explicitEndpoint) ||
+        /^(forge_minio_admin|forge_minio_secret_key_123)$/.test(keyId) ||
+        /^(forge_minio_admin|forge_minio_secret_key_123)$/.test(secret)) {
+      throw new AppError(
+        "Production object storage requires explicit HTTPS endpoint and non-default credentials",
+        503,
+        "OBJECT_STORAGE_UNAVAILABLE"
+      );
+    }
+  }
   const endpoint =
     process.env.STORAGE_ENDPOINT ||
     process.env.MINIO_ENDPOINT ||
@@ -157,6 +172,30 @@ export async function putObject(
       ContentType: contentType,
     })
   );
+}
+
+/**
+ * Confirm actual object existence and server-observed metadata before a
+ * client-supplied upload confirmation can create a durable database record.
+ */
+export async function headObject(
+  bucketName: string,
+  key: string
+): Promise<{ contentLength: number; contentType?: string }> {
+  const sdk = await getS3Sdk();
+  const client = await getS3Client();
+  try {
+    const result = await client.send(new sdk.HeadObjectCommand({
+      Bucket: bucketName, Key: key,
+    }));
+    if (!Number.isSafeInteger(result.ContentLength) || result.ContentLength < 0) {
+      throw new AppError("Uploaded object metadata is incomplete", 409, "UPLOAD_NOT_VERIFIED");
+    }
+    return { contentLength: result.ContentLength, contentType: result.ContentType };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError("Uploaded object could not be verified in storage", 409, "UPLOAD_NOT_VERIFIED");
+  }
 }
 
 /**

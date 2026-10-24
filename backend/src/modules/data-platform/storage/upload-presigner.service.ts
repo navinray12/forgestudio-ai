@@ -5,6 +5,7 @@ import {
   deleteObject,
   getStorageConfig,
   getPresignedPutUrl,
+  headObject,
 } from "./s3-client.js";
 import type { StorageBucket, StorageObject } from "../../../generated/prisma/client.js";
 
@@ -146,6 +147,7 @@ export async function generateUploadPresignedUrl(
 }
 
 export interface ConfirmUploadParams {
+  websiteId: string;
   bucketId: string;
   objectKey: string;
   originalName: string;
@@ -162,15 +164,66 @@ export interface ConfirmUploadParams {
 export async function confirmUpload(
   params: ConfirmUploadParams
 ): Promise<StorageObject> {
+  if (!Number.isSafeInteger(params.sizeBytes) || params.sizeBytes <= 0 ||
+      !params.websiteId || !params.objectKey.startsWith(params.websiteId + "/") ||
+      params.objectKey.includes("..") || params.objectKey.includes("\\") ||
+      params.mimeType.length > 128) {
+    throw new AppError("Invalid upload confirmation", 400, "INVALID_UPLOAD_CONFIRMATION");
+  }
+  const assignedBucket = await prisma.storageBucket.findUnique({
+    where: { id: params.bucketId },
+  });
+  if (!assignedBucket || assignedBucket.websiteId !== params.websiteId) {
+    throw new AppError("Storage bucket not found for this website", 404, "BUCKET_NOT_FOUND");
+  }
+  const observed = await headObject(assignedBucket.name, params.objectKey);
+  if (observed.contentLength !== params.sizeBytes ||
+      (observed.contentType && observed.contentType.toLowerCase() !== params.mimeType.toLowerCase())) {
+    throw new AppError("Upload metadata does not match the stored object", 409, "UPLOAD_METADATA_MISMATCH");
+  }
   const bytes = BigInt(params.sizeBytes);
 
-  return await prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const bucket = await tx.storageBucket.findUnique({
       where: { id: params.bucketId },
     });
 
-    if (!bucket) {
+    if (!bucket || bucket.websiteId !== params.websiteId) {
       throw new AppError("Storage bucket not found", 404, "BUCKET_NOT_FOUND");
+    }
+    // Duplicate confirmations for the same S3 key are safe and idempotent.
+    // They must not double-charge bucket quota.
+    const existing = await tx.storageObject.findUnique({
+      where: {
+        bucketId_objectKey: {
+          bucketId: params.bucketId,
+          objectKey: params.objectKey,
+        },
+      },
+    });
+    if (existing) {
+      if (existing.sizeBytes !== bytes || existing.mimeType !== params.mimeType) {
+        throw new AppError("Confirmed object metadata cannot be changed", 409, "UPLOAD_CONFIRMATION_CONFLICT");
+      }
+      return existing;
+    }
+
+    // Reserve quota with one atomic conditional UPDATE. A read-then-write
+    // guard is unsafe when multiple uploads finish simultaneously.
+    if (bucket.maxSizeBytes < bytes) {
+      throw new AppError("Storage quota exceeded", 413, "STORAGE_QUOTA_EXCEEDED");
+    }
+    const reservation = await tx.storageBucket.updateMany({
+      where: {
+        id: params.bucketId,
+        websiteId: params.websiteId,
+        usedSizeBytes: { lte: bucket.maxSizeBytes - bytes },
+      },
+      data: { usedSizeBytes: { increment: bytes } },
+    });
+    if (reservation.count !== 1) {
+      throw new AppError("Storage quota exceeded or changed concurrently", 413, "STORAGE_QUOTA_EXCEEDED");
     }
 
     const createdObject = await tx.storageObject.create({
@@ -185,17 +238,29 @@ export async function confirmUpload(
       },
     });
 
-    await tx.storageBucket.update({
-      where: { id: params.bucketId },
-      data: {
-        usedSizeBytes: {
-          increment: bytes,
-        },
-      },
-    });
-
     return createdObject;
-  });
+    });
+  } catch (error) {
+    // Two callers may HEAD the same object before either commits. The loser
+    // sees the composite (bucketId, objectKey) unique constraint. Prisma rolls
+    // back its quota reservation; return the existing matching object on retry.
+    if ((error as { code?: string } | null)?.code === "P2002") {
+      const existing = await prisma.storageObject.findUnique({
+        where: {
+          bucketId_objectKey: {
+            bucketId: params.bucketId,
+            objectKey: params.objectKey,
+          },
+        },
+      });
+      if (existing && existing.sizeBytes === bytes && existing.mimeType === params.mimeType) {
+        return existing;
+      }
+      throw new AppError("Uploaded object metadata conflicts with an existing confirmation",
+        409, "UPLOAD_CONFIRMATION_CONFLICT");
+    }
+    throw error;
+  }
 }
 
 /**
