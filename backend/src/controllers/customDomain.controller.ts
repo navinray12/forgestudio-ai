@@ -122,7 +122,12 @@ export async function verifyDomain(req: Request, res: Response) {
 
     const now = new Date().toISOString();
     if (check.success) {
-      domains[idx] = { ...record, status: "active", verifiedAt: now, lastCheckedAt: now, sslEnabled: true };
+      // DNS ownership is verified, not a certificate. Never infer HTTPS.
+      domains[idx] = {
+        ...record, status: "active", verifiedAt: now, lastCheckedAt: now,
+        sslEnabled: false, sslStatus: "PENDING_DNS",
+        sslIssuer: undefined, sslExpiresAt: undefined,
+      };
     } else {
       domains[idx] = { ...record, status: "failed", lastCheckedAt: now };
     }
@@ -135,7 +140,7 @@ export async function verifyDomain(req: Request, res: Response) {
       success: check.success,
       domain: { ...domains[idx], dnsRecords },
       dnsRecords,
-      message: check.success ? "Domain verified and SSL provisioned successfully" : check.reason,
+      message: check.success ? "Domain DNS verified; HTTPS certificate issuance is not yet confirmed" : check.reason,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
@@ -250,7 +255,11 @@ export async function provisionDomainSsl(req: Request, res: Response) {
           : "Pre-flight DNS check failed: " + (updatedRecord.dnsPreflight?.errors?.join("; ") || "Check DNS records"),
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({
+      success: false,
+      code: err.code || "SSL_PROVISIONING_FAILED",
+      message: err.message,
+    });
   }
 }
 
