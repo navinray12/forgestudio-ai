@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../config/prisma.js", () => ({
   prisma: {
     storageBucket: { findUnique: h.bucketFind },
+    storageObject: { findUnique: h.objectFind },
     $transaction: h.tx,
   },
 }));
@@ -95,6 +96,23 @@ describe("WP-04 confirmed storage object trust boundary", () => {
     await expect(confirmUpload(params))
       .rejects.toMatchObject({ code: "UPLOAD_CONFIRMATION_CONFLICT", statusCode: 409 });
     expect(h.bucketUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns a prior confirmed upload after a concurrent unique-key race", async () => {
+    const existing = { id: "already-saved", sizeBytes: 1200n, mimeType: "image/png" };
+    h.tx.mockRejectedValueOnce(Object.assign(new Error("duplicate object"), { code: "P2002" }));
+    h.objectFind.mockResolvedValue(existing);
+    await expect(confirmUpload(params)).resolves.toEqual(existing);
+    expect(h.objectFind).toHaveBeenCalledWith({
+      where: { bucketId_objectKey: { bucketId: "bucket-1", objectKey: params.objectKey } },
+    });
+  });
+
+  it("returns conflict if another upload reserved the key for different metadata", async () => {
+    h.tx.mockRejectedValueOnce(Object.assign(new Error("duplicate object"), { code: "P2002" }));
+    h.objectFind.mockResolvedValue({ id: "other", sizeBytes: 12n, mimeType: "text/plain" });
+    await expect(confirmUpload(params))
+      .rejects.toMatchObject({ code: "UPLOAD_CONFIRMATION_CONFLICT", statusCode: 409 });
   });
 
   it("atomically reserves capacity before registering an object", async () => {
