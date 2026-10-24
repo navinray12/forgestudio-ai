@@ -41,6 +41,7 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 | WP02-06 | P0 | Tenant schema/user revocation and stale-pool invalidation, read replica, quotas and backup/restore not yet live-certified | Run independent database recovery, secrets rotation, load/limit, and deprovision race tests | OPEN — production environment evidence |
 | WP02-07 | P0 | **Two customer database implementations**: `ForgeDatabase` shared-schema `connectionManager.ts` vs dedicated `ProjectDatabase` tenant roles | Trace route callers, enforce owner/site & environment and real least privilege in shared-schema path, formally decide product support and migration strategy | OPEN — architecture review, no broad refactor |
 | WP02-08 | P1 | Shared-schema `forgeDatabase.service.ts#getDatabase()` auto-provisions and `connectionManager.ts` executes on `pgPool` with tenant-specific search_path | Separate focused security review: bind dbId to owner, eliminate unsafe implicit creation, test schema isolation under two tenants | OPEN — requires independent integration path |
+| WP02-09 | P0 | `api-layer/dataApi.service.ts`: absent API exposure config granted access and new customer tables started `isExposed=true` | Fail closed with HTTP 403 unless explicit enabled config permits operation; new tables default private; unit tests `wp02-api-exposure-defaults.test.ts` | **FIXED — CI VERIFIED** at `d3bbfb35`; 4/4 tests passed |
 
 ## Test evidence and regression location
 
@@ -48,13 +49,17 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 
 **Current code + audit evidence:** [Phase 2 qualification 40079386681](https://github.com/navinray12/forgestudio-ai/actions/runs/40079386681) on commit `bb4fd9c1bb10d1da20e2e641032a3b4a9e527939` — all six jobs passed. Fresh PostgreSQL: 42 migrations and **11/11 live tenant HTTP tests**; source-level checks include 247 MCP/security/XSS tests plus backend/frontend builds. This report-only document update is not itself covered by that earlier commit; recheck the exact branch head after updates.
 
+**Latest code-gate result:** [Phase 2 qualification 40079774685](https://github.com/navinray12/forgestudio-ai/actions/runs/40079774685) on `d3bbfb353dcac410f2e004926dede7859e0757a7`: **7/7 jobs passed**, comprising backend/frontend builds, global-widget verification, hosting isolation, 42 clean migrations, **11/11 real dedicated-tenant HTTP tests**, **14/14 real PostgreSQL restricted-role RLS tests**, **77/77 focused backend tests**, and **247/247 MCP/XSS security regressions**. Existing identity, AI, and frontend lint workflows are separate; do not silently count them if still running.
+
+**Security/API behavior change:** The legacy ForgeDatabase generated-API adapter now defaults new table API exposure to `false`; missing table API configs no longer grant CRUD access. Consumers must explicitly enable/configure exposure, and website owner authorization for that management path remains a separate acceptance gate (WP02-07/08).
+
 **Added in this issue pass:**
 - `backend/src/tests/wp01-data-credential-validation.test.ts`: authenticated session FORCE RLS + editor write restriction
 - `backend/src/tests/wp01-realtime-subscription-isolation.test.ts`: canonical website access check
 - `backend/src/tests/wp01-real-data-plane.integration.test.ts`: real editor production-write 403, auth session unprotected table 403, no implicit DB provisioning, concurrent pool equality
 - `backend/src/modules/data-platform/common/pool-manager.ts`: single-flight tenant pool, explicit-provision-only reads
 
-**Quality gate:** `.github/workflows/phase2-qualification.yml` must pass on the **final SHA**, including the dedicated real PostgreSQL job. Report CI failures by job ID rather than inferring that earlier green commits validate newer ones.
+**Quality gate:** `.github/workflows/phase2-qualification.yml` now includes two **separate disposable PostgreSQL** jobs: (1) dedicated tenant + live HTTP test, and (2) pre-existing restricted-role tenant RLS/rollback tests. Both passed at `d3bbfb35`. Every subsequent code/document commit needs fresh exact-SHA verification.
 
 ## Release decision and acceptance boundary
 
