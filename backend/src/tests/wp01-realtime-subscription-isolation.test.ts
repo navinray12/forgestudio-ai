@@ -10,8 +10,8 @@ const h = vi.hoisted(() => ({
   release: vi.fn(),
 }));
 
-vi.mock("../services/project/forgeProject.service.js", () => ({
-  getForgeProjectById: h.authorize,
+vi.mock("../modules/data-platform/common/project-access.js", () => ({
+  verifyProjectAccess: h.authorize,
 }));
 vi.mock("../modules/data-platform/common/pool-manager.js", () => ({
   TenantPoolManager: { getTenantPool: h.getPool },
@@ -70,6 +70,7 @@ describe("WP-01 realtime subscription isolation", () => {
     const owner = socket("owner");
     owner.receive({ event: "subscribe", projectId: "proj-a", table: "orders" });
     await untilFrame(owner, "subscribed");
+    expect(h.authorize).toHaveBeenCalledWith("proj-a", "owner");
     expect(h.connect).toHaveBeenCalledOnce();
 
     const intruder = socket("other");
