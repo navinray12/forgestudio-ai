@@ -3,14 +3,19 @@
  */
 import type { EditorElement, FormFieldItem, FormFieldType } from "../../types";
 import { UniversalItemManager } from "../shared/UniversalItemManager";
+import { FormDeliveryPolicyPanel } from "../../components/forms/FormDeliveryPolicyPanel";
 
 // 7. Form Builder Inspector (F-178)
 export function FormWidgetInspector({
   el,
-  updateProp
+  updateProp,
+  websiteId,
+  apiUrl,
 }: {
   el: EditorElement;
   updateProp: (key: string, val: any) => void;
+  websiteId?: string;
+  apiUrl?: string;
 }) {
   const fields = el.formFields || [];
   const steps = el.formSteps || [
@@ -256,6 +261,8 @@ export function FormWidgetInspector({
           </div>
         )}
       />
+
+      <FormDeliveryPolicyPanel key={el.id} websiteId={websiteId} formId={el.id} apiUrl={apiUrl} />
 
       {/* Button & Action Settings */}
       <div className="pt-2 border-t border-slate-200 space-y-2">
