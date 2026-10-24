@@ -4,6 +4,16 @@ import { assertSafeUrl } from "../../utils/ssrf.guard.js";
 import { verifyProjectAccess } from "../../modules/data-platform/common/project-access.js";
 import { encryptCredential, decryptCredential } from "../../modules/data-platform/security/encryption.js";
 
+/** Startup gate: missing migrations must stop production before accepting form traffic. */
+export async function verifyFormDeliveryPolicyMigration(): Promise<void> {
+  const { rows } = await pgPool.query<{ policy_table: string | null }>(
+    `SELECT to_regclass('public.form_delivery_policies')::text AS policy_table`
+  );
+  if (!rows[0]?.policy_table) {
+    throw new AppError("Form delivery policy migration is missing", 503, "FORM_DELIVERY_MIGRATION_REQUIRED");
+  }
+}
+
 type FormActions = Record<string, unknown>;
 const FORM_ID = /^[A-Za-z0-9._:-]{1,256}$/;
 const ACTION_TYPES = new Set(["database", "email", "webhook", "google_sheets", "mailchimp", "zapier", "redirect", "popup"]);
