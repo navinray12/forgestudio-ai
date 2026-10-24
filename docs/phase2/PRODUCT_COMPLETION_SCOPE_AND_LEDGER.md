@@ -115,6 +115,12 @@ The active audit and per-file remediation log is [WP00_WP01_SECURITY_EVIDENCE.md
 - **Verified:** [Phase 2 qualification run 40078109973](https://github.com/navinray12/forgestudio-ai/actions/runs/40078109973) is green (6/6 jobs) at commit `b2d32fb2`; this is NOT certification of a deployed production environment. Revalidate CI against any newer commit.
 - **Go/No-go: NO-GO.** WP-00/WP-01 remain **IN PROGRESS**, pending a fully reconciled current-entry-point inventory, comprehensive deployed adversarial authorization testing, independent runtime isolation, and applicable operator/staging security evidence. Do not count a security-disabled runtime as a delivered customer feature.
 
+## WP-01 / WP-02 canonical audit — do not repeat full refactors
+
+All new work on security and multi-tenancy must start from [WP01_WP02_CANONICAL_AUDIT.md](./WP01_WP02_CANONICAL_AUDIT.md). The document maps both existing database architectures, records exact file owners and permanent issue IDs, and distinguishes verified fixes from release blockers. Use incremental reproduction → fix → test → ledger update instead of re-auditing the complete repository or rewriting module boundaries.
+
+The latest work adds authenticated-session FORCE RLS enforcement, production editor write denial, canonical Website-scoped realtime authorization, read-only tenant pool lookup with explicit provisioning, and single-flight PostgreSQL pool initialization. Qualification evidence must match the exact current SHA; prior green runs do not qualify new changes. **WP-01/WP-02 remain IN PROGRESS until real-environment and open-P0 exit conditions are met.**
+
 ## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
