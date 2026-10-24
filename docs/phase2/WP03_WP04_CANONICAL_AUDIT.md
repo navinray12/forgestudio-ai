@@ -81,6 +81,20 @@ Targeted CI is wired into `.github/workflows/phase2-qualification.yml`:
 - Form schema creation on service import removed; required form migration checked before server starts. New source-inventory hashes editor, route, CMS, tests and migrations per commit.
 - [Detailed work register](./SIX_TASK_DELIVERY_EVIDENCE.md); verified source [CI run](https://github.com/navinray12/forgestudio-ai/actions/runs/40084498359) at `e2956e0d`: 126 focused backend, 41 editor journey, 21 frontend contract and 247 security tests passed. WP-03 and WP-04 remain IN PROGRESS pending user-facing scope exit tests.
 
+## Production form credential control — 24 October 2026
+
+**WP04-05 server-only policy storage IMPLEMENTED / CI VERIFIED** at `a0b0cfeb`:
+
+- `prisma/migrations/20261024003000_form_delivery_policy_secrets/migration.sql` installs `form_delivery_policies`, keyed by website and form, with credential ciphertext, last actor and update timestamp. It is part of the **43 versioned migrations** proven on disposable PostgreSQL.
+- `services/form/formDeliveryPolicy.service.ts` provides owner/admin-only encrypted PUT/GET-status/DELETE at `/api/forms/:websiteId/forms/:formId/delivery`. GET never returns SMTP, webhook or third-party credentials. Network destinations are validated and encryption fails closed without a dedicated production secret.
+- `services/form/trustedFormPolicy.service.ts` resolves production delivery only from this server-only encrypted policy. Anonymous submissions and published editor JSON cannot choose outbound destinations.
+- `services/websites/formEditorSecrets.guard.ts` and `save-document.ts` block newly persisted raw form API keys and access tokens in production editor JSON; published layout is not a secret store. Legacy secrets already saved before this gate require migration and exposure review.
+- Production startup requires `FORGE_DATA_PLATFORM_SECRET` and verifies the migration before opening HTTP.
+- `wp04-server-form-policy.test.ts`, `wp04-real-form-delivery.integration.test.ts`, `wp04-form-editor-secrets.test.ts` cover unauthorized tenant writes, encrypted SQL storage, production source isolation, raw-secret rejection and revocation.
+- [Phase 2 run 40088546404](https://github.com/navinray12/forgestudio-ai/actions/runs/40088546404) on `a0b0cfeb`: **9/9 jobs passed**, including 165 focused backend tests and 16 actual HTTP/PostgreSQL integration tests.
+
+**WP04-05 still NOT release-certified:** editor settings UX must call the new privileged policy API, existing plaintext editor documents must be migrated/redacted, provider-specific secret refs and real outbound delivery/retry must be exercised on a deployed staging website. Do not describe encryption-at-rest alone as production completion.
+
 ## Work discipline
 
 Audit source only once per issue; if the current architecture changes, update this file first. Implement narrow fixes in existing modules and tests, review diffs, run all relevant CI, keep `sconfigtesting` untouched, maintain draft PR #42 until independent review. Security-degraded or disabled features are explicitly **pending**, never called production-ready.
