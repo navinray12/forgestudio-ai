@@ -60,6 +60,18 @@ The existing blueprint specifies **J01–J12**, not a smaller invented feature l
 | J11 Invite/role/revoke with cross-tenant denial | Authorization tests exist; deployed multi-user acceptance **UNVERIFIED** |
 | J12 Incident → logs → restore → verify | Monitoring/backup sources present; incident and recovery drill **UNVERIFIED** |
 
+## Audit corrections and confirmed issues, 24 October 2026
+
+**QA-01: test-count reliability, WP-08.** `backend/src/tests/wordpress-publish-f495.test.ts` contains many `record(name, true)` statements instead of executing the claimed scenario; `wordpress-publish-rollback-f497.test.ts` similarly records many unconditional passes. `wordpress-webhooks-f505.test.ts` contains placeholder `assert(true)` scenarios and imports `assert` from `console`, where a false assertion logs rather than throwing. Their headline 74/77/100 counts are **NOT independent production acceptance evidence**. New qualification includes `regression/wordpress-connector-characterization.test.ts`, which has actual test assertions. All provider journeys remain unverified without an actual sandbox WordPress server.
+
+**GAP-05A: domain mutation access** at `controllers/customDomain.controller.ts`: missing principal formerly skipped website authorization, and a read-only collaborator could mutate domain configuration. New canonical `verifyProjectAccess` check requires a principal, and owner/admin permission is required for domain mutations; negative tests `wp05-domain-authorization.test.ts` added.
+
+**GAP-05B: fabricated SSL readiness** at `services/domains/customDomain.service.ts` and `controllers/customDomain.controller.ts`: earlier DNS verification falsely asserted that a Let's Encrypt certificate had been issued, set 90-day expiry and advertised renewal despite no real ACME/edge installer. This unsafe success path now fails closed with `SSL_ISSUANCE_UNAVAILABLE`; DNS ownership is reported separately from HTTPS readiness. `wp05-ssl-truthfulness.test.ts` added. **This does not implement ACME issuance**, which remains OPEN and mandatory before publishing production custom domains.
+
+**GAP-07A: migration authority** at `.github/workflows/identity-boundary.yml`: the Identity browser runner previously used `prisma db push`, omitting the raw SQL `form_delivery_policies` table. It now applies the full versioned migration ledger. A subsequent run proved `workspaces.isDefault` and `isArchived` were absent from clean migrations; `20261024004000_workspace_flags_schema_alignment/migration.sql` adds them. The presence-security fixture now creates workspace + owner membership atomically, respecting its deferred PostgreSQL invariant. Workspace browser fixture no longer drops tables and replays old migrations on top of canonical migration state. These changes **require a passing final Identity browser run** before marking J01/J11 accepted.
+
+**AUDIT-AUTO:** `scripts/saas-feature-crosscheck.mjs` and the Phase 2 CI artifact record source/test evidence for the 23 named features at each commit, with `productionAcceptance: NOT_VERIFIED` explicitly. The new source-level CI job exercises real assertions for AI capabilities, WordPress characterization, operational telemetry, maintenance and project ownership. **Source, test file, and live provider success remain different acceptance levels.**
+
 ## Order of implementation (no blind refactor)
 
 1. **Repair the confirmed WP-07 Identity browser blocker** using real `prisma migrate deploy` rather than `db push` on clean databases. Verify CI on exact SHA; never weaken startup migration checks.
