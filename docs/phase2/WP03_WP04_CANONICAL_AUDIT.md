@@ -22,13 +22,13 @@
 
 | ID | Priority | Root cause + owning file | Fix / release acceptance | Status |
 | --- | --- | --- | --- | --- |
-| WP03-01 | P1 | `features/templates/services/templateService.ts`: 200 malformed payload yielded `[]`; save/update/share could return undefined as success | Require expected template/list response contracts and surface real errors; frontend test | FIX COMMITTED — CI pending |
+| WP03-01 | P1 | `features/templates/services/templateService.ts`: 200 malformed payload yielded `[]`; save/update/share could return undefined as success | Require expected template/list response contracts and surface real errors; frontend test | FIXED — CI VERIFIED on `de5498d4` |
 | WP03-02 | P0 | Editor widget registry differs from published renderer; some advertised widgets vanish on publish (historical audit) | Current widget-type registry parity matrix, editor/save/reopen/preview/publish browser E2E for every advertised type | OPEN |
 | WP03-03 | P0 | Editor save and template update concurrency might overwrite newer versions | Version compare/conditional update with 409 and recoverable UI state; competing-editor integration test | OPEN |
 | WP03-04 | P1 | Global-widget source changes do not prove propagated instance updates | Explicit model for linked instances + stable identity, or honest reusable-copy UX with no auto-sync claim | OPEN |
-| WP04-01 | P0 | `services/media.service.ts`: client-supplied `websiteId` was not checked against media owner's websites | Website ownership check on create/list/reassign; negative tenant tests | FIX COMMITTED — CI pending |
-| WP04-02 | P1 | `controllers/form.controller.ts`: CSV exported visitor-supplied values and headers without formula neutralization | Quote/escape field names and values; neutralize spreadsheet formulas; test malicious form data | FIX COMMITTED — CI pending |
-| WP04-03 | P0 | `middlewares/upload.middleware.ts`: local file write could return success after MediaAsset DB failure; extension/MIME spoofing and active SVG | Require authenticated + metadata-confirmed file, remove file on failure, signature-sniff raster, reject unsanitized SVG, production local-storage quarantine | FIX COMMITTED — CI pending; durable production upload remains OPEN |
+| WP04-01 | P0 | `services/media.service.ts`: client-supplied `websiteId` was not checked against media owner's websites | Website ownership check on create/list/reassign; negative tenant tests | FIXED — CI VERIFIED on `de5498d4` |
+| WP04-02 | P1 | `controllers/form.controller.ts`: CSV exported visitor-supplied values and headers without formula neutralization | Quote/escape field names and values; neutralize spreadsheet formulas; test malicious form data | FIXED — CI VERIFIED on `de5498d4` |
+| WP04-03 | P0 | `middlewares/upload.middleware.ts`: local file write could return success after MediaAsset DB failure; extension/MIME spoofing and active SVG | Require authenticated + metadata-confirmed file, remove file on failure, signature-sniff raster, reject unsanitized SVG, production local-storage quarantine | FIXED — CI VERIFIED on `de5498d4`; durable production upload remains OPEN |
 | WP04-04 | P0 | Production media uses legacy `uploads/images` application disk, not durable object-storage pipeline | Wire authenticated upload to existing organization-scoped object storage/quarantine, signed asset retrieval and CDN; upload → browser → published URL → retention/recovery test | OPEN |
 | WP04-05 | P0 | `services/form/form.service.ts`: public submission request carries `actions` (email recipient, webhook and third-party keys). Site owner trust of these settings has not been proven | Bind integration destinations and credentials to durable *server-owned* website/form configuration; never use anonymous client-supplied SMTP/webhook/Sheets/Mailchimp/Zapier secrets or targets | OPEN — security review and test mandatory |
 | WP04-06 | P1 | Form schema, conditional rules, notification retries and idempotency need verified end-to-end visitor contracts | Live web form → transactional submission+lead+outbox → worker → owner lead UI test, duplicate and abuse cases | OPEN |
@@ -42,6 +42,21 @@
 **WP-04:** preview/apply website kit, CMS schemas/entries and public list/detail pages, form submission with durable lead/outbox and trusted actions, secure media upload with durable object storage and published delivery, safe CSV/PDF export, proven authorizations and recovery.
 
 **Not included as a completion shortcut:** tests that only validate services using mocks, local disk artifacts mislabeled as durable production uploads, old audit lists as current proofs, or disabled endpoints described as implemented.
+
+## Verification evidence — latest code and documentation checkpoint
+
+[Phase 2 qualification run 40081631402](https://github.com/navinray12/forgestudio-ai/actions/runs/40081631402), commit `de5498d419ec2ab862380af6a37ba7a1ba4051f6`, **7/7 jobs passed**:
+
+- Backend and frontend production builds
+- **102/102 focused backend regression tests**, including media ownership, CSV safety and the legacy local upload contract
+- **21/21 frontend contract tests**, including template save/list/update/share error handling and Global Widgets
+- **247/247 broader MCP/security/XSS tests**
+- 42 versioned database migrations and **11/11 real tenant HTTP/PostgreSQL tests**
+- **14/14 restricted-role PostgreSQL RLS tests**
+
+The independent [AI/worker qualification](https://github.com/navinray12/forgestudio-ai/actions/runs/40081631394) and frontend lint check also passed at the same code SHA. Identity qualification may have a longer browser stage and is not counted as passed until completed. Subsequent documentation or code commits require their own exact-SHA check.
+
+**Product certification remains NO-GO:** site publishing parity, trusted form integration configuration, complete CMS/template/kit journeys and durable production media storage remain open P0 work. The quarantine on production legacy disk uploads is safety containment, not delivery of the production upload feature.
 
 ## Verification plan
 
