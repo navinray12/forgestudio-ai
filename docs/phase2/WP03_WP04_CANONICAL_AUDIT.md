@@ -69,6 +69,14 @@ Targeted CI is wired into `.github/workflows/phase2-qualification.yml`:
 
 **Evidence:** Link the exact GitHub Actions run and SHA after passing. Do not mark any item complete merely on commit. Track P0 OPEN items above before declaring production or the five requested scopes complete.
 
+## Six-task follow-up — editor and website services (24 October 2026)
+
+- `WP03-03`: backend document writes already enforce documentVersion and reject stale writes with 412. New CI executes 41 editor history/save/publish/page-management tests. Real cross-browser competing-editor and published-renderer E2E remain OPEN; no redundant editor refactor.
+- `WP04-05`: public form service now sources integration destinations, secrets, spam/validation policy and form name from authenticated owner-saved `Website.editorData`, never from visitor-request `actions`. Unknown form representations create durable lead **without** sending outbound integrations. Owner secrets must be migrated into encrypted server-only storage before production certification.
+- `WP04-04`: public image transform now checks exact website key and an explicitly PUBLIC bucket. Storage URL configuration rejects default HTTP/MinIO production credentials, and S3 upload confirmation requires S3 HEAD evidence, tenant bucket ownership, quota and matching size/type. Real S3/CDN publish/restore integration remains OPEN; legacy local disk upload remains blocked for production.
+- Form schema creation on service import removed; required form migration checked before server starts. New source-inventory hashes editor, route, CMS, tests and migrations per commit.
+- [Detailed work register](./SIX_TASK_DELIVERY_EVIDENCE.md); verified source [CI run](https://github.com/navinray12/forgestudio-ai/actions/runs/40084498359) at `e2956e0d`: 126 focused backend, 41 editor journey, 21 frontend contract and 247 security tests passed. WP-03 and WP-04 remain IN PROGRESS pending user-facing scope exit tests.
+
 ## Work discipline
 
 Audit source only once per issue; if the current architecture changes, update this file first. Implement narrow fixes in existing modules and tests, review diffs, run all relevant CI, keep `sconfigtesting` untouched, maintain draft PR #42 until independent review. Security-degraded or disabled features are explicitly **pending**, never called production-ready.
