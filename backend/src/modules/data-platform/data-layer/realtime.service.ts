@@ -35,9 +35,11 @@ async function ensureProjectListener(
     return;
   }
 
+  let listenerClient: pg.PoolClient | null = null;
   try {
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
     const client = await pool.connect();
+    listenerClient = client;
 
     client.on("notification", (msg) => {
       if (msg.channel === "forge_realtime" && msg.payload) {
@@ -81,7 +83,10 @@ async function ensureProjectListener(
 
     await client.query("LISTEN forge_realtime;");
     activeListeners.set(projectId, { client, refCount: 1 });
+    listenerClient = null; // The active-listener registry now owns this connection.
   } catch (err) {
+    // Failed LISTEN must not leak a PostgreSQL pool connection.
+    try { listenerClient?.release(true); } catch { /* already closed */ }
     console.error(`[RealtimeService] Failed to establish listener for project ${projectId}:`, err);
     throw err; // Do not acknowledge a subscription with no active LISTEN connection.
   }
