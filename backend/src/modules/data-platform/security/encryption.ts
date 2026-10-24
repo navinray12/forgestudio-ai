@@ -16,6 +16,13 @@ function getMasterKey(): Buffer {
   return crypto.createHash("sha256").update(effective).digest();
 }
 
+/** Refuse to boot production without a dedicated credential encryption key. */
+export function assertProductionEncryptionConfigured(): void {
+  if (process.env.NODE_ENV === "production") {
+    getMasterKey();
+  }
+}
+
 /**
  * Encrypt a plaintext string using AES-256-GCM
  */
