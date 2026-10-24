@@ -162,15 +162,9 @@ export async function getTenantPool(
     } catch {}
   }
 
-  // Auto-provision tenant database on demand if missing
-  if (!dbRecord) {
-    try {
-      const { provisionDatabase } = await import("../database/database-provisioner.service.js");
-      dbRecord = await provisionDatabase(projectId, environment);
-    } catch (provErr: any) {
-      console.warn(`[PoolManager] Auto-provision on demand failed for ${projectId}:`, provErr?.message);
-    }
-  }
+  // Never create roles, databases or tenant catalog records as a side effect
+  // of a SELECT, API request or background listener. Explicit provisioning is
+  // owned by the authenticated database-management workflow.
 
   if (!dbRecord) {
     throw new AppError(
