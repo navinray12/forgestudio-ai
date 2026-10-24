@@ -31,7 +31,6 @@ export function sanitizeCategory(cat?: string): string {
  * Ensure templates table exists in PostgreSQL and has category, isFavorite, isShared, and shareToken columns
  */
 export async function initTemplateTable() {
-  try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS templates (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,13 +65,7 @@ export async function initTemplateTable() {
     await prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS idx_templates_share_token ON templates("shareToken");
     `);
-  } catch (error) {
-    console.error("Template table initialization log:", error);
-  }
 }
-
-// Auto-run initialization
-initTemplateTable();
 
 export interface CreateTemplateParams {
   name: string;
