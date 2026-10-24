@@ -61,6 +61,13 @@ No issue is `CERTIFIED` based on a mocked test. Mark as `FIXED — CI VERIFIED` 
 
 **Quality gate:** `.github/workflows/phase2-qualification.yml` now includes two **separate disposable PostgreSQL** jobs: (1) dedicated tenant + live HTTP test, and (2) pre-existing restricted-role tenant RLS/rollback tests. Both passed at `d3bbfb35`. Every subsequent code/document commit needs fresh exact-SHA verification.
 
+## Six-task follow-up — security and legacy tenancy (24 October 2026)
+
+- `WP02-08`: `forgeDatabase.service.getDatabase` no longer provisions on read. `connectionManager.executeInSchema` refuses to run against the shared admin `pgPool` in production and narrows nonproduction search_path. This is an **explicit production quarantine**, not a replacement for restricted tenant credentials.
+- `WP01-06`: realtime WebSocket delivery now re-checks website membership before sending each notification and closes revoked subscribers. Trigger payload no longer includes full row bodies. Further session-token expiry and reconnect/network adversarial tests remain open.
+- `WP00`: versioned form submissions migration is now checked at startup rather than modified silently when `form.service` is imported. Build/migration qualification passed.
+- [Evidence](./SIX_TASK_DELIVERY_EVIDENCE.md) and [CI](https://github.com/navinray12/forgestudio-ai/actions/runs/40084498359), exact code SHA `e2956e0d`: 9/9 jobs passed. Both WP-01 and WP-02 have unresolved P0 release infrastructure dependencies; never label the quarantine as a delivered DB or runtime feature.
+
 ## Release decision and acceptance boundary
 
 Do not call WP-01 or WP-02 `DONE` until the high-priority OPEN rows are resolved or the disabled features explicitly removed from release scope, AND their real-environment acceptance evidence exists. In particular, no product manager should interpret a safe 404 or disabled shell as a functional website publishing/developer execution feature.
