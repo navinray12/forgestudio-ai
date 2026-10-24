@@ -21,6 +21,7 @@ vi.mock("../modules/data-platform/common/project-access.js", () => ({
 
 import {
   assertDataScope,
+  assertPublicTableRls,
   injectRlsClaims,
   resolveAuthClaims,
 } from "../modules/data-platform/data-layer/rls-claim-injector.js";
@@ -132,6 +133,29 @@ describe("WP-01 public data API credential validation", () => {
     expect(() => assertDataScope({
       apiKeyId: "key-2", scopes: null, isServiceRole: true,
     }, "data:write")).toThrow(/does not permit/);
+  });
+
+  it("blocks public key table queries unless FORCE RLS is enabled", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ enabled: true, forced: false }] });
+    await expect(assertPublicTableRls({ query } as never, "private_orders", {
+      role: "anon", isServiceRole: false, apiKeyId: "public-key",
+    })).rejects.toMatchObject({ code: "PUBLIC_RLS_REQUIRED", statusCode: 403 });
+    expect(query.mock.calls[0][1]).toEqual(["private_orders"]);
+  });
+
+  it("allows a public read only when PostgreSQL enforces RLS", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ enabled: true, forced: true }] });
+    await expect(assertPublicTableRls({ query } as never, "public_articles", {
+      role: "anon", isServiceRole: false, apiKeyId: "public-key",
+    })).resolves.toBeUndefined();
+  });
+
+  it("does not open a separate table policy query for the verified service key", async () => {
+    const query = vi.fn();
+    await assertPublicTableRls({ query } as never, "orders", {
+      role: "service_role", isServiceRole: true,
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("does not set rls.bypass for an untrusted service_role string", async () => {
