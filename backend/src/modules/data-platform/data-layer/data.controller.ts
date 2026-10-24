@@ -12,7 +12,7 @@ import { enableTableRealtime } from "./realtime.service.js";
 import { generateProjectTypeScriptSdk } from "./sdk-generator.service.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 import { AppError } from "../../../utils/app-error.js";
-import { resolveExplicitEnvironment } from "../common/project-access.js";
+import { resolveExplicitEnvironment, verifyProjectAccess, assertCanModify } from "../common/project-access.js";
 
 function getParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] || "";
@@ -245,7 +245,10 @@ export async function enableRealtimeHandler(
     if (!projectId || !table) {
       throw new AppError("projectId and table parameters are required", 400, "BAD_REQUEST");
     }
-
+    const user = res.locals.user || (req as any).user;
+    if (!user?.id) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
+    const access = await verifyProjectAccess(projectId, user.id);
+    assertCanModify(environment, access, "enable realtime triggers");
     await enableTableRealtime(projectId, table, environment);
 
     res.status(200).json({
@@ -273,7 +276,9 @@ export async function getSdkTypeScriptHandler(
     if (!projectId) {
       throw new AppError("projectId parameter is required", 400, "BAD_REQUEST");
     }
-
+    const user = res.locals.user || (req as any).user;
+    if (!user?.id) throw new AppError("Authentication required", 401, "UNAUTHORIZED");
+    await verifyProjectAccess(projectId, user.id);
     const code = await generateProjectTypeScriptSdk(projectId, environment);
 
     res.setHeader("Content-Type", "application/typescript; charset=utf-8");
