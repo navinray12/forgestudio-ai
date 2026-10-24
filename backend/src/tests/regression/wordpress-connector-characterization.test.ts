@@ -20,6 +20,7 @@
  */
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { resolve } from "node:path";
 import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { CALLS, SCENARIOS, URLS, ENVS, AMBIGUOUS, TITLES, SLUGS, ROWS, WP_BODY, FIXED_NOW, type Scenario } from "./wordpress-connector.cases.js";
 
@@ -134,6 +135,46 @@ function zipEntries(b: Buffer) {
   }
   return entries.sort((x: any, y: any) => (x.name < y.name ? -1 : 1));
 }
+/** Check the ZIP contains the exact tracked WordPress plugin source bytes.
+ * A historical ZIP golden cannot stay constant when the real plugin is edited.
+ * Retain the strict golden for all other calls and seven failure scenarios.
+ */
+function crc32(buffer: Buffer): number {
+  let result = 0xffffffff;
+  for (const byte of buffer) {
+    result ^= byte;
+    for (let bit = 0; bit < 8; bit++) {
+      result = (result >>> 1) ^ ((result & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (result ^ 0xffffffff) >>> 0;
+}
+function assertCurrentPluginZip(value: any) {
+  const base = resolve(process.cwd(), "..", "wordpress-plugin");
+  const filenames = ["forgestudio-connector.php", "readme.txt"];
+  const entries = filenames.map((name) => {
+    const bytes = readFileSync(resolve(base, name));
+    return {
+      name: "forgestudio-connector/" + name,
+      uncompressed: bytes.length,
+      crc32: crc32(bytes),
+      method: 8,
+    };
+  });
+  expect(value).toMatchObject({
+    returned: { zipSignature: "504b0304" },
+    trace: [],
+  });
+  const found = value.returned.entries;
+  expect(found).toHaveLength(filenames.length);
+  for (const expected of entries) {
+    expect(found).toEqual(expect.arrayContaining([
+      expect.objectContaining(expected),
+    ]));
+  }
+  expect(value.returned.buffer).toBeGreaterThan(0);
+}
+
 function outcome(v: unknown) {
   if (Buffer.isBuffer(v)) return { buffer: v.length, zipSignature: v.subarray(0, 4).toString("hex"), entries: zipEntries(v) };
   return v === undefined ? "[undefined]" : JSON.parse(JSON.stringify(v));
@@ -196,7 +237,13 @@ describe("WordPress connector characterization", () => {
     expect(Object.keys(calls)).toEqual(Object.keys(golden.calls));
     expect(SCENARIOS.length * CALLS.length).toBe(Object.keys(golden.calls).length);
   });
-  it.each(Object.keys(golden.calls))("%s", (key) => { expect(calls[key]).toEqual(golden.calls[key]); });
+  it.each(Object.keys(golden.calls))("%s", (key) => {
+    if (key.endsWith(":generateWordPressPluginZip")) {
+      assertCurrentPluginZip(calls[key]);
+    } else {
+      expect(calls[key]).toEqual(golden.calls[key]);
+    }
+  });
   it("URL validation and SSRF rules across environments", () => { expect(tables.urls).toEqual(golden.tables.urls); });
   it("helpers", () => {
     expect(tables.ambiguous).toEqual(golden.tables.ambiguous);
