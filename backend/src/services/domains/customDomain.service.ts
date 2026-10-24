@@ -185,7 +185,7 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
       const challengeHost = `_forgestudio-challenge.${record.domain}`;
       const txtRecords = await dns.resolveTxt(challengeHost);
       const flattened = txtRecords.flat().join("");
-      if (flattened.includes(record.verificationToken)) {
+      if (txtRecords.flat().some((entry) => entry === record.verificationToken)) {
         return { success: true, method: "TXT" };
       }
     } catch {
@@ -196,7 +196,7 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
     try {
       const cnames = await dns.resolveCname(`www.${record.domain}`);
       if (cnames.some((c) => c.toLowerCase().includes("forgestudio.app") || c.toLowerCase().includes("cname.forgestudio.app"))) {
-        return { success: true, method: "CNAME" };
+        if (process.env.NODE_ENV !== "production") return { success: true, method: "CNAME" };
       }
     } catch {
       // Record not present or unresolved yet
@@ -207,7 +207,7 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
       const aRecords = await dns.resolve4(record.domain);
       const edgeIp = process.env.EDGE_SERVER_IP || "76.76.21.21";
       if (aRecords.includes(edgeIp)) {
-        return { success: true, method: "A" };
+        if (process.env.NODE_ENV !== "production") return { success: true, method: "A" };
       }
     } catch {
       // Record not present or unresolved yet
@@ -217,7 +217,8 @@ export async function verifyDomainDns(record: CustomDomain): Promise<{
   }
 
   // Gracefully fallback to simulated success in local/development/testing environments
-  const isDev = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_DNS_FALLBACK === "true";
+  // No environment flag may promote a synthetic DNS result in production.
+  const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
     return { success: true, simulated: true, reason: "Verified via local development DNS resolver" };
   }
