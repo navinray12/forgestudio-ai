@@ -108,6 +108,13 @@ The active audit and per-file remediation log is [WP00_WP01_SECURITY_EVIDENCE.md
 - **Release security gate remains blocked** until real Postgres cross-tenant policy/role tests, isolated developer execution infrastructure or explicit product removal, and external API/browser/WS negative integration coverage are complete. Quarantined features are **unavailable**, not implemented.
 - Exact CI links, decisions and remaining attack surfaces: [security evidence](./WP00_WP01_SECURITY_EVIDENCE.md) and draft [PR #42](https://github.com/navinray12/forgestudio-ai/pull/42).
 
+## Wave-0 live database qualification update — 24 October 2026
+
+- **WP-00:** fresh checkout now proves 42 versioned PostgreSQL migrations, real user/website creation and physically separate tenant-database provisioning. The runtime-only `project_databases` schema bootstrap was promoted to Prisma migrations and converted to fail-closed schema verification. The exact seven live HTTP/PostgreSQL tests and file inventory are in [WP-00/WP-01 evidence](./WP00_WP01_SECURITY_EVIDENCE.md).
+- **WP-01:** API keys now require matching project **and environment**, dedicated pools attest real PostgreSQL ownership and restricted role flags, realtime broadcasts no longer leak unfiltered rows, and sandbox file materialization refuses lexical and symlink escapes.
+- **Verified:** [Phase 2 qualification run 40078109973](https://github.com/navinray12/forgestudio-ai/actions/runs/40078109973) is green (6/6 jobs) at commit `b2d32fb2`; this is NOT certification of a deployed production environment. Revalidate CI against any newer commit.
+- **Go/No-go: NO-GO.** WP-00/WP-01 remain **IN PROGRESS**, pending a fully reconciled current-entry-point inventory, comprehensive deployed adversarial authorization testing, independent runtime isolation, and applicable operator/staging security evidence. Do not count a security-disabled runtime as a delivered customer feature.
+
 ## Current code ledger (GitHub)
 
 | Change | File | Verification | Risk/status |
