@@ -69,7 +69,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Verify legacy artifact endpoint denies unverified access
-        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts
+        run: npx --no-install vitest run src/tests/phase2-hosted-route-access.test.ts src/tests/phase2-template-list-contract.test.ts
 
   global-widget-contract:
     name: Global widget persistence and failure handling
