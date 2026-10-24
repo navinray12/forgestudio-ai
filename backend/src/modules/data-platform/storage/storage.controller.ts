@@ -145,6 +145,7 @@ export async function confirmUploadHandler(
     }
 
     const savedObject = await confirmUpload({
+      websiteId: projectId,
       bucketId,
       objectKey: String(objectKey),
       originalName: String(originalName),
