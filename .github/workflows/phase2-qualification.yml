@@ -316,13 +316,17 @@ jobs:
         run: npm ci
       - name: Generate Prisma client for cross-scope test imports
         run: npx --no-install prisma generate
-      - name: Run hosting, AI, commerce, provider, operations and worker contracts
+      - name: Run native Vitest hosting, provider and operations contracts
         run: >-
           npx --no-install vitest run
           src/tests/wp05-ssl-truthfulness.test.ts
           src/tests/wp05-domain-instructions.test.ts
-          src/tests/ai-platform-capabilities.test.ts
-          src/tests/licensing-billing.test.ts
           src/tests/regression/wordpress-connector-characterization.test.ts
           src/tests/point48-acceptance-register-metrics.test.ts
-          src/tests/ai-worker-smoke.test.ts
+          src/tests/point49-maintenance-boundaries.test.ts
+          src/tests/regression/project-authz-user-id.test.ts
+      - name: Run Node test-runner AI capability assertions (no database)
+        run: node --import tsx --test src/tests/ai-platform-capabilities.test.ts
+      # Billing integration and AI worker smoke require a migrated disposable DB,
+      # a running worker, and explicit fixture opt-in. They must NOT be executed
+      # against a fake database URL, nor treated as successful production journeys.
