@@ -19,8 +19,12 @@ const server = http.createServer(app);
 const gateways = attachWebSocketGateways(server);
 
 import { ensureDefaultPlans } from "./services/subscription.service.js";
+import { initTemplateTable } from "./services/template.service.js";
 
 void ensureDatabaseTables().then(async () => {
+  // Bootstrap dependent template tables in startup order, never during import.
+  // A failed schema operation must prevent the HTTP server from accepting traffic.
+  await initTemplateTable();
   // Ensure subscription plans exist for onboarding
   await ensureDefaultPlans().catch((err) => {
     console.warn("[subscriptions] could not seed default plans:", err?.message || err);
