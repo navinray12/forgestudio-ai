@@ -136,6 +136,21 @@ describe("WP-04 production form policy management", () => {
     expect(h.query).not.toHaveBeenCalled();
   });
 
+  it("blocks unsafe active redirect and popup destinations before persistence", async () => {
+    const invalid = [
+      { activeActions: ["redirect"] },
+      { activeActions: ["redirect"], redirectConfig: { url: "http://example.org" } },
+      { activeActions: ["redirect"], redirectConfig: { url: "https://127.0.0.1/private" } },
+      { activeActions: ["popup"] },
+      { activeActions: ["popup"], popupConfig: { popupId: "../bad" } },
+    ];
+    for (const policy of invalid) {
+      await expect(upsertFormDeliveryPolicy(site, formId, user, policy))
+        .rejects.toMatchObject({ statusCode: 400, code: "INVALID_FORM_POLICY" });
+    }
+    expect(h.query).not.toHaveBeenCalled();
+  });
+
   it("deleting a policy disables delivery without deleting the form itself", async () => {
     await upsertFormDeliveryPolicy(site, formId, user, { activeActions: ["database"] });
     await deleteFormDeliveryPolicy(site, formId, user);
