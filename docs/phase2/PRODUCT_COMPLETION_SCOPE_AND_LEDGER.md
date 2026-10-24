@@ -167,3 +167,9 @@ A dedicated PR CI workflow at `.github/workflows/phase2-qualification.yml` now r
 5. **WP-03:** global-widget HTTP error tests, persistence consistency and publish parity tests.
 
 **Document changes must be committed alongside scope/status changes.** Historical October 15 audit counts (263 features, 30 broken, 22 partial, 10 disconnected) are hypotheses for current revalidation, not verified current defect totals.
+
+## WP-04 production form settings — editor implementation checkpoint (24 October 2026)
+
+At code SHA `8d000530` ([9/9 Phase 2 CI](https://github.com/navinray12/forgestudio-ai/actions/runs/40090306159)), the existing editor's form widget inspector now mounts an owner-authenticated encrypted policy settings panel, rather than requiring new webhook / email / Google Sheets / Mailchimp / Zapier destinations and secrets in the published site document. Policy status is redacted; saves and revocations require backend confirmation, and successful saves clear transient credential inputs. Three frontend regression cases exercise secure PUT, denied access and DELETE. The frontend full lint gate also passed.
+
+**WP-04 remains IN PROGRESS:** audit and migrate older editor-stored plaintext credentials (with redaction and rollback), verify any other form-inspector surfaces, qualify real provider delivery on deployed staging, and finish durable media / CMS / templates and published browser journeys. WP-00, WP-01, WP-02 and WP-03 remain IN PROGRESS for their original acceptance gates. CI is source qualification, not production release certification. WP-05–WP-10 have not started; draft PR #42 remains unmerged.
