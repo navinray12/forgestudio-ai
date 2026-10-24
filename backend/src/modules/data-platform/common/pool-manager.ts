@@ -303,17 +303,42 @@ export async function getTenantPool(
     console.error(`[PoolManager] Background error on tenant pool ${key}:`, err.message);
   });
 
-  // Test connection immediately
+  // An encrypted credential and READY row do not establish role isolation.
+  // Verify the ACTUAL PostgreSQL principal and database before caching this pool.
   try {
     const client = await pool.connect();
-    client.release();
+    try {
+      const verified = await client.query<{
+        database_name: string;
+        role_name: string;
+        is_superuser: boolean;
+        bypass_rls: boolean;
+        can_create_db: boolean;
+        can_create_role: boolean;
+        database_owner: string;
+      }>(`SELECT current_database() AS database_name, current_user AS role_name,
+              r.rolsuper AS is_superuser, r.rolbypassrls AS bypass_rls,
+              r.rolcreatedb AS can_create_db, r.rolcreaterole AS can_create_role,
+              pg_get_userbyid(d.datdba) AS database_owner
+           FROM pg_roles r JOIN pg_database d ON d.datname = current_database()
+          WHERE r.rolname = current_user`);
+      const role = verified.rows[0];
+      if (!role || role.database_name !== dbRecord.dbName ||
+          role.role_name !== dbRecord.dbUser || role.database_owner !== dbRecord.dbUser ||
+          role.is_superuser || role.bypass_rls || role.can_create_db || role.can_create_role) {
+        throw new AppError(
+          "Tenant database connection has an unsafe principal or ownership",
+          503,
+          "TENANT_DATABASE_ISOLATION_UNAVAILABLE"
+        );
+      }
+    } finally {
+      client.release();
+    }
   } catch (err: any) {
     await pool.end().catch(() => undefined);
-    throw new AppError(
-      `Failed to connect to tenant database: ${err.message}`,
-      503,
-      "DATABASE_CONNECTION_FAILED"
-    );
+    if (err instanceof AppError && err.code === "TENANT_DATABASE_ISOLATION_UNAVAILABLE") throw err;
+    throw new AppError("Tenant database connection validation failed", 503, "DATABASE_CONNECTION_FAILED");
   }
 
   poolCache.set(key, {
