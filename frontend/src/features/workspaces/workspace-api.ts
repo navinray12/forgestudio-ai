@@ -2,6 +2,7 @@ export interface WorkspaceSummary {
   id: string; name: string; slug: string; organizationId: string;
   version: number; lifecycleStatus: "ACTIVE" | "ARCHIVED";
   organizationName?: string; userRole: "OWNER" | "ADMIN" | "MEMBER";
+  ownerId?: string; owner?: { id: string; fullName: string | null } | null;
 }
 export interface WorkspaceDetails extends WorkspaceSummary {
   settings?: {locale?:string;timeZone?:string}; archivedAt?:string|null;

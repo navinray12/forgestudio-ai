@@ -5,7 +5,17 @@ import { requirePrivilegedMutation } from "../../../middlewares/privileged-mutat
 import { assignOrganizationSeat, getOrganizationBilling, listOrganizationPlans, reserveUsage, settleUsageReservation, startOrganizationCheckout } from "../billing.service.js";
 
 const router = Router({ mergeParams: true });
+import { billingDashboard, billingPortal } from "../dashboard.service.js";
 router.use(requireAuth);
+router.get("/dashboard", async (req, res, next) => {
+  try { res.setHeader("Cache-Control", "private, no-store"); res.json({ success: true, ...await billingDashboard(organizationId(req), res.locals.user.id) }); } catch (error) { next(error); }
+});
+router.post("/portal", requirePrivilegedMutation, async (req, res, next) => {
+  try {
+    if (req.get("X-Forge-Intent") !== "billing-portal") return res.status(403).json({ success: false, message: "Billing command header required" });
+    res.setHeader("Cache-Control", "private, no-store"); return res.json({ success: true, ...await billingPortal(organizationId(req), res.locals.user.id) });
+  } catch (error) { next(error); }
+});
 
 router.get("/profile", async (req, res, next) => {
   try { res.setHeader("Cache-Control", "no-store"); res.json({ success: true, profile: await billingProfile(organizationId(req), res.locals.user.id) }); }

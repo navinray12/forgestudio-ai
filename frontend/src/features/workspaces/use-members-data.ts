@@ -13,12 +13,14 @@ const empty: MembersData = { workspaces: [], workspace: null, invitations: [], l
 
 export function useMembersData() {
   const [data, setData] = useState<MembersData>(empty);
+  // Owned by the dashboard so navigation does not reset the workspace selection.
+  const [selectionLocked, setSelectionLocked] = useState(false);
   const selected = useRef("");
   const inFlight = useRef<AbortController | null>(null);
   const expired = useRef(false);
   const pauseRefresh = useRef(false);
   const reloadRequested = useRef(false);
-  const setRefreshPaused = useCallback((paused: boolean) => { pauseRefresh.current = paused; }, []);
+  const setRefreshPaused = useCallback((paused: boolean) => { pauseRefresh.current = paused; setSelectionLocked(paused); }, []);
   const expireSession = useCallback((message: string) => {
     expired.current = true; inFlight.current?.abort();
     setData({ ...empty, loading: false, sessionExpired: true, error: message });
@@ -65,6 +67,7 @@ export function useMembersData() {
     return load();
   }, [load]);
   const selectWorkspace = useCallback((id: string) => {
+    if (pauseRefresh.current || expired.current) return;
     selected.current = id;
     setData(previous => ({ ...previous, workspace: null, invitations: [], loading: true, error: "" }));
     void load();
@@ -86,5 +89,5 @@ export function useMembersData() {
       window.removeEventListener("focus", quietlyRefresh); document.removeEventListener("visibilitychange", quietlyRefresh);
     };
   }, [load]);
-  return { ...data, refresh, load, selectWorkspace, expireSession, setRefreshPaused };
+  return { ...data, selectionLocked, refresh, load, selectWorkspace, expireSession, setRefreshPaused };
 }

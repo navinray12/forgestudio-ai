@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { Clock3, Mail, RefreshCw, Search, ShieldCheck, UserPlus, Users, X } from "lucide-react";
 import { workspaceRequest, WorkspaceRequestError } from "./workspace-api";
-import { useMembersData } from "./use-members-data";
-import { canResendInvitation, invitationStatus, memberMatches, membersPermissions, memberStatus, resendWait } from "./members-model";
+import type { useMembersData } from "./use-members-data";
+import { canResendInvitation, invitationStatus, memberDetails, memberMatches, membersPermissions, memberStatus, resendWait, workspaceDisplayName } from "./members-model";
 import type { WorkspaceInvitation } from "./members-model";
 import "./MembersView.css";
 
@@ -18,8 +18,7 @@ function deliveryName(invitation: WorkspaceInvitation) {
 type Command = { kind: "invite" | "resend" | "revoke" | "role"; path: string; method: string; payload: unknown; etag?: string;
   invitation?: WorkspaceInvitation; target?: { role: string; status: string }; success: string };
 
-export default function MembersView() {
-  const data = useMembersData();
+export default function MembersView({ data }: { data: ReturnType<typeof useMembersData> }) {
   const { workspace, workspaces, invitations } = data;
   const permissions = membersPermissions(workspace);
   const [query, setQuery] = useState("");
@@ -132,27 +131,26 @@ export default function MembersView() {
       <div className="members-toolbar">
         <label className="members-search"><Search size={16} /><input aria-label="Search members" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search members..." /></label>
         <select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} aria-label="Filter members"><option value="ALL">All roles</option><option value="OWNER">Owner</option><option value="ADMIN">Admin</option><option value="MEMBER">Member</option></select>
-        {workspaces.length > 1 && <select value={workspace?.id || ""} disabled={busy} onChange={event => { setNotice(""); setActionError(""); data.selectWorkspace(event.target.value); }} aria-label="Workspace"><option value="" disabled>Select workspace</option>{workspaces.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+        {workspaces.length > 1 && <select value={workspace?.id || ""} disabled={busy} onChange={event => { setNotice(""); setActionError(""); data.selectWorkspace(event.target.value); }} aria-label="Workspace"><option value="" disabled>Select workspace</option>{workspaces.map(item => <option key={item.id} value={item.id}>{workspaceDisplayName(item)}</option>)}</select>}
         <button className="members-icon-button" disabled={busy || data.loading || data.refreshing} onClick={() => void data.refresh()} aria-label="Refresh members"><RefreshCw size={15} className={data.refreshing ? "members-spin" : ""} /></button>
         {permissions.invite && <button className="members-primary" disabled={busy} onClick={openInvite}><UserPlus size={15} /> Invite member</button>}
       </div>
       {data.loading && <div className="members-empty" role="status">Loading workspace members...</div>}
       {!workspace && !data.loading && !data.error && <div className="members-empty">No workspaces are available for this account.</div>}
       {workspace && <>
-        <p className="members-workspace-name">{workspace.name}{workspace.lifecycleStatus === "ARCHIVED" && " · Archived — invitations and role changes are disabled"}</p>
+        <p className="members-workspace-name">{workspaceDisplayName(workspace)}{workspace.lifecycleStatus === "ARCHIVED" && " · Archived — invitations and role changes are disabled"}</p>
         <div className="members-table-card" role="table" aria-label="Workspace members">
           <div className="members-table-head" role="row"><span role="columnheader">Name</span><span role="columnheader">Role</span><span role="columnheader">Status</span><span role="columnheader">Joined</span></div>
           {members.length === 0 ? <div className="members-empty">{query || roleFilter !== "ALL" ? "No members match your filters." : "No members found."}</div> : members.map(member => {
-            const name = member.user.fullName || member.user.email || "Unnamed member";
-            const status = memberStatus(member);
+            const { name, email: memberEmail, status, joined } = memberDetails(member);
             return <div className="member-row" role="row" key={member.id}>
               <div className="member-identity" role="cell"><span className="member-avatar">{initials(name)}</span><div><strong>{name}{member.role === "OWNER" && <em>Owner</em>}</strong>
-                <small>{member.user.email || "Email unavailable"}</small>{member.user.emailVerified === false && <small>Email not verified</small>}</div></div>
+                <small>{memberEmail || "Email unavailable"}</small>{member.user.emailVerified === false && <small>Email not verified</small>}</div></div>
               <div className="member-role" role="cell">{permissions.changeRoles && member.role !== "OWNER" && status === "ACTIVE" ? <select aria-label={`Role for ${name}`} value={member.role} disabled={busy}
                 onChange={event => void command({ kind: "role", path: "/member-role", method: "PATCH", payload: { userId: member.userId, role: event.target.value },
                   etag: `"${workspace.id}:${workspace.version}"`, target: { role: member.role, status }, success: "Member role updated." })}><option value="ADMIN">Admin</option><option value="MEMBER">Member</option></select> : roleName(member.role)}</div>
               <div role="cell"><span className={`members-badge ${status.toLowerCase()}`}>{status === "UNKNOWN" ? "Status unavailable" : status.charAt(0) + status.slice(1).toLowerCase()}</span></div>
-              <span className="member-joined" role="cell">{date(member.createdAt)}</span>
+              <span className="member-joined" role="cell">{joined ? <time dateTime={joined}>{date(joined)}</time> : "—"}</span>
             </div>;
           })}
         </div>

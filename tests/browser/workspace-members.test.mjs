@@ -86,6 +86,54 @@ test('Workspace Members UI (mock HTTP; no real database or email)',{timeout:2400
     const invite=async()=>{await page.locator('.members-toolbar').getByRole('button',{name:'Invite member',exact:true}).click();await expect(modal()).toBeVisible();};
     return{state,requests,page,context,open,invite,modal};
   }
+  await t.test('shared dashboard settings toggle, support navigation and logout work on desktop and mobile',async()=>{
+    const f=await fixture();
+    await f.context.route('**/api/**',route=>{
+      const pathname=new URL(route.request().url()).pathname;
+      if(pathname.includes('/auth/')||pathname.startsWith('/api/v1/tenant-workspaces')||pathname.startsWith('/api/websites'))return route.fallback();
+      return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,message:'Section data unavailable in layout fixture'})});
+    });
+    await f.open();
+    const settings=f.page.getByRole('button',{name:'Settings',exact:true});
+    await expect(settings).toHaveAttribute('aria-expanded','false');
+    await expect(f.page.getByRole('link',{name:'Help center',exact:true})).toHaveCount(0);
+    await expect(f.page.getByRole('button',{name:/^(Undo|Redo)$/})).toHaveCount(0);
+    const closedBounds=await settings.boundingBox();
+    const navBounds=await f.page.getByRole('navigation',{name:'Workspace navigation'}).boundingBox();
+    await settings.focus();await f.page.keyboard.press('Enter');
+    await expect(settings).toHaveAttribute('aria-expanded','true');
+    assert.deepEqual(await settings.boundingBox(),closedBounds);
+    assert.deepEqual(await f.page.getByRole('navigation',{name:'Workspace navigation'}).boundingBox(),navBounds);
+    const popup=f.page.locator('#dashboard-settings');
+    const popupBounds=await popup.boundingBox();assert.ok(popupBounds.y+popupBounds.height<=closedBounds.y);
+    await f.page.getByRole('link',{name:'Help center',exact:true}).focus();await f.page.keyboard.press('Escape');
+    await expect(settings).toHaveAttribute('aria-expanded','false');await expect(settings).toBeFocused();
+    await settings.click();await f.page.locator('.studio-brand').click();
+    await expect(settings).toHaveAttribute('aria-expanded','false');
+    await settings.click();await settings.click();await expect(settings).toHaveAttribute('aria-expanded','false');
+    for(const section of ['Sites','Archive','Members','Usage','Forms','Billing','Integrations','Libraries & Templates']){
+      await f.page.getByRole('navigation',{name:'Workspace navigation'}).getByRole('button',{name:section,exact:true}).click();
+      await expect(settings).toBeVisible();
+      await expect(settings).toHaveAttribute('aria-expanded','false');await settings.click();
+      await expect(f.page.getByRole('link',{name:'Help center',exact:true})).toHaveAttribute('href','/support');
+      await expect(f.page.getByRole('button',{name:/^(Undo|Redo)$/})).toHaveCount(0);
+    }
+    await f.page.getByRole('link',{name:'Help center',exact:true}).click();await expect(f.page).toHaveURL(/\/support$/);
+    await f.page.goto(base+'/dashboard');
+    await f.page.setViewportSize({width:390,height:844});
+    await f.page.getByRole('button',{name:'Toggle navigation'}).click();
+    await expect.poll(async()=>Math.round((await settings.boundingBox()).x)).toBe(15);
+    const mobileBounds=await settings.boundingBox();
+    await settings.click();await expect(f.page.getByRole('button',{name:'Log out',exact:true})).toBeVisible();
+    assert.deepEqual(await settings.boundingBox(),mobileBounds);
+    await f.page.keyboard.press('Escape');await expect(settings).toHaveAttribute('aria-expanded','false');
+    await settings.click();await f.page.locator('.studio-main').click({position:{x:280,y:10}});
+    await expect(settings).toHaveAttribute('aria-expanded','false');await settings.click();
+    await settings.click();await expect(settings).toHaveAttribute('aria-expanded','false');
+    await settings.click();await f.page.getByRole('button',{name:'Log out',exact:true}).click();
+    await expect(f.page).toHaveURL(/\/login$/);
+    assert.ok(f.requests.some(r=>r.path.endsWith('/auth/logout')&&r.method==='POST'));
+  });
   await t.test('email invites use the existing API, normalize input, and remain pending without creating a member',async()=>{
     const f=await fixture();await f.open();await f.invite();
     await f.modal().getByLabel('Email address',{exact:true}).fill(' New@Example.Test ');await f.modal().getByLabel('Role',{exact:true}).selectOption('ADMIN');
@@ -141,6 +189,8 @@ test('Workspace Members UI (mock HTTP; no real database or email)',{timeout:2400
     const current=scope();current.members.push(member(randomUUID(),'Suspended person','suspended@example.test','ADMIN','SUSPENDED'));
     const f=await fixture({scopes:[current]});await f.open();const table=f.page.getByRole('table',{name:'Workspace members'});
     await expect(table.getByText('sam@example.test',{exact:true})).toBeVisible();await expect(table.getByText('Suspended',{exact:true})).toBeVisible();
+    await expect(table.locator('time').first()).toHaveAttribute('datetime',joined);
+    await expect(table.getByText('Active',{exact:true})).toHaveCount(2);
     assert.equal(await table.getByLabel('Role for Workspace owner',{exact:true}).count(),0);assert.equal(await table.getByLabel('Role for Suspended person',{exact:true}).count(),0);
     await table.getByLabel('Role for Sam Member',{exact:true}).selectOption('ADMIN');await expect(f.page.getByRole('status')).toContainText('Member role updated');
     assert.equal(f.requests.find(r=>r.method==='PATCH').headers['if-match'],`"${workspaceId}:1"`);await expect(table.getByLabel('Role for Sam Member',{exact:true})).toHaveValue('ADMIN');
@@ -186,7 +236,40 @@ test('Workspace Members UI (mock HTTP; no real database or email)',{timeout:2400
     let release;f.state.readGates.set(otherId,new Promise(resolve=>{release=resolve;}));
     await f.page.getByLabel('Workspace',{exact:true}).selectOption(otherId);await f.page.getByLabel('Workspace',{exact:true}).selectOption(workspaceId);
     await expect(f.page.locator('.members-workspace-name')).toBeVisible();release();
-    await expect(f.page.getByLabel('Workspace',{exact:true})).toHaveValue(workspaceId);assert.equal(await f.page.getByText('Second workspace',{exact:true}).count(),1); // selector option only
+    await expect(f.page.getByLabel('Workspace',{exact:true})).toHaveValue(workspaceId);
+    await expect(f.page.getByLabel('Dashboard workspace',{exact:true})).toHaveValue(workspaceId);
+  });
+  await t.test('sidebar and Members share workspace selection across dashboard navigation',async()=>{
+    const second=scope(otherId,'Second workspace');second.members=[member(randomUUID(),'Other member','other@example.test')];
+    const f=await fixture({scopes:[scope(),second]});await f.open();
+    const sidebar=f.page.getByLabel('Dashboard workspace',{exact:true});
+    await expect(sidebar).toHaveValue(workspaceId);
+    await sidebar.selectOption(otherId);
+    await expect(f.page.getByLabel('Workspace',{exact:true})).toHaveValue(otherId);
+    await expect(f.page.getByRole('table',{name:'Workspace members'})).toContainText('other@example.test');
+    await f.page.getByRole('button',{name:'Sites',exact:true}).click();await expect(sidebar).toHaveValue(otherId);
+    await f.page.getByRole('button',{name:'Members',exact:true}).click();
+    await expect(f.page.locator('.members-workspace-name')).toHaveText('Second workspace');
+    await f.page.getByLabel('Workspace',{exact:true}).selectOption(workspaceId);
+    await expect(sidebar).toHaveValue(workspaceId);
+    await expect(f.page.getByRole('table',{name:'Workspace members'})).toContainText('sam@example.test');
+  });
+  await t.test('missing member fields show honest fallbacks without inventing active status or a join date',async()=>{
+    const current=scope();current.members=[{id:memberId,userId:memberId,role:'MEMBER',createdAt:'invalid',user:{fullName:' ',email:' ',status:'ACTIVE'}}];
+    const f=await fixture({scopes:[current]});await f.open();const table=f.page.getByRole('table',{name:'Workspace members'});
+    await expect(table).toContainText('Unnamed member');await expect(table).toContainText('Email unavailable');
+    await expect(table).toContainText('Status unavailable');await expect(table.locator('.member-joined')).toHaveText('—');
+    await expect(table.locator('time')).toHaveCount(0);
+  });
+  await t.test('owner email and active status come from the backend, and both workspace labels use the real owner',async()=>{
+    const current=scope();current.ownerId=ownerId;current.owner={id:ownerId,fullName:'Actual Owner'};
+    current.userRole='MEMBER';current.members[0].user.email='actual-owner@example.test';
+    const f=await fixture({scopes:[current]});await f.open();
+    await expect(f.page.getByLabel('Dashboard workspace').locator('option:checked')).toHaveText("Actual Owner's Workspace");
+    await expect(f.page.locator('.members-workspace-name')).toHaveText("Actual Owner's Workspace");
+    const owner=f.page.getByRole('table',{name:'Workspace members'}).getByRole('row').filter({hasText:'actual-owner@example.test'});
+    await expect(owner).toContainText('Active');await expect(owner).toContainText('Owner');
+    assert.equal(await owner.getByText('Email unavailable').count(),0);
   });
   for(const segment of ['list','detail','invitations'])await t.test(`401 during ${segment} loading clears data and offers sign-in`,async()=>{
     const f=await fixture({loadFailure:{segment,status:401,code:'UNAUTHORIZED'}});await f.open();await expect(f.page.getByRole('link',{name:'Sign in again',exact:true})).toBeVisible();

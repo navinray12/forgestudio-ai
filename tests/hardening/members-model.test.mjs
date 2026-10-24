@@ -46,7 +46,7 @@ test('workspace member projection exposes only safe details and accurately ident
   let projection;
   const row=(userId,status='ACTIVE',orgRoles=['MEMBER'],role='MEMBER')=>({id:userId,userId,role,createdAt:new Date(),user:{fullName:userId,email:userId+'@example.test',status,emailVerified:true,organizationMemberships:orgRoles.map(role=>({role}))}});
   const tx={
-    $queryRaw:async()=>[], user:{findUnique:async()=>({status:'ACTIVE'})},
+    $queryRaw:async()=>[], user:{findUnique:async options=> options.where.id==='owner' ? {id:'owner',fullName:'Actual owner',status:'ACTIVE'} : {status:'ACTIVE'}},
     organization:{findUnique:async()=>organization},organizationMember:{findUnique:async()=>({role:'OWNER'})},
     workspace:{findUnique:async()=>current},workspaceMember:{findUnique:async()=>({role:'OWNER'}),findMany:async options=>{projection=options.select;return[row('owner','ACTIVE',['OWNER'],'OWNER'),row('active'),row('suspended','SUSPENDED'),row('revoked-org','ACTIVE',[]),row('fake-owner','ACTIVE',['MEMBER'],'OWNER')];}},website:{findMany:async()=>[]},
   };
@@ -55,9 +55,48 @@ test('workspace member projection exposes only safe details and accurately ident
     '../billing/subscription-policy.js':{requireSubscriptionAccess(){}},'./command.js':{workspaceCommand(){}},
   });
   const result=await service.readTenantWorkspace('owner','workspace');
+  assert.equal(result.ownerId,'owner');assert.equal(result.owner.fullName,'Actual owner');
+  assert.equal(api.workspaceDisplayName(result),"Actual owner's Workspace");
+  assert.equal(result.members[0].user.email,'owner@example.test');
   assert.equal(result.members[0].membershipStatus,'ACTIVE');assert.equal(result.members[1].membershipStatus,'ACTIVE');
   assert.equal(result.members[2].membershipStatus,'SUSPENDED');assert.equal(result.members[3].membershipStatus,'INACTIVE');assert.equal(result.members[4].membershipStatus,'INACTIVE');
   assert.equal(result.members[1].user.email,'active@example.test');
   assert.equal('organizationMemberships' in result.members[1].user,false);
   assert.equal('passwordHash' in projection.user.select,false);assert.equal('sessions' in projection.user.select,false);
+  const details=api.memberDetails(result.members[1]);
+  assert.equal(details.email,'active@example.test');assert.equal(details.status,'ACTIVE');
+  assert.equal(details.joined,result.members[1].createdAt);
+});
+
+test('workspace labels use the real owner identity and preserve stored names when it is unavailable',()=>{
+  const row={name:'Stored custom name',ownerId:'owner',owner:{id:'owner',fullName:'  Ashwani  '}};
+  assert.equal(api.workspaceDisplayName(row),"Ashwani's Workspace");
+  assert.equal(api.workspaceDisplayName({...row,owner:{id:'viewer',fullName:'Different viewer'}}),'Stored custom name');
+  assert.equal(api.workspaceDisplayName({...row,owner:{id:'owner',fullName:' '}}),'Stored custom name');
+  assert.equal(api.workspaceDisplayName({name:'Legacy name'}),'Legacy name');
+});
+
+test('workspace summaries expose the actual owner even when the viewer is a member',async()=>{
+  let projection;
+  const tx={$queryRaw:async()=>[],user:{findUnique:async()=>({status:'ACTIVE'})},workspace:{findMany:async options=>{
+    projection=options.select;
+    return [{id:'workspace',name:'Stored name',ownerId:'owner',owner:{id:'owner',fullName:'Actual owner'},
+      members:[{role:'MEMBER'}],organization:{ownerId:'owner',members:[{role:'MEMBER'}]}}];
+  }}};
+  const service=await loadTypeScript('backend/src/services/workspaces/workspace-api.service.ts',{
+    '../../config/prisma.js':{prisma:{$transaction:fn=>fn(tx)}},
+    '../billing/subscription-policy.js':{requireSubscriptionAccess(){}},'./command.js':{workspaceCommand(){}},
+  });
+  const {workspaces}=await service.listTenantWorkspaces('viewer');
+  assert.equal(workspaces[0].ownerId,'owner');assert.equal(workspaces[0].owner.fullName,'Actual owner');
+  assert.equal(workspaces[0].userRole,'MEMBER');assert.equal(api.workspaceDisplayName(workspaces[0]),"Actual owner's Workspace");
+  assert.deepEqual(Object.keys(projection.owner.select).sort(),['fullName','id']);
+});
+
+test('member display preserves backend membership data and handles missing or invalid fields honestly',()=>{
+  assert.deepEqual({...api.memberDetails({createdAt:'2026-01-01T00:00:00Z',membershipStatus:'INACTIVE',user:{fullName:'  Sam  ',email:' sam@example.test ',status:'ACTIVE'}})},
+    {name:'Sam',email:'sam@example.test',status:'INACTIVE',joined:'2026-01-01T00:00:00Z'});
+  assert.deepEqual({...api.memberDetails({createdAt:'invalid',user:{fullName:' ',email:' ',status:'ACTIVE'}})},
+    {name:'Unnamed member',email:null,status:'UNKNOWN',joined:null});
+  assert.equal(api.memberDetails({user:{fullName:null,email:'fallback@example.test'}}).name,'fallback@example.test');
 });

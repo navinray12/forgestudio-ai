@@ -60,6 +60,7 @@ export async function listTenantWorkspaces(actorId: string) {
     const rows = await tx.workspace.findMany({
       where: { members: { some: { userId: actorId } }, organization: { members: { some: { userId: actorId } } } },
       select: { id: true, name: true, slug: true, organizationId: true, ownerId: true, lifecycleStatus: true, version: true,
+        owner: { select: { id: true, fullName: true } },
         organization: { select: { id: true, name: true, ownerId: true, members: { where: { userId: actorId }, select: { role: true } } } },
         members: { where: { userId: actorId }, select: { role: true } },
       }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 101,
@@ -71,6 +72,7 @@ export async function listTenantWorkspaces(actorId: string) {
     });
     return { workspaces: permitted.slice(0,100).map((row) => ({
       id: row.id, name: row.name, slug: row.slug, organizationId: row.organizationId,
+      ownerId: row.ownerId, owner: row.owner,
       organizationName: row.organization?.name, userRole: row.members[0]!.role, lifecycleStatus: row.lifecycleStatus, version: row.version,
     })), hasMore: rows.length > 100 };
   });
@@ -80,6 +82,9 @@ export async function readTenantWorkspace(actorId: string, workspaceId: string) 
   return prisma.$transaction(async (tx) => {
     await requireActiveActor(tx, actorId);
     const { workspace, membership, organization } = await requireWorkspace(tx, workspaceId, actorId);
+    // Resolve ownership by the persisted foreign key, never by the requesting user
+    // or the first member (the member list is bounded and ordered by join date).
+    const owner = await tx.user.findUnique({ where: { id: workspace.ownerId }, select: { id: true, fullName: true } });
     const members = await tx.workspaceMember.findMany({
       where: { workspaceId }, take: 200, orderBy: { createdAt: "asc" },
       select: { id: true, userId: true, role: true, createdAt: true, user: { select: {
@@ -93,6 +98,7 @@ export async function readTenantWorkspace(actorId: string, workspaceId: string) 
       }, select: safeWebsiteFields, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 101,
     });
     return { id: workspace.id, name: workspace.name, slug: workspace.slug, organizationId: organization.id,
+      ownerId: workspace.ownerId, owner,
       organizationName: organization.name, userRole: membership.role, members: members.map(member => {
         const { organizationMemberships, ...user } = member.user;
         const validOrganization = organizationMemberships.some(row => ["OWNER", "ADMIN", "MEMBER"].includes(row.role) &&
