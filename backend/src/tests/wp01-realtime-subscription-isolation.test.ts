@@ -100,5 +100,6 @@ describe("WP-01 realtime subscription isolation", () => {
     ws.receive({ event: "subscribe", projectId: "proj-a", table: "items" });
     await untilFrame(ws, "error");
     expect(ws.sent.some((x) => x.event === "subscribed")).toBe(false);
+    expect(h.release).toHaveBeenCalledExactlyOnceWith(true);
   });
 });
