@@ -76,6 +76,33 @@ describe("WP-05 honest HTTPS certificate lifecycle", () => {
     expect(result).toMatchObject({ success: true, method: "TXT" });
   });
 
+  it("rejects spoofed DNS preflight when routing matches but TXT is absent", async () => {
+    process.env.NODE_ENV = "production";
+    vi.mocked(dns.resolveTxt).mockRejectedValue(new Error("TXT not present"));
+    vi.mocked(dns.resolveCname).mockResolvedValue(["cname.forgestudio.app"]);
+    vi.mocked(dns.resolve4).mockResolvedValue(["76.76.21.21"]);
+    const checked = await runDnsPreflightCheck(domain.domain, "p".repeat(40));
+    expect(checked.cnameValid).toBe(true);
+    expect(checked.aRecordValid).toBe(true);
+    expect(checked.txtValid).toBe(false);
+    expect(checked.passed).toBe(false);
+  });
+
+  it("requires an exact complete TXT resource record, including chunked records", async () => {
+    process.env.NODE_ENV = "production";
+    const token = "p".repeat(40);
+    vi.mocked(dns.resolveTxt).mockResolvedValue([["prefix", token], ["unrelated"]]);
+    let checked = await runDnsPreflightCheck(domain.domain, token);
+    expect(checked.txtValid).toBe(false);
+    expect(checked.passed).toBe(false);
+    vi.mocked(dns.resolveTxt).mockResolvedValue([[token.slice(0, 20), token.slice(20)]]);
+    checked = await runDnsPreflightCheck(domain.domain, token);
+    expect(checked.txtValid).toBe(true);
+    expect(checked.passed).toBe(true);
+    const verified = await verifyDomainDns({ ...domain, verificationToken: token });
+    expect(verified).toMatchObject({ success: true, method: "TXT" });
+  });
+
   it("fails closed when no real ACME issuance/edge installer is configured", async () => {
     process.env.NODE_ENV = "development"; // successful local-only DNS fixture
     await expect(initiateSslProvisioning(domain, "website-1"))
