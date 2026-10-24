@@ -72,6 +72,14 @@ The existing blueprint specifies **J01–J12**, not a smaller invented feature l
 
 **AUDIT-AUTO:** `scripts/saas-feature-crosscheck.mjs` and the Phase 2 CI artifact record source/test evidence for the 23 named features at each commit, with `productionAcceptance: NOT_VERIFIED` explicitly. The new source-level CI job exercises real assertions for AI capabilities, WordPress characterization, operational telemetry, maintenance and project ownership. **Source, test file, and live provider success remain different acceptance levels.**
 
+## Current-head feature cross-check addendum — 24 October 2026
+
+The existing 23-row source/test matrix is an **inventory**, not a feature completion count. Reviewed against `phase2/production-hardening` branch head `b2d754a0` before this fix. The user requested **audit first, then completion of WP-03 through WP-10**; the following issue was confirmed by inspecting actual WP-05 domain implementation.
+
+**GAP-05C / P0 — PROD DOMAIN OWNERSHIP SPOOFING:** `backend/src/services/domains/customDomain.service.ts#verifyDomainDns` formerly reported verification successful with a matching A record, platform CNAME, or `ALLOW_LOCAL_DNS_FALLBACK=true` even in production. These are routing clues, not a website owner's unique challenge proof. Remediation committed at `2b9b4fc5`: production only accepts an **exact** domain-specific TXT verification token; A/CNAME and synthetic development fallback can no longer assert ownership. Regression cases in `backend/src/tests/wp05-ssl-truthfulness.test.ts` were added at `5b07cc9e`, covering CNAME/A spoofing, fallback flag and substring TXT acceptance. **CI for this commit is pending as this text was authored**. This does not deliver ACME SSL issuance, domain edge routing, or public publishing.
+
+**Remaining priority P0:** WP-03 full widget/publish browser parity; WP-04 CMS/media/form delivery on real cloud services; WP-05 immutable hosted artifacts + DNS/TLS + rollback; WP-06 AI provider/usage enforcement E2E; WP-07 Stripe signed real webhooks/entitlements and signup; WP-08 WordPress/provider sandboxes; WP-09 real incident + restore + telemetry; WP-10 measured performance and narrowly proved dead-code removal. J01–J12 still **NOT PRODUCTION CERTIFIED**. Preserve the issue matrix; continue with narrow verification-backed corrections, not full repo re-audits.
+
 ## Order of implementation (no blind refactor)
 
 1. **Repair the confirmed WP-07 Identity browser blocker** using real `prisma migrate deploy` rather than `db push` on clean databases. Verify CI on exact SHA; never weaken startup migration checks.
