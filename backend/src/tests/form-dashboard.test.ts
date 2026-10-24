@@ -1,0 +1,26 @@
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+const mocks=vi.hoisted(()=>({access:vi.fn(),find:vi.fn(),query:vi.fn(),write:vi.fn()}));
+vi.mock('../config/prisma.js',()=>({prisma:{website:{findUnique:mocks.find},$queryRaw:mocks.query,$executeRaw:mocks.write}}));
+vi.mock('../modules/data-platform/common/project-access.js',()=>({verifyProjectAccess:mocks.access}));
+import {buildFormNotifications,defaultNotificationSettings,discoverForms,formsDashboard,parseNotificationSettings,saveNotifications} from '../services/form/form-dashboard.service.js';
+const settings={...defaultNotificationSettings,recipients:['owner@example.com'],senderEmail:'forms@example.com',replyTo:'reply@example.com'};
+const id='c0de0000-0000-4000-8000-000000000001';
+beforeEach(()=>{vi.clearAllMocks();vi.unstubAllEnvs();mocks.access.mockResolvedValue({canAdminister:true});mocks.find.mockResolvedValue({name:'Test',editorData:{},user:{email:'owner@example.com'},mailerConfig:null});mocks.query.mockResolvedValue([])});
+describe('form notification settings',()=>{
+ it.each([{senderEmail:'bad'},{replyTo:'bad'},{senderName:'Name\r\nBcc: evil@example.com'},{recipients:[]},{recipients:['bad']},{subject:'Unknown {{password}}'},{subject:'Bad\nHeader'},{timing:'weekly'}])('rejects invalid settings %j',patch=>{expect(()=>parseNotificationSettings({...settings,...patch})).toThrow()});
+ it('deduplicates recipient addresses',()=>{expect(parseNotificationSettings({...settings,recipients:['OWNER@example.com','owner@example.com']}).recipients).toEqual(['owner@example.com'])});
+ it('allows notifications to be disabled with no recipients',()=>{expect(parseNotificationSettings({...settings,enabled:false,recipients:[]}).enabled).toBe(false)});
+ it('preserves unrelated site fields in a parameterized write',async()=>{await saveNotifications(id,'actor',settings);expect(mocks.write.mock.calls[0][0].join('')).toContain("'{formNotifications}'");expect(mocks.write.mock.calls[0][0].join('')).toContain('"documentVersion"+1');expect(mocks.write.mock.calls[0].slice(1)).toEqual([JSON.stringify(settings),id])});
+ it('denies non-admin reads and writes',async()=>{mocks.access.mockResolvedValue({canAdminister:false});await expect(formsDashboard(id,'actor')).rejects.toMatchObject({statusCode:403});await expect(saveNotifications(id,'actor',settings)).rejects.toMatchObject({statusCode:403});expect(mocks.find).not.toHaveBeenCalled();expect(mocks.write).not.toHaveBeenCalled()});
+ it('discovers forms without counting mirrored pages twice or old releases',()=>{expect(discoverForms({elements:[{id:'form-1',type:'form',formTitle:'Signup'}],pages:[{elements:[{id:'form-1',type:'form',formTitle:'Signup'}]}],releases:[{elements:[{id:'old',type:'form'}]}]})).toEqual([{id:'form-1',name:'Signup'}])});
+ it('merges real submission totals with existing empty forms',async()=>{mocks.find.mockResolvedValue({name:'Test',editorData:{elements:[{id:'empty',type:'form',formTitle:'Contact'}],formNotifications:settings},user:{email:'owner@example.com'},mailerConfig:{host:'smtp.example.com'}});mocks.query.mockResolvedValue([{formId:'signup',formName:'Signup Form',submissions:52,lastSubmission:new Date('2026-09-29T10:24:00Z')}]);const result=await formsDashboard(id,'actor');expect(result.forms).toHaveLength(2);expect(result.forms[0]).toMatchObject({id:'signup',submissions:52});expect(result.smtpConfigured).toBe(true)});
+});
+describe('notification job construction',()=>{
+ const input={settings,websiteId:id,siteName:'My Site',formName:'Signup',fields:{email:'visitor@example.com',name:'<img src=x onerror=evil()>'},now:new Date('2026-10-19T00:00:00Z')};
+ it('does not enqueue email when disabled',()=>{expect(buildFormNotifications({...input,settings:{...settings,enabled:false}})).toEqual([])});
+ it('builds one private notification per recipient with sender and reply-to',()=>{const jobs=buildFormNotifications({...input,settings:{...settings,recipients:['one@example.com','two@example.com']}});expect(jobs).toHaveLength(2);expect(jobs[0].payload).toMatchObject({to:'one@example.com',fromEmail:'forms@example.com',replyTo:'reply@example.com',requireDelivery:true});expect(jobs[0].key).not.toBe(jobs[1].key)});
+ it('adds the submitter once when requested',()=>{const jobs=buildFormNotifications({...input,settings:{...settings,sendToSubmitter:true,recipients:['visitor@example.com']}});expect(jobs).toHaveLength(1);expect(jobs[0].payload.to).toBe('visitor@example.com')});
+ it('supports custom-named submitter email fields',()=>{const jobs=buildFormNotifications({...input,fields:{contact:'custom@example.com'},settings:{...settings,sendToSubmitter:true}});expect(jobs.map(job=>job.payload.to)).toContain('custom@example.com')});
+ it('interpolates supported variables and escapes HTML content',()=>{const job=buildFormNotifications(input)[0];expect(job.payload.subject).toContain('My Site');expect(job.payload.subject).toContain('Signup');expect(job.payload.html).toContain('&lt;img');expect(job.payload.html).not.toContain('<img')});
+ it.each([['immediately',0],['hour',3600000],['day',86400000]] as const)('schedules %s delivery', (timing,delay)=>{expect(buildFormNotifications({...input,settings:{...settings,timing}})[0].runAt?.getTime()).toBe(input.now.getTime()+delay)});
+});

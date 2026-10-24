@@ -145,7 +145,7 @@ export async function getUserTemplates(userId: string) {
   try {
     if (db?.template?.findMany) {
       const templates = await db.template.findMany({
-        where: { userId },
+        where: { userId, type: { not: "CATALOG_FAVORITE" } },
         orderBy: { createdAt: "desc" },
       });
       if (templates) return templates;
@@ -154,7 +154,7 @@ export async function getUserTemplates(userId: string) {
     const rawTemplates: any[] = await prisma.$queryRaw`
       SELECT id, "userId", name, description, type, category, "isFavorite", "isShared", "shareToken", "templateData", "createdAt", "updatedAt"
       FROM templates
-      WHERE "userId" = ${userId}::uuid
+      WHERE "userId" = ${userId}::uuid AND type <> 'CATALOG_FAVORITE'
       ORDER BY "createdAt" DESC
     `;
     return rawTemplates || [];

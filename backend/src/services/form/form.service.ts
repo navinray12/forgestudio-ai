@@ -1,3 +1,4 @@
+import { buildFormNotifications } from "./form-dashboard.service.js";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../utils/app-error.js";
 import { getWebsiteById } from "../website.service.js";
@@ -6,6 +7,7 @@ import { assertSafeUrl, isSafeUrl } from "../../utils/ssrf.guard.js";
 import { IntegrationService } from "../integration.service.js";
 import { acceptSubmission, isKnownSubmissionKey, type LeadNotification } from "../leads/leadIntake.service.js";
 import nodemailer from "nodemailer";
+import { verifyIntegrationChallenges } from "../integrations/site-integrations.service.js";
 
 // In-memory rate limiting map: ip -> timestamps[]
 const rateLimitMap = new Map<string, number[]>();
@@ -111,6 +113,7 @@ export function checkRateLimit(ip: string, maxPerMin = 5): boolean {
 }
 
 export interface FormSubmitPayload {
+  integrationTokens?: { turnstile?: string; recaptcha?: string };
   websiteId: string;
   formId: string;
   formName: string;
@@ -307,6 +310,12 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
     );
   }
 
+  const integrationSite = await prisma.website.findUnique({ where: { id: websiteId }, select: { name: true, editorData: true } });
+  const integrationData: any = integrationSite?.editorData;
+  const storedDocument = typeof integrationData === "string" ? JSON.parse(integrationData) : integrationData;
+  const siteIntegrations = storedDocument?.integrations;
+  if (!isRetry) await verifyIntegrationChallenges(siteIntegrations, payload.integrationTokens || {}, clientIp);
+
   // 2b. Evaluate Server-side Conditional Logic & Required Checks
   if (fieldConfigs && fieldConfigs.length > 0) {
     const { invalidRequiredFields } = evaluateServerConditionalLogic(
@@ -339,6 +348,9 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
   // webhook/email notification jobs commit in one transaction. Nothing below runs, and no success
   // is returned, unless that commit succeeded. Delivery happens afterwards from background_jobs.
   const notifications: LeadNotification[] = [];
+  for (const hook of siteIntegrations?.webhooks || []) {
+    if (hook.event === "form.submitted" && isSafeUrl(hook.url).safe) notifications.push({ type: "WEBHOOK_RETRY", key: hook.id, payload: { url: hook.url, event: "form.submitted", headers: { "Content-Type": "application/json" }, body: { event: "form.submitted", websiteId, formId, formName, fields: sanitizedFields, metadata: sanitizedMetadata } } });
+  }
   if (activeActions.includes("webhook") && actions?.webhookConfig?.endpointUrl) {
     const endpoint = actions.webhookConfig.endpointUrl.trim();
     const ssrfCheck = isSafeUrl(endpoint);
@@ -365,7 +377,10 @@ export async function processFormSubmission(payload: FormSubmitPayload) {
       executionResults.webhook = true;
     }
   }
-  if (activeActions.includes("email") && actions?.emailConfig?.toEmail) {
+  if (storedDocument?.formNotifications) {
+    notifications.push(...buildFormNotifications({settings:storedDocument.formNotifications,websiteId,siteName:integrationSite?.name||"Website",formName:formName||"Website Form",fields:sanitizedFields}));
+    executionResults.email = notifications.some(item=>item.type==="FORM_NOTIFICATION_EMAIL");
+  } else if (activeActions.includes("email") && actions?.emailConfig?.toEmail) {
     const toEmail = actions.emailConfig.toEmail.trim();
     const subject = actions.emailConfig.subject || "New Lead Received";
     const fromName = actions.emailConfig.fromName || "ForgeStudio Forms";

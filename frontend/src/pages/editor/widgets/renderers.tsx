@@ -1,3 +1,4 @@
+import { integrationFormTokens } from "../../../features/integrations/PublishedIntegrations";
 import { useEffect, useRef, useState } from "react";
 import { submissionKeyFor, type SubmissionKeySlot } from "../../../utils/submissionKey";
 import {
@@ -425,6 +426,7 @@ export const FormWidgetRenderer = ({
       try {
         setIsSubmitting(true);
         const payload = {
+          integrationTokens: integrationFormTokens(e.currentTarget),
           websiteId,
           formId: el.id,
           formName: el.formTitle || el.content || "Website Form",

@@ -13,6 +13,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
 import UserDashboard from "./pages/dashboard/DashboardPage";
+import { invitationReturnFromAuth } from "./features/workspaces/invitation-context";
+import { InvitationAuthReturn } from "./features/workspaces/InvitationAuthReturn";
 
 // Route-based code splitting for optimal initial bundle size and load performance
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
@@ -28,6 +30,8 @@ const SharedTemplatePreviewPage = lazy(() => import("./pages/templates/SharedTem
 const PublishedSite = lazy(() => import("./pages/published/PublishedSite"));
 const PlatformControlPage = lazy(() => import("./features/platform-control/PlatformControlPage"));
 const DatabaseStudioPage = lazy(() => import("./features/database-studio/pages/DatabaseStudioPage"));
+const WorkspaceInvitationPage = lazy(() => import("./features/workspaces/WorkspaceInvitationPage"));
+const WorkspaceHomePage = lazy(() => import("./features/workspaces/WorkspaceHomePage"));
 
 const TicketListPage = lazy(() => import("./features/support/pages/TicketList").then(m => ({ default: m.TicketListPage })));
 const CreateTicketPage = lazy(() => import("./features/support/pages/CreateTicket").then(m => ({ default: m.CreateTicketPage })));
@@ -106,6 +110,8 @@ function LoginRoute() {
     );
   }
 
+  const invitationPath = invitationReturnFromAuth(window.location.search);
+  if (user && invitationPath) return <Navigate to={invitationPath} replace />;
   if (user) {
     switch (user.role) {
       case "PLATFORM_ADMIN":
@@ -154,6 +160,8 @@ function SignupRoute() {
     );
   }
 
+  const invitationPath = invitationReturnFromAuth(window.location.search);
+  if (user && invitationPath) return <Navigate to={invitationPath} replace />;
   if (user) {
     switch (user.role) {
       case "SUPER_ADMIN":
@@ -247,6 +255,8 @@ function App() {
             path="/signup"
             element={<SignupRoute />}
           />
+          <Route path="/workspace-invitations/:invitationId" element={<WorkspaceInvitationPage />} />
+          <Route path="/dashboard/workspaces/:workspaceId" element={<WorkspaceHomePage />} />
 
           {/* ================= PUBLIC SHARED TEMPLATES ================= */}
 
@@ -299,9 +309,11 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <RoleRoute allowedRoles={["USER"]}>
-                <UserDashboard />
-              </RoleRoute>
+              <InvitationAuthReturn>
+                <RoleRoute allowedRoles={["USER"]}>
+                  <UserDashboard />
+                </RoleRoute>
+              </InvitationAuthReturn>
             }
           />
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -23,14 +23,19 @@ import {
   Star,
   Settings,
   Plug,
-  Undo2,
   Users,
   X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { HeaderUserDropdown } from "../../components/HeaderUserDropdown";
 import MembersView from "../../features/workspaces/MembersView";
+import { useMembersData } from "../../features/workspaces/use-members-data";
+import { workspaceDisplayName } from "../../features/workspaces/members-model";
 import UsageView from "../../features/usage/UsageView";
+import BillingView from "../../features/billing/BillingView";
+import IntegrationsView from "../../features/integrations/IntegrationsView";
+import TemplateGallery from "../../features/template-gallery/TemplateGallery";
+import FormsView from "../../features/forms/FormsView";
 import "./DashboardPage.css";
 
 interface Website {
@@ -43,7 +48,7 @@ interface Website {
 }
 
 type ViewMode = "grid" | "list";
-type DashboardSection = "sites" | "archive" | "members" | "usage";
+type DashboardSection = "sites" | "archive" | "members" | "usage" | "billing" | "integrations" | "libraries" | "forms";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const folderStorageKey = "forgestudio.dashboard.folders";
@@ -79,6 +84,7 @@ function initials(name: string) {
 function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const membersData = useMembersData();
   const [section, setSection] = useState<DashboardSection>("sites");
   const [websites, setWebsites] = useState<Website[]>([]);
   const [archivedWebsites, setArchivedWebsites] = useState<Website[]>([]);
@@ -93,6 +99,29 @@ function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !settingsRef.current?.contains(event.target)) setSettingsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSettingsOpen(false);
+        settingsButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [settingsOpen]);
   const [createOpen, setCreateOpen] = useState(false);
   const [siteName, setSiteName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -172,13 +201,11 @@ function DashboardPage() {
   const workspaceTitle = user?.fullName ? `${user.fullName.split(" ")[0]}'s Workspace` : user?.email ? `${user.email.split("@")[0]}'s Workspace` : "My Workspace";
 
   return (
-    <div className="studio-dashboard">
+    <div className={`studio-dashboard ${section === "billing" ? "is-billing" : section === "integrations" ? "is-integrations" : section === "libraries" ? "is-libraries" : ""}`}>
       <header className="studio-header">
         <Link to="/dashboard" className="studio-brand">web studio</Link>
         <div className="header-divider" />
         <div className="header-actions">
-          <button className="icon-button header-undo" aria-label="Undo"><Undo2 size={16} /></button>
-          <button className="icon-button header-undo" aria-label="Redo"><Undo2 size={16} className="redo-icon" /></button>
           <button className="icon-button notification-button" aria-label="Notifications"><Bell size={16} /><span className="notification-dot" /></button>
           <Link className="upgrade-button" to="/subscriptions">Upgrade <span>→</span></Link>
           <HeaderUserDropdown />
@@ -188,45 +215,61 @@ function DashboardPage() {
 
       <div className="studio-layout">
         <aside className={`studio-sidebar ${mobileNavOpen ? "is-open" : ""}`}>
-          <div className="workspace-select"><span className="workspace-icon">▤</span><span>{workspaceTitle}</span><ChevronDown size={14} /></div>
+          <div className="workspace-select"><span className="workspace-icon" aria-hidden="true">▤</span><select aria-label="Dashboard workspace" value={membersData.workspace?.id || ""} disabled={membersData.selectionLocked || membersData.sessionExpired || !membersData.workspaces.length} onChange={event => membersData.selectWorkspace(event.target.value)}>
+            <option value="" disabled>{membersData.loading ? "Loading workspace..." : membersData.error ? "Workspace unavailable" : "No workspaces"}</option>
+            {membersData.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspaceDisplayName(workspace)}</option>)}
+          </select><ChevronDown size={14} aria-hidden="true" /></div>
           <nav className="sidebar-nav" aria-label="Workspace navigation">
             {navItems.map(({ label, icon: Icon, section: itemSection }) => (
               <button key={label} className={`sidebar-link ${section === itemSection ? "is-active" : ""}`} onClick={() => { setSection(itemSection); setActiveFolder("All sites"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span></button>
             ))}
             <div className="sidebar-rule" />
-            {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
+            {secondaryItems.map(({ label, icon: Icon, section: itemSection, expandable }) => <button key={label} className={`sidebar-link ${(label === "Members" && section === "members") || (label === "Usage" && section === "usage") || (label === "Billing" && section === "billing") || (label === "Integrations" && section === "integrations") || (label === "Libraries & Templates" && section === "libraries") || (label === "Forms" && section === "forms") ? "is-active" : ""}`} onClick={() => { if (itemSection === "plans") navigate("/subscriptions"); else if (itemSection === "members") setSection("members"); else if (itemSection === "usage") setSection("usage"); else if (itemSection === "billing") setSection("billing"); else if (itemSection === "integrations") setSection("integrations"); else if (itemSection === "libraries") setSection("libraries"); else if (itemSection === "forms") setSection("forms"); setMobileNavOpen(false); }}><Icon size={16} /><span>{label}</span>{expandable && <ChevronRight className="sidebar-chevron" size={14} />}</button>)}
           </nav>
-          <div className="sidebar-footer">
-            <button className="sidebar-link" onClick={() => navigate("/settings/account")}><Settings size={16} /><span>Settings</span></button>
-            <button className="sidebar-link" onClick={() => navigate("/settings/help-support")}><CircleHelp size={16} /><span>Help center</span></button>
-            <button className="sidebar-link" onClick={handleLogout}><LogOut size={16} /><span>Log out</span></button>
+          <div className="sidebar-footer" ref={settingsRef}>
+            <button ref={settingsButtonRef} type="button" className="sidebar-link" aria-expanded={settingsOpen} aria-controls="dashboard-settings" onClick={() => setSettingsOpen((open) => !open)}>
+              <Settings size={16} /><span>Settings</span>
+              {settingsOpen ? <ChevronDown className="sidebar-chevron" size={14} /> : <ChevronRight className="sidebar-chevron" size={14} />}
+            </button>
+            <div id="dashboard-settings" className="sidebar-settings" hidden={!settingsOpen}>
+              <Link className="sidebar-link" to="/settings/account" onClick={() => { setSettingsOpen(false); setMobileNavOpen(false); }}>
+                <Settings size={16} /><span>Account settings</span>
+              </Link>
+              <Link className="sidebar-link" to="/settings/help-support" onClick={() => { setSettingsOpen(false); setMobileNavOpen(false); }}>
+                <CircleHelp size={16} /><span>Help center</span>
+              </Link>
+              <button type="button" className="sidebar-link" onClick={() => { setSettingsOpen(false); setMobileNavOpen(false); handleLogout(); }}>
+                <LogOut size={16} /><span>Log out</span>
+              </button>
+            </div>
           </div>
-        </aside>
+    </aside>
 
-        <main className="studio-main">
-          {section === "members" ? <MembersView /> : section === "usage" ? <UsageView /> : <>
-          <div className="main-heading-row">
-            <div><p className="eyebrow">{section === "archive" ? "YOUR SITES, STORED" : "YOUR WEB, ORGANIZED"}</p><h1>{section === "archive" ? "Archive" : "All sites"}</h1><p className="subtitle">{section === "archive" ? "Restore and manage sites you have moved out of your workspace." : "Create, design, and manage your websites in one place."}</p></div>
-            <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>
-          </div>
+    <main className="studio-main">
+      {section === "forms" ? <FormsView /> : section === "libraries" ? <TemplateGallery /> : section === "integrations" ? <IntegrationsView /> : section === "billing" ? <BillingView workspace={membersData.workspace} workspaceLoading={membersData.loading} /> : section === "members" ? <MembersView data={membersData} /> : section === "usage" ? <UsageView /> : <>
+        <div className="main-heading-row">
+          <div><p className="eyebrow">{section === "archive" ? "YOUR SITES, STORED" : "YOUR WEB, ORGANIZED"}</p><h1>{section === "archive" ? "Archive" : "All sites"}</h1><p className="subtitle">{section === "archive" ? "Restore and manage sites you have moved out of your workspace." : "Create, design, and manage your websites in one place."}</p></div>
+          <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>
+        </div>
 
-          <div className="toolbar">
-            <label className="search-field"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sites..." /><kbd>/</kbd></label>
-            <div className="sort-controls"><span>Sort by</span><button className="control-button" onClick={() => setSortNewestFirst((current) => !current)}>Last modified <ChevronDown size={13} /></button><button className="control-button" onClick={() => setSortNewestFirst((current) => !current)}>{sortNewestFirst ? "Descending" : "Ascending"}</button><div className="view-toggle"><button className={viewMode === "grid" ? "is-active" : ""} onClick={() => setViewMode("grid")} aria-label="Grid view"><Grid2X2 size={15} /></button><button className={viewMode === "list" ? "is-active" : ""} onClick={() => setViewMode("list")} aria-label="List view"><List size={16} /></button></div><button className="icon-button refresh-button" onClick={() => void fetchWebsites(true)} aria-label="Refresh sites"><RefreshCw size={15} className={refreshing ? "spin" : ""} /></button></div>
-          </div>
+        <div className="toolbar">
+          <label className="search-field"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sites..." /><kbd>/</kbd></label>
+          <div className="sort-controls"><span>Sort by</span><button className="control-button" onClick={() => setSortNewestFirst((current) => !current)}>Last modified <ChevronDown size={13} /></button><button className="control-button" onClick={() => setSortNewestFirst((current) => !current)}>{sortNewestFirst ? "Descending" : "Ascending"}</button><div className="view-toggle"><button className={viewMode === "grid" ? "is-active" : ""} onClick={() => setViewMode("grid")} aria-label="Grid view"><Grid2X2 size={15} /></button><button className={viewMode === "list" ? "is-active" : ""} onClick={() => setViewMode("list")} aria-label="List view"><List size={16} /></button></div><button className="icon-button refresh-button" onClick={() => void fetchWebsites(true)} aria-label="Refresh sites"><RefreshCw size={15} className={refreshing ? "spin" : ""} /></button></div>
+        </div>
 
-          {section === "sites" && <div className="folders-section"><div className="section-label-row"><span className="section-label">Folders</span><button className="new-folder-button" onClick={addFolder}><FolderPlus size={14} /> New folder</button></div><div className="folder-tabs"><button className={`folder-tab ${activeFolder === "All sites" ? "is-active" : ""}`} onClick={() => setActiveFolder("All sites")}><Grid2X2 size={14} /> All sites <span className="count-badge">{websites.length}</span></button>{folders.map((folder) => <button key={folder} className={`folder-tab ${activeFolder === folder ? "is-active" : ""}`} onClick={() => setActiveFolder(folder)}><Folder size={14} /> {folder} <MoreHorizontal size={14} /></button>)}</div><p className="folder-helper">Drag owned sites into a folder, or choose “Move to folder” from a site&apos;s menu.</p></div>}
+        {section === "sites" && <div className="folders-section"><div className="section-label-row"><span className="section-label">Folders</span><button className="new-folder-button" onClick={addFolder}><FolderPlus size={14} /> New folder</button></div><div className="folder-tabs"><button className={`folder-tab ${activeFolder === "All sites" ? "is-active" : ""}`} onClick={() => setActiveFolder("All sites")}><Grid2X2 size={14} /> All sites <span className="count-badge">{websites.length}</span></button>{folders.map((folder) => <button key={folder} className={`folder-tab ${activeFolder === folder ? "is-active" : ""}`} onClick={() => setActiveFolder(folder)}><Folder size={14} /> {folder} <MoreHorizontal size={14} /></button>)}</div><p className="folder-helper">Drag owned sites into a folder, or choose “Move to folder” from a site&apos;s menu.</p></div>}
 
-          <div className="sites-heading"><div className="sites-title"><h2>{section === "archive" ? "Archived sites" : activeFolder}</h2><span className="count-badge">{currentSites.length}</span></div><span className="save-note">Changes are saved to your workspace</span></div>
+        <div className="sites-heading"><div className="sites-title"><h2>{section === "archive" ? "Archived sites" : activeFolder}</h2><span className="count-badge">{currentSites.length}</span></div><span className="save-note">Changes are saved to your workspace</span></div>
 
-          {error && <div className="dashboard-error">{error}<button onClick={() => void fetchWebsites(true)}>Try again</button></div>}
-          {loading && section === "sites" ? <div className="site-grid"><div className="loading-card" /><div className="loading-card" /><div className="loading-card" /></div> : visibleWebsites.length === 0 ? <div className="empty-state"><div className="empty-icon"><Folder size={22} /></div><h3>{section === "archive" ? "Your archive is empty" : search ? "No sites found" : "Create your first site"}</h3><p>{search ? "Try a different search term." : "Start with a blank canvas, a template, or an AI-generated site."}</p>{section === "sites" && !search && <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>}</div> : <div className={`site-grid ${viewMode === "list" ? "is-list" : ""}`}>{visibleWebsites.map((site, index) => <SiteCard key={site.id} site={site} index={index} viewMode={viewMode} menuId={menuId} onMenu={() => setMenuId(menuId === site.id ? null : site.id)} onOpen={() => navigate(`/editor/${site.id}`)} />)}</div>}
-          </>}
-        </main>
-      </div>
+        {error && <div className="dashboard-error">{error}<button onClick={() => void fetchWebsites(true)}>Try again</button></div>}
+        {loading && section === "sites" ? <div className="site-grid"><div className="loading-card" /><div className="loading-card" /><div className="loading-card" /></div> : visibleWebsites.length === 0 ? <div className="empty-state"><div className="empty-icon"><Folder size={22} /></div><h3>{section === "archive" ? "Your archive is empty" : search ? "No sites found" : "Create your first site"}</h3><p>{search ? "Try a different search term." : "Start with a blank canvas, a template, or an AI-generated site."}</p>{section === "sites" && !search && <button className="primary-button" onClick={() => setCreateOpen(true)}><Plus size={16} /> New site</button>}</div> : <div className={`site-grid ${viewMode === "list" ? "is-list" : ""}`}>{visibleWebsites.map((site, index) => <SiteCard key={site.id} site={site} index={index} viewMode={viewMode} menuId={menuId} onMenu={() => setMenuId(menuId === site.id ? null : site.id)} onOpen={() => navigate(`/editor/${site.id}`)} />)}</div>}
+      </>}
+    </main>
+      </div >
 
-          {createOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateOpen(false); }}><form className="create-modal" onSubmit={handleCreate}><button type="button" className="modal-close" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={18} /></button><div className="modal-icon"><Sparkles size={20} /></div><p className="eyebrow">NEW PROJECT</p><h2>Create a new site</h2><p className="modal-description">Give your project a name. You can customize everything in the visual editor.</p><label className="modal-label" htmlFor="site-name">Site name<input id="site-name" autoFocus value={siteName} onChange={(event) => setSiteName(event.target.value)} placeholder="e.g. Northstar Notes" /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={creating || !siteName.trim()}>{creating ? "Creating..." : "Create site"}</button></div></form></div>}
-    </div>
+    { createOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateOpen(false); }}><form className="create-modal" onSubmit={handleCreate}><button type="button" className="modal-close" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={18} /></button><div className="modal-icon"><Sparkles size={20} /></div><p className="eyebrow">NEW PROJECT</p><h2>Create a new site</h2><p className="modal-description">Give your project a name. You can customize everything in the visual editor.</p><label className="modal-label" htmlFor="site-name">Site name<input id="site-name" autoFocus value={siteName} onChange={(event) => setSiteName(event.target.value)} placeholder="e.g. Northstar Notes" /></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreateOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={creating || !siteName.trim()}>{creating ? "Creating..." : "Create site"}</button></div></form></div>
+}
+    </div >
   );
 }
 
