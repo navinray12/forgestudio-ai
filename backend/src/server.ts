@@ -21,12 +21,14 @@ const gateways = attachWebSocketGateways(server);
 import { ensureDefaultPlans } from "./services/subscription.service.js";
 import { initTemplateTable } from "./services/template.service.js";
 import { initFormSubmissionsTable } from "./services/form/form.service.js";
+import { verifyFormDeliveryPolicyMigration } from "./services/form/formDeliveryPolicy.service.js";
 
 void ensureDatabaseTables().then(async () => {
   // Bootstrap dependent template tables in startup order, never during import.
   // A failed schema operation must prevent the HTTP server from accepting traffic.
   await initTemplateTable();
   await initFormSubmissionsTable();
+  await verifyFormDeliveryPolicyMigration();
   // Ensure subscription plans exist for onboarding
   await ensureDefaultPlans().catch((err) => {
     console.warn("[subscriptions] could not seed default plans:", err?.message || err);
