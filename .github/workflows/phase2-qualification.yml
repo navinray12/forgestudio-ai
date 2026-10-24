@@ -206,4 +206,4 @@ jobs:
       - name: Install locked frontend dependencies
         run: npm ci
       - name: Validate global widget server persistence
-        run: npx --no-install vitest run tests/global-widget-service.test.ts tests/global-widget-library-recovery.test.tsx
+        run: npx --no-install vitest run tests/global-widget-service.test.ts tests/global-widget-library-recovery.test.tsx tests/wp03-template-service.test.ts
