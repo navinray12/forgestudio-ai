@@ -48,6 +48,21 @@ export interface StorageConfig {
 }
 
 export function getStorageConfig(): StorageConfig {
+  if (process.env.NODE_ENV === "production") {
+    const explicitEndpoint = process.env.STORAGE_ENDPOINT;
+    const keyId = process.env.STORAGE_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID;
+    const secret = process.env.STORAGE_SECRET_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+    if (!explicitEndpoint || !keyId || !secret ||
+        !/^https:\/\//i.test(explicitEndpoint) ||
+        /^(forge_minio_admin|forge_minio_secret_key_123)$/.test(keyId) ||
+        /^(forge_minio_admin|forge_minio_secret_key_123)$/.test(secret)) {
+      throw new AppError(
+        "Production object storage requires explicit HTTPS endpoint and non-default credentials",
+        503,
+        "OBJECT_STORAGE_UNAVAILABLE"
+      );
+    }
+  }
   const endpoint =
     process.env.STORAGE_ENDPOINT ||
     process.env.MINIO_ENDPOINT ||
