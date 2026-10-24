@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type pg from "pg";
 import { TenantPoolManager } from "../common/pool-manager.js";
 import { validateIdentifier } from "./query-compiler.js";
-import { getForgeProjectById } from "../../../services/project/forgeProject.service.js";
+import { verifyProjectAccess } from "../common/project-access.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
 // Dedicated WebSocketServer instance for /ws/realtime upgrades
@@ -243,7 +243,8 @@ export function handleRealtimeWebSocketConnection(
 
         // Verify project authorization for authenticated user
         try {
-          await getForgeProjectById(projectId, user);
+          // Realtime subscriptions refer to Website IDs, just like the data API.
+          await verifyProjectAccess(projectId, user.id);
         } catch (authErr: any) {
           ws.send(JSON.stringify({
             event: "error",
