@@ -361,19 +361,15 @@ export async function runDnsPreflightCheck(domain: string, token: string): Promi
     // Optional
   }
 
-  // CNAME and A confirm routing only, not proof of control over this
-  // customer domain. In production an exact TXT challenge is mandatory.
-  const isDev = process.env.NODE_ENV !== "production";
-  let passed = isDev ? cnameValid || aRecordValid || txtValid : txtValid;
-  if (!passed && isDev) {
-    passed = true;
-    cnameValid = true;
-    aRecordValid = true;
-  } else if (!passed) {
-    if (!aRecordValid) errors.push(`Root A record does not point to edge IP ${edgeIp}`);
-    if (!cnameValid) errors.push(`www CNAME does not point to cname.forgestudio.app`);
-    if (!txtValid) errors.push(`TXT challenge record _forgestudio-challenge.${domain} not found or mismatch`);
+  // CNAME and A confirm routing only, not proof of control over this domain.
+  // DNS ownership is never fabricated, including local development.
+  // A/CNAME are routing hints; the TXT challenge proves website ownership.
+  const passed = txtValid;
+  if (!passed) {
+    errors.push(`TXT challenge record _forgestudio-challenge.${domain} not found or mismatch`);
   }
+  if (!aRecordValid) errors.push(`Root A record does not point to edge IP ${edgeIp}`);
+  if (!cnameValid) errors.push("www CNAME does not point to cname.forgestudio.app");
 
   return {
     passed,
