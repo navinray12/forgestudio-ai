@@ -12,7 +12,7 @@ vi.mock("../config/prisma.js", () => ({
   },
 }));
 
-import { getUserTemplates, initTemplateTable } from "../services/template.service.js";
+import { deleteTemplate, getUserTemplates, initTemplateTable, updateTemplate } from "../services/template.service.js";
 
 beforeEach(() => {
   db.queryRaw.mockReset();
@@ -39,6 +39,31 @@ describe("template listing database contract", () => {
     db.queryRaw.mockResolvedValue([template]);
     await expect(getUserTemplates("00000000-0000-0000-0000-000000000001"))
       .resolves.toEqual([template]);
+  });
+
+  it("passes the authenticated user ID into the parameterized list query", async () => {
+    const ownerId = "00000000-0000-0000-0000-000000000007";
+    db.queryRaw.mockResolvedValue([]);
+    await getUserTemplates(ownerId);
+    expect(db.queryRaw.mock.calls[0][1]).toBe(ownerId);
+  });
+
+  it("rejects cross-tenant template update without modifying another owner", async () => {
+    db.queryRaw.mockResolvedValue([]);
+    await expect(updateTemplate(
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+      { name: "Unauthorized" },
+    )).rejects.toThrow("not found or unauthorized");
+    expect(db.queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects deletion for an ID not belonging to the authenticated user", async () => {
+    db.queryRaw.mockResolvedValue([]);
+    await expect(deleteTemplate(
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+    )).rejects.toThrow("not found or unauthorized");
   });
 
   it("reports a database failure rather than an incorrect empty library", async () => {
