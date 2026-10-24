@@ -83,6 +83,7 @@ async function ensureProjectListener(
     activeListeners.set(projectId, { client, refCount: 1 });
   } catch (err) {
     console.error(`[RealtimeService] Failed to establish listener for project ${projectId}:`, err);
+    throw err; // Do not acknowledge a subscription with no active LISTEN connection.
   }
 }
 
@@ -246,21 +247,30 @@ export function handleRealtimeWebSocketConnection(
 
         const safeTable = validateIdentifier(table);
         const channelKey = `${projectId}:${safeTable}`;
+        const existingChannels = socketChannels.get(ws);
+        if (existingChannels?.has(channelKey)) {
+          // Repeated subscribe frames must not acquire additional listener refs.
+          ws.send(JSON.stringify({ event: "subscribed", projectId, table: safeTable, channel: channelKey }));
+          return;
+        }
+
+        // Acquire a DB listener before acknowledging subscription success.
+        await ensureProjectListener(projectId);
+        if (ws.readyState !== WebSocket.OPEN) {
+          releaseProjectListener(projectId);
+          return;
+        }
 
         if (!channelSubscriptions.has(channelKey)) {
           channelSubscriptions.set(channelKey, new Set());
         }
         channelSubscriptions.get(channelKey)!.add(ws);
-
         let userChannels = socketChannels.get(ws);
         if (!userChannels) {
           userChannels = new Set();
           socketChannels.set(ws, userChannels);
         }
         userChannels.add(channelKey);
-
-        // Ensure database listener is active
-        await ensureProjectListener(projectId);
 
         ws.send(
           JSON.stringify({
@@ -277,15 +287,18 @@ export function handleRealtimeWebSocketConnection(
         const safeTable = validateIdentifier(table);
         const channelKey = `${projectId}:${safeTable}`;
 
+        const userChannels = socketChannels.get(ws);
+        if (!userChannels?.has(channelKey)) {
+          ws.send(JSON.stringify({ event: "error", code: "NOT_SUBSCRIBED", message: "No active subscription for this channel" }));
+          return;
+        }
+        userChannels.delete(channelKey);
+
         const subscribers = channelSubscriptions.get(channelKey);
         if (subscribers) {
           subscribers.delete(ws);
           if (subscribers.size === 0) channelSubscriptions.delete(channelKey);
         }
-
-        const userChannels = socketChannels.get(ws);
-        if (userChannels) userChannels.delete(channelKey);
-
         releaseProjectListener(projectId);
 
         ws.send(
