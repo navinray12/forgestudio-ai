@@ -66,7 +66,7 @@ export async function provisionDatabase(
   environment: DatabaseEnvironment = "PRODUCTION"
 ): Promise<ProjectDatabase> {
   const adminConfig = getAdminDatabaseConfig();
-  let { dbName, dbUser } = getDatabaseIdentifiers(projectId, environment);
+  const { dbName, dbUser } = getDatabaseIdentifiers(projectId, environment);
 
   // 1. Check existing record in Prisma
   let existing = await prisma.projectDatabase.findUnique({
@@ -113,7 +113,6 @@ export async function provisionDatabase(
   }
 
   const adminClient = await pgPool.connect();
-  let isDedicated = true;
 
   try {
     try {
@@ -155,50 +154,58 @@ export async function provisionDatabase(
       // 4. Secure database permissions
       await adminClient.query(`REVOKE ALL ON DATABASE "${dbName}" FROM PUBLIC;`);
       await adminClient.query(`GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";`);
-    } catch (createErr: any) {
-      console.warn(`[Provisioner] Dedicated database creation skipped (${createErr?.message}), falling back to cluster database.`);
-      isDedicated = false;
-      dbName = adminConfig.database;
-      dbUser = adminConfig.user;
+    } catch {
+      // Never put tenant data in the SaaS control-plane database using an
+      // administrator account. A failed dedicated database is NOT provisioned.
+      await prisma.projectDatabase.update({
+        where: { id: existing.id },
+        data: { status: "FAILED" },
+      }).catch(() => undefined);
+      throw new AppError(
+        "Dedicated tenant database provisioning failed; administrator database fallback is forbidden",
+        503,
+        "TENANT_DATABASE_ISOLATION_UNAVAILABLE"
+      );
     }
   } finally {
     adminClient.release();
   }
 
   // 5. Connect to tenant database if dedicated to install standard extensions
-  if (isDedicated) {
-    const tenantAdminPool = new pg.Pool({
-      ...adminConfig,
-      database: dbName,
-      max: 2,
-      connectionTimeoutMillis: 5000,
-    });
+  const tenantAdminPool = new pg.Pool({
+    ...adminConfig,
+    database: dbName,
+    max: 2,
+    connectionTimeoutMillis: 5000,
+  });
 
+  try {
+    const tenantClient = await tenantAdminPool.connect();
     try {
-      const tenantClient = await tenantAdminPool.connect();
-      try {
-        await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
-        await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-        await tenantClient.query(`GRANT ALL ON SCHEMA public TO "${dbUser}";`);
-        await tenantClient.query(`GRANT USAGE ON SCHEMA public TO "${dbUser}";`);
-        await tenantClient.query(
-          `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${dbUser}";`
-        );
-        await tenantClient.query(
-          `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${dbUser}";`
-        );
-      } finally {
-        tenantClient.release();
-      }
-    } catch (extErr: any) {
-      console.warn("[Provisioner] Extension setup notice:", extErr?.message);
+      await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
+      await tenantClient.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+      await tenantClient.query(`GRANT ALL ON SCHEMA public TO "${dbUser}";`);
+      await tenantClient.query(`GRANT USAGE ON SCHEMA public TO "${dbUser}";`);
+      await tenantClient.query(
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${dbUser}";`
+      );
+      await tenantClient.query(
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${dbUser}";`
+      );
     } finally {
-      await tenantAdminPool.end().catch(() => undefined);
+      tenantClient.release();
     }
+  } catch {
+    await prisma.projectDatabase.update({
+      where: { id: existing.id },
+      data: { status: "FAILED" },
+    }).catch(() => undefined);
+    throw new AppError("Dedicated tenant database initialization failed", 503, "TENANT_DATABASE_SETUP_FAILED");
+  } finally {
+    await tenantAdminPool.end().catch(() => undefined);
   }
-
   // 6. Update database status to READY in Prisma
-  const finalEncryptedPassword = isDedicated ? encryptedPassword : encryptCredential(adminConfig.password || "");
+  const finalEncryptedPassword = encryptedPassword;
   const readyRecord = await prisma.projectDatabase.update({
     where: { id: existing.id },
     data: {
