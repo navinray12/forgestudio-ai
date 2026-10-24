@@ -12,13 +12,22 @@ vi.mock("../config/prisma.js", () => ({
   },
 }));
 
-import { getUserTemplates } from "../services/template.service.js";
+import { getUserTemplates, initTemplateTable } from "../services/template.service.js";
 
 beforeEach(() => {
   db.queryRaw.mockReset();
 });
 
 describe("template listing database contract", () => {
+  it("does not run template DDL merely because the service was imported", () => {
+    expect(db.executeRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("propagates schema bootstrap errors to the startup gate", async () => {
+    db.executeRawUnsafe.mockRejectedValueOnce(new Error("schema permission denied"));
+    await expect(initTemplateTable()).rejects.toThrow("schema permission denied");
+  });
+
   it("returns an empty list when the authenticated user has no templates", async () => {
     db.queryRaw.mockResolvedValue([]);
     await expect(getUserTemplates("00000000-0000-0000-0000-000000000001"))
