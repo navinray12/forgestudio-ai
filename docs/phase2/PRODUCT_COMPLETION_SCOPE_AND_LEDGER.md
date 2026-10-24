@@ -18,7 +18,7 @@ A new customer can sign up, verify identity, start a website via blank/template/
 | **WP-01 Execution/data security** | P0 / 0 | Revalidate terminal, WebSocket, hosted runtime, public data APIs, user SQL and HTML trust boundaries; close exploitable access | Unauthorized, cross-tenant, traversal and injection tests fail safely | WP-00 | **IN PROGRESS** (legacy hosted route quarantined pending tests) |
 | **WP-02 Database and tenancy** | P0 / 1 | One schema migration authority; fresh PostgreSQL install; bind principal/project/database in every sensitive operation | Clean migration and negative tenant tests | WP-00/01 | **IN PROGRESS** (template startup sequencing and DB-read error fixes; real database validation pending) |
 | **WP-03 Editor reliability** | P0 / 1 | Versioned editor saves, widget catalog and rendering parity, responsive breakpoints, recovery | Advertised widgets survive save/reopen/preview/publish; concurrency tests | WP-00/02 | **IN PROGRESS** (global widget server-backed CRUD and error/retry contract tests; published parity pending) |
-| **WP-04 Functional business website** | P1 / 2 | Templates/kits, CMS list/detail, durable media, live forms/leads/notifications | Real visitor submissions and CMS updates on published URL | WP-02/03/05 | NOT STARTED |
+| **WP-04 Functional business website** | P1 / 2 | Templates/kits, CMS list/detail, durable media, live forms/leads/notifications | Real visitor submissions and CMS updates on published URL | WP-02/03/05 | **IN PROGRESS** (media tenant checks, CSV safety, legacy upload safety; durable media/CMS/kit/notification E2E pending) |
 | **WP-05 Hosting and release** | P0 / 2 | Authorized artifact resolving, staging, immutable releases, domains, TLS and rollback | Live HTTP/DNS/TLS and rollback checks; no fake health | WP-01/02/03 | NOT STARTED |
 | **WP-06 Complete AI workflow** | P1 / 2 | Provider-backed job/proposal/preview/apply, concurrency safety, quota/budget | Real sandbox provider flow and generated-site publish tests | WP-02/03/05 | NOT STARTED |
 | **WP-07 Onboarding and commercial** | P1 / 1–3 | OTP, idempotent provisioning, canonical entitlements, payment and webhook lifecycle | Fresh signup-to-site and pay-to-upgrade tests | WP-01/02 | NOT STARTED |
@@ -120,6 +120,12 @@ The active audit and per-file remediation log is [WP00_WP01_SECURITY_EVIDENCE.md
 All new work on security and multi-tenancy must start from [WP01_WP02_CANONICAL_AUDIT.md](./WP01_WP02_CANONICAL_AUDIT.md). The document maps both existing database architectures, records exact file owners and permanent issue IDs, and distinguishes verified fixes from release blockers. Use incremental reproduction → fix → test → ledger update instead of re-auditing the complete repository or rewriting module boundaries.
 
 The latest work adds authenticated-session FORCE RLS enforcement, production editor write denial, canonical Website-scoped realtime authorization, read-only tenant pool lookup with explicit provisioning, and single-flight PostgreSQL pool initialization. Qualification evidence must match the exact current SHA; prior green runs do not qualify new changes. **WP-01/WP-02 remain IN PROGRESS until real-environment and open-P0 exit conditions are met.**
+
+## WP-03 / WP-04 development audit
+
+The permanent issue register is [WP03_WP04_CANONICAL_AUDIT.md](./WP03_WP04_CANONICAL_AUDIT.md). It maps editor/template/global widgets, form intake, lead/export, CMS and media paths to exact owning files and acceptance criteria. **Do not repeat a full-repository refactor** for these issues.
+
+Current implementation commits: WP03-01 template API contract validation; WP04-01 media website ownership checks; WP04-02 CSV export injection protection; WP04-03 image signature checks, false-success removal and local storage quarantine. The dedicated backend/frontend tests are wired to Phase 2 CI; use the run on the **latest branch SHA** for verification. Legacy public form integration destinations supplied in client requests (WP04-05), durable production asset upload (WP04-04), CMS/kit complete journeys and editor/public parity remain **OPEN**. The temporary production local-upload rejection is a **security restriction**, not delivery of a production media feature.
 
 ## Current code ledger (GitHub)
 
