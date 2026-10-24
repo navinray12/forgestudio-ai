@@ -39,6 +39,9 @@ jobs:
         working-directory: backend
     env:
       DATABASE_URL: postgresql://postgres:disposable_fixture_only@127.0.0.1:5432/forge_phase2_fresh
+      FORGE_DISPOSABLE_TEST_DB: '1'
+      NODE_ENV: test
+      DATA_PLATFORM_ENCRYPTION_KEY: wp01-ephemeral-test-fixture-not-for-production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -54,6 +57,8 @@ jobs:
         run: npx --no-install prisma migrate deploy
       - name: Verify migration ledger has no pending entries
         run: npx --no-install prisma migrate status
+      - name: Qualify real project database roles and HTTP tenant boundaries
+        run: npx --no-install vitest run src/tests/wp01-real-data-plane.integration.test.ts
 
   build:
     name: Build ${{ matrix.component }}
