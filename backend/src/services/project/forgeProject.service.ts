@@ -209,7 +209,11 @@ export async function createForgeProject(input: {
   // If websiteId is provided, verify it exists and belongs to workspace/owner
   if (input.websiteId) {
     const site = await db.website.findUnique({ where: { id: input.websiteId } });
-    if (!site) {
+    if (!site || site.userId !== input.ownerId ||
+        (input.workspaceId && site.workspaceId !== input.workspaceId) ||
+        (input.organizationId && site.organizationId !== input.organizationId)) {
+      // A user must never attach their ForgeProject to another tenant's site.
+      // Return 404 for both missing and foreign sites to avoid enumeration.
       throw new AppError("Associated website not found", 404, "NOT_FOUND");
     }
   }
