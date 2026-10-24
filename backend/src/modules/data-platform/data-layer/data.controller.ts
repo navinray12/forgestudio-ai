@@ -7,7 +7,7 @@ import {
   compileDelete,
   validateIdentifier,
 } from "./query-compiler.js";
-import { injectRlsClaims, resolveAuthClaims } from "./rls-claim-injector.js";
+import { assertDataScope, injectRlsClaims, resolveAuthClaims } from "./rls-claim-injector.js";
 import { enableTableRealtime } from "./realtime.service.js";
 import { generateProjectTypeScriptSdk } from "./sdk-generator.service.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
@@ -47,6 +47,7 @@ export async function getTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId);
+    assertDataScope(claims, "data:read");
     const compiled = compileSelect(table, req.query);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -107,6 +108,7 @@ export async function insertTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId);
+    assertDataScope(claims, "data:write");
     const compiled = compileInsert(table, req.body);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -154,6 +156,7 @@ export async function updateTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId);
+    assertDataScope(claims, "data:write");
     const compiled = compileUpdate(table, req.query, req.body);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
@@ -201,6 +204,7 @@ export async function deleteTableDataHandler(
 
     validateIdentifier(table);
     const claims = await resolveAuthClaims(req, projectId);
+    assertDataScope(claims, "data:write");
     const compiled = compileDelete(table, req.query);
 
     const pool = await TenantPoolManager.getTenantPool(projectId, environment);
