@@ -1,8 +1,5 @@
 name: Phase 2 qualification
 on:
-  push:
-    branches:
-      - phase2/production-hardening
   pull_request:
     branches:
       - sconfigtesting
