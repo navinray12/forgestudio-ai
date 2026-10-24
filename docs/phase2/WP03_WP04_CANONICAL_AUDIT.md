@@ -98,3 +98,11 @@ Targeted CI is wired into `.github/workflows/phase2-qualification.yml`:
 ## Work discipline
 
 Audit source only once per issue; if the current architecture changes, update this file first. Implement narrow fixes in existing modules and tests, review diffs, run all relevant CI, keep `sconfigtesting` untouched, maintain draft PR #42 until independent review. Security-degraded or disabled features are explicitly **pending**, never called production-ready.
+
+## WP04-05 secure editor settings UI checkpoint — 24 October 2026
+
+**Implemented / code and CI verified on `8d000530`:** `frontend/src/pages/editor/components/forms/FormDeliveryPolicyPanel.tsx` now supplies an owner-only interface for server-side encrypted form delivery policies. The existing active `FormWidgetInspector` receives the website ID and API origin through `widgetInspectorSlots.tsx` / `WebsiteEditor.tsx`; configuration is sent via authenticated `PUT /api/forms/:websiteId/forms/:formId/delivery`, with redacted GET and DELETE controls. Credentials are kept in transient component state, never passed to `updateProp` or copied into the website document. Successful save clears credential fields; errors are shown without echoing submitted keys.
+
+`frontend/tests/wp04-form-delivery-policy.test.tsx` covers authenticated PUT payload and credential clearing, owner access denial, and verified revocation; it is included in the editor CI job. [Phase 2 run #40090306159](https://github.com/navinray12/forgestudio-ai/actions/runs/40090306159) on code SHA `8d000530` passed **9/9** jobs, including frontend production build and the expanded editor journey suite. Frontend full lint [run #40090306170](https://github.com/navinray12/forgestudio-ai/actions/runs/40090306170) passed.
+
+**Not certified / OPEN:** Old plaintext editor document credentials must be identified and migrated/redacted safely; real external email/webhook/Sheets/Mailchimp/Zapier calls, retries and deployed browser flows have not been proven. Legacy `FormInspectorPanel.tsx` integration editors remain an additional UI integration/security review surface. Never claim WP04-05 fully done merely because the new secure settings screen and CI pass. Production release remains NO-GO.
