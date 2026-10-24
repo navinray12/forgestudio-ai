@@ -233,6 +233,7 @@ jobs:
           tests/website-editor/publish-flow.test.tsx
           tests/website-editor/editor-payloads.test.ts
           tests/website-editor/page-management.test.ts
+          tests/wp04-form-delivery-policy.test.tsx
 
   global-widget-contract:
     name: Global widget persistence and failure handling
