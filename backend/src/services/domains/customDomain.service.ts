@@ -7,6 +7,7 @@
  * Additive only — stored in Website.editorData.customDomains[].
  */
 import { createHash } from "crypto";
+import { AppError } from "../../utils/app-error.js";
 
 
 export type DomainVerificationMethod = "TXT" | "CNAME" | "FILE";
@@ -360,8 +361,9 @@ export async function runDnsPreflightCheck(domain: string, token: string): Promi
 
   let passed = cnameValid || aRecordValid || txtValid;
 
-  // Development/Test fallback
-  const isDev = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_DNS_FALLBACK === "true";
+  // Test-mode DNS fixtures may be used locally only; production may never
+  // claim verified ownership through a fallback environment switch.
+  const isDev = process.env.NODE_ENV !== "production";
   if (!passed && isDev) {
     passed = true;
     cnameValid = true;
@@ -403,24 +405,14 @@ export async function initiateSslProvisioning(
     };
   }
 
-  // Generate ACME challenge
-  const challenge = generateHttp01Challenge(record.domain, websiteId);
-
-  // Provision SSL Certificate (Let's Encrypt / ACME edge)
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-
-  return {
-    ...record,
-    status: "active",
-    sslStatus: "ACTIVE",
-    sslEnabled: true,
-    verifiedAt: now,
-    lastCheckedAt: now,
-    sslIssuer: "Let's Encrypt Authority X3 (ACME v2)",
-    sslExpiresAt: expiresAt,
-    acmeChallengeToken: challenge.token,
-    dnsPreflight: preflight,
-  };
+  // DNS proves domain control only. No ACME order, certificate PEM, issuer
+  // validation, edge installation or renewal worker exists in this service.
+  // It must never create a fictitious Let's Encrypt cert or 90-day expiry.
+  throw new AppError(
+    "DNS preflight succeeded, but verified ACME certificate issuance and edge installation are not configured",
+    503,
+    "SSL_ISSUANCE_UNAVAILABLE"
+  );
 }
 
 /**
@@ -438,14 +430,14 @@ export function getDomainDiagnosticStatus(record: CustomDomain): SslDiagnosticSt
   return {
     domain: record.domain,
     status: record.status,
-    sslStatus: record.sslStatus || (record.status === "active" ? "ACTIVE" : "PENDING_DNS"),
-    sslEnabled: record.sslEnabled || record.status === "active",
-    sslIssuer: record.sslIssuer || (record.status === "active" ? "Let's Encrypt Authority X3 (ACME v2)" : undefined),
+    sslStatus: record.sslStatus || "PENDING_DNS",
+    sslEnabled: record.sslEnabled === true && record.sslStatus === "ACTIVE",
+    sslIssuer: record.sslIssuer,
     sslExpiresAt: record.sslExpiresAt,
     daysUntilExpiry,
-    autoRenew: true,
+    autoRenew: false,
     dnsPreflight: {
-      passed: record.dnsPreflight?.passed ?? (record.status === "active"),
+      passed: record.dnsPreflight?.passed === true,
       cnameValid: record.dnsPreflight?.cnameValid,
       aRecordValid: record.dnsPreflight?.aRecordValid,
       txtValid: record.dnsPreflight?.txtValid,
