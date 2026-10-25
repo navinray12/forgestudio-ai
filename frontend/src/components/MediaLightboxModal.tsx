@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize, Play } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 export interface LightboxMediaItem {
   id?: string;
@@ -28,21 +28,25 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
   const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
-    setIndex(currentIndex);
-    setZoom(1);
+    // Reset after the effect is established to avoid synchronous render cascades.
+    const resetId = window.setTimeout(() => {
+      setIndex(currentIndex);
+      setZoom(1);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [currentIndex, isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || items.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       } else if (e.key === 'ArrowLeft') {
-        setIndex((prev) => (prev - 1 + items.length) % items.length);
+        setIndex((prev) => (Math.min(prev, items.length - 1) - 1 + items.length) % items.length);
         setZoom(1);
       } else if (e.key === 'ArrowRight') {
-        setIndex((prev) => (prev + 1) % items.length);
+        setIndex((prev) => (Math.min(prev, items.length - 1) + 1) % items.length);
         setZoom(1);
       }
     };
@@ -53,17 +57,20 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
 
   if (!isOpen || items.length === 0) return null;
 
-  const currentItem = items[index] || items[0];
+  // Item collections may shrink while the lightbox is open. Keep the active
+  // item and the displayed position in sync until the next navigation event.
+  const visibleIndex = Math.max(0, Math.min(index, items.length - 1));
+  const currentItem = items[visibleIndex];
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIndex((prev) => (prev - 1 + items.length) % items.length);
+    setIndex((prev) => (Math.min(prev, items.length - 1) - 1 + items.length) % items.length);
     setZoom(1);
   };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIndex((prev) => (prev + 1) % items.length);
+    setIndex((prev) => (Math.min(prev, items.length - 1) + 1) % items.length);
     setZoom(1);
   };
 
@@ -83,7 +90,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
       >
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold text-slate-400">
-            {index + 1} / {items.length}
+            {visibleIndex + 1} / {items.length}
           </span>
           {currentItem.title && (
             <h3 className="text-sm font-bold text-white truncate max-w-md">{currentItem.title}</h3>

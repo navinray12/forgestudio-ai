@@ -4,12 +4,15 @@ import {
   createAppGenerationHandler,
   listAppGenerationsHandler,
   getAppGenerationHandler,
+  verifyAppGenerationSourceHandler,
   retryAppGenerationHandler,
   listAppGenerationTemplatesHandler,
 } from "../controllers/appGeneration.controller.js";
 import {
   createProjectHandler,
   getProjectHandler,
+  commitProjectApplicationSpecHandler,
+  getProjectApplicationSpecHandler,
   getProjectByWebsiteHandler,
   listProjectsHandler,
   updateProjectHandler,
@@ -293,6 +296,9 @@ router.get("/:id/snapshots", listSnapshotsHandler);
 
 // Project Manifest (Module 03)
 router.get("/:id/manifest", getManifestHandler);
+ // Versioned application domain contract. Auth and ownership enforced in the shared controller.
+router.post("/:id/application-spec/revisions", commitProjectApplicationSpecHandler);
+router.get("/:id/application-spec/:applicationId", getProjectApplicationSpecHandler);
 router.put("/:id/manifest", updateManifestHandler);
 
 // Unified Compiler / IR & Visual ↔ Code Sync (Modules 06 & 07)
@@ -329,6 +335,7 @@ router.get("/:id/app-generation-templates", listAppGenerationTemplatesHandler);
 router.get("/:id/app-generations", listAppGenerationsHandler);
 router.post("/:id/app-generations", createAppGenerationHandler);
 router.get("/:id/app-generations/:runId", getAppGenerationHandler);
+router.get("/:id/app-generations/:runId/source-verification", verifyAppGenerationSourceHandler);
 router.post("/:id/app-generations/:runId/retry", retryAppGenerationHandler);
 
 // Blueprint Point 39: General-Purpose Application Data-Model & Introspection

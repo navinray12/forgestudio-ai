@@ -8,13 +8,16 @@ interface FormPreviewProps {
 }
 
 export const FormPreview: React.FC<FormPreviewProps> = ({ form }) => {
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleInputChange = (fieldName: string, value: any) => {
+  const getTextValue = (fieldName: string): string =>
+    typeof formValues[fieldName] === "string" ? formValues[fieldName] as string : "";
+
+  const handleInputChange = (fieldName: string, value: string | boolean) => {
     setFormValues((prev) => ({ ...prev, [fieldName]: value }));
     if (fieldErrors[fieldName]) {
       setFieldErrors((prev) => {
@@ -99,7 +102,7 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ form }) => {
                 {field.type === "textarea" ? (
                   <textarea
                     rows={3}
-                    value={formValues[field.name] || ""}
+                    value={getTextValue(field.name)}
                     placeholder={field.placeholder}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 outline-none transition ${
@@ -110,7 +113,7 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ form }) => {
                   />
                 ) : field.type === "select" ? (
                   <select
-                    value={formValues[field.name] || ""}
+                    value={getTextValue(field.name)}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 outline-none transition cursor-pointer ${
                       hasError
@@ -155,13 +158,13 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ form }) => {
                   <PhoneInput
                     id={`preview_field_${field.name}`}
                     required={field.required}
-                    value={formValues[field.name] || ""}
+                    value={getTextValue(field.name)}
                     onChange={(val) => handleInputChange(field.name, val.fullNumber)}
                   />
                 ) : (
                   <input
                     type={field.type}
-                    value={formValues[field.name] || ""}
+                    value={getTextValue(field.name)}
                     placeholder={field.placeholder}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 outline-none transition ${

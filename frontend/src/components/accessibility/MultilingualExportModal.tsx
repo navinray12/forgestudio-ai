@@ -9,8 +9,8 @@ import type { MultilingualExportOptions } from "../../types/accessibility.types"
 export interface MultilingualExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activePage: any;
-  websiteData: any;
+  activePage: { id?: string; name?: string; elements?: unknown[]; slug?: string; pageSettings?: unknown } | null;
+  websiteData: { name?: string; domain?: string; siteSettings?: { siteName?: string } } | null;
 }
 
 export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = ({
@@ -23,11 +23,12 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
   const [sourceLang, setSourceLang] = useState<string>("en");
   const [targetLangs, setTargetLangs] = useState<string[]>(["es", "fr", "de"]);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
-  const elements = activePage?.elements || [];
+  const elements = Array.isArray(activePage?.elements) ? activePage.elements : [];
   const siteName = websiteData?.name || websiteData?.siteSettings?.siteName || "ForgeStudio Site";
   const baseUrl = websiteData?.domain || "https://example.com";
   const pageSlug = activePage?.slug || "";
@@ -39,7 +40,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
   };
 
   const exportedJson = exportMultilingualStrings(elements, options);
-  const hreflangTags = generateHreflangTags(baseUrl, pageSlug, [sourceLang, ...targetLangs]);
+  const hreflangTags = generateHreflangTags(baseUrl, pageSlug, [sourceLang, ...targetLangs], sourceLang);
 
   const handleToggleTargetLang = (langCode: string) => {
     setTargetLangs((prev) =>
@@ -47,10 +48,16 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
     );
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(exportedJson);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(exportedJson);
+      setCopyError(null);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setCopyError("Copy failed. Select the JSON in the preview and copy it manually.");
+    }
   };
 
   const handleDownload = () => {
@@ -114,16 +121,16 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
               1. Select Multilingual Translation Engine
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
+              {([
                 { id: "wpml", label: "WPML Package", desc: "WordPress WPML String Trans" },
                 { id: "polylang", label: "Polylang", desc: "Polylang Strings Array" },
                 { id: "translatepress", label: "TranslatePress", desc: "TranslatePress Key Map" },
                 { id: "weglot", label: "Weglot API", desc: "Weglot Dynamic Words" },
-              ].map((eng) => (
+              ] as const).map((eng) => (
                 <button
                   key={eng.id}
                   type="button"
-                  onClick={() => setEngine(eng.id as any)}
+                  onClick={() => setEngine(eng.id as MultilingualExportOptions['engine'])}
                   className={`p-3 rounded-xl text-left border transition cursor-pointer ${
                     engine === eng.id
                       ? "bg-indigo-600/20 border-indigo-500 text-white shadow-md shadow-indigo-600/20"
@@ -248,6 +255,7 @@ export const MultilingualExportModal: React.FC<MultilingualExportModalProps> = (
               </div>
             </div>
 
+            {copyError && <p role="alert" className="text-amber-300 text-xs">{copyError}</p>}
             <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
               <pre className="p-4 text-xs font-mono text-indigo-300 overflow-x-auto max-h-64 leading-relaxed">
                 {exportedJson}

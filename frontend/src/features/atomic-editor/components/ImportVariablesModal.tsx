@@ -81,8 +81,8 @@ export const ImportVariablesModal: React.FC<ImportVariablesModalProps> = ({
 
       await onConfirmImport(itemsToCreate, itemsToReplace);
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to import variables.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to import variables.");
     } finally {
       setIsSubmitting(false);
     }

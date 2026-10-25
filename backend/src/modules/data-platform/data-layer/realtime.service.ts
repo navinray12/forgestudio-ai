@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type pg from "pg";
 import { TenantPoolManager } from "../common/pool-manager.js";
 import { validateIdentifier } from "./query-compiler.js";
+import { getForgeProjectById } from "../../../services/project/forgeProject.service.js";
 import type { DatabaseEnvironment } from "../../../generated/prisma/client.js";
 
 // Dedicated WebSocketServer instance for /ws/realtime upgrades
@@ -155,10 +156,12 @@ export async function enableTableRealtime(
 
 /**
  * Handles incoming WebSocket connection on `/ws/realtime`.
+ * Enforces session authentication and per-project authorization before allowing subscriptions.
  */
 export function handleRealtimeWebSocketConnection(
   ws: WebSocket,
-  _req: http.IncomingMessage
+  _req: http.IncomingMessage,
+  user?: { id?: string; role?: string }
 ): void {
   socketChannels.set(ws, new Set());
 
@@ -219,7 +222,25 @@ export function handleRealtimeWebSocketConnection(
       if (msg.event === "subscribe") {
         const { projectId, table } = msg;
         if (!projectId || !table) {
-          ws.send(JSON.stringify({ event: "error", message: "projectId and table required" }));
+          ws.send(JSON.stringify({ event: "error", code: "BAD_REQUEST", message: "projectId and table required" }));
+          return;
+        }
+
+        // SEC-03: Realtime data exposure remediation
+        if (!user || !user.id) {
+          ws.send(JSON.stringify({ event: "error", code: "UNAUTHORIZED", message: "Authentication required to subscribe to realtime events" }));
+          return;
+        }
+
+        // Verify project authorization for authenticated user
+        try {
+          await getForgeProjectById(projectId, user);
+        } catch (authErr: any) {
+          ws.send(JSON.stringify({
+            event: "error",
+            code: "FORBIDDEN",
+            message: authErr?.message || "Forbidden: Access to project realtime data denied",
+          }));
           return;
         }
 

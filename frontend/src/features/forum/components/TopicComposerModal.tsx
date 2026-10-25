@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { ForumCategory } from "../types/forum.types";
-import { X, Plus, Sparkles, Lock, Globe, Building2 } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 
 interface TopicComposerModalProps {
   isOpen: boolean;
@@ -29,11 +29,16 @@ export const TopicComposerModal: React.FC<TopicComposerModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Categories can arrive after the modal mounts, so the initial selection may be empty.
+  const selectedCategoryId = categories.some((category) => category.id === categoryId)
+    ? categoryId
+    : (categories[0]?.id ?? "");
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim() || !categoryId) {
+    if (!title.trim() || !content.trim() || !selectedCategoryId) {
       setError("Title, content, and category are required.");
       return;
     }
@@ -46,10 +51,10 @@ export const TopicComposerModal: React.FC<TopicComposerModalProps> = ({
     setIsSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ title, content, categoryId, tags, visibility });
+      await onSubmit({ title: title.trim(), content: content.trim(), categoryId: selectedCategoryId, tags, visibility });
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to create topic");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create topic");
     } finally {
       setIsSubmitting(false);
     }
@@ -98,7 +103,7 @@ export const TopicComposerModal: React.FC<TopicComposerModalProps> = ({
                 Category
               </label>
               <select
-                value={categoryId}
+                value={selectedCategoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               >

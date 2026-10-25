@@ -22,7 +22,7 @@ import {
   validateAppModel,
   type AppModel,
 } from "./appModel.js";
-import { emitApplicationSource, validateEmittedSource, GENERATED_MARKER, type EmittedFile } from "./appSourceEmitter.js";
+import { emitApplicationSource, validateEmittedSource, type EmittedFile } from "./appSourceEmitter.js";
 
 export type AppGenerationMode = "AI_PROVIDER" | "APPROVED_TEMPLATE";
 export type AppGenerationStatus =
@@ -134,41 +134,70 @@ export class AppGenerationService {
   async createRun(input: CreateRunInput): Promise<{ run: AppGenerationRun; created: boolean }> {
     const { mode, brief, templateId, idempotencyKey } = normalizeInput(input);
 
-    const existing = await pgPool.query(
-      `SELECT * FROM forge_app_generation_runs WHERE "projectId" = $1 AND "idempotencyKey" = $2`,
-      [input.projectId, idempotencyKey]
-    );
-    if (existing.rows[0]) {
-      const run = rowToRun(existing.rows[0]);
-      if (run.mode !== mode || run.brief !== brief || run.templateId !== templateId) {
-        throw new AppError("This idempotency key was already used for a different request", 409, "IDEMPOTENCY_CONFLICT");
+    // Admission must be serialized across server processes, not only within this
+    // worker. The transaction-scoped advisory lock is released on commit/rollback.
+    const client = await pgPool.connect();
+    let run: AppGenerationRun;
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext('forge-app-generation'), hashtext($1::text))",
+        [input.projectId]
+      );
+
+      const existing = await client.query(
+        `SELECT * FROM forge_app_generation_runs WHERE "projectId" = $1 AND "idempotencyKey" = $2`,
+        [input.projectId, idempotencyKey]
+      );
+      if (existing.rows[0]) {
+        const previous = rowToRun(existing.rows[0]);
+        if (previous.mode !== mode || previous.brief !== brief || previous.templateId !== templateId) {
+          throw new AppError("This idempotency key was already used for a different request", 409, "IDEMPOTENCY_CONFLICT");
+        }
+        await client.query("COMMIT");
+        return { run: previous, created: false };
       }
-      return { run, created: false };
+
+      const active = await client.query(
+        `SELECT id FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[]) LIMIT 1`,
+        [input.projectId, TERMINAL]
+      );
+      if (active.rows[0]) {
+        throw new AppError("A generation is already running for this project", 409, "GENERATION_IN_PROGRESS");
+      }
+
+      const inserted = await client.query(
+        `INSERT INTO forge_app_generation_runs ("projectId", "requestedById", mode, status, brief, "templateId", "idempotencyKey", "retryOfRunId")
+         VALUES ($1, $2, $3, 'QUEUED', $4, $5, $6, $7)
+         ON CONFLICT ("projectId", "idempotencyKey") DO NOTHING
+         RETURNING *`,
+        [input.projectId, input.requestedById, mode, brief, templateId, idempotencyKey, input.retryOfRunId ?? null]
+      );
+      if (!inserted.rows[0]) {
+        // A request bypassing this lock may have inserted this idempotency key.
+        // Do not recursively create a run: fail safely and let the caller replay.
+        throw new AppError("Generation idempotency key is being processed; retry the request", 409, "IDEMPOTENCY_IN_PROGRESS");
+      }
+      run = rowToRun(inserted.rows[0]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
 
-    const active = await pgPool.query(
-      `SELECT id FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[]) LIMIT 1`,
-      [input.projectId, TERMINAL]
-    );
-    if (active.rows[0]) {
-      throw new AppError("A generation is already running for this project", 409, "GENERATION_IN_PROGRESS");
-    }
-
-    const inserted = await pgPool.query(
-      `INSERT INTO forge_app_generation_runs ("projectId", "requestedById", mode, status, brief, "templateId", "idempotencyKey", "retryOfRunId")
-       VALUES ($1, $2, $3, 'QUEUED', $4, $5, $6, $7)
-       ON CONFLICT ("projectId", "idempotencyKey") DO NOTHING
-       RETURNING *`,
-      [input.projectId, input.requestedById, mode, brief, templateId, idempotencyKey, input.retryOfRunId ?? null]
-    );
-    if (!inserted.rows[0]) {
-      // A concurrent request with the same key won the insert; return its run.
-      return this.createRun(input);
-    }
-    const run = rowToRun(inserted.rows[0]);
+    // Start only after the transaction commits, otherwise a worker might claim
+    // a run before it is visible outside the admission transaction.
     setImmediate(() => {
-      this.processRun(run.id, input.tenantId).catch((err) => {
-        console.error(`[app-generation] run ${run.id} crashed:`, err?.message || err);
+      this.processRun(run.id, input.tenantId).catch(async () => {
+        // Unexpected failures must not strand a project in an active run state.
+        // Do not expose internal exception messages, which may contain provider credentials.
+        try {
+          await failUnexpectedGenerationRun(run.id);
+        } catch {
+          console.error(`[app-generation] Failed to persist unexpected failure for run ${run.id}`);
+        }
       });
     });
     return { run, created: true };
@@ -181,6 +210,47 @@ export class AppGenerationService {
     );
     if (!rows[0]) throw new AppError("Generation run not found", 404, "NOT_FOUND");
     return rowToRun(rows[0]);
+  }
+
+  /**
+   * Read-only evidence check against the exact persisted generation manifest.
+   * This does not build or certify generated code and never changes historical run status.
+   * An edited or removed file is reported as drift, not silently overwritten.
+   */
+  async verifySource(projectId: string, runId: string): Promise<{
+    runId: string;
+    checkedAt: string;
+    allMatch: boolean;
+    files: Array<{ path: string; result: "MATCH" | "CHANGED" | "MISSING" | "NOT_WRITTEN" }>;
+  }> {
+    const run = await this.getRun(projectId, runId);
+    if (run.status !== "SOURCE_WRITTEN") {
+      throw new AppError("Only completed source generation runs can be verified", 409, "SOURCE_NOT_READY");
+    }
+    const files: Array<{ path: string; result: "MATCH" | "CHANGED" | "MISSING" | "NOT_WRITTEN" }> = [];
+    for (const entry of run.files) {
+      if (!entry.written) {
+        files.push({ path: entry.path, result: "NOT_WRITTEN" });
+        continue;
+      }
+      try {
+        const actual = await this.deps.filesystem.readFile(projectId, entry.path);
+        const hash = crypto.createHash("sha256").update(String(actual.content ?? "")).digest("hex");
+        files.push({
+          path: entry.path,
+          result: actual.isGenerated && hash === entry.sha256 ? "MATCH" : "CHANGED",
+        });
+      } catch (err: any) {
+        if (err?.code !== "FILE_NOT_FOUND") throw err;
+        files.push({ path: entry.path, result: "MISSING" });
+      }
+    }
+    return {
+      runId: run.id,
+      checkedAt: new Date().toISOString(),
+      allMatch: files.length > 0 && files.every((entry) => entry.result === "MATCH"),
+      files,
+    };
   }
 
   async listRuns(projectId: string, limit = 20): Promise<AppGenerationRun[]> {
@@ -264,20 +334,64 @@ export class AppGenerationService {
     }
     diagnostics.push({ severity: "info", message: `Syntax-checked ${sourceCheck.checkedFiles} files; relative imports resolve and every package import is a declared dependency.` });
 
-    // 4. Refuse to overwrite source that ForgeStudio did not generate.
+    // 4. Preserve both hand-written source and user edits made after a successful
+    // generation. A generated marker is not an ownership grant: an editor can
+    // legitimately change the file while leaving that marker intact.
+    const { rows: priorRows } = await pgPool.query(
+      `SELECT files FROM forge_app_generation_runs
+       WHERE "projectId" = $1 AND status = 'SOURCE_WRITTEN'
+       ORDER BY "completedAt" DESC NULLS LAST LIMIT 1`,
+      [run.projectId]
+    );
+    const previousManifest = new Map<string, string>(
+      (Array.isArray(priorRows[0]?.files) ? priorRows[0].files : [])
+        .filter((item: any) => item.written === true && typeof item.path === "string" && typeof item.sha256 === "string")
+        .map((item: any) => [item.path, item.sha256])
+    );
+    // A failed run may have verified some files before another write failed.
+    // Retrying that *specific* run may safely replace only those byte-identical
+    // generated files. Never trust unverified files or a manifest from another project.
+    const retryManifest = new Map<string, string>();
+    if (run.retryOfRunId) {
+      const { rows: failedRows } = await pgPool.query(
+        `SELECT files FROM forge_app_generation_runs
+         WHERE id = $1 AND "projectId" = $2 AND status = 'FAILED'`,
+        [run.retryOfRunId, run.projectId]
+      );
+      for (const item of Array.isArray(failedRows[0]?.files) ? failedRows[0].files : []) {
+        if (item.written === true && typeof item.path === "string" &&
+            typeof item.sha256 === "string" && /^[a-f0-9]{64}$/.test(item.sha256)) {
+          retryManifest.set(item.path, item.sha256);
+        }
+      }
+    }
     const expectedVersions = new Map<string, number>();
     const conflicts: string[] = [];
+    let verifiedPartialFiles = 0;
     for (const file of files) {
       try {
         const existing = await this.deps.filesystem.readFile(run.projectId, file.path);
-        if (!existing.isGenerated || !String(existing.content ?? "").includes(GENERATED_MARKER)) conflicts.push(file.path);
-        else expectedVersions.set(file.path, existing.version);
+        const existingHash = crypto.createHash("sha256").update(String(existing.content ?? "")).digest("hex");
+        const matchesCompletedRun = previousManifest.get(file.path) === existingHash;
+        const matchesFailedRun = retryManifest.get(file.path) === existingHash;
+        if (!existing.isGenerated || (!matchesCompletedRun && !matchesFailedRun)) {
+          conflicts.push(file.path);
+        } else {
+          expectedVersions.set(file.path, existing.version);
+          if (matchesFailedRun && !matchesCompletedRun) verifiedPartialFiles++;
+        }
       } catch (err: any) {
         if (err?.code !== "FILE_NOT_FOUND") throw err;
       }
     }
     if (conflicts.length > 0) {
-      return fail("SOURCE_CONFLICT", `These files exist and were not generated by ForgeStudio, so they were not overwritten: ${conflicts.join(", ")}`);
+      return fail("SOURCE_CONFLICT", `Existing files have user edits or unverified generation provenance; source was preserved: ${conflicts.join(", ")}`);
+    }
+    if (verifiedPartialFiles > 0) {
+      diagnostics.push({
+        severity: "info",
+        message: `Resuming after an interrupted write: ${verifiedPartialFiles} previously verified generated file(s) match the failed run manifest; user changes remain protected.`,
+      });
     }
 
     // 5. Write files. A partial failure is reported with exactly which files were written.
@@ -297,15 +411,27 @@ export class AppGenerationService {
           encoding: "utf-8",
           isGenerated: true,
           expectedVersion: expectedVersions.get(file.path),
+          requireAbsent: !expectedVersions.has(file.path),
           authorId: run.requestedById,
           reason: `Application generation run ${run.id}`,
         });
+        // A successful write acknowledgement is not proof that the bytes are
+        // durably readable. Verify content and provenance before issuing evidence.
+        const persisted = await this.deps.filesystem.readFile(run.projectId, file.path);
+        if (!persisted.isGenerated ||
+            crypto.createHash("sha256").update(String(persisted.content ?? "")).digest("hex") !== manifest[i].sha256) {
+          return fail(
+            "SOURCE_VERIFICATION_FAILED",
+            `The generated file ${file.path} did not match its persisted source manifest; build and deployment are blocked.`,
+            { files: manifest }
+          );
+        }
         manifest[i].written = true;
       } catch (err: any) {
         const written = manifest.filter((m) => m.written).length;
         return fail(
           "WRITE_FAILED",
-          `Writing ${file.path} failed (${err?.code || "ERROR"}: ${err?.message || err}); ${written} of ${files.length} files were written.`,
+          `Writing generated file failed; ${written} of ${files.length} files were verified. Review restricted server diagnostics before retrying.`,
           { files: manifest }
         );
       }
@@ -324,7 +450,7 @@ export class AppGenerationService {
       provider = this.deps.providerFactory();
     } catch (err: any) {
       const failure = await updateRun(run.id, {
-        status: "FAILED", errorCode: err?.code || "AI_NOT_CONFIGURED", errorMessage: err?.message || "AI provider unavailable",
+        status: "FAILED", errorCode: "AI_NOT_CONFIGURED", errorMessage: "AI generation provider is unavailable or not configured.",
         completedAt: new Date().toISOString(),
       });
       return { run, model: null, failure };
@@ -354,12 +480,12 @@ export class AppGenerationService {
       } catch (err: any) {
         const failure = await updateRun(run.id, {
           status: "FAILED",
-          errorCode: err?.code || "AI_PROVIDER_UNAVAILABLE",
-          errorMessage: err?.message || "AI provider request failed",
+          errorCode: "AI_PROVIDER_UNAVAILABLE",
+          errorMessage: "AI provider request failed. Check the provider configuration and retry.",
           providerCalls: attempt + 1,
           repairAttempts: attempt,
           inputTokens, outputTokens, providerRequestIds: requestIds,
-          diagnostics: [...diagnostics, { severity: "error", message: `Provider request ${attempt + 1} failed: ${err?.message || err}` }],
+          diagnostics: [...diagnostics, { severity: "error", message: `Provider request ${attempt + 1} failed; provider error details were withheld from the run record.` }],
           completedAt: new Date().toISOString(),
         });
         return { run, model: null, failure };
@@ -415,6 +541,25 @@ export class AppGenerationService {
  * Runs left in a non-terminal state by a process that stopped cannot be resumed safely (the
  * provider call or writes may have partially happened), so they are marked as interrupted.
  */
+/**
+ * Fail only a still-active generation after an unhandled worker error.
+ * This conditional write cannot erase a terminal result from a concurrent worker,
+ * and preserves the existing diagnostic history without leaking the thrown error.
+ */
+export async function failUnexpectedGenerationRun(runId: string): Promise<boolean> {
+  const { rowCount } = await pgPool.query(
+    `UPDATE forge_app_generation_runs
+     SET status = 'FAILED', "errorCode" = 'UNEXPECTED_GENERATION_FAILURE',
+         "errorMessage" = 'Application generation stopped unexpectedly. Review diagnostics and retry the failed run.',
+         diagnostics = COALESCE(diagnostics, '[]'::jsonb) ||
+           $2::jsonb,
+         "completedAt" = now(), "updatedAt" = now()
+     WHERE id = $1 AND status <> ALL($3::text[])`,
+    [runId, JSON.stringify([{ severity: "error", message: "An unexpected generation failure interrupted this run." }]), TERMINAL]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function reconcileInterruptedRuns(): Promise<number> {
   const { rowCount } = await pgPool.query(
     `UPDATE forge_app_generation_runs

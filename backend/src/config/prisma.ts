@@ -29,11 +29,11 @@ export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
   // the session time zone. Pinning sessions to UTC keeps timestamptz writes and now() comparisons
   // correct on servers whose default time zone is not UTC.
   options: "-c TimeZone=UTC",
-  max: positiveInteger("DATABASE_POOL_MAX", 10, 100),
-  connectionTimeoutMillis: positiveInteger("DATABASE_ACQUIRE_TIMEOUT_MS", 10000, 30000),
+  max: positiveInteger("DATABASE_POOL_MAX", 5, 100),
+  connectionTimeoutMillis: positiveInteger("DATABASE_ACQUIRE_TIMEOUT_MS", 2000, 30000),
   idleTimeoutMillis: positiveInteger("DATABASE_IDLE_TIMEOUT_MS", 30000, 300000),
-  statement_timeout: positiveInteger("DATABASE_STATEMENT_TIMEOUT_MS", 30000, 60000),
-  idle_in_transaction_session_timeout: 30000,
+  statement_timeout: positiveInteger("DATABASE_STATEMENT_TIMEOUT_MS", 5000, 60000),
+  idle_in_transaction_session_timeout: 10000,
 });
 setFallbackPool(pgPool);
 const adapter = new PrismaPg(pgPool);

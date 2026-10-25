@@ -87,7 +87,7 @@ export function preservePublishingAuthority(current: JsonObject, incoming: JsonO
   return result;
 }
 /** Validate structure and stable identifiers independently of the renderer. */
-export function validateDocumentTree(document: JsonObject): void {
+export function validateDocumentTree(document: JsonObject): { valid: true; errors: [] } {
   const ids = new Set<string>();
   let elements = 0;
   const visit = (items: JsonValue | undefined, depth = 0) => {
@@ -122,6 +122,7 @@ export function validateDocumentTree(document: JsonObject): void {
     if (!Array.isArray(document.popups) || document.popups.length > 200) throw new AppError("Invalid popup collection", 422, "DOCUMENT_INVALID");
     for (const popup of document.popups) { const container = asObject(popup); if (!container) throw new AppError("Invalid popup", 422, "DOCUMENT_INVALID"); ids.clear(); visit(container.elements); }
   }
+  return { valid: true, errors: [] };
 }
 function contentOnly(current: JsonObject, incoming: JsonObject): boolean {
   const compareElements = (before: JsonValue | undefined, after: JsonValue | undefined): boolean => {

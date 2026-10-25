@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { AppError } from "../../utils/app-error.js";
 import { forgeSandboxService } from "../runtime/forgeSandbox.service.js";
 import { forgeManifestService } from "../project/forgeManifest.service.js";
+import { getForgeProjectById } from "../project/forgeProject.service.js";
 import { prisma } from "../../config/prisma.js";
 
 const db = prisma as any;
@@ -264,125 +265,53 @@ export function explainCommandWithAI(command: string, exitCode: number, output: 
 }
 
 /**
- * Handle incoming WebSocket connection for real interactive terminal PTY session
+ * Handle incoming WebSocket connection for terminal sessions.
+ * Enforces authentication, project authorization, and disables dangerous interactive
+ * host shell execution until isolated container runtimes (Docker/Firecracker/gVisor) are available.
  */
-export function handleTerminalWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
+export async function handleTerminalWebSocketConnection(
+  ws: WebSocket,
+  req: http.IncomingMessage,
+  user?: { id?: string; role?: string }
+): Promise<void> {
   try {
+    if (!user || !user.id) {
+      ws.send(JSON.stringify({ type: "error", code: "UNAUTHORIZED", message: "Authentication required for terminal access" }));
+      ws.close(1008, "Authentication required");
+      return;
+    }
+
     const parsedUrl = new URL(req.url ?? "", "http://localhost");
     const sessionId = parsedUrl.searchParams.get("sessionId");
     const projectId = parsedUrl.searchParams.get("projectId");
 
     if (!sessionId && !projectId) {
-      ws.send(JSON.stringify({ type: "error", message: "sessionId or projectId parameter is required" }));
-      ws.close(1008, "Missing session ID");
+      ws.send(JSON.stringify({ type: "error", code: "BAD_REQUEST", message: "sessionId or projectId parameter is required" }));
+      ws.close(1008, "Missing session or project ID");
       return;
     }
 
     const sid = sessionId || `pty_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const pid = projectId || ACTIVE_TERMINALS.get(sid)?.projectId || "default";
+    const pid = projectId || ACTIVE_TERMINALS.get(sid)?.projectId;
 
-    // Get or start PTY session
-    let pty = ACTIVE_PTY_SESSIONS.get(sid);
-    if (!pty) {
-      const workspaceDir = forgeSandboxService.getSandboxWorkspaceDir(pid);
-      void forgeSandboxService.materializeProjectWorkspace(pid);
-
-      const isWin = process.platform === "win32";
-      const shell = isWin ? (process.env.COMSPEC || "cmd.exe") : (process.env.SHELL || "/bin/sh");
-      const shellArgs = isWin ? [] : ["-i"];
-
-      const proc = spawn(shell, shellArgs, {
-        cwd: workspaceDir,
-        env: {
-          ...process.env,
-          TERM: "xterm-256color",
-          COLORTERM: "truecolor",
-          FORGE_PROJECT_ID: pid,
-          FORGE_TERMINAL_SESSION: sid,
-        },
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true,
-      });
-
-      pty = {
-        sessionId: sid,
-        projectId: pid,
-        proc,
-        subscribers: new Set<WebSocket>(),
-        buffer: [],
-      };
-
-      const broadcastData = (data: string) => {
-        pty!.buffer.push(data);
-        if (pty!.buffer.length > 500) pty!.buffer.shift();
-        for (const sub of pty!.subscribers) {
-          if (sub.readyState === WebSocket.OPEN) {
-            sub.send(JSON.stringify({ type: "output", data }));
-          }
-        }
-      };
-
-      proc.stdout?.on("data", (chunk: Buffer) => {
-        broadcastData(chunk.toString());
-      });
-
-      proc.stderr?.on("data", (chunk: Buffer) => {
-        broadcastData(chunk.toString());
-      });
-
-      proc.on("close", (code) => {
-        broadcastData(`\r\n[Process exited with code ${code ?? 0}]\r\n`);
-        ACTIVE_PTY_SESSIONS.delete(sid);
-        void db.forgeTerminalSession.updateMany({
-          where: { id: sid },
-          data: { status: "CLOSED", lastActivityAt: new Date() },
-        }).catch(() => {});
-      });
-
-      ACTIVE_PTY_SESSIONS.set(sid, pty);
-    }
-
-    pty.subscribers.add(ws);
-
-    // Send initial buffer replay
-    if (pty.buffer.length > 0) {
-      ws.send(JSON.stringify({ type: "replay", data: pty.buffer.join("") }));
-    }
-
-    ws.on("message", (raw: string | Buffer) => {
+    if (pid) {
       try {
-        const text = raw.toString();
-        let payload: any;
-        try {
-          payload = JSON.parse(text);
-        } catch {
-          payload = { type: "stdin", data: text };
-        }
-
-        if (payload.type === "stdin" && typeof payload.data === "string") {
-          pty?.proc.stdin?.write(payload.data);
-        } else if (payload.type === "signal" && payload.signal === "SIGINT") {
-          pty?.proc.kill("SIGINT");
-        } else if (payload.type === "signal" && payload.signal === "EOF") {
-          pty?.proc.stdin?.end();
-        }
+        await getForgeProjectById(pid, user);
       } catch (err: any) {
-        ws.send(JSON.stringify({ type: "error", message: err.message }));
+        ws.send(JSON.stringify({ type: "error", code: "FORBIDDEN", message: err?.message || "Forbidden: Access to project terminal denied" }));
+        ws.close(1008, "Forbidden");
+        return;
       }
-    });
+    }
 
-    ws.on("close", () => {
-      pty?.subscribers.delete(ws);
-      if (pty && pty.subscribers.size === 0) {
-        // Keep active for 60 seconds to allow reconnection
-        setTimeout(() => {
-          if (pty && pty.subscribers.size === 0) {
-            try { pty.proc.kill("SIGTERM"); } catch {}
-            ACTIVE_PTY_SESSIONS.delete(sid);
-          }
-        }, 60000);
-      }
-    });
+    // SEC-01: Interactive host shell execution on the application server is disabled
+    // until verified container/VM isolation runtime is available.
+    ws.send(JSON.stringify({
+      type: "error",
+      code: "TERMINAL_EXECUTION_DISABLED",
+      message: "Interactive host terminal execution is disabled for security pending isolated container runtime infrastructure."
+    }));
+    ws.close(1008, "Terminal execution disabled for security");
   } catch (err: any) {
     ws.close(1011, err.message);
   }

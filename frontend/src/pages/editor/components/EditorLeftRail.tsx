@@ -1,9 +1,9 @@
 import React from "react";
 import {
-  Plus, FileText, Layout, Box, Grid, Sparkles, Settings
+  Plus, FileText, Layout, Box, Grid, Sparkles, Settings, Layers, Atom
 } from "lucide-react";
 
-export type LeftRailActiveItem = "pages" | "blocks" | "templates" | "elements" | "ai" | "settings";
+export type LeftRailActiveItem = "pages" | "blocks" | "templates" | "elements" | "navigator" | "atomic" | "ai" | "settings";
 
 interface EditorLeftRailProps {
   activeItem: LeftRailActiveItem;
@@ -21,6 +21,8 @@ export const EditorLeftRail: React.FC<EditorLeftRailProps> = ({
     { id: "blocks", label: "Blocks", icon: <Layout className="w-4 h-4" /> },
     { id: "templates", label: "Templates", icon: <Box className="w-4 h-4" /> },
     { id: "elements", label: "Elements", icon: <Grid className="w-4 h-4" /> },
+    { id: "navigator", label: "Navigator", icon: <Layers className="w-4 h-4" /> },
+    { id: "atomic", label: "Atomic", icon: <Atom className="w-4 h-4" /> },
     { id: "ai", label: "AI", icon: <Sparkles className="w-4 h-4" /> },
   ];
 

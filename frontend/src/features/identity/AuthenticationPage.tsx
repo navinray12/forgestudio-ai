@@ -44,9 +44,14 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
       if (mode === "signup" && password !== form.get("confirm")) throw new Error("The passwords do not match.");
       const body = { identifier: String(form.get("email") ?? ""), password,
         ...(mode === "signup" ? { fullName: String(form.get("name") ?? "") } : {}) };
-      const result = await identityRequest<{ data: { userId: string; email: string } }>(`/${mode}`, body, signal);
-      if (mode === "login") await identityRequest("/login/send-otp", { userId: result.data.userId, channel: "EMAIL" }, signal);
+      const result = await identityRequest<any>(`/${mode}`, body, signal);
+      let devCode = result?.devOtp;
+      if (mode === "login") {
+        const otpRes = await identityRequest<any>("/login/send-otp", { userId: result.data.userId, channel: "EMAIL" }, signal);
+        if (otpRes?.devOtp) devCode = otpRes.devOtp;
+      }
       if (!mounted.current) return;
+      if (devCode) setCode(devCode);
       setChallenge(result.data); setCooldown(60);
     });
   }
@@ -91,13 +96,18 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
         <button disabled={busy} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">{busy ? "Please wait…" : title}</button>
       </form>}
       {challenge && <form onSubmit={verify} className="mt-6 space-y-4">
+        {code && <div className="p-3 bg-blue-950/70 border border-blue-500 rounded text-blue-200 text-sm flex items-center justify-between">
+          <span>🔑 <strong>Dev Code:</strong> {code}</span>
+          <span className="text-xs text-blue-300 bg-blue-900/60 px-2 py-0.5 rounded">Auto-filled</span>
+        </div>}
         <label className="block">Verification code<input autoFocus required inputMode="numeric" autoComplete="one-time-code"
           pattern="[0-9]{6}" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
           className="mt-1 block w-full rounded bg-slate-800 p-3 tracking-widest" /></label>
         <button disabled={busy} className="w-full rounded bg-blue-600 p-3 disabled:opacity-50">Verify and sign in</button>
         <button type="button" disabled={busy || cooldown > 0} className="w-full rounded border border-slate-500 p-3 disabled:opacity-50"
           onClick={() => void perform(async signal => {
-            await identityRequest(`/${mode}/resend-otp`, { userId: challenge.userId, channel: "EMAIL" }, signal);
+            const res = await identityRequest<any>(`/${mode}/resend-otp`, { userId: challenge.userId, channel: "EMAIL" }, signal);
+            if (res?.devOtp) setCode(res.devOtp);
             if (mounted.current) setCooldown(60);
           })}>{cooldown ? `Resend in ${cooldown} seconds` : "Resend code"}</button>
         <button type="button" disabled={busy} onClick={() => { setChallenge(null); setCode(""); setError(""); }} className="underline">Start again</button>

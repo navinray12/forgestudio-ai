@@ -2,7 +2,8 @@ import React from "react";
 import type { EditorElement, ElementStyles, DeviceMode, ElementState } from "../types";
 import { getControlStyleValue, hasStyleOverride, hasHoverStyleOverride, parseSpacingUnit, isControlStyleConfigured } from "../utils";
 
-const ScrubbableNumberInput: React.FC<{
+/** Plain text value box for one side of the spacing control (no drag scrubbing, unlike the editor-wide number input in components/). */
+const SpacingValueInput: React.FC<{
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
@@ -122,7 +123,7 @@ export const SpacingControl: React.FC<SpacingControlProps> = ({
           { label: "Left", key: leftKey, parsed: parsedLeft },
         ].map(({ label, key, parsed }) => (
           <div key={label} className="flex flex-col items-center">
-            <ScrubbableNumberInput
+            <SpacingValueInput
               value={parsed.num}
               onChange={(val) => handleSideChange(key, val, parsed.unit || activeUnit)}
               placeholder="0"

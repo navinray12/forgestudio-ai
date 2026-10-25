@@ -21,6 +21,8 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+*.rej
+*.orig
 
 # IDE
 .vscode/
@@ -33,3 +35,4 @@ test-results/
 playwright-report/
 backend/uploads/backups/
 backend/uploads/images/
+.backup*

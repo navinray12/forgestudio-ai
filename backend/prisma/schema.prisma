@@ -2063,3 +2063,20 @@ model BenchmarkRunRecord {
 
   @@map("forge_benchmark_runs")
 }
+
+/// Durable ApplicationSpec revisions (blueprint v2.1 §33.1/33.3, WP-17/WP-20). The forge_projects
+/// foreign key and check constraints are migration-owned SQL.
+model ForgeApplicationSpecRevision {
+  applicationId  String   @db.VarChar(120)
+  revision       Int
+  parentRevision Int
+  projectId      String   @db.Uuid
+  tenantId       String   @db.VarChar(120)
+  digest         String   @db.Char(64)
+  spec           Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([applicationId, revision], map: "forge_appspec_revision_pk")
+  @@index([projectId, applicationId, revision(sort: Desc)], map: "forge_appspec_project_idx")
+  @@map("forge_application_spec_revisions")
+}

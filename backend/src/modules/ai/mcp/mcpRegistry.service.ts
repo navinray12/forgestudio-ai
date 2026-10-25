@@ -6,6 +6,9 @@
 
 import { prisma } from "../../../config/prisma.js";
 import { AppError } from "../../../utils/app-error.js";
+import { randomUUID } from "node:crypto";
+import { resolveSafeDestination, safeEgressRequest } from "../../../platform/integrations/safe-egress.js";
+import { withServiceTransaction } from "../../../platform/tenancy/tenant-unit-of-work.js";
 import { McpServerRecord, McpTransport, McpTrustLevel } from "./mcpTypes.js";
 
 const db = prisma as any;
@@ -26,13 +29,19 @@ export class McpRegistryService {
     if (!params.name || !params.endpoint) {
       throw new AppError("Server name and endpoint are required", 400, "INVALID_MCP_CONFIG");
     }
+    // Endpoints that would be dialled must satisfy the egress policy up front. Every request is
+    // validated again when it is made, so this is a usability check, not the security boundary.
+    if (params.endpoint.startsWith("http")) {
+      await resolveSafeDestination(params.endpoint, { allowedPorts: [443] });
+    }
 
     const created = await db.forgeMcpServer.create({
       data: {
         name: params.name,
         endpoint: params.endpoint,
         transport: params.transport || "HTTP",
-        trustLevel: params.trustLevel || "VERIFIED",
+        // New servers always start UNTRUSTED; a client cannot choose its own trust level.
+        trustLevel: "UNTRUSTED",
         projectId: params.projectId || null,
         userId: params.userId || null,
         status: "CONNECTED",
@@ -72,6 +81,68 @@ export class McpRegistryService {
   }
 
   /**
+   * Approve a registered server for invocation: UNTRUSTED -> VERIFIED only.
+   * The caller must already be an authorized platform administrator with recent re-authentication;
+   * this method enforces the server, project, separation-of-duties and egress checks.
+   *
+   * Runs as one transaction: the server row is locked, the transition is applied only if the row is
+   * still UNTRUSTED, and the audit entry is written before COMMIT. Any failure rolls back both.
+   */
+  public async approveServer(input: { serverId: string; actorId: string }): Promise<{
+    id: string; name: string; projectId: string; trustLevel: "VERIFIED";
+  }> {
+    const notFound = () => new AppError("MCP Server not found", 404, "MCP_SERVER_NOT_FOUND");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.serverId)) throw notFound();
+
+    return withServiceTransaction("platform-control", async (client) => {
+      const { rows } = await client.query(
+        `SELECT id, name, "projectId", "userId", endpoint, "trustLevel", "isEnabled"
+           FROM forge_mcp_servers WHERE id = $1::uuid FOR UPDATE`,
+        [input.serverId]
+      );
+      const server = rows[0];
+      if (!server) throw notFound();
+      if (server.isEnabled === false) throw new AppError("MCP Server is disabled", 409, "MCP_SERVER_DISABLED");
+      if (server.trustLevel === "VERIFIED" || server.trustLevel === "TRUSTED") {
+        throw new AppError("MCP Server is already approved", 409, "MCP_SERVER_ALREADY_APPROVED");
+      }
+      if (server.trustLevel !== "UNTRUSTED") {
+        throw new AppError("Only UNTRUSTED servers can be approved", 409, "MCP_TRUST_TRANSITION_INVALID");
+      }
+      if (!server.projectId) throw new AppError("MCP Server is not attached to a project", 409, "MCP_SERVER_PROJECT_REQUIRED");
+
+      const project = (await client.query(
+        `SELECT "ownerId", "deletedAt" FROM forge_projects WHERE id = $1::uuid`,
+        [server.projectId]
+      )).rows[0];
+      if (!project || project.deletedAt) throw new AppError("Project not found", 404, "NOT_FOUND");
+      if (server.userId === input.actorId || project.ownerId === input.actorId) {
+        throw new AppError("The registering user or project owner cannot approve this server", 403, "SEPARATION_OF_DUTIES");
+      }
+      if (server.endpoint.startsWith("http")) {
+        await resolveSafeDestination(server.endpoint, { allowedPorts: [443] });
+      }
+
+      // Conditional transition: exactly one approval can move the row out of UNTRUSTED.
+      const updated = await client.query(
+        `UPDATE forge_mcp_servers SET "trustLevel" = 'VERIFIED', "updatedAt" = NOW()
+          WHERE id = $1::uuid AND "trustLevel" = 'UNTRUSTED'`,
+        [server.id]
+      );
+      if (updated.rowCount !== 1) throw new AppError("MCP Server is already approved", 409, "MCP_SERVER_ALREADY_APPROVED");
+
+      await client.query(
+        `INSERT INTO audit_logs (id, "userId", action, "targetResource", details, "createdAt")
+         VALUES ($1::uuid, $2::uuid, 'MCP_SERVER_APPROVED', $3, $4::jsonb, NOW())`,
+        [randomUUID(), input.actorId, `mcp-server:${server.id}`,
+          JSON.stringify({ projectId: server.projectId, endpoint: server.endpoint, from: "UNTRUSTED", to: "VERIFIED" })]
+      );
+
+      return { id: server.id, name: server.name, projectId: server.projectId, trustLevel: "VERIFIED" as const };
+    });
+  }
+
+  /**
    * Health check for registered MCP servers
    */
   public async checkHealth(serverId: string): Promise<{ available: boolean; latencyMs: number }> {
@@ -82,10 +153,13 @@ export class McpRegistryService {
     let available = true;
     if (server.endpoint.startsWith("http")) {
       try {
-        const res = await fetch(server.endpoint, { method: "HEAD", signal: AbortSignal.timeout(3000) });
-        available = res.ok || res.status === 405 || res.status === 404; // Server responded
+        const res = await safeEgressRequest({
+          url: server.endpoint, method: "HEAD", timeoutMs: 3000, maxResponseBytes: 1024, allowedPorts: [443],
+        });
+        const ok = res.status >= 200 && res.status < 300;
+        available = ok || res.status === 405 || res.status === 404; // Server responded
       } catch {
-        available = true; // Local/mock fallback
+        available = false; // Blocked by egress policy, redirected, timed out or unreachable
       }
     }
     const latencyMs = Date.now() - startTime;
@@ -185,8 +259,18 @@ Custom Model Context Protocol Server for ForgeStudio.
 
 ## Quickstart
 1. \`npm install\`
-2. \`npm start\`
-3. Register URL inside ForgeStudio MCP settings.
+2. \`npm start\` (listens on plain HTTP, port 8080 by default, for local development only)
+3. Publish the server behind a public HTTPS endpoint on port 443.
+4. Register that HTTPS URL inside ForgeStudio MCP settings.
+
+## Connection requirements
+ForgeStudio only connects to remote MCP servers that are:
+- reachable at a public \`https://\` URL on port 443 (no plain HTTP, custom ports or embedded credentials);
+- resolvable only to public addresses (localhost, private, link-local and cloud metadata addresses are refused, including via DNS);
+- served without redirects, answering within the request timeout and response-size limits;
+- approved: newly registered servers start UNTRUSTED and cannot be invoked until a platform administrator approves them.
+
+A server running on \`localhost\` or a private network cannot be registered directly, and there is no development-mode exception.
 `;
 
     return { packageJson, serverTs, readmeMd };

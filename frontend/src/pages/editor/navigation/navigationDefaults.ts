@@ -519,7 +519,7 @@ export function createDefaultHeaderElements(
           id: "header-nav-menu-widget",
           type: "nav-menu",
           content: JSON.stringify(navItems),
-          navMenuItems: navItems as any,
+          navMenuItems: navItems as unknown as NonNullable<EditorElement["navMenuItems"]>,
           styles: {
             navLayout: "horizontal",
             navAlign: "center",

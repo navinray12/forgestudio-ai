@@ -32,6 +32,7 @@ export default function CustomPostTypesList() {
 
     return (
         <div className="p-8 max-w-5xl mx-auto">
+            <Link to={`/dashboard?tab=cpts&site=${websiteId}`} className="inline-block mb-4 text-xs font-bold text-slate-500 hover:text-slate-900">← Dashboard</Link>
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800">Custom Post Types</h1>

@@ -1,6 +1,6 @@
 import React from "react";
 import type { ForumPost } from "../types/forum.types";
-import { CheckCircle2, Award } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 interface AcceptedAnswerCardProps {
   post: ForumPost;

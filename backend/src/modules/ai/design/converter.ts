@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { load } from "cheerio";
 import postcss from "postcss";
-import tailwindcss from "tailwindcss";
+import tailwindPostcss from "@tailwindcss/postcss";
 import type { AnyNode, Element } from "domhandler";
 import { AppError } from "../../../utils/app-error.js";
 import type { JsonObject } from "../../../services/websites/document-policy.js";
@@ -29,6 +29,21 @@ export class HtmlDesignConverter implements DesignConverter {
     if (Buffer.byteLength(html) > 1024 * 1024) throw new ConversionError(["HTML_SIZE_LIMIT"]);
     if (!/<(?:html|body|header|main|footer|section|article|div|h[1-6]|p|span|a)(?:\s|>)/i.test(html)) throw new ConversionError(["HTML_PAGE_REQUIRED"]);
     const $ = load(html);
+    // Unsafe provider exports must fail closed. Silently stripping active content
+    // can conceal an incomplete or unsafe conversion from the editor.
+    if ($("script,iframe,object,embed").length) throw new ConversionError(["ACTIVE_CONTENT_UNSUPPORTED"]);
+    if ($("link[href],style").toArray().some(element => {
+      const item = $(element);
+      return element.type === "tag" && element.name === "link"
+        ? Boolean(item.attr("href"))
+        : /url\s*\(|@import\b|expression\s*\(/i.test(item.html() || "");
+    })) throw new ConversionError(["EXTERNAL_STYLES_UNSUPPORTED"]);
+    if ($("*").toArray().some(element => {
+      if (element.type !== "tag") return false;
+      return Object.entries(element.attribs).some(([name, value]) =>
+        /^on/i.test(name) || /url\s*\(|expression\s*\(|javascript\s*:/i.test(value)
+      );
+    })) throw new ConversionError(["UNSAFE_ATTRIBUTE"]);
     if ($("*").length > 1800) throw new ConversionError(["ELEMENT_LIMIT"]);
 
     // Strip scripts, external links, and unsupported media elements cleanly
@@ -61,9 +76,34 @@ export class HtmlDesignConverter implements DesignConverter {
     const styleTexts = $("style").toArray().map((el: AnyNode) => $(el).text());
     if (Buffer.byteLength(styleTexts.join("")) > 200_000) throw new ConversionError(["CSS_SIZE_LIMIT"]);
     const utilityClasses = $("[class]").toArray().map((el: AnyNode) => $(el).attr("class") || "").join(" ");
-    const compiled = await postcss([tailwindcss({ content: [{ raw: utilityClasses, extension: "html" }], corePlugins: { preflight: false }, theme: {}, plugins: [] })]).process("@tailwind utilities;", { from: undefined });
-    const css = postcss.parse([...styleTexts, compiled.css].join("\n"));
+    // Compile only explicitly imported utility classes; never scan local files.
+    const classNames = [...new Set(utilityClasses.split(/\s+/).filter(value =>
+      value.length > 0 && value.length <= 120 && !/[{};"\\]/.test(value)
+    ))].slice(0, 300);
+    const inlineSources = classNames.map(value => `@source inline("${value}");`).join("\n");
+    const compiled = await postcss([tailwindPostcss()]).process(
+      `@import "tailwindcss" source(none);\n${inlineSources}`,
+      { from: undefined }
+    );
+    const generated = postcss.parse(compiled.css);
+    // Do not apply Tailwind preflight rules to editable native nodes.
+    generated.walkAtRules("layer", layer => {
+      if (layer.params === "base") layer.remove();
+    });
+    const css = postcss.parse([...styleTexts, generated.toString()].join("\n"));
     const rules: Array<{ selector: string; widthMin: number; widthMax: number; weight: number; styles: Record<string, string> }> = [];
+    // Tailwind 4 defines tokens such as --spacing in its theme layer on :root/:host.
+    // These are inherited CSS variables, not editable style rules. Resolve them
+    // before converting utilities such as p-4: calc(var(--spacing) * 4).
+    const themeVariables: Record<string, string> = {};
+    css.walkRules(rule => {
+      if (!rule.selectors.some(selector => selector.trim() === ":root" || selector.trim() === ":host")) return;
+      rule.walkDecls(decl => {
+        if (decl.prop.startsWith("--") && !/url\s*\(|expression\s*\(|javascript|[<>;{}\\]/i.test(decl.value)) {
+          themeVariables[decl.prop] = decl.value;
+        }
+      });
+    });
     css.walkAtRules(() => { /* Decorative at-rules ignored */ });
     css.walkRules(rule => {
       if (rules.length > 5000) throw new ConversionError(["CSS_RULE_LIMIT"]);
@@ -113,7 +153,7 @@ export class HtmlDesignConverter implements DesignConverter {
       }
 
       const computed = [1440, 768, 390].map((width, index) => {
-        const resolved = { ...inherited[index] };
+        const resolved = { ...themeVariables, ...inherited[index] };
         for (const rule of rules) if (width >= rule.widthMin && width <= rule.widthMax) {
           try { if (rule.selector === ":root") Object.assign(resolved, Object.fromEntries(Object.entries(rule.styles).filter(([key]) => inheritedKeys.has(key) || key.startsWith("--")))); else if ($(el).is(rule.selector)) Object.assign(resolved, rule.styles); }
           catch {}
@@ -172,7 +212,13 @@ export class HtmlDesignConverter implements DesignConverter {
         ...(type === "container" ? { children, layout: layout(styles[0]!), responsiveLayout: { tablet: layout(styles[1]!), mobile: layout(styles[2]!) } } : {}),
       };
     };
-    const body = $("body").get(0) || $("main").get(0) || $("div").get(0);
+    // Cheerio synthesizes html/body wrappers for fragments. Import the supplied
+    // root element for fragments, but retain the body root for full documents.
+    const fullDocument = /<\s*(?:html|body)(?:\s|>)/i.test(html);
+    const body = fullDocument
+      ? $("body").get(0) || $("main").get(0) || $("div").get(0)
+      : $("body").children().filter((_index, element) => element.type === "tag" && !["script", "style", "link", "meta"].includes(element.name)).get(0)
+        || $("main").get(0) || $("div").get(0);
     if (!body) throw new ConversionError(["HTML_PAGE_REQUIRED"]);
     const result = walk(body, "root", [{}, {}, {}], 0);
     if (!result) throw new ConversionError(["EMPTY_DOCUMENT"]);

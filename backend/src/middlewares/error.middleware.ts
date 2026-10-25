@@ -37,9 +37,12 @@ export function errorMiddleware(error: unknown, _req: Request, res: Response, ne
   // Do not stringify the original Error in production: ORM errors can contain parameters and
   // provider errors can contain tokens. Correlation enables safe operator triage.
   if (status >= 500) {
+    // Never log the raw exception: SQL queries, credentials and provider tokens
+    // may appear in its message, stack or nested properties.
     console.error(JSON.stringify({ event: "request.failed", requestId, code, status }));
   }
-  const responseMessage = message;
+  // Internal failures are sanitized in every environment, including local dev.
+  const responseMessage = status >= 500 ? (status === 503 ? message : "Something went wrong") : message;
   res.setHeader("X-Request-Id", requestId);
   res.setHeader("Cache-Control", "no-store");
   res.type("application/problem+json");

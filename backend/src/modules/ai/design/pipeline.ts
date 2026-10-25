@@ -91,6 +91,7 @@ export async function runDesignExecution(executionId: string, job: { id: string;
         // Provider failures are not replaced with locally synthesised designs: a failed or uncertain
         // provider step fails the execution (FAILED / RECONCILIATION_REQUIRED) so nothing that was
         // not produced by the AI designer is presented as an AI result.
+        // Existing completed checkpoints remain reusable.
         const screen = await stage(`SCREEN_${index}`, () => ports.designer.generate(projectId,
           `${DESIGN_CONTRACT}\nShared design: ${plan.design}\nSite routes: ${JSON.stringify(plan.pages.map(item => ({ name: item.name, slug: item.slug })))}\nPage: ${page.name}\n${page.brief}`), true);
         const html = await stage(`EXPORT_${index}`, () => ports.designer.html(projectId, screen.screenId));

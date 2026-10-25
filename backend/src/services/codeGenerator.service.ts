@@ -5,6 +5,7 @@
  */
 import * as archiverModule from "archiver";
 import { Writable } from "stream";
+import { isSitePartEnabled } from "../utils/site-part-visibility.js";
 
 function createArchiverInstance(options: any = { zlib: { level: 9 } }) {
   const a = (archiverModule as any).default || archiverModule;
@@ -495,11 +496,11 @@ export function parseEditorDataToCanonicalDoc(editorData: any): CanonicalDocumen
 
   // Combine site header + page elements + site footer if defined in siteParts
   const combinedElements: any[] = [];
-  if (editorData?.siteParts?.header?.enabled && Array.isArray(editorData.siteParts.header.elements)) {
+  if (editorData?.siteParts?.header && isSitePartEnabled(editorData.siteParts.header) && Array.isArray(editorData.siteParts.header.elements)) {
     combinedElements.push(...editorData.siteParts.header.elements);
   }
   combinedElements.push(...pageElements);
-  if (editorData?.siteParts?.footer?.enabled && Array.isArray(editorData.siteParts.footer.elements)) {
+  if (editorData?.siteParts?.footer && isSitePartEnabled(editorData.siteParts.footer) && Array.isArray(editorData.siteParts.footer.elements)) {
     combinedElements.push(...editorData.siteParts.footer.elements);
   }
 

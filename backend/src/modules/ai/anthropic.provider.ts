@@ -51,8 +51,10 @@ export class AnthropicProvider implements AiProvider {
         }),
       });
       if (!response.ok) {
+        // Provider bodies may contain credentials, prompts, and private content:
+        // never log the raw body; only surface the provider's structured error message.
         const errorText = await response.text().catch(() => "");
-        console.error(`[ANTHROPIC ERROR ${response.status}]:`, errorText);
+        console.error(`[ANTHROPIC ERROR ${response.status}]`);
         let reason = "";
         try {
           const parsed = JSON.parse(errorText) as { error?: { message?: unknown } };

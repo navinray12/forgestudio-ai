@@ -28,7 +28,7 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
   const { ensureDatabaseTables } = await import("../config/ensure-schema.js");
   const { createForgeProject } = await import("../services/project/forgeProject.service.js");
   const fs = await import("../services/project/forgeFilesystem.service.js");
-  const { AppGenerationService, reconcileInterruptedRuns, MAX_REPAIR_ATTEMPTS } = await import("../services/appGeneration/appGeneration.service.js");
+  const { AppGenerationService, reconcileInterruptedRuns, failUnexpectedGenerationRun, MAX_REPAIR_ATTEMPTS } = await import("../services/appGeneration/appGeneration.service.js");
   const controller = await import("../controllers/appGeneration.controller.js");
   const { AppError } = await import("../utils/app-error.js");
 
@@ -186,6 +186,86 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     expect(run).toMatchObject({ status: "SOURCE_WRITTEN", providerCalls: 2, repairAttempts: 1, inputTokens: 250, outputTokens: 210 });
   });
 
+  it("persists unexpected worker failures and permits a clean retry without overwriting terminal state", async () => {
+    const project = await newProject();
+    const failingFs = {
+      readFile: async () => { throw new Error("unexpected fixture filesystem failure"); },
+      writeFile: fs.writeFile,
+    };
+    const broken = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: failingFs,
+    });
+    const failed = await runToCompletion(broken, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(failed.status).toBe("FAILED");
+    expect(failed.errorCode).toBe("UNEXPECTED_GENERATION_FAILURE");
+    expect(failed.errorMessage).not.toContain("fixture filesystem failure");
+    expect(failed.diagnostics.some((d) => /unexpected generation failure/i.test(d.message))).toBe(true);
+    expect(await failUnexpectedGenerationRun(failed.id)).toBe(false);
+
+    const fixed = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: fs,
+    });
+    const { run: retry } = await fixed.retryRun(project.id, failed.id, users.owner.id, users.owner.id);
+    const retried = await fixed.getRun(project.id, retry.id);
+    expect(retried.retryOfRunId).toBe(failed.id);
+    for (let i = 0; i < 200; i++) {
+      const current = await fixed.getRun(project.id, retry.id);
+      if (current.status === "SOURCE_WRITTEN" || current.status === "FAILED") {
+        expect(current.status).toBe("SOURCE_WRITTEN");
+        expect(await failUnexpectedGenerationRun(current.id)).toBe(false);
+        expect((await fixed.getRun(project.id, current.id)).status).toBe("SOURCE_WRITTEN");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error("retry never reached terminal state");
+  });
+
+  it("does not persist provider or filesystem exception secrets in generation run records", async () => {
+    const secret = "private-api-token-test-fixture-123";
+    const project = await newProject();
+    const { provider } = scriptedProvider([{ error: new Error(`provider Authorization: Bearer ${secret}`) }]);
+    const service = new AppGenerationService({ providerFactory: () => provider, filesystem: fs });
+    const failed = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Create a simple appointment management application",
+    });
+    expect(failed.errorCode).toBe("AI_PROVIDER_UNAVAILABLE");
+    expect(JSON.stringify(failed)).not.toContain(secret);
+
+    const otherProject = await newProject();
+    const missingProvider = new AppGenerationService({
+      providerFactory: () => { throw new Error(`connection failed with token ${secret}`); },
+      filesystem: fs,
+    });
+    const noProvider = await runToCompletion(missingProvider, {
+      projectId: otherProject.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Create a simple appointment management application",
+    });
+    expect(noProvider.errorCode).toBe("AI_NOT_CONFIGURED");
+    expect(JSON.stringify(noProvider)).not.toContain(secret);
+
+    const thirdProject = await newProject();
+    const brokenWrite = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template must not invoke provider"); },
+      filesystem: {
+        readFile: fs.readFile,
+        writeFile: async () => { throw new Error(`storage URL included credential ${secret}`); },
+      },
+    });
+    const writeFailed = await runToCompletion(brokenWrite, {
+      projectId: thirdProject.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(writeFailed.errorCode).toBe("WRITE_FAILED");
+    expect(JSON.stringify(writeFailed)).not.toContain(secret);
+  });
+
   it("reports provider failures truthfully", async () => {
     const project = await newProject();
     const { provider } = scriptedProvider([{ error: new AppError("AI provider request timed out or failed", 503, "AI_PROVIDER_UNAVAILABLE") }]);
@@ -236,6 +316,233 @@ describe.skipIf(!optedIn)("Application generation runs (disposable PostgreSQL)",
     const retry = await new AppGenerationService({ providerFactory: () => scriptedProvider([{ text: JSON.stringify(VALID_MODEL) }]).provider, filesystem: fs })
       .retryRun(project.id, first.run.id, users.owner.id, users.owner.id);
     expect(retry.run.retryOfRunId).toBe(first.run.id);
+  });
+
+  it("serializes simultaneous admission for one project across distinct idempotency keys", async () => {
+    const project = await newProject();
+    const { provider } = scriptedProvider([]);
+    const slow = { ...provider, generate: () => new Promise<never>(() => undefined) };
+    const service = new AppGenerationService({ providerFactory: () => slow as any, filesystem: fs });
+    const base = {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "AI_PROVIDER", brief: "Clinic appointments booking",
+    };
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) => service.createRun({ ...base, idempotencyKey: `concurrent-${i}` }))
+    );
+    const accepted = results.filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled");
+    const rejected = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    expect(accepted).toHaveLength(1);
+    expect(rejected).toHaveLength(7);
+    expect(rejected.every((result) => result.reason?.code === "GENERATION_IN_PROGRESS")).toBe(true);
+    const { rows } = await pgPool.query(
+      `SELECT count(*)::int AS count FROM forge_app_generation_runs WHERE "projectId" = $1 AND status <> ALL($2::text[])`,
+      [project.id, ["FAILED", "SOURCE_WRITTEN"]]
+    );
+    expect(rows[0].count).toBe(1);
+    await reconcileInterruptedRuns();
+  });
+
+  it("resumes a partial verified template write without treating its unchanged files as user edits", async () => {
+    const project = await newProject();
+    let writes = 0;
+    const interrupted = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: {
+        readFile: fs.readFile,
+        writeFile: async (projectId: string, filePath: string, opts: Parameters<typeof fs.writeFile>[2]) => {
+          if (++writes === 2) throw new Error("simulated storage outage after first verified file");
+          return fs.writeFile(projectId, filePath, opts);
+        },
+      },
+    });
+    const failed = await runToCompletion(interrupted, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(failed).toMatchObject({ status: "FAILED", errorCode: "WRITE_FAILED" });
+    expect(failed.files[0].written).toBe(true);
+    expect(failed.files.some((file) => file.written === false)).toBe(true);
+    const existing = await fs.readFile(project.id, failed.files[0].path);
+    expect(existing.isGenerated).toBe(true);
+
+    const recoveredService = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: fs,
+    });
+    const retry = await recoveredService.retryRun(project.id, failed.id, users.owner.id, users.owner.id);
+    for (let i = 0; i < 200; i++) {
+      const current = await recoveredService.getRun(project.id, retry.run.id);
+      if (current.status === "SOURCE_WRITTEN" || current.status === "FAILED") {
+        expect(current.status).toBe("SOURCE_WRITTEN");
+        expect(current.files.every((file) => file.written)).toBe(true);
+        expect(current.diagnostics.some((item) => /Resuming after an interrupted write/.test(item.message))).toBe(true);
+        expect((await recoveredService.verifySource(project.id, current.id)).allMatch).toBe(true);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error("partial run retry did not reach a terminal state");
+  });
+
+  it("does not overwrite an edited file even when the failed run had verified its earlier bytes", async () => {
+    const project = await newProject();
+    let writes = 0;
+    const interrupted = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: {
+        readFile: fs.readFile,
+        writeFile: async (projectId: string, filePath: string, opts: Parameters<typeof fs.writeFile>[2]) => {
+          if (++writes === 2) throw new Error("simulated storage outage");
+          return fs.writeFile(projectId, filePath, opts);
+        },
+      },
+    });
+    const failed = await runToCompletion(interrupted, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(failed.status).toBe("FAILED");
+    const generated = failed.files.find((file) => file.written)!;
+    const preserved = await fs.readFile(project.id, generated.path);
+    const userContent = preserved.content + "\n// reviewed owner customization\n";
+    await fs.writeFile(project.id, generated.path, {
+      content: userContent, encoding: "utf-8", authorId: users.owner.id,
+      expectedVersion: preserved.version, reason: "owner customization after interrupted run",
+    });
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("template generation must not request AI"); },
+      filesystem: fs,
+    });
+    const retry = await service.retryRun(project.id, failed.id, users.owner.id, users.owner.id);
+    for (let i = 0; i < 200; i++) {
+      const current = await service.getRun(project.id, retry.run.id);
+      if (current.status === "SOURCE_WRITTEN" || current.status === "FAILED") {
+        expect(current).toMatchObject({ status: "FAILED", errorCode: "SOURCE_CONFLICT" });
+        expect((await fs.readFile(project.id, generated.path)).content).toBe(userContent);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error("edited partial retry did not reach a terminal state");
+  });
+
+  it("does not claim SOURCE_WRITTEN when storage acknowledges but corrupts generated bytes", async () => {
+    const project = await newProject();
+    const dishonestFilesystem = {
+      readFile: fs.readFile,
+      writeFile: async (projectId: string, filePath: string, opts: Parameters<typeof fs.writeFile>[2]) =>
+        fs.writeFile(projectId, filePath, { ...opts, content: `${opts.content}\n// corrupted after generation\n` }),
+    };
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("template mode must not request AI"); },
+      filesystem: dishonestFilesystem,
+    });
+    const run = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(run.status).toBe("FAILED");
+    expect(run.errorCode).toBe("SOURCE_VERIFICATION_FAILED");
+    expect(run.files.length).toBeGreaterThan(0);
+    expect(run.files[0].written).toBe(false);
+    expect(run.files.some((item) => item.written)).toBe(false);
+  });
+
+  it("checks persisted source without overwriting edits or mislabelling an old manifest", async () => {
+    const project = await newProject();
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Approved template does not use AI"); },
+      filesystem: fs,
+    });
+    const run = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(run.status).toBe("SOURCE_WRITTEN");
+    const initial = await service.verifySource(project.id, run.id);
+    expect(initial.allMatch).toBe(true);
+    expect(initial.files.every((file) => file.result === "MATCH")).toBe(true);
+
+    const changedPath = initial.files[0].path;
+    const original = await fs.readFile(project.id, changedPath);
+    await fs.writeFile(project.id, changedPath, {
+      content: original.content + "\\n// owner correction\\n",
+      expectedVersion: original.version,
+      authorId: users.owner.id,
+    });
+    const afterEdit = await service.verifySource(project.id, run.id);
+    expect(afterEdit.allMatch).toBe(false);
+    expect(afterEdit.files.find((file) => file.path === changedPath)?.result).toBe("CHANGED");
+    expect((await fs.readFile(project.id, changedPath)).content).toContain("owner correction");
+    expect((await service.getRun(project.id, run.id)).status).toBe("SOURCE_WRITTEN");
+
+    const removedPath = initial.files[1].path;
+    await fs.deleteFile(project.id, removedPath, users.owner.id);
+    const afterRemoval = await service.verifySource(project.id, run.id);
+    expect(afterRemoval.files.find((file) => file.path === removedPath)?.result).toBe("MISSING");
+    await expect(service.verifySource(project.id, randomUUID())).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("does not overwrite a new source file created after generation preflight", async () => {
+    const project = await newProject();
+    const protectedPath = "forge-app/server/task.routes.ts";
+    const editorSource = "// a real edit added while the generator was working\nexport const protectedWork = true;\n";
+    let injected = false;
+    const racingFilesystem = {
+      readFile: fs.readFile,
+      writeFile: async (projectId: string, filePath: string, opts: Parameters<typeof fs.writeFile>[2]) => {
+        if (filePath === protectedPath && !injected) {
+          injected = true;
+          await fs.writeFile(projectId, filePath, { content: editorSource, authorId: users.owner.id });
+        }
+        return fs.writeFile(projectId, filePath, opts);
+      },
+    };
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template must not invoke provider"); },
+      filesystem: racingFilesystem,
+    });
+    const run = await runToCompletion(service, {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    });
+    expect(injected).toBe(true);
+    expect(run.status).toBe("FAILED");
+    expect(run.errorCode).toBe("WRITE_FAILED");
+    const saved = await fs.readFile(project.id, protectedPath);
+    expect(saved.content).toBe(editorSource);
+    expect(saved.isGenerated).toBe(false);
+    expect(saved.version).toBe(1);
+  });
+
+  it("preserves edits to previously generated source even when the marker remains", async () => {
+    const project = await newProject();
+    const service = new AppGenerationService({
+      providerFactory: () => { throw new Error("Template mode must not call the AI provider"); },
+      filesystem: fs,
+    });
+    const input = {
+      projectId: project.id, tenantId: users.owner.id, requestedById: users.owner.id,
+      mode: "APPROVED_TEMPLATE", templateId: "task-tracker",
+    };
+    const initial = await runToCompletion(service, input);
+    expect(initial.status).toBe("SOURCE_WRITTEN");
+    const untouched = await runToCompletion(service, input);
+    expect(untouched.status).toBe("SOURCE_WRITTEN");
+
+    const path = "forge-app/server/task.routes.ts";
+    const saved = await fs.readFile(project.id, path);
+    const userEdit = saved.content + "\n// user-maintained validation must survive\n";
+    await fs.writeFile(project.id, path, {
+      content: userEdit, expectedVersion: saved.version, authorId: users.owner.id,
+    });
+    const refused = await runToCompletion(service, input);
+    expect(refused).toMatchObject({ status: "FAILED", errorCode: "SOURCE_CONFLICT" });
+    expect(refused.errorMessage).toContain(path);
+    expect(await fs.readFile(project.id, path)).toMatchObject({ content: userEdit });
+    expect(refused.files).toEqual([]);
+    expect((await service.verifySource(project.id, untouched.id)).allMatch).toBe(false);
   });
 
   it("never overwrites source that ForgeStudio did not generate", async () => {

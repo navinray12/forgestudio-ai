@@ -11,6 +11,7 @@
  * This module is pure: it reads and writes no storage.
  */
 import crypto from "node:crypto";
+import { isSitePartEnabled } from "../../utils/site-part-visibility.js";
 import { requireTs } from "./tsCompiler.js";
 import {
   visualDocumentToIR,
@@ -572,6 +573,14 @@ function isContainerType(element: any): boolean {
  */
 function setText(element: any, text: string) {
   element.content = text;
+  // A code edit establishes one canonical text value. Keep historic editor
+  // documents that explicitly use textContent/text compatible, but do not
+  // leave duplicate aliases that can mask a later canvas edit to content.
+  if (["heading", "text", "paragraph", "blockquote"].includes(String(element.type).toLowerCase())) {
+    delete element.textContent;
+    delete element.text;
+    return;
+  }
   if ("textContent" in element) element.textContent = text;
   if ("text" in element) element.text = text;
   if (String(element.type).toLowerCase() === "button") {
@@ -922,7 +931,7 @@ function collectAllIds(editorData: any): Set<string> {
 }
 
 function sitePartElements(part: any): any[] {
-  return part && part.enabled !== false && Array.isArray(part.elements)
+  return part && isSitePartEnabled(part) && Array.isArray(part.elements)
     ? part.elements.filter((el: any) => el && typeof el === "object")
     : [];
 }

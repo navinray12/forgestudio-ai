@@ -1,6 +1,6 @@
 import { PublishedIntegrations, type PublicIntegrations } from "../../features/integrations/PublishedIntegrations";
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
     resolveElementStyles,
     getInnerStyles,
@@ -11,7 +11,11 @@ import {
 } from "../editor/utils";
 import type { EditorElement, Breakpoint } from "../editor/types";
 import { resolveDynamicTokens } from "../editor/types";
+import { isSitePartEnabled } from "../editor/core/siteParts";
 import type { PopupConfig } from "../../types/popup.types";
+import { readPreviewCommand } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
+import { loadSiteSnapshot } from "../../features/developer-workspace/services/loadSiteSnapshot";
+import { sanitizeHtml } from "../../utils/sanitizeHtml";
 
 const BackgroundSlideshow: React.FC<{ urls: string[]; interval?: number }> = ({ urls, interval }) => {
     const [index, setIndex] = useState(0);
@@ -296,11 +300,11 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
     const stickyStyles = resolveStickyStyles(el);
 
     // Defer Background Image safely via F-355
-    let finalMergedStyles: any = {
+    const finalMergedStyles: any = {
         ...(optClass ? {} : resolvedStyles),
         ...stickyStyles
     };
-    let finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
+    const finalInnerStyles: any = optClass ? {} : getInnerStyles(resolvedStyles);
 
     // Keep backgroundImage strictly inline safely
     if (resolvedStyles.backgroundImage) {
@@ -831,7 +835,7 @@ export const RenderNode: React.FC<RenderNodeProps> = React.memo(({ el, isCritica
 });
 
 function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
-    const { websiteId, pageSlug } = useParams<{ websiteId: string; pageSlug?: string }>();
+    const { websiteId, pageSlug, cptSlug, entrySlug } = useParams<{ websiteId: string; pageSlug?: string; cptSlug?: string; entrySlug?: string }>();
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
     const isPreview = Boolean(isPreviewMode) || 
@@ -842,7 +846,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
 
     const [loading, setLoading] = useState(true);
     // Incremented by the editor preview's "reload" message to re-run the site fetch effect.
-    const [reloadToken, setReloadToken] = useState(0);
+    const [reloadTick, setReloadTick] = useState(0);
     const [errorMessage, setErrorMessage] = useState("");
     const [elements, setElements] = useState<EditorElement[]>([]);
     const [pages, setPages] = useState<PageConfig[]>([]);
@@ -863,6 +867,22 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
     const [statementOpen, setStatementOpen] = useState<boolean>(false);
     const [experiments, setExperiments] = useState<any[]>([]);
     const [assignedVariants, setAssignedVariants] = useState<Record<string, string>>({});
+
+    // CMS CPT Dynamic States
+    const [cptArchive, setCptArchive] = useState<{ postType: any; data: any[] } | null>(null);
+    const [cptSingle, setCptSingle] = useState<{ postType: any; entry: any } | null>(null);
+    const [cptLoading, setCptLoading] = useState<boolean>(false);
+    const [cptError, setCptError] = useState<string | null>(null);
+    const [availableCpts, setAvailableCpts] = useState<any[]>([]);
+
+    const rawSlug = pageSlug || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("page") || "" : "");
+    const cleanSlug = rawSlug.replace(/^\//, "");
+    const pathSegments = cleanSlug.split("/").filter(Boolean);
+
+    const detectedCptSlug = cptSlug || (pathSegments.length >= 2 ? pathSegments[0] : (cleanSlug === "blog" || cleanSlug === "blog-posts" || cleanSlug === "post" ? cleanSlug : ""));
+    const detectedEntrySlug = entrySlug || (pathSegments.length >= 2 ? pathSegments.slice(1).join("/") : "");
+    const isSinglePost = Boolean(detectedEntrySlug && (detectedCptSlug === "blog" || detectedCptSlug === "blog-posts" || detectedCptSlug === "post" || cptSlug));
+    const isPostArchive = Boolean(!isSinglePost && (cleanSlug === "blog" || cleanSlug === "blog-posts" || (cptSlug && !entrySlug)));
 
     // F-339 & F-344: Compile Design System CSS Variables (:root) and Global Classes
     const compiledDesignTokensCss = useMemo(() => {
@@ -923,37 +943,22 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
 
     useEffect(() => {
         if (!websiteId) return;
+        const controller = new AbortController();
+        let active = true;
 
         const fetchWebsite = async () => {
             try {
                 setLoading(true);
-                let res: Response;
-                if (isPreview) {
-                    res = await fetch(`${apiUrl}/api/websites/${websiteId}`, { credentials: "include" });
-                    if (!res.ok) {
-                        res = await fetch(`${apiUrl}/api/v1/websites/${websiteId}`, { credentials: "include" });
-                    }
-                    if (!res.ok) {
-                        res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
-                    }
-                } else {
-                    res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
-                    if (!res.ok && res.status !== 404) {
-                        const fallback = await fetch(`${apiUrl}/api/websites/public/${websiteId}`);
-                        if (fallback.ok) res = fallback;
-                    }
-                }
-                const data = await res.json();
-
-                if (!res.ok) throw new Error(data?.message || "This website is unavailable.");
-
-                const site = data.website || data;
+                setErrorMessage("");
+                const site = await loadSiteSnapshot(apiUrl, websiteId, isPreview, controller.signal);
+                // Aborted/obsolete requests may resolve anyway (custom transports/tests).
+                if (!active || controller.signal.aborted) return;
                 let rawEditorData = site?.editorData;
                 if (typeof rawEditorData === "string") {
                     try {
                         rawEditorData = JSON.parse(rawEditorData);
-                    } catch (_e) {
-                        rawEditorData = {};
+                    } catch (parseError) {
+                        throw new Error("The saved website document is invalid.", { cause: parseError });
                     }
                 }
                 const editorData = isPreview 
@@ -961,7 +966,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     : (rawEditorData?.publishedData || rawEditorData || {});
 
                 setIntegrations(isPreview ? null : editorData?.integrations || null);
-                if (editorData?.siteParts) setSitePartsState(editorData.siteParts);
+                setSitePartsState(editorData?.siteParts ?? null);
                 const loadedSiteParts = editorData?.siteParts;
 
                 if (editorData?.pages && editorData.pages.length > 0) {
@@ -978,11 +983,11 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     if (matchedPage) {
                         setActivePageId(matchedPage.id || "home");
                         setElements(matchedPage.elements?.length ? matchedPage.elements : (editorData.elements || []));
-                    } else if (isPostRoute && loadedSiteParts?.single?.elements?.length && (loadedSiteParts.single.isEnabled ?? true)) {
+                    } else if (isPostRoute && loadedSiteParts?.single?.elements?.length && isSitePartEnabled(loadedSiteParts.single)) {
                         // F-237: Single Post Template Fallback
                         setActivePageId("single-post-template");
                         setElements(loadedSiteParts.single.elements);
-                    } else if (isTermRoute && loadedSiteParts?.archive?.elements?.length && (loadedSiteParts.archive.isEnabled ?? true)) {
+                    } else if (isTermRoute && loadedSiteParts?.archive?.elements?.length && isSitePartEnabled(loadedSiteParts.archive)) {
                         // F-256: Term / Taxonomy Archive Template Fallback
                         setActivePageId("archive-template");
                         setElements(loadedSiteParts.archive.elements);
@@ -991,7 +996,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                         const archivePage = pagesList.find((p) => p.slug === "/archive" || p.slug === "archive" || p.slug === "/blog" || p.slug === "blog") || pagesList.find((p: any) => p.isHome || p.slug === "/") || pagesList[0];
                         setActivePageId(archivePage?.id || "home");
                         setElements(archivePage?.elements?.length ? archivePage.elements : (editorData.elements || []));
-                    } else if (initialSlug && loadedSiteParts?.notFound404?.elements?.length && (loadedSiteParts.notFound404.isEnabled ?? true)) {
+                    } else if (initialSlug && loadedSiteParts?.notFound404?.elements?.length && isSitePartEnabled(loadedSiteParts.notFound404)) {
                         // F-239: 404 Template Fallback for unmatched route
                         setActivePageId("404-template");
                         setElements(loadedSiteParts.notFound404.elements);
@@ -1005,30 +1010,132 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     setPages([defaultPage]);
                     setActivePageId("home");
                     setElements(editorData.elements);
+                } else {
+                    setPages([]);
+                    setElements([]);
+                    setActivePageId("home");
                 }
-                if (editorData?.popups) setPopups(editorData.popups);
-                if (editorData?.breakpoints) setBreakpoints(editorData.breakpoints);
-                if (editorData?.globalSettings) setGlobalSettings(editorData.globalSettings);
-                if (editorData?.globalVariables) setGlobalVariables(editorData.globalVariables);
-                if (editorData?.globalClasses) setGlobalClasses(editorData.globalClasses);
-                if (site?.customCodeSnippets) setCustomCodeSnippets(site.customCodeSnippets);
-                if (site?.status) setSiteStatus(site.status);
-                if (site?.themeLocationRules) _setThemeRules(site.themeLocationRules);
-                if (editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent) {
-                    setCookieConsentConfig(editorData.siteSettings?.cookieConsent || editorData.cookieConsent);
-                }
-                if (site?.editorData?.experiments) {
-                    setExperiments(site.editorData.experiments);
-                }
+                setPopups(editorData?.popups || []);
+                setBreakpoints(editorData?.breakpoints || DEFAULT_BREAKPOINTS);
+                setGlobalSettings(editorData?.globalSettings || {});
+                setGlobalVariables(editorData?.globalVariables || []);
+                setGlobalClasses(editorData?.globalClasses || []);
+                setCustomCodeSnippets(site?.customCodeSnippets || []);
+                setSiteStatus(site?.status || "DRAFT");
+                _setThemeRules(site?.themeLocationRules || []);
+                setCookieConsentConfig(editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent || null);
+                setExperiments(isPreview ? [] : (rawEditorData?.experiments || []));
 
             } catch (_err: any) {
-                setErrorMessage("This website is unavailable.");
+                if (!active || controller.signal.aborted) return;
+                setErrorMessage(_err?.message || "This website is unavailable.");
+                setElements([]);
+                setPages([]);
+                setCustomCodeSnippets([]);
+                setExperiments([]);
+                setSitePartsState(null);
             } finally {
-                setLoading(false);
+                if (active && !controller.signal.aborted) setLoading(false);
             }
         };
-        fetchWebsite();
-    }, [websiteId, apiUrl, pageSlug, reloadToken]);
+        void fetchWebsite();
+        return () => { active = false; controller.abort(); };
+    }, [websiteId, apiUrl, pageSlug, cptSlug, entrySlug, isPreview, reloadTick]);
+
+    // CMS Dynamic Content Resolution for Published / Preview Site
+    useEffect(() => {
+        if (!websiteId || errorMessage) return;
+
+        let active = true;
+        const controller = new AbortController();
+
+        // Load available CPTs for navigation metadata
+        (async () => {
+            try {
+                const res = await fetch(`${apiUrl}/api/v1/websites/public/${encodeURIComponent(websiteId)}/cpt`, {
+                    signal: controller.signal,
+                    credentials: isPreview ? "include" : "omit",
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (active && Array.isArray(json.data)) {
+                        setAvailableCpts(json.data);
+                    }
+                }
+            } catch (_e) {}
+        })();
+
+        if (isSinglePost) {
+            setCptLoading(true);
+            setCptError(null);
+            (async () => {
+                try {
+                    const res = await fetch(
+                        `${apiUrl}/api/v1/websites/public/${encodeURIComponent(websiteId)}/cpt/${encodeURIComponent(detectedCptSlug || "blog")}/entries/${encodeURIComponent(detectedEntrySlug)}`,
+                        {
+                            signal: controller.signal,
+                            credentials: isPreview ? "include" : "omit",
+                        }
+                    );
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || err.error?.message || "The requested article cannot be found or is not currently published.");
+                    }
+                    const json = await res.json();
+                    if (active) {
+                        setCptSingle(json);
+                        setCptArchive(null);
+                    }
+                } catch (err: any) {
+                    if (active && !controller.signal.aborted) {
+                        setCptError(err.message || "Article not available.");
+                        setCptSingle(null);
+                    }
+                } finally {
+                    if (active && !controller.signal.aborted) setCptLoading(false);
+                }
+            })();
+        } else if (isPostArchive) {
+            setCptLoading(true);
+            setCptError(null);
+            (async () => {
+                try {
+                    const res = await fetch(
+                        `${apiUrl}/api/v1/websites/public/${encodeURIComponent(websiteId)}/cpt/${encodeURIComponent(detectedCptSlug || "blog")}/entries`,
+                        {
+                            signal: controller.signal,
+                            credentials: isPreview ? "include" : "omit",
+                        }
+                    );
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || err.error?.message || "Could not load published blog posts.");
+                    }
+                    const json = await res.json();
+                    if (active) {
+                        setCptArchive(json);
+                        setCptSingle(null);
+                    }
+                } catch (err: any) {
+                    if (active && !controller.signal.aborted) {
+                        setCptError(err.message || "Blog articles not available.");
+                        setCptArchive(null);
+                    }
+                } finally {
+                    if (active && !controller.signal.aborted) setCptLoading(false);
+                }
+            })();
+        } else {
+            setCptSingle(null);
+            setCptArchive(null);
+            setCptError(null);
+        }
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [websiteId, apiUrl, detectedCptSlug, detectedEntrySlug, isSinglePost, isPostArchive, isPreview, errorMessage]);
 
     // Phase 3 Subsystem 2: A/B Split Testing & Impression Telemetry
     useEffect(() => {
@@ -1106,29 +1213,33 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     type: "forge:preview:route-changed",
                     route: isHome ? "/" : `/${cleanSlug}`,
                     pageId: page.id,
-                }, "*");
+                }, window.location.origin);
             }
         }
     };
 
     useEffect(() => {
         const handleParentMessage = (e: MessageEvent) => {
-            if (e.data?.type === "forge:preview:set-route") {
-                const target = e.data.route;
+            const command = readPreviewCommand(e, {
+                parent: window.parent, self: window, origin: window.location.origin, isPreview,
+            });
+            if (!command) return;
+            if (command.type === "route") {
+                const target = command.route;
                 if (!target || !pages || pages.length === 0) return;
                 const matched = findTargetPage(pages, target);
                 if (matched && matched.id !== activePageId) {
                     setActivePageId(matched.id);
                     setElements(matched.elements || []);
                 }
-            } else if (e.data?.type === "forge:preview:reload") {
-                setReloadToken((token) => token + 1);
+            } else if (command.type === "reload") {
+                setReloadTick((value) => value + 1);
             }
         };
 
         window.addEventListener("message", handleParentMessage);
         return () => window.removeEventListener("message", handleParentMessage);
-    }, [pages, activePageId]);
+    }, [pages, activePageId, isPreview]);
 
     useEffect(() => {
         const handlePopState = () => {
@@ -1338,8 +1449,15 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                 <div className="text-5xl mb-4">🌐</div>
                 <h1 className="text-2xl font-bold mb-2">This website is unavailable.</h1>
                 <p className="text-slate-500 max-w-md text-sm">
-                    The requested page cannot be found or is not currently published.
+                    {errorMessage !== "This website is unavailable."
+                        ? errorMessage
+                        : "The requested page cannot be found or is not currently published."}
                 </p>
+                {isPreview && (
+                    <p className="text-xs text-blue-600 mt-4 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                        Preview Mode: If this is a draft site, verify you are signed in as an owner or collaborator.
+                    </p>
+                )}
             </div>
         );
     }
@@ -1373,7 +1491,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             )}
 
             {/* Configured Global Header */}
-            {sitePartsState?.header?.elements && sitePartsState.header.elements.length > 0 && (sitePartsState.header.isEnabled ?? true) && (
+            {sitePartsState?.header?.elements && sitePartsState.header.elements.length > 0 && isSitePartEnabled(sitePartsState.header) && (
                 <header className="site-global-header w-full">
                     {sitePartsState.header.elements.map((el: EditorElement, index: number) => (
                         <RenderNode
@@ -1413,12 +1531,18 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                         {/* Desktop Header Navigation Links */}
                         <nav className="hidden sm:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
                             {pages.map((p) => {
-                                const isCurrent = activePageId === p.id;
+                                const isCurrent = !isSinglePost && !isPostArchive && activePageId === p.id;
                                 return (
                                     <button
                                         key={p.id}
                                         type="button"
-                                        onClick={() => handleSwitchPage(p)}
+                                        onClick={() => {
+                                            if (isSinglePost || isPostArchive) {
+                                                window.location.href = isPreview ? `/preview/site/${websiteId}` : `/site/${websiteId}`;
+                                            } else {
+                                                handleSwitchPage(p);
+                                            }
+                                        }}
                                         className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                             isCurrent
                                                 ? "bg-white text-blue-600 shadow-sm border border-slate-200/60 font-extrabold"
@@ -1429,6 +1553,18 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                                     </button>
                                 );
                             })}
+                            {availableCpts.length > 0 && pages.every(p => p.slug !== "/blog" && p.slug !== "blog") && (
+                                <Link
+                                    to={isPreview ? `/preview/site/${websiteId}/blog` : `/site/${websiteId}/blog`}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                        isPostArchive || isSinglePost
+                                            ? "bg-white text-blue-600 shadow-sm border border-slate-200/60 font-extrabold"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                                    }`}
+                                >
+                                    Blog
+                                </Link>
+                            )}
                         </nav>
 
                         {/* Mobile Hamburger Toggle Button */}
@@ -1445,14 +1581,18 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                     {mobileMenuOpen && (
                         <div className="sm:hidden border-t border-slate-200 bg-slate-50 p-3 space-y-1">
                             {pages.map((p) => {
-                                const isCurrent = activePageId === p.id;
+                                const isCurrent = !isSinglePost && !isPostArchive && activePageId === p.id;
                                 return (
                                     <button
                                         key={p.id}
                                         type="button"
                                         onClick={() => {
-                                            handleSwitchPage(p);
-                                            setMobileMenuOpen(false);
+                                            if (isSinglePost || isPostArchive) {
+                                                window.location.href = isPreview ? `/preview/site/${websiteId}` : `/site/${websiteId}`;
+                                            } else {
+                                                handleSwitchPage(p);
+                                                setMobileMenuOpen(false);
+                                            }
                                         }}
                                         className={`w-full text-left px-4 py-2 text-xs font-bold rounded-lg transition flex items-center justify-between ${
                                             isCurrent
@@ -1465,6 +1605,20 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
                                     </button>
                                 );
                             })}
+                            {availableCpts.length > 0 && pages.every(p => p.slug !== "/blog" && p.slug !== "blog") && (
+                                <Link
+                                    to={isPreview ? `/preview/site/${websiteId}/blog` : `/site/${websiteId}/blog`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className={`w-full text-left px-4 py-2 text-xs font-bold rounded-lg transition flex items-center justify-between ${
+                                        isPostArchive || isSinglePost
+                                            ? "bg-blue-600 text-white font-extrabold shadow-sm"
+                                            : "text-slate-700 hover:bg-slate-200/70"
+                                    }`}
+                                >
+                                    <span>Blog</span>
+                                    <span className="text-[10px] opacity-70 font-mono">/blog</span>
+                                </Link>
+                            )}
                         </div>
                     )}
                 </header>
@@ -1472,22 +1626,212 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
 
             {/* F-361: Semantic Main Container */}
             <main id="main-content" className="w-full">
-                {elements.map((el, index) => (
-                    <RenderNode
-                        key={el.id}
-                        el={el}
-                        isCritical={index === 0}
-                        activeBreakpointId={activeBreakpointId}
-                        breakpoints={breakpoints}
-                        globalSettings={globalSettings}
-                        elementClassMap={elementClassMap}
-                        apiUrl={apiUrl}
-                        allElements={elements}
-                        pages={pages}
-                        onSwitchPage={handleSwitchPage}
-                        websiteId={websiteId}
-                    />
-                ))}
+                {isSinglePost ? (
+                    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                        {cptLoading ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                                <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
+                                <p className="text-sm font-medium">Loading article...</p>
+                            </div>
+                        ) : cptError ? (
+                            <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center max-w-lg mx-auto">
+                                <div className="text-4xl mb-3">📰</div>
+                                <h2 className="text-lg font-bold text-rose-800 mb-2">Article Unavailable</h2>
+                                <p className="text-sm text-rose-600 mb-6">{cptError}</p>
+                                <Link
+                                    to={isPreview ? `/preview/site/${websiteId}/blog` : `/site/${websiteId}/blog`}
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
+                                >
+                                    ← Back to Blog
+                                </Link>
+                            </div>
+                        ) : cptSingle?.entry ? (
+                            <article className="space-y-8">
+                                <nav className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                                    <Link to={isPreview ? `/preview/site/${websiteId}` : `/site/${websiteId}`} className="hover:text-slate-700 transition">
+                                        Home
+                                    </Link>
+                                    <span>/</span>
+                                    <Link to={isPreview ? `/preview/site/${websiteId}/blog` : `/site/${websiteId}/blog`} className="hover:text-slate-700 transition">
+                                        {cptSingle.postType?.name || "Blog"}
+                                    </Link>
+                                    <span>/</span>
+                                    <span className="text-slate-800 truncate max-w-xs">{cptSingle.entry.title}</span>
+                                </nav>
+
+                                <header className="space-y-4">
+                                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                                        {cptSingle.entry.title}
+                                    </h1>
+
+                                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-2 border-b border-slate-100 pb-6">
+                                        {(cptSingle.entry.author?.fullName || cptSingle.entry.values?.author) && (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shadow-sm">
+                                                    {(cptSingle.entry.author?.fullName || cptSingle.entry.values?.author || "A").charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="font-semibold text-slate-800">
+                                                    {cptSingle.entry.author?.fullName || cptSingle.entry.values?.author}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <span>•</span>
+                                        <time dateTime={cptSingle.entry.createdAt}>
+                                            {new Date(cptSingle.entry.createdAt).toLocaleDateString("en-US", {
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                            })}
+                                        </time>
+                                        {cptSingle.entry.status === "PUBLISHED" && (
+                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold tracking-wide uppercase border border-emerald-200">
+                                                Published
+                                            </span>
+                                        )}
+                                    </div>
+                                </header>
+
+                                {(cptSingle.entry.values?.cover_image || cptSingle.entry.values?.thumbnail) && (
+                                    <div className="rounded-3xl overflow-hidden shadow-md border border-slate-100 bg-slate-50 max-h-[480px]">
+                                        <img
+                                            src={cptSingle.entry.values.cover_image || cptSingle.entry.values.thumbnail}
+                                            alt={cptSingle.entry.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                )}
+
+                                <div
+                                    className="prose prose-slate prose-lg max-w-none text-slate-700 leading-relaxed space-y-4 pt-2"
+                                    dangerouslySetInnerHTML={{
+                                        __html: sanitizeHtml(
+                                            cptSingle.entry.values?.content ||
+                                            cptSingle.entry.values?.body ||
+                                            cptSingle.entry.values?.description ||
+                                            "<p class='text-slate-400 italic'>No content provided for this entry.</p>"
+                                        ),
+                                    }}
+                                />
+
+                                <div className="pt-10 border-t border-slate-200/80 flex items-center justify-between">
+                                    <Link
+                                        to={isPreview ? `/preview/site/${websiteId}/blog` : `/site/${websiteId}/blog`}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition"
+                                    >
+                                        ← Back to all posts
+                                    </Link>
+                                </div>
+                            </article>
+                        ) : null}
+                    </div>
+                ) : isPostArchive ? (
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                        <header className="mb-12 text-center max-w-2xl mx-auto">
+                            <span className="text-xs font-black uppercase tracking-widest text-blue-600 mb-2 block">
+                                Editorial & Insights
+                            </span>
+                            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mb-3">
+                                {cptArchive?.postType?.name || "Blog Posts"}
+                            </h1>
+                            <p className="text-base text-slate-500">
+                                {cptArchive?.postType?.description || "Browse our latest published articles, guides, and announcements."}
+                            </p>
+                        </header>
+
+                        {cptLoading ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                                <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
+                                <p className="text-sm font-medium">Loading articles...</p>
+                            </div>
+                        ) : cptError ? (
+                            <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center max-w-lg mx-auto">
+                                <div className="text-4xl mb-3">⚠️</div>
+                                <h2 className="text-lg font-bold text-rose-800 mb-2">Unable to Load Blog</h2>
+                                <p className="text-sm text-rose-600">{cptError}</p>
+                            </div>
+                        ) : !cptArchive?.data?.length ? (
+                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-16 text-center max-w-md mx-auto">
+                                <div className="text-4xl mb-3">📝</div>
+                                <h3 className="text-base font-bold text-slate-800 mb-1">No articles published yet</h3>
+                                <p className="text-xs text-slate-500">Articles published in the CMS will appear here automatically.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {cptArchive.data.map((entry: any) => {
+                                    const coverImg = entry.values?.cover_image || entry.values?.thumbnail;
+                                    const rawContent = entry.values?.content || entry.values?.body || "";
+                                    const excerpt = rawContent.replace(/<[^>]*>/g, "").slice(0, 140) + (rawContent.length > 140 ? "..." : "");
+                                    const articleUrl = isPreview
+                                        ? `/preview/site/${websiteId}/blog/${entry.slug}`
+                                        : `/site/${websiteId}/blog/${entry.slug}`;
+
+                                    return (
+                                        <article
+                                            key={entry.id}
+                                            className="group bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs hover:shadow-md hover:border-slate-300 transition-all flex flex-col"
+                                        >
+                                            {coverImg && (
+                                                <Link to={articleUrl} className="block aspect-[16/9] overflow-hidden bg-slate-100">
+                                                    <img
+                                                        src={coverImg}
+                                                        alt={entry.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                                                    />
+                                                </Link>
+                                            )}
+                                            <div className="p-6 flex flex-col flex-1">
+                                                <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 mb-2">
+                                                    <time dateTime={entry.createdAt}>
+                                                        {new Date(entry.createdAt).toLocaleDateString("en-US", {
+                                                            month: "short",
+                                                            day: "numeric",
+                                                            year: "numeric",
+                                                        })}
+                                                    </time>
+                                                    {(entry.author?.fullName || entry.values?.author) && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span>{entry.author?.fullName || entry.values?.author}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <h2 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition mb-2 leading-snug">
+                                                    <Link to={articleUrl}>{entry.title}</Link>
+                                                </h2>
+                                                {excerpt && <p className="text-xs text-slate-500 line-clamp-3 mb-4 leading-relaxed">{excerpt}</p>}
+                                                <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                                                    <Link
+                                                        to={articleUrl}
+                                                        className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
+                                                    >
+                                                        Read article <span>→</span>
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    elements.map((el, index) => (
+                        <RenderNode
+                            key={el.id}
+                            el={el}
+                            isCritical={index === 0}
+                            activeBreakpointId={activeBreakpointId}
+                            breakpoints={breakpoints}
+                            globalSettings={globalSettings}
+                            elementClassMap={elementClassMap}
+                            apiUrl={apiUrl}
+                            allElements={elements}
+                            pages={pages}
+                            onSwitchPage={handleSwitchPage}
+                            websiteId={websiteId}
+                        />
+                    ))
+                )}
             </main>
 
             {/* F-364 & F-367 & F-374: Accessibility Visitor Widget */}
@@ -1504,7 +1848,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
             />
 
             {/* Configured Global Footer */}
-            {sitePartsState?.footer?.elements && sitePartsState.footer.elements.length > 0 && (sitePartsState.footer.isEnabled ?? true) && (
+            {sitePartsState?.footer?.elements && sitePartsState.footer.elements.length > 0 && isSitePartEnabled(sitePartsState.footer) && (
                 <footer className="site-global-footer w-full">
                     {sitePartsState.footer.elements.map((el: EditorElement, index: number) => (
                         <RenderNode

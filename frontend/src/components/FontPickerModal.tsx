@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, Star, Sparkles, Check, RefreshCw } from 'lucide-react';
+import { Search, X, Star, Sparkles, Check } from 'lucide-react';
 import { FontService } from '../features/fonts/FontService';
-import type { FontMetadata, FontCategory } from '../features/fonts/types';
-import { loadFontBatch, loadFontFamily } from '../features/fonts/FontLoader';
+import type { FontCategory } from '../features/fonts/types';
+import { loadFontBatch } from '../features/fonts/FontLoader';
 
 interface FontPickerModalProps {
   isOpen: boolean;
@@ -37,9 +37,10 @@ export const FontPickerModal: React.FC<FontPickerModalProps> = ({
   const [favTrigger, setFavTrigger] = useState(0);
 
   useEffect(() => {
-    if (isOpen) {
-      setSearchQuery('');
-    }
+    if (!isOpen) return;
+    // Reset the search after opening without synchronously cascading a render.
+    const resetId = window.setTimeout(() => setSearchQuery(''), 0);
+    return () => window.clearTimeout(resetId);
   }, [isOpen]);
 
   const fontPairings = useMemo(() => {

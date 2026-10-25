@@ -72,23 +72,20 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   // Sync external value changes (e.g., initial form load or reset)
   useEffect(() => {
-    if (value !== undefined) {
-      const parsed = parsePhoneNumber(value, defaultCountryIso);
-      setSelectedCountry((prevCountry) => {
-        // If parsed country differs from state (e.g. initial load with full international number)
-        if (parsed.country.iso !== prevCountry.iso && value.startsWith("+")) {
-          return parsed.country;
-        }
-        return prevCountry;
-      });
-
-      setNationalNumber((prevNum) => {
-        if (parsed.nationalNumber !== prevNum) {
-          return parsed.nationalNumber;
-        }
-        return prevNum;
-      });
-    }
+    const timer = window.setTimeout(() => {
+      if (value !== undefined) {
+        const parsed = parsePhoneNumber(value, defaultCountryIso);
+        setSelectedCountry((previous) =>
+          parsed.country.iso !== previous.iso && value.startsWith("+")
+            ? parsed.country
+            : previous
+        );
+        setNationalNumber((previous) =>
+          parsed.nationalNumber !== previous ? parsed.nationalNumber : previous
+        );
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [value, defaultCountryIso]);
 
   // Handle Country Selection

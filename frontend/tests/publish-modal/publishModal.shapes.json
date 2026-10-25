@@ -1,0 +1,566 @@
+{
+ "deployment": {
+  "customDomain": {},
+  "webhookUrl": {},
+  "provider": {},
+  "deployedAt": {}
+ },
+ "wpPages": {
+  "[]": {
+   "id": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "title": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "slug": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "status": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "parent": {},
+   "menuOrder": {},
+   "modified": {},
+   "content": {}
+  },
+  "#type": {
+   "array": {}
+  }
+ },
+ "wpMediaPagination": {
+  "page": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "perPage": {},
+  "total": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "totalPages": {
+   "#type": {
+    "text": {}
+   }
+  }
+ },
+ "selectedMediaDetail": {
+  "id": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "mimeType": {
+   "#type": {
+    "string": {}
+   }
+  },
+  "url": {},
+  "altText": {},
+  "title": {},
+  "filename": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "filesize": {}
+ },
+ "activeWpJob": {
+  "id": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "status": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "step": {},
+  "progressPercent": {}
+ },
+ "selectedRollbackTarget": {
+  "snapshotId": {},
+  "sourceVersion": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "publishedAt": {},
+  "wordpressPageId": {
+   "#type": {
+    "text": {}
+   }
+  }
+ },
+ "wpStatus": {
+  "isConnected": {},
+  "connection": {
+   "wpSiteName": {},
+   "siteUrl": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "pluginVersion": {},
+   "apiVersion": {},
+   "lastVerifiedAt": {},
+   "capabilities": {}
+  },
+  "mappingsCount": {}
+ },
+ "publishing": {
+  "status": {
+   "#type": {
+    "array": {}
+   }
+  },
+  "version": {},
+  "publishedAt": {}
+ },
+ "pages": {
+  "#type": {
+   "array": {}
+  },
+  "[]": {
+   "isHome": {},
+   "slug": {}
+  }
+ },
+ "deployments": {
+  "#type": {
+   "array": {}
+  },
+  "[]": {
+   "version": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "id": {},
+   "status": {},
+   "destinationType": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "createdAt": {},
+   "creator": {
+    "fullName": {}
+   }
+  }
+ },
+ "verificationDetails": {
+  "healthy": {},
+  "pluginVersion": {},
+  "apiVersion": {},
+  "wordpressVersion": {},
+  "responseTimeMs": {},
+  "capabilities": {},
+  "errors": {
+   "#type": {
+    "array": {}
+   },
+   "[]": {
+    "code": {
+     "#type": {
+      "text": {}
+     }
+    },
+    "message": {
+     "#type": {
+      "text": {}
+     }
+    }
+   }
+  }
+ },
+ "siteHealth": {
+  "overallStatus": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "checkedAt": {},
+  "score": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "responseTimeMs": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "authentication": {
+   "permissions": {}
+  },
+  "compatibility": {
+   "wordpressVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "minimumSupportedVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "status": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "connectorVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "apiVersion": {
+    "#type": {
+     "text": {}
+    }
+   }
+  },
+  "publishingReadiness": {
+   "status": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "canPublishPages": {},
+   "canUploadMedia": {},
+   "canUseGutenberg": {},
+   "canUpdateContent": {}
+  },
+  "capabilities": {
+   "#type": {
+    "object": {}
+   }
+  },
+  "security": {
+   "https": {}
+  },
+  "errors": {
+   "#type": {
+    "array": {}
+   },
+   "[]": {
+    "code": {
+     "#type": {
+      "text": {}
+     }
+    },
+    "message": {
+     "#type": {
+      "text": {}
+     }
+    }
+   }
+  },
+  "warnings": {
+   "#type": {
+    "array": {}
+   },
+   "[]": {
+    "code": {
+     "#type": {
+      "text": {}
+     }
+    },
+    "message": {
+     "#type": {
+      "text": {}
+     }
+    }
+   }
+  },
+  "recommendations": {
+   "#type": {
+    "array": {}
+   },
+   "[]": {}
+  }
+ },
+ "siteInfo": {
+  "general": {
+   "siteUrl": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "homeUrl": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "wordpressVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "locale": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "language": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "timezone": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "restApiStatus": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "multisiteStatus": {}
+  },
+  "connector": {
+   "connectorVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "apiVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "responseTimeMs": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "lastVerifiedAt": {}
+  },
+  "theme": {
+   "name": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "version": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "themeType": {},
+   "parentTheme": {}
+  },
+  "capabilities": {}
+ },
+ "wpPagePublishStatus": {
+  "state": {},
+  "wordpressUrl": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "lastPublishedAt": {},
+  "contentState": {},
+  "remoteState": {},
+  "wordpressPageId": {
+   "#type": {
+    "text": {}
+   }
+  }
+ },
+ "htmlPreviewData": {
+  "stats": {
+   "htmlSizeBytes": {},
+   "cssSizeBytes": {},
+   "sanitizationWarnings": {
+    "#type": {
+     "array": {}
+    }
+   }
+  },
+  "htmlHash": {
+   "#type": {
+    "string": {}
+   }
+  },
+  "mediaCount": {},
+  "blockStats": {
+   "blocksCount": {},
+   "nestedBlocksCount": {},
+   "markupSizeBytes": {},
+   "sanitizationWarnings": {
+    "#type": {
+     "array": {}
+    }
+   }
+  },
+  "gutenbergHash": {
+   "#type": {
+    "string": {}
+   }
+  }
+ },
+ "wpPublishResult": {
+  "action": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "wordpressPageId": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "publishedAt": {},
+  "url": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "warnings": {
+   "#type": {
+    "array": {}
+   },
+   "[]": {
+    "message": {
+     "#type": {
+      "text": {}
+     }
+    }
+   }
+  }
+ },
+ "wpJobs": {
+  "#type": {
+   "array": {}
+  },
+  "[]": {
+   "id": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "status": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "payload": {
+    "pageId": {}
+   },
+   "createdAt": {},
+   "attempts": {},
+   "maxAttempts": {},
+   "lastError": {
+    "#type": {
+     "text": {}
+    }
+   }
+  }
+ },
+ "wpRollbackResult": {
+  "wordpressPageId": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "publishedAt": {},
+  "status": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "url": {
+   "#type": {
+    "text": {}
+   }
+  }
+ },
+ "wpRollbackTargets": {
+  "#type": {
+   "array": {}
+  },
+  "[]": {
+   "snapshotId": {},
+   "sourceVersion": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "title": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "publishedAt": {},
+   "elementCount": {},
+   "slug": {
+    "#type": {
+     "text": {}
+    }
+   }
+  }
+ },
+ "mediaUploadSuccess": {
+  "id": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "url": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "filename": {
+   "#type": {
+    "text": {}
+   }
+  },
+  "mimeType": {
+   "#type": {
+    "text": {}
+   }
+  }
+ },
+ "wpMediaList": {
+  "#type": {
+   "array": {}
+  },
+  "[]": {
+   "id": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "mimeType": {
+    "#type": {
+     "string": {}
+    }
+   },
+   "url": {},
+   "altText": {},
+   "title": {},
+   "filename": {
+    "#type": {
+     "text": {}
+    }
+   },
+   "caption": {},
+   "description": {}
+  }
+ }
+}

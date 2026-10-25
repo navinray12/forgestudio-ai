@@ -11,7 +11,9 @@ import {
   buildSyncBaseline,
   hashPage,
   hashSharedParts,
-  isRecognizedPageEntry,
+  normalizePageSourcePath,
+  pageRouteIdentity,
+  resolvePageSourceTarget,
   parseEditorDocument,
   toProjectFramework,
   RegisteredPage,
@@ -458,13 +460,21 @@ export async function syncSourceToVisualWebsite(
   authorId?: string,
   options: CodeSyncOptions = {}
 ): Promise<VisualCodeSyncResult> {
-  const cleanPath = sanitizeAndNormalizePath(filePath);
-  const file = await readFile(projectId, cleanPath);
+  const relativePath = normalizePageSourcePath(filePath);
+  if (!relativePath) throw new AppError("Expected a safe project-relative source path", 422, "INVALID_PAGE_SOURCE_PATH");
+  const cleanPath = sanitizeAndNormalizePath(relativePath);
+  if (options.resolve !== undefined && options.resolve !== "code" && options.resolve !== "visual") {
+    throw new AppError("Choose code or visual to resolve a sync conflict", 422, "INVALID_SYNC_RESOLUTION");
+  }
   const project = await db.forgeProject.findUnique({ where: { id: projectId } });
-  const website = await db.website.findUnique({ where: { id: websiteId } });
-
   if (!project) throw new AppError("Project not found", 404, "NOT_FOUND");
+  // This relationship check supplements, rather than replaces, caller authorization.
+  if (project.websiteId !== websiteId) {
+    throw new AppError("Website is not bound to this project", 403, "PROJECT_WEBSITE_MISMATCH");
+  }
+  const website = await db.website.findUnique({ where: { id: websiteId } });
   if (!website) throw new AppError("Associated website not found", 404, "NOT_FOUND");
+  const file = await readFile(projectId, cleanPath);
 
   const editorData = parseEditorDocument(website.editorData);
   const framework = toProjectFramework(project.framework);
@@ -513,26 +523,33 @@ export async function syncSourceToVisualWebsite(
     return { compiled, updatedFiles };
   };
 
-  let page = buildPageRegistry(editorData, framework).find((p) => p.filePath === cleanPath);
-  const pageEntry = !page ? isRecognizedPageEntry(cleanPath, framework) : null;
-  if (!page && pageEntry && pageEntry.isPage) {
-    page = buildPageRegistry(editorData, framework).find(
-      (p) =>
-        p.routePath.toLowerCase() === pageEntry.routePath.toLowerCase() ||
-        p.name.toLowerCase() === pageEntry.pageName.toLowerCase() ||
-        p.filePath === pageEntry.targetFilePath
-    );
+  const target = resolvePageSourceTarget(buildPageRegistry(editorData, framework), cleanPath, framework);
+  if (target.status === "conflict") {
+    return result("conflict", {
+      message: target.message,
+      diagnostics: [{ severity: "error", code: target.code, message: target.message, filePath: cleanPath }],
+      conflicts: target.conflictingPages.map((other) => ({
+        filePath: cleanPath,
+        visualValue: { pageId: other.pageId, filePath: other.filePath, routePath: other.routePath },
+        sourceValue: { filePath: cleanPath },
+        reason: target.message,
+      })),
+    });
+  }
+  if (target.status === "invalid" || target.status === "unsupported") {
+    return result(target.status, {
+      message: target.message,
+      diagnostics: [{ severity: "error", code: target.code, message: target.message, filePath: cleanPath }],
+    });
+  }
+  if (target.status === "not-a-page") {
+    return result("not-a-page", { message: `${cleanPath} is not a registered page; source was preserved.` });
   }
 
-  if (!page) {
-    if (!pageEntry || !pageEntry.isPage) {
-      return result("not-a-page", {
-        message: `${cleanPath} is not a registered page, so there is nothing to reconcile with the Visual Editor.`,
-      });
-    }
-
-    // Dynamic Page Registration: The developer created a new page file in the workspace
-    // (e.g. about.tsx, src/pages/AboutPage.tsx, or app/about/page.tsx)
+  if (target.status === "new") {
+    const pageEntry = target.entry;
+    // Registration is a draft operation. It must not take ownership of a page
+    // with a matching title/URL or silently move source to a generated filename.
     const nextDoc = JSON.parse(JSON.stringify(editorData ?? {}));
     if (!Array.isArray(nextDoc.pages) || nextDoc.pages.length === 0) {
       const defaultTitle = String(nextDoc.pageSettings?.title || nextDoc.title || nextDoc.name || "Home");
@@ -562,7 +579,7 @@ export async function syncSourceToVisualWebsite(
     }
     const importedElements: any[] = imported.elements;
 
-    const pageId = `page_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const pageId = `page_${crypto.randomUUID()}`;
     const newPageObj = {
       id: pageId,
       name: pageEntry.pageTitle,
@@ -580,11 +597,33 @@ export async function syncSourceToVisualWebsite(
     };
     nextDoc.pages.push(newPageObj);
 
+    // The legacy emitter does not yet preserve every router's source layout.
+    // Check its plan BEFORE saving the document or changing file ownership.
+    const plannedPage = buildPageRegistry(nextDoc, framework).find((p) => p.pageId === pageId);
+    // React page-convention sources may be normalized to the canonical *Page.tsx
+    // filename by the emitter. The route identity must remain stable; a safe
+    // filename normalization is part of the supported import contract.
+    if (!plannedPage || pageRouteIdentity(plannedPage.routePath) !== pageRouteIdentity(pageEntry.routePath)) {
+      const message = "The current compiler would relocate this source or change its route. " +
+        "The file was preserved; register it only after a compatible source-layout adapter is available.";
+      return result("unsupported", {
+        message,
+        diagnostics: [{ severity: "error", code: "PAGE_SOURCE_LAYOUT_UNSUPPORTED", message, filePath: cleanPath }],
+      });
+    }
+
     let documentVersion: number;
     try {
       const saved = await saveDocumentFromCode(websiteId, actorId, nextDoc, website.documentVersion ?? 1);
       documentVersion = saved.documentVersion;
     } catch (err: any) {
+      if (err?.code === "DOCUMENT_VERSION_CONFLICT") {
+        const reason = "The website changed while the new source page was being registered. Neither version was overwritten.";
+        return result("conflict", {
+          message: reason,
+          conflicts: [{ filePath: cleanPath, visualValue: "newer visual document", sourceValue: "saved source", reason }],
+        });
+      }
       return result("error", {
         message: `Failed to register page ${pageEntry.pageTitle}: ${err?.message || "Document save error"}`,
       });
@@ -606,7 +645,7 @@ export async function syncSourceToVisualWebsite(
     }
 
     const registeredPage = buildPageRegistry(persistedDoc, framework).find(
-      (p) => p.pageId === pageId || p.routePath.toLowerCase() === pageEntry.routePath.toLowerCase()
+      (p) => p.pageId === pageId
     );
 
     return result("synced", {
@@ -620,10 +659,12 @@ export async function syncSourceToVisualWebsite(
     });
   }
 
+  const page = target.page;
   const baseline = metadata.visualSync || {};
   const previousEntry: CodeSyncEntry | undefined = metadata.codeSync?.[cleanPath];
-  // A held file was not regenerated by later visual saves, so the code it contains is still based
-  // on the page as it was when the hold started; the latest visual baseline is not its base.
+  // A held code file is based on the snapshot recorded when it first became
+  // unsupported/conflicted. Subsequent visual saves must not silently rebase
+  // that file or hide a two-sided edit conflict: the latest visual baseline is not its base.
   const basePageHash: string | undefined = previousEntry
     ? previousEntry.basePageHash
     : baseline.pages?.[page.key]?.hash;
@@ -661,7 +702,7 @@ export async function syncSourceToVisualWebsite(
   }
 
   // The visual page moved on after this code was generated: applying the code would undo that work
-  if (options.resolve !== "code" && options.resolve !== "overwrite") {
+  if (options.resolve !== "code") {
     const pageChanged = !!basePageHash && basePageHash !== hashPage(editorData, page.key);
     const sharedChanged = !!baseSharedHash && baseSharedHash !== hashSharedParts(editorData);
     if (pageChanged || sharedChanged) {

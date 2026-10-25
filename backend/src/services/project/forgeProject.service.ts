@@ -272,7 +272,11 @@ export async function getForgeProjectById(
   // Tenant / permission verification:
   // Allowed if owner, workspace member, or admin
   const isPrivileged = ["ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"].includes(user.role || "");
-  if (!isPrivileged && user.id && project.ownerId !== user.id) {
+  // Fail closed: a non-privileged user without a usable id must never skip the ownership check.
+  if (!isPrivileged && (typeof user.id !== "string" || user.id === "")) {
+    throw new AppError("You do not have permission to view this project", 403, "FORBIDDEN");
+  }
+  if (!isPrivileged && project.ownerId !== user.id) {
     if (project.workspaceId) {
       const isMember = await db.workspaceMember?.findUnique?.({
         where: {
@@ -379,6 +383,11 @@ export async function syncProjectFromWebsite(
   }
 
   const pagePaths = new Set(Object.values(baseline.pages).map((page) => page.filePath));
+  // Hand-written page files held after an unsupported edit or conflict must never
+  // be unheld by an unrelated visual save. Only code reconciliation may release
+  // that hold after the caller explicitly resolves the source/document conflict.
+  const heldPaths = new Set(Object.keys(metadata.codeSync || {}));
+  const unheldPaths = new Set([...pagePaths].filter((path) => !heldPaths.has(path)));
 
   const result = await compileAndSyncProject(
     project.id,
@@ -389,7 +398,8 @@ export async function syncProjectFromWebsite(
       slug: project.slug,
       framework,
     },
-    user.id
+    user.id,
+    { unholdPaths: unheldPaths }
   );
 
   if (!result.success) {
@@ -404,7 +414,7 @@ export async function syncProjectFromWebsite(
   await updateProjectMetadataAtomic(project.id, (current) => {
     let nextCodeSync = current.codeSync ? { ...current.codeSync } : undefined;
     if (nextCodeSync) {
-      for (const p of pagePaths) if (!heldBack.has(p)) delete nextCodeSync[p];
+      for (const p of unheldPaths) if (!heldBack.has(p)) delete nextCodeSync[p];
       if (Object.keys(nextCodeSync).length === 0) nextCodeSync = undefined;
     }
     current.visualSync = baseline;

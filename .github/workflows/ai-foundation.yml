@@ -39,18 +39,50 @@ jobs:
       - run: npm run build --prefix backend
       - name: AI and worker contracts (fixtures, no live provider requests)
         working-directory: backend
-        run: node --test dist/tests/ai-changeset-integration.test.js dist/tests/job-leases-integration.test.js dist/tests/ai-prompt-cleanup.test.js dist/tests/ai-site-brief.test.js dist/tests/ai-site-blueprint.test.js dist/tests/ai-site-repair.test.js
+        run: |
+          set -e
+          for test_file in src/tests/ai-changeset-integration.test.ts src/tests/job-leases-integration.test.ts src/tests/ai-prompt-cleanup.test.ts src/tests/ai-site-brief.test.ts src/tests/ai-site-blueprint.test.ts src/tests/ai-site-repair.test.ts; do
+            node --import tsx --test "$test_file"
+          done
+      - name: AI assistant and provider fallback regression tests
+        working-directory: backend
+        run: |
+          node --import tsx --test src/tests/assistant-intent-routing.test.ts
+          node --import tsx --test src/tests/ai-gateway-provider-fallback.test.ts
+      - name: Durable ApplicationSpec PostgreSQL contract
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/application-spec-persistence.integration.test.ts
+      - name: Full-stack generation failure and retry regression (disposable PostgreSQL)
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/app-generation.integration.test.ts
+      - name: ApplicationSpec full-contract digest and revision integrity
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point32-fullstack-application-spec.test.ts
+      - name: Page registry stable-identity and lifecycle contract tests
+        working-directory: backend
+        run: npx --no-install vitest run src/tests/point36-page-lifecycle.test.ts
+      - name: Schema Studio SQL safety regression tests
+        working-directory: backend
+        run: node --import tsx --test src/tests/schema-studio-ddl-validation.test.ts
       - name: Changed AI UI lint
         working-directory: frontend
         run: npx --no-install eslint src/features/ai/AiSiteAssistant.tsx src/features/ai/DesignAssistant.tsx src/features/ai/DesignProposalPreview.tsx src/features/editor-access/document-save-coordinator.ts
       - name: Design importer, provider boundaries and durable execution
         working-directory: backend
-        run: node --test dist/tests/ai-design.test.js dist/tests/ai-design-integration.test.js
+        run: |
+          set -e
+          for test_file in src/tests/ai-design.test.ts src/tests/ai-design-integration.test.ts; do
+            node --import tsx --test "$test_file"
+          done
       - name: Browser save coordinator ordering
         run: node --experimental-vm-modules --test tests/hardening/document-coordinator.test.mjs tests/hardening/design-styles.test.mjs
       - name: Existing workspace and document contracts on migrated schema
         working-directory: backend
-        run: node --test dist/tests/workspace-integration.test.js
+        run: |
+          set -e
+          for test_file in src/tests/workspace-integration.test.ts; do
+            node --import tsx --test "$test_file"
+          done
       - run: npm run build --prefix frontend
       - run: docker compose config --quiet
       - name: Install browser qualification tools
@@ -69,7 +101,7 @@ jobs:
           FORGE_BROWSER_FIXTURE_PATH: ${{ runner.temp }}/forge-design-browser.json
         shell: bash
         run: |
-          node backend/dist/tests/fixtures/design-browser-server.js > "$RUNNER_TEMP/forge-design-api.log" 2>&1 &
+          (cd backend && exec node --import tsx src/tests/fixtures/design-browser-server.ts) > "$RUNNER_TEMP/forge-design-api.log" 2>&1 &
           api_pid=$!
           npm --prefix frontend run preview -- --host 127.0.0.1 --port 55174 > "$RUNNER_TEMP/forge-design-ui.log" 2>&1 &
           ui_pid=$!

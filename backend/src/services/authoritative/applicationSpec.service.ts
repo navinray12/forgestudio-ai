@@ -231,8 +231,11 @@ export class ApplicationSpecService {
     if (!spec.applicationId) errors.push("applicationId is required");
     if (!spec.projectId) errors.push("projectId is required");
     if (!spec.tenantId) errors.push("tenantId is required");
-    if (typeof spec.revision !== "number" || spec.revision < 1) {
+    if (!Number.isSafeInteger(spec.revision) || spec.revision < 1) {
       errors.push("revision must be a positive integer");
+    }
+    if (!Number.isSafeInteger(spec.parentRevision) || spec.parentRevision < 0) {
+      errors.push("parentRevision must be a non-negative integer");
     }
 
     // Invariant 1: Must NOT contain raw credentials or customer row storage.
@@ -260,8 +263,20 @@ export class ApplicationSpecService {
     // Invariant 2: Entity & Field Identifiers must be stable and prefixed
     const entityIds = new Set<string>();
     const entityNames = new Set<string>();
+    const physicalTables = new Set<string>();
+    const isSafeSqlIdentifier = (value: unknown): value is string =>
+      typeof value === "string" && /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(value);
 
     for (const entity of spec.entities || []) {
+      if (!isSafeSqlIdentifier(entity.physicalTableName)) {
+        errors.push(`Entity '${entity.name}' has an invalid physical table identifier.`);
+      } else {
+        const physicalTable = entity.physicalTableName.toLowerCase();
+        if (physicalTables.has(physicalTable)) {
+          errors.push(`Duplicate physical table '${entity.physicalTableName}' detected.`);
+        }
+        physicalTables.add(physicalTable);
+      }
       if (!entity.id || !entity.id.startsWith("ent_")) {
         errors.push(`Entity '${entity.name}' has invalid ID '${entity.id}'. Must start with 'ent_'.`);
       }
@@ -276,6 +291,8 @@ export class ApplicationSpecService {
       entityNames.add(entity.name.toLowerCase());
 
       const fieldIds = new Set<string>();
+      const fieldNames = new Set<string>();
+      const physicalColumns = new Set<string>();
       for (const field of entity.fields || []) {
         if (!field.id || !field.id.startsWith("fld_")) {
           errors.push(`Field '${field.name}' in entity '${entity.name}' must have stable ID starting with 'fld_'.`);
@@ -284,6 +301,38 @@ export class ApplicationSpecService {
           errors.push(`Duplicate field ID '${field.id}' in entity '${entity.name}'.`);
         }
         fieldIds.add(field.id);
+        const logicalName = field.name.toLowerCase();
+        const physicalName = field.physicalColumnName.toLowerCase();
+        if (!isSafeSqlIdentifier(field.physicalColumnName)) {
+          errors.push(`Field '${field.name}' in entity '${entity.name}' has an invalid physical column identifier.`);
+        }
+        if (field.type === "enum" && (!Array.isArray(field.enumOptions) || field.enumOptions.length === 0 || new Set(field.enumOptions).size !== field.enumOptions.length)) {
+          errors.push(`Enum field '${field.name}' must declare distinct non-empty enumOptions.`);
+        }
+        if (fieldNames.has(logicalName)) {
+          errors.push(`Duplicate field name '${field.name}' in entity '${entity.name}'.`);
+        }
+        if (physicalColumns.has(physicalName)) {
+          errors.push(`Duplicate physical column '${field.physicalColumnName}' in entity '${entity.name}'.`);
+        }
+        fieldNames.add(logicalName);
+        physicalColumns.add(physicalName);
+      }
+      const indexNames = new Set<string>();
+      for (const index of entity.indexes || []) {
+        if (!isSafeSqlIdentifier(index.name) || indexNames.has(index.name.toLowerCase())) {
+          errors.push(`Entity '${entity.name}' has a duplicate or invalid index name '${index.name}'.`);
+        }
+        indexNames.add(index.name.toLowerCase());
+        if (!Array.isArray(index.fields) || index.fields.length === 0 || new Set(index.fields).size !== index.fields.length) {
+          errors.push(`Index '${index.name}' must use distinct, non-empty fields.`);
+        } else {
+          for (const fieldName of index.fields) {
+            if (!entity.fields.some((field) => field.id === fieldName || field.name === fieldName || field.physicalColumnName === fieldName)) {
+              errors.push(`Index '${index.name}' references unknown field '${fieldName}'.`);
+            }
+          }
+        }
       }
     }
 
@@ -295,6 +344,10 @@ export class ApplicationSpecService {
       if (!entityIds.has(rel.targetEntityId)) {
         errors.push(`Relationship '${rel.name}' references non-existent targetEntityId '${rel.targetEntityId}'.`);
       }
+      const source = spec.entities.find((entity) => entity.id === rel.sourceEntityId);
+      if (source && !source.fields.some((field) => field.id === rel.foreignKeyField || field.name === rel.foreignKeyField || field.physicalColumnName === rel.foreignKeyField)) {
+        errors.push(`Relationship '${rel.name}' references unknown foreignKeyField '${rel.foreignKeyField}'.`);
+      }
     }
 
     // Invariant 4: Tenancy enforcement - All entities must support tenant scoping under MULTI_TENANT strategies
@@ -304,7 +357,7 @@ export class ApplicationSpecService {
           (f) => f.name.toLowerCase() === "tenantid" || f.physicalColumnName.toLowerCase() === "tenant_id"
         );
         if (!hasTenantField) {
-          warnings.push(`Entity '${entity.name}' lacks explicit tenantId field under MULTI_TENANT_ROW strategy.`);
+          errors.push(`Entity '${entity.name}' must declare a tenantId field under MULTI_TENANT_ROW strategy.`);
         }
       }
     }
@@ -325,6 +378,33 @@ export class ApplicationSpecService {
       }
     }
 
+    // Prevent unresolved or misdirected authorization and UI bindings from
+    // becoming part of a supposedly valid application contract.
+    const actorIds = new Set((spec.actors || []).map((actor) => actor.id));
+    for (const policy of spec.policies || []) {
+      if (!actorIds.has(policy.actorId)) {
+        errors.push(`Policy '${policy.name}' references unknown actorId '${policy.actorId}'.`);
+      }
+      if (!entityIds.has(policy.resourceEntityId)) {
+        errors.push(`Policy '${policy.name}' references unknown resourceEntityId '${policy.resourceEntityId}'.`);
+      }
+    }
+    for (const binding of spec.frontendBindings || []) {
+      if (!opIds.has(binding.operationId)) {
+        errors.push(`Frontend binding '${binding.id}' references unknown operationId '${binding.operationId}'.`);
+      }
+    }
+    for (const op of spec.operations || []) {
+      if (op.targetEntityId && !entityIds.has(op.targetEntityId)) {
+        errors.push(`Operation '${op.name}' references unknown targetEntityId '${op.targetEntityId}'.`);
+      }
+    }
+    for (const retention of spec.retentionPolicies || []) {
+      if (!entityIds.has(retention.entityId)) {
+        errors.push(`Retention policy references unknown entityId '${retention.entityId}'.`);
+      }
+    }
+
     return {
       valid: errors.length === 0,
       errors,
@@ -337,27 +417,18 @@ export class ApplicationSpecService {
    * Deterministic SHA-256 digest of an ApplicationSpec
    */
   public static computeDigest(spec: ApplicationSpec): string {
-    const canonical = JSON.stringify({
-      schemaVersion: spec.schemaVersion,
-      applicationId: spec.applicationId,
-      projectId: spec.projectId,
-      tenantId: spec.tenantId,
-      revision: spec.revision,
-      frameworkProfile: spec.frameworkProfile,
-      identityStrategy: spec.identityStrategy,
-      requirementIds: [...spec.requirementIds].sort(),
-      entities: spec.entities.map((e) => ({
-        id: e.id,
-        name: e.name,
-        tableName: e.physicalTableName,
-        fields: e.fields.map((f) => ({ id: f.id, name: f.name, type: f.type })),
-      })),
-      operations: spec.operations.map((o) => ({
-        id: o.id,
-        name: o.name,
-        method: o.method,
-        routePath: o.routePath,
-      })),
+    // The release identity must cover the ENTIRE authoritative spec, including
+    // policies, relationships, job behavior, retention, bindings and defaults.
+    // Sorting object keys makes logically identical JSON inputs hash identically;
+    // array order remains part of the explicit contract.
+    const canonical = JSON.stringify(spec, (_key, value: unknown) => {
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        return Object.fromEntries(
+          Object.entries(value as Record<string, unknown>)
+            .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        );
+      }
+      return value;
     });
 
     return crypto.createHash("sha256").update(canonical).digest("hex");
@@ -384,7 +455,31 @@ export class ApplicationSpecService {
     const history = this.specStore.get(spec.applicationId) || [];
     const latest = history[history.length - 1];
 
+    if (!latest) {
+      // A new application must start from the genesis checkpoint; accepting an
+      // arbitrary later revision would create an unverifiable history gap.
+      if (spec.revision !== 1 || spec.parentRevision !== 0) {
+        throw new AppError(
+          "The initial application revision must be 1 with parentRevision 0",
+          400,
+          "INVALID_INITIAL_REVISION"
+        );
+      }
+    }
+
     if (latest) {
+      // The application ID is one authority: never let a subsequent revision
+      // silently move that authority across projects or tenant boundaries.
+      if (spec.projectId !== latest.projectId || spec.tenantId !== latest.tenantId) {
+        throw new AppError(
+          "Application revision cannot change its project or tenant ownership",
+          409,
+          "APPLICATION_OWNERSHIP_CONFLICT"
+        );
+      }
+      if (spec.applicationId !== latest.applicationId) {
+        throw new AppError("Application identity cannot change across revisions", 409, "APPLICATION_IDENTITY_CONFLICT");
+      }
       if (spec.parentRevision !== latest.revision) {
         throw new AppError(
           `Revision conflict: expected parent revision ${latest.revision}, but received ${spec.parentRevision}`,
@@ -402,14 +497,17 @@ export class ApplicationSpecService {
     }
 
     const digest = this.computeDigest(spec);
-    history.push({ ...spec });
+    // Store an independent snapshot; callers must not be able to mutate the
+    // accepted revision (or a subsequent release's approval evidence).
+    const snapshot = structuredClone(spec);
+    history.push(snapshot);
     this.specStore.set(spec.applicationId, history);
 
     return {
       success: true,
       revision: spec.revision,
       digest,
-      spec,
+      spec: structuredClone(snapshot),
     };
   }
 
@@ -419,7 +517,92 @@ export class ApplicationSpecService {
   public static getLatestSpec(applicationId: string): ApplicationSpec | null {
     const history = this.specStore.get(applicationId);
     if (!history || history.length === 0) return null;
-    return history[history.length - 1];
+    return structuredClone(history[history.length - 1]);
+  }
+
+  /**
+   * Durable revision writer for the authoritative project-backed ApplicationSpec.
+   * This is an opt-in storage path while older synchronous callers are migrated;
+   * it never falls back to memory if PostgreSQL is unavailable.
+   *
+   * Application IDs are globally unique across projects. The transaction-wide
+   * lock serializes genesis and subsequent writes even when no history exists.
+   * A persisted revision is immutable: retries must read the existing record
+   * rather than silently overwriting it.
+   */
+  public static async commitRevisionPersisted(spec: ApplicationSpec): Promise<{
+    success: boolean;
+    revision: number;
+    digest: string;
+    spec: ApplicationSpec;
+  }> {
+    const validation = this.validateApplicationSpec(spec);
+    if (!validation.valid) {
+      throw new AppError(
+        `ApplicationSpec validation failed: ${validation.errors.join("; ")}`,
+        422,
+        "INVALID_APPLICATION_SPEC"
+      );
+    }
+    const { pgPool } = await import("../../config/prisma.js");
+    const client = await pgPool.connect();
+    try {
+      await client.query("BEGIN");
+      // Stable transaction-level advisory lock includes uncommitted genesis.
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [spec.applicationId]);
+      const { rows } = await client.query(
+        `SELECT "projectId", "tenantId", "revision" FROM forge_application_spec_revisions
+         WHERE "applicationId" = $1 ORDER BY "revision" DESC LIMIT 1 FOR UPDATE`,
+        [spec.applicationId]
+      );
+      const latest = rows[0] as { projectId: string; tenantId: string; revision: number } | undefined;
+      if (!latest) {
+        if (spec.revision !== 1 || spec.parentRevision !== 0) {
+          throw new AppError("The initial application revision must be 1 with parentRevision 0", 400, "INVALID_INITIAL_REVISION");
+        }
+      } else {
+        if (String(latest.projectId) !== spec.projectId || latest.tenantId !== spec.tenantId) {
+          throw new AppError("Application revision cannot change its project or tenant ownership", 409, "APPLICATION_OWNERSHIP_CONFLICT");
+        }
+        if (spec.parentRevision !== latest.revision || spec.revision !== latest.revision + 1) {
+          throw new AppError(`Revision conflict: current revision is ${latest.revision}`, 409, "REVISION_CONFLICT");
+        }
+      }
+      const snapshot = structuredClone(spec);
+      const digest = this.computeDigest(snapshot);
+      await client.query(
+        `INSERT INTO forge_application_spec_revisions
+         ("applicationId", "revision", "parentRevision", "projectId", "tenantId", "digest", "spec")
+         VALUES ($1, $2, $3, $4::uuid, $5, $6, $7::jsonb)`,
+        [spec.applicationId, spec.revision, spec.parentRevision, spec.projectId, spec.tenantId, digest, JSON.stringify(snapshot)]
+      );
+      await client.query("COMMIT");
+      return { success: true, revision: spec.revision, digest, spec: structuredClone(snapshot) };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Project- and tenant-scoped durable read. Never returns another tenant's spec. */
+  public static async getLatestSpecPersisted(
+    applicationId: string, projectId: string, tenantId: string
+  ): Promise<ApplicationSpec | null> {
+    const { pgPool } = await import("../../config/prisma.js");
+    const { rows } = await pgPool.query(
+      `SELECT "spec", "digest" FROM forge_application_spec_revisions
+       WHERE "applicationId" = $1 AND "projectId" = $2::uuid AND "tenantId" = $3
+       ORDER BY "revision" DESC LIMIT 1`,
+      [applicationId, projectId, tenantId]
+    );
+    if (!rows[0]) return null;
+    const snapshot = rows[0].spec as ApplicationSpec;
+    if (this.computeDigest(snapshot) !== rows[0].digest) {
+      throw new AppError("Stored application revision digest mismatch", 409, "APPLICATION_SPEC_INTEGRITY_ERROR");
+    }
+    return structuredClone(snapshot);
   }
 
   /**

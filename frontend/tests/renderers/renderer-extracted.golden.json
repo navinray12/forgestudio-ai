@@ -1,0 +1,560 @@
+{
+  "facebook-embed": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><div class=\"flex flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50/50 p-8 text-center max-w-lg w-full\"><svg class=\"h-6 w-6 text-blue-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"3\" stroke-width=\"2\"></rect><path stroke-width=\"2\" stroke-linecap=\"round\" d=\"M10 8h4v8M14 12h-4\"></path></svg><h4 class=\"mt-3 text-sm font-bold text-blue-900\">Facebook Embed Widget</h4><p class=\"mt-1 text-xs text-blue-700\">Enter a Facebook post or video URL in the Inspector panel to embed live content.</p></div></div>",
+    "tick": "ff2276f9303dd9d6",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "facebook-comments": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-xs overflow-hidden max-w-full\" style=\"width: 100%;\"><div class=\"flex items-center gap-2 border-b border-slate-100 pb-3 mb-3\"><svg class=\"h-6 w-6 text-blue-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z\"></path></svg><h4 class=\"text-xs font-bold text-slate-800\">Facebook Discussion &amp; Comments</h4></div><iframe title=\"Facebook Comments Plugin\" src=\"https://www.facebook.com/plugins/comments.php?href=https%3A%2F%2Ffacebook.com&amp;numposts=5&amp;width=100%25\" width=\"100%\" height=\"320\" style=\"border: medium; overflow: hidden;\" scrolling=\"no\" frameborder=\"0\"></iframe></div></div>",
+    "tick": "539520f9c2243b56",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "facebook-page": {
+    "markup": "<div class=\"w-full flex justify-center\"><div class=\"w-full max-w-md p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50/80 to-indigo-50/40 text-center flex flex-col items-center justify-center gap-3 shadow-xs\" style=\"border-color: rgb(191, 219, 254); border-radius: 16px;\"><div class=\"flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-md\"><svg class=\"h-6 w-6\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z\"></path></svg></div><div><h4 class=\"text-sm font-bold text-slate-800\">Facebook Page Embed</h4><p class=\"text-xs text-slate-500 mt-1 max-w-xs\">No Facebook Page URL configured. Please enter a valid URL (e.g. <span class=\"font-mono text-blue-600\">https://www.facebook.com/facebook</span>) in the inspector panel.</p></div></div></div>",
+    "tick": "c4275b763ab685ea",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "lottie": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><div class=\"relative overflow-hidden rounded-2xl border border-slate-100 bg-transparent flex items-center justify-center\" style=\"width: 280px; height: 280px;\"><div class=\"flex flex-col items-center justify-center p-6 text-center text-xs text-slate-500 bg-slate-50/80 rounded-2xl w-full h-full border border-dashed border-slate-300\"><svg class=\"h-6 w-6 text-teal-500\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z\"></path><path stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"></path></svg><span class=\"mt-2 font-bold text-slate-700\">Lottie Animation</span><span class=\"mt-1 text-[11px] text-slate-500\">Configure Lottie JSON URL in Inspector</span></div></div></div>",
+    "tick": "cf7cb94cc0fc63b1",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "basic-gallery": {
+    "markup": "<div class=\"w-full grid transition-all\" style=\"grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;\"><div class=\"group relative overflow-hidden bg-slate-100 shadow-xs\" style=\"border-radius: 12px;\"><img alt=\"One\" class=\"w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://example.com/1.jpg\"><div class=\"absolute inset-x-0 bottom-0 bg-slate-900/70 p-2 text-center text-white text-[11px] font-medium backdrop-blur-xs\">One</div></div><div class=\"group relative overflow-hidden bg-slate-100 shadow-xs\" style=\"border-radius: 12px;\"><img alt=\"Two\" class=\"w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://example.com/2.jpg\"><div class=\"absolute inset-x-0 bottom-0 bg-slate-900/70 p-2 text-center text-white text-[11px] font-medium backdrop-blur-xs\">Two</div></div></div>",
+    "tick": "e2ef4af6ff2bc476",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "reusable": {
+    "markup": "<div class=\"w-full rounded-2xl border border-purple-300 bg-purple-50/40 p-5 transition shadow-xs hover:border-purple-400\"><div class=\"flex items-center justify-between mb-3 border-b border-purple-200/60 pb-2\"><div class=\"flex items-center gap-2\"><span class=\"text-lg\">🧩</span><span class=\"text-xs font-bold text-purple-900\">Saved Reusable Component</span></div><span class=\"text-[9px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-200/60 px-2 py-0.5 rounded-full\">Reusable Block</span></div><div class=\"text-xs text-purple-800 leading-relaxed font-medium\">Dynamic Reusable Component instance rendered on canvas.</div></div>",
+    "tick": "f169d3bfd4f5025c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "stripe": {
+    "markup": "<div class=\"w-full flex justify-start text-left transition-all\"><button type=\"button\" class=\"inline-flex items-center rounded-xl font-sans shadow-xs transition-all duration-200 cursor-pointer hover:shadow-md active:scale-95 px-5 py-2.5 text-sm gap-2 font-semibold\" style=\"background-color: rgb(99, 91, 255); color: rgb(255, 255, 255);\"><svg class=\"h-6 w-6 text-indigo-600\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C17.75.526 15.006 0 12.18 0 6.877 0 3.12 2.766 3.12 7.37c0 7.159 9.852 6.002 9.852 9.094 0 .998-.87 1.48-2.138 1.48-2.584 0-5.58-1.127-7.464-2.227l-.927 5.626c2.083.998 5.145 1.657 8.391 1.657 5.61 0 9.389-2.659 9.389-7.397 0-7.742-10.247-6.529-10.247-9.453z\"></path></svg><span>Checkout with Stripe</span><span class=\"text-[11px] opacity-85\">($49.00)</span></button></div>",
+    "tick": "df456fd4a86de65b",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "df456fd4a86de65b"
+      ]
+    ]
+  },
+  "stripe@editor": {
+    "markup": "<div class=\"w-full flex justify-start text-left transition-all\"><button type=\"button\" class=\"inline-flex items-center rounded-xl font-sans shadow-xs transition-all duration-200 cursor-pointer hover:shadow-md active:scale-95 px-5 py-2.5 text-sm gap-2 font-semibold\" style=\"background-color: rgb(99, 91, 255); color: rgb(255, 255, 255);\"><svg class=\"h-6 w-6 text-indigo-600\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C17.75.526 15.006 0 12.18 0 6.877 0 3.12 2.766 3.12 7.37c0 7.159 9.852 6.002 9.852 9.094 0 .998-.87 1.48-2.138 1.48-2.584 0-5.58-1.127-7.464-2.227l-.927 5.626c2.083.998 5.145 1.657 8.391 1.657 5.61 0 9.389-2.659 9.389-7.397 0-7.742-10.247-6.529-10.247-9.453z\"></path></svg><span>Checkout with Stripe</span><span class=\"text-[11px] opacity-85\">($49.00)</span></button></div>",
+    "tick": "df456fd4a86de65b",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "df456fd4a86de65b"
+      ]
+    ]
+  },
+  "wc:WcProductPrice": {
+    "markup": "<div class=\"inline-flex items-baseline gap-2 font-bold\" aria-label=\"Price $199.99\"><span class=\"text-2xl font-extrabold text-emerald-600\">$199.99</span><span class=\"text-sm text-slate-400 line-through font-normal\">$249.99</span><span class=\"text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800\">In Stock</span></div>",
+    "tick": "219e54cc09838886",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProductImages": {
+    "markup": "<div class=\"relative group overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-xs space-y-3\"><div class=\"relative overflow-hidden rounded-xl bg-slate-50 aspect-square\"><img alt=\"Aura Pro Wireless Headphones\" class=\"h-full w-full object-cover transition-transform duration-300 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><span class=\"absolute top-3 left-3 px-3 py-1 bg-indigo-600 text-white font-extrabold text-[10px] uppercase rounded-full shadow-md\">Bestseller</span></div><div class=\"flex gap-2 justify-center\"><button type=\"button\" class=\"h-12 w-12 rounded-lg border-2 overflow-hidden transition border-indigo-600 scale-105\"><img alt=\"Thumbnail 1\" class=\"h-full w-full object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"></button><button type=\"button\" class=\"h-12 w-12 rounded-lg border-2 overflow-hidden transition border-slate-200 opacity-70 hover:opacity-100\"><img alt=\"Thumbnail 2\" class=\"h-full w-full object-cover\" src=\"https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400\"></button><button type=\"button\" class=\"h-12 w-12 rounded-lg border-2 overflow-hidden transition border-slate-200 opacity-70 hover:opacity-100\"><img alt=\"Thumbnail 3\" class=\"h-full w-full object-cover\" src=\"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400\"></button></div><div class=\"absolute inset-3 rounded-xl bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 p-2 z-10\"><label class=\"inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-800 rounded-lg text-xs font-bold shadow-md hover:bg-slate-100 cursor-pointer transition active:scale-95\"><span>📁 Upload Custom Product Image</span><input accept=\"image/*\" class=\"hidden\" type=\"file\"></label></div></div>",
+    "tick": "af0a1f336c3edf46",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "af0a1f336c3edf46"
+      ],
+      [
+        "1:button",
+        [],
+        "6e7648ffcfa28799"
+      ],
+      [
+        "2:button",
+        [],
+        "4ee02ea59be1c87a"
+      ]
+    ]
+  },
+  "wc:WcProductRating": {
+    "markup": "<div class=\"inline-flex items-center gap-1.5 font-bold\" aria-label=\"Rated 4.9 out of 5 stars from 142 reviews\"><div class=\"flex items-center text-amber-500 text-sm\" style=\"color: rgb(245, 158, 11);\">★★★★☆</div><span class=\"text-xs text-slate-900 font-extrabold\">4.9</span><span class=\"text-xs text-slate-500 font-medium\">(142 customer reviews)</span></div>",
+    "tick": "3c35f634b1a39153",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcBuilder": {
+    "markup": "<div class=\"rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 via-purple-50/60 to-white p-6 shadow-sm space-y-4\"><div class=\"flex items-center justify-between border-b border-indigo-100 pb-3\"><div class=\"flex items-center gap-3\"><span class=\"flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white text-xl font-extrabold shadow-md\">🏪</span><div><h3 class=\"font-extrabold text-sm text-slate-900\">WooCommerce Engine Core</h3><p class=\"text-[11px] text-slate-500\">Full Parity WooCommerce Architecture • 4 Products Active</p></div></div><span class=\"inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-extrabold text-emerald-800\"><span class=\"h-2 w-2 rounded-full bg-emerald-500 animate-ping\"></span> Synchronized</span></div><div class=\"grid grid-cols-3 gap-3 text-center text-xs font-bold\"><div class=\"rounded-xl bg-white p-3 border border-slate-200/80 shadow-2xs\"><span class=\"block text-lg\">📦</span> 4 Products</div><div class=\"rounded-xl bg-white p-3 border border-slate-200/80 shadow-2xs\"><span class=\"block text-lg\">🛒</span> 1 Cart Items</div><div class=\"rounded-xl bg-white p-3 border border-slate-200/80 shadow-2xs\"><span class=\"block text-lg\">💳</span> Live Checkout Ready</div></div></div>",
+    "tick": "155ed77230eb0c08",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProduct": {
+    "markup": "<div class=\"rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition space-y-3.5 max-w-sm\"><div class=\"relative overflow-hidden rounded-xl bg-slate-50 aspect-video\"><img alt=\"Aura Pro Wireless Headphones\" class=\"w-full h-full object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><span class=\"absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold uppercase\">Bestseller</span></div><h3 class=\"font-extrabold text-slate-900 text-sm line-clamp-1\">Aura Pro Wireless Headphones</h3><div class=\"flex items-center justify-between pt-1\"><span class=\"text-lg font-extrabold text-emerald-600\">$199.99</span><button type=\"button\" class=\"px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition active:scale-95\">Add to Cart</button></div></div>",
+    "tick": "686ee8216431984c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "686ee8216431984c"
+      ]
+    ]
+  },
+  "wc:WcProductStock": {
+    "markup": "<div style=\"background-color: rgb(236, 253, 245); color: rgb(4, 120, 87); border-color: rgb(167, 243, 208);\" class=\"inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-extrabold border\"><span style=\"background-color: rgb(4, 120, 87);\" class=\"h-2.5 w-2.5 rounded-full animate-pulse\"></span><span>In Stock (Ready to Ship)</span></div>",
+    "tick": "51ed707f4f50ddc5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProductMeta": {
+    "markup": "<div class=\"text-xs space-y-1.5 text-slate-600 border-t border-slate-200 pt-3\"><p><strong class=\"text-slate-900 font-extrabold\">SKU:</strong> <span class=\"font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md\">wc-prod-101</span></p><p><strong class=\"text-slate-900 font-extrabold\">Category:</strong> <button type=\"button\" class=\"text-indigo-600 font-bold hover:underline ml-1\">Audio &amp; Sound</button></p><p><strong class=\"text-slate-900 font-extrabold\">Tags:</strong> <span class=\"text-slate-500 font-medium\">Electronics • Wireless • Studio Audio</span></p></div>",
+    "tick": "e12ddc3421764cf3",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "e12ddc3421764cf3"
+      ]
+    ]
+  },
+  "wc:WcProductContent": {
+    "markup": "<div class=\"prose prose-slate text-xs leading-relaxed text-slate-600 bg-white p-4 rounded-xl border border-slate-100\"><p>Experience ultra-crisp active noise cancellation, 40-hour battery stamina, and custom-tuned acoustic drivers.</p></div>",
+    "tick": "53125e9f712e3f4a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcShortDescription": {
+    "markup": "<p class=\"text-xs text-slate-600 font-medium leading-normal italic border-l-2 border-indigo-500 pl-3 py-1\">Experience ultra-crisp active noise cancellation, 40-hour battery stamina, and custom-tuned acoustic drivers.</p>",
+    "tick": "ed28c4c2aac97d8b",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProductDataTabs": {
+    "markup": "<div class=\"rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4 text-xs\"><div class=\"flex border-b border-slate-200 gap-4 overflow-x-auto font-bold text-slate-600\"><button type=\"button\" class=\"pb-2.5 transition whitespace-nowrap border-b-2 cursor-pointer border-indigo-600 text-indigo-600 font-extrabold\">Description</button><button type=\"button\" class=\"pb-2.5 transition whitespace-nowrap border-b-2 cursor-pointer border-transparent hover:text-slate-900\">Additional Info</button><button type=\"button\" class=\"pb-2.5 transition whitespace-nowrap border-b-2 cursor-pointer border-transparent hover:text-slate-900\">Customer Reviews</button></div><div class=\"text-slate-600 leading-relaxed min-h-[60px]\">Experience ultra-crisp active noise cancellation, 40-hour battery stamina, and custom-tuned acoustic drivers.</div></div>",
+    "tick": "53d3154ff1fd3fd9",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "53d3154ff1fd3fd9"
+      ],
+      [
+        "1:button",
+        [],
+        "f3297a0e6f673216"
+      ],
+      [
+        "2:button",
+        [],
+        "594f46a535cec42a"
+      ]
+    ]
+  },
+  "wc:WcAdditionalInfo": {
+    "markup": "<div class=\"rounded-xl border border-slate-200 overflow-hidden bg-white text-xs shadow-2xs\"><table class=\"w-full text-left border-collapse\"><tbody><tr class=\"border-b border-slate-100 bg-slate-50/70\"><th class=\"p-3 font-bold text-slate-800 w-1/3\">Weight</th><td class=\"p-3 text-slate-600\">250 grams</td></tr><tr class=\"border-b border-slate-100 bg-white\"><th class=\"p-3 font-bold text-slate-800 w-1/3\">Dimensions</th><td class=\"p-3 text-slate-600\">18 x 15 x 8 cm</td></tr><tr class=\"border-b border-slate-100 bg-slate-50/70\"><th class=\"p-3 font-bold text-slate-800 w-1/3\">Material</th><td class=\"p-3 text-slate-600\">Anodized Aerospace Aluminum</td></tr><tr class=\"border-b border-slate-100 bg-white\"><th class=\"p-3 font-bold text-slate-800 w-1/3\">Connectivity</th><td class=\"p-3 text-slate-600\">Bluetooth 5.3 + 3.5mm AUX</td></tr><tr class=\"border-b border-slate-100 bg-slate-50/70\"><th class=\"p-3 font-bold text-slate-800 w-1/3\">Warranty</th><td class=\"p-3 text-slate-600\">2 Years Manufacturer Warranty</td></tr></tbody></table></div>",
+    "tick": "8a18930f36bbc1a5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcRelatedProducts": {
+    "markup": "<div class=\"space-y-3\"><h4 class=\"font-extrabold text-sm text-slate-900 flex items-center gap-2\"><span>🔄 Related Products</span></h4><div class=\"grid gap-3\" style=\"grid-template-columns: repeat(3, minmax(0, 1fr));\"><div class=\"rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs hover:shadow-md transition\"><img alt=\"Aura Pro Wireless Headphones\" class=\"h-24 w-full rounded-lg object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><p class=\"font-bold text-xs text-slate-900 line-clamp-1\">Aura Pro Wireless Headphones</p><div class=\"flex items-center justify-between\"><span class=\"text-xs font-extrabold text-emerald-600\">$199.99</span><button type=\"button\" class=\"px-2.5 py-1 rounded-md bg-indigo-600 text-white font-bold text-[10px] hover:bg-indigo-700 cursor-pointer\">Add</button></div></div><div class=\"rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs hover:shadow-md transition\"><img alt=\"ChronoSync Smart Fitness Watch\" class=\"h-24 w-full rounded-lg object-cover\" src=\"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800\"><p class=\"font-bold text-xs text-slate-900 line-clamp-1\">ChronoSync Smart Fitness Watch</p><div class=\"flex items-center justify-between\"><span class=\"text-xs font-extrabold text-emerald-600\">$149.50</span><button type=\"button\" class=\"px-2.5 py-1 rounded-md bg-indigo-600 text-white font-bold text-[10px] hover:bg-indigo-700 cursor-pointer\">Add</button></div></div><div class=\"rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs hover:shadow-md transition\"><img alt=\"Vortex Hi-Fi Bluetooth Speaker\" class=\"h-24 w-full rounded-lg object-cover\" src=\"https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800\"><p class=\"font-bold text-xs text-slate-900 line-clamp-1\">Vortex Hi-Fi Bluetooth Speaker</p><div class=\"flex items-center justify-between\"><span class=\"text-xs font-extrabold text-emerald-600\">$89.99</span><button type=\"button\" class=\"px-2.5 py-1 rounded-md bg-indigo-600 text-white font-bold text-[10px] hover:bg-indigo-700 cursor-pointer\">Add</button></div></div></div></div>",
+    "tick": "faea69f503485e4c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "faea69f503485e4c"
+      ],
+      [
+        "1:button",
+        [],
+        "faea69f503485e4c"
+      ],
+      [
+        "2:button",
+        [],
+        "faea69f503485e4c"
+      ]
+    ]
+  },
+  "wc:WcUpsells": {
+    "markup": "<div class=\"rounded-2xl border border-amber-300 bg-amber-50/80 p-4 space-y-2.5 text-xs shadow-2xs\"><div class=\"flex items-center justify-between text-amber-950 font-extrabold\"><span class=\"flex items-center gap-1.5\">🚀 Frequently Bought Together</span><span class=\"px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold\">Save 20%</span></div><p class=\"text-amber-900\">Add 2-Year Full Damage Protection &amp; Hard Travel Case bundle for only <strong>$29.99</strong>!</p><button type=\"button\" class=\"px-4 py-2 rounded-xl font-bold text-white transition active:scale-95 cursor-pointer bg-amber-600 hover:bg-amber-700\">Add Protection Bundle ($29.99)</button></div>",
+    "tick": "04bda88a287d148d",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "73c7f60bdeb3ef88"
+      ]
+    ]
+  },
+  "wc:WcProducts": {
+    "markup": "<div class=\"grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3\"><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"Aura Pro Wireless Headphones\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">Aura Pro Wireless Headphones</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Experience ultra-crisp active noise cancellation, 40-hour battery stamina, and custom-tuned acoustic drivers.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$199.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"ChronoSync Smart Fitness Watch\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">ChronoSync Smart Fitness Watch</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Track vital stats, continuous heart rate, AMOLED display touch controls, and 50m water resistance.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$149.50</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"Vortex Hi-Fi Bluetooth Speaker\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">Vortex Hi-Fi Bluetooth Speaker</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">360-degree room-filling acoustic bass, IPX7 waterproof casing, and seamless dual-pairing sync.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$89.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"ErgoLift Aluminum Laptop Stand\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">ErgoLift Aluminum Laptop Stand</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Precision CNC aluminum construction with ergonomic height adjustments and heat-dissipating airflow cutouts.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$49.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div></div>",
+    "tick": "facd56a1808face4",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "facd56a1808face4"
+      ],
+      [
+        "1:button",
+        [],
+        "facd56a1808face4"
+      ],
+      [
+        "2:button",
+        [],
+        "facd56a1808face4"
+      ],
+      [
+        "3:button",
+        [],
+        "facd56a1808face4"
+      ]
+    ]
+  },
+  "wc:WcCustomAddToCart": {
+    "markup": "<div class=\"inline-flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs\"><div class=\"flex items-center border border-slate-300 rounded-xl overflow-hidden bg-slate-50\"><button type=\"button\" class=\"px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-200 cursor-pointer\">-</button><span class=\"px-3 py-1.5 font-extrabold text-xs text-slate-900\">1</span><button type=\"button\" class=\"px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-200 cursor-pointer\">+</button></div><button type=\"button\" class=\"px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-extrabold text-xs shadow-md hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">🛒 Add (1) to Cart</button></div>",
+    "tick": "dc410fbf36a48681",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "dc410fbf36a48681"
+      ],
+      [
+        "1:button",
+        [],
+        "24ae4fd746107a8e"
+      ],
+      [
+        "2:button",
+        [],
+        "dc410fbf36a48681"
+      ]
+    ]
+  },
+  "wc:WcProductCategories": {
+    "markup": "<div class=\"flex flex-wrap gap-2\"><button type=\"button\" class=\"px-3.5 py-2 rounded-xl text-xs font-extrabold border transition active:scale-95 cursor-pointer bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200\">📂 Audio &amp; Sound</button><button type=\"button\" class=\"px-3.5 py-2 rounded-xl text-xs font-extrabold border transition active:scale-95 cursor-pointer bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200\">📂 Wearables</button><button type=\"button\" class=\"px-3.5 py-2 rounded-xl text-xs font-extrabold border transition active:scale-95 cursor-pointer bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200\">📂 Accessories</button><button type=\"button\" class=\"px-3.5 py-2 rounded-xl text-xs font-extrabold border transition active:scale-95 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm\">📂 All Products</button></div>",
+    "tick": "151ff7f40a90356b",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "151ff7f40a90356b"
+      ],
+      [
+        "1:button",
+        [],
+        "151ff7f40a90356b"
+      ],
+      [
+        "2:button",
+        [],
+        "151ff7f40a90356b"
+      ],
+      [
+        "3:button",
+        [],
+        "151ff7f40a90356b"
+      ]
+    ]
+  },
+  "wc:WcMenuCart": {
+    "markup": "<div class=\"relative inline-block\"><button type=\"button\" aria-label=\"View shopping cart\" class=\"inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-md hover:bg-slate-800 transition active:scale-95 cursor-pointer\"><span class=\"text-sm\">🛒</span><span>Cart</span><span class=\"flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-slate-950 font-black text-[10px]\">1</span><span class=\"text-slate-300 font-mono pl-1 border-l border-slate-700\">$199.99</span></button></div>",
+    "tick": "83b290ba966b2080",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "50c2799aba1014ff"
+      ]
+    ]
+  },
+  "wc:WcCheckout": {
+    "markup": "<form class=\"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 text-xs\"><h3 class=\"font-extrabold text-base text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2\"><span>💳</span> Live Store Checkout</h3><div class=\"space-y-3\"><label class=\"block space-y-1 font-bold text-slate-700\">Full Name<input required=\"\" class=\"w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-normal focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none\" type=\"text\" value=\"John Doe\"></label><label class=\"block space-y-1 font-bold text-slate-700\">Email Address<input required=\"\" class=\"w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-normal focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none\" type=\"email\" value=\"customer@forgestudio.com\"></label></div><div class=\"rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-1\"><div class=\"flex justify-between font-bold text-slate-700\"><span>Order Subtotal:</span><span>$199.99</span></div><div class=\"flex justify-between font-bold text-slate-700\"><span>Shipping:</span><span class=\"text-emerald-600 font-extrabold\">FREE</span></div><div class=\"flex justify-between font-extrabold text-sm text-slate-900 pt-1 border-t border-slate-200\"><span>Total Due:</span><span class=\"text-emerald-600\">$199.99</span></div></div><button type=\"submit\" style=\"background-color: rgb(16, 185, 129);\" class=\"w-full py-3.5 rounded-xl text-white font-extrabold text-xs shadow-md disabled:opacity-50 cursor-pointer active:scale-95 transition\">Place Order ($199.99)</button></form>",
+    "tick": "8fc8277dc8ea669f",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:input[text]",
+        [],
+        "43b0523dc6dfe77d"
+      ],
+      [
+        "1:input[email]",
+        [],
+        "3911d0cd178c8cc2"
+      ],
+      [
+        "2:button",
+        [],
+        "8fc8277dc8ea669f"
+      ]
+    ]
+  },
+  "wc:WcMyAccount": {
+    "markup": "<div class=\"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5 text-xs\"><div class=\"flex items-center gap-3 border-b border-slate-100 pb-4\"><span class=\"flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 font-extrabold text-indigo-700 text-xl shadow-xs\">👤</span><div><h4 class=\"font-extrabold text-slate-900 text-sm\">Customer Dashboard</h4><p class=\"text-slate-500 text-[11px]\">Welcome back! Manage your active orders and profile settings.</p></div></div><div class=\"flex gap-2\"><button type=\"button\" class=\"px-4 py-2 rounded-xl font-extrabold transition bg-indigo-600 text-white shadow-xs\">📦 Orders (0)</button><button type=\"button\" class=\"px-4 py-2 rounded-xl font-extrabold transition bg-slate-100 text-slate-700 hover:bg-slate-200\">📍 Shipping Addresses</button><button type=\"button\" class=\"px-4 py-2 rounded-xl font-extrabold transition bg-slate-100 text-slate-700 hover:bg-slate-200\">⚙️ Account Settings</button></div><div><p class=\"text-slate-500 italic py-3\">No orders placed yet.</p></div></div>",
+    "tick": "9133edbd12c12e42",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "9133edbd12c12e42"
+      ],
+      [
+        "1:button",
+        [],
+        "76662f258fd321f5"
+      ],
+      [
+        "2:button",
+        [],
+        "d1f93f1f1850601c"
+      ]
+    ]
+  },
+  "wc:WcPurchaseSummary": {
+    "markup": "<div class=\"rounded-2xl border border-emerald-300 bg-emerald-50/90 p-6 shadow-sm space-y-4 text-xs\"><div class=\"flex items-center gap-3 text-emerald-950 font-extrabold text-base border-b border-emerald-200 pb-3\"><span class=\"text-2xl\">🎉</span> Order Receipt &amp; Confirmation</div><p class=\"text-emerald-900 leading-relaxed font-medium\">Thank you for your purchase! Your order has been placed and is currently being processed by our fulfillment team.</p><div class=\"p-3 bg-white/60 rounded-xl text-slate-600 italic\">Sample Receipt: Order #WC-89240 • Total: $199.99</div></div>",
+    "tick": "1952a635ddee0104",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcNotices": {
+    "markup": "<div class=\"space-y-2\"><div class=\"rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900 font-bold flex items-center justify-between shadow-2xs\"><span class=\"flex items-center gap-2\"><span>ℹ️</span> Free Express Shipping on all orders over $50!</span></div></div>",
+    "tick": "f45990cdf9a51909",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcShopLayouts": {
+    "markup": "<div class=\"inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold\"><button type=\"button\" class=\"px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer bg-white text-indigo-600 shadow-xs font-extrabold\"><span>▦ Grid View</span></button><button type=\"button\" class=\"px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer text-slate-600 hover:bg-slate-200\"><span>☰ List View</span></button></div>",
+    "tick": "686e3f6b035180fd",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "686e3f6b035180fd"
+      ],
+      [
+        "1:button",
+        [],
+        "686e3f6b035180fd"
+      ]
+    ]
+  },
+  "wc:WcProductArchive": {
+    "markup": "<div class=\"space-y-4 rounded-2xl border border-slate-200 bg-slate-50/50 p-5\"><div class=\"flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 pb-3 gap-2\"><div><h3 class=\"font-extrabold text-base text-slate-900\">Product Archive Catalog</h3><p class=\"text-xs text-slate-500\">Showing 4 store items</p></div><div class=\"inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold\"><button type=\"button\" class=\"px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer bg-white text-indigo-600 shadow-xs font-extrabold\"><span>▦ Grid View</span></button><button type=\"button\" class=\"px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer text-slate-600 hover:bg-slate-200\"><span>☰ List View</span></button></div></div><div class=\"grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3\"><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"Aura Pro Wireless Headphones\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">Aura Pro Wireless Headphones</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Experience ultra-crisp active noise cancellation, 40-hour battery stamina, and custom-tuned acoustic drivers.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$199.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"ChronoSync Smart Fitness Watch\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">ChronoSync Smart Fitness Watch</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Track vital stats, continuous heart rate, AMOLED display touch controls, and 50m water resistance.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$149.50</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"Vortex Hi-Fi Bluetooth Speaker\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1545454675-3531b543be5d?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">Vortex Hi-Fi Bluetooth Speaker</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">360-degree room-filling acoustic bass, IPX7 waterproof casing, and seamless dual-pairing sync.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$89.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div><div class=\"rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3\"><img alt=\"ErgoLift Aluminum Laptop Stand\" class=\"w-full h-36 rounded-xl object-cover\" src=\"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=800\"><div class=\"flex-1 space-y-1\"><h4 class=\"font-extrabold text-xs text-slate-900 line-clamp-1\">ErgoLift Aluminum Laptop Stand</h4><p class=\"text-[11px] text-slate-500 line-clamp-1\">Precision CNC aluminum construction with ergonomic height adjustments and heat-dissipating airflow cutouts.</p><div class=\"flex items-center justify-between pt-1\"><span class=\"font-extrabold text-xs text-emerald-600\">$49.99</span><button type=\"button\" class=\"px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition active:scale-95 cursor-pointer\">Add to Cart</button></div></div></div></div></div>",
+    "tick": "92e3d940acf69e8c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "92e3d940acf69e8c"
+      ],
+      [
+        "1:button",
+        [],
+        "92e3d940acf69e8c"
+      ],
+      [
+        "2:button",
+        [],
+        "92e3d940acf69e8c"
+      ],
+      [
+        "3:button",
+        [],
+        "92e3d940acf69e8c"
+      ],
+      [
+        "4:button",
+        [],
+        "92e3d940acf69e8c"
+      ],
+      [
+        "5:button",
+        [],
+        "92e3d940acf69e8c"
+      ]
+    ]
+  },
+  "wc:WcProductPageTemplates": {
+    "markup": "<div class=\"rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-xs font-extrabold text-indigo-900 flex items-center gap-2\"><span>🔲 Single Product Template Activated • Auto-bound to product params</span></div>",
+    "tick": "095e8a6f7e96c58a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProductArchiveTemplates": {
+    "markup": "<div class=\"rounded-2xl border border-purple-200 bg-purple-50/60 p-4 text-xs font-extrabold text-purple-900 flex items-center gap-2\"><span>🗄️ Product Archive Template Activated • Full pagination &amp; filters enabled</span></div>",
+    "tick": "3fc62343e2c8f12d",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc:WcProductAddOns": {
+    "markup": "<div class=\"rounded-2xl border border-indigo-200/80 bg-white p-5 shadow-sm space-y-4 text-xs font-sans\"><div class=\"flex items-center justify-between border-b border-slate-100 pb-3\"><div class=\"flex items-center gap-2\"><span class=\"flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 text-base font-extrabold\">🧩</span><div><h4 class=\"font-extrabold text-slate-900 text-sm\">Custom Options &amp; Add-Ons</h4><p class=\"text-[11px] text-slate-500\">Configure personalization &amp; optional hardware extensions</p></div></div><div class=\"text-right\"><span class=\"text-[10px] text-slate-400 uppercase font-bold block\">Effective Price</span><span class=\"text-base font-extrabold text-emerald-600\">$199.99</span></div></div><div class=\"space-y-3\"><div class=\"p-3 rounded-xl border transition border-slate-200 bg-slate-50/50\"><label class=\"flex items-center justify-between cursor-pointer\"><div class=\"flex items-center gap-2.5\"><input class=\"rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer\" type=\"checkbox\"><span class=\"font-bold text-slate-800\">Luxury Gift Wrapping &amp; Ribbon</span></div><span class=\"font-extrabold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md text-[11px]\">+$4.99</span></label></div><div class=\"p-3 rounded-xl border transition border-slate-200 bg-slate-50/50\"><label class=\"flex items-center justify-between cursor-pointer\"><div class=\"flex items-center gap-2.5\"><input class=\"rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer\" type=\"checkbox\"><span class=\"font-bold text-slate-800\">2-Year Extended Hardware Protection</span></div><span class=\"font-extrabold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md text-[11px]\">+$19.99</span></label></div><div class=\"p-3 rounded-xl border transition border-slate-200 bg-slate-50/50\"><div class=\"space-y-1.5\"><div class=\"flex justify-between items-center\"><span class=\"font-bold text-slate-800\">Custom Laser Name Engraving</span><span class=\"font-extrabold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md text-[11px]\">+$9.99</span></div><input placeholder=\"Enter custom text...\" class=\"w-full p-2 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none\" type=\"text\" value=\"\"></div></div><div class=\"p-3 rounded-xl border transition border-slate-200 bg-slate-50/50\"><div class=\"space-y-1.5\"><div class=\"flex justify-between items-center\"><span class=\"font-bold text-slate-800\">Audio Cable Upgrade</span></div><select class=\"w-full p-2 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500\"><option value=\"\">-- Select an option (Standard) --</option><option value=\"Braided Silver-Plated 3.5mm (+$14.99)\">Braided Silver-Plated 3.5mm (+$14.99)</option><option value=\"Balanced 4.4mm Pentaconn (+$24.99)\">Balanced 4.4mm Pentaconn (+$24.99)</option></select></div></div></div><div class=\"border-t border-slate-100 pt-3 flex items-center justify-between gap-3\"><div class=\"flex items-center border border-slate-300 rounded-xl overflow-hidden bg-slate-50\"><button type=\"button\" class=\"px-2.5 py-1 text-slate-600 font-bold hover:bg-slate-200 cursor-pointer\">-</button><span class=\"px-2.5 py-1 font-extrabold text-slate-900\">1</span><button type=\"button\" class=\"px-2.5 py-1 text-slate-600 font-bold hover:bg-slate-200 cursor-pointer\">+</button></div><button type=\"button\" class=\"flex-1 py-3 px-4 rounded-xl text-white font-extrabold text-xs shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700\"><span>🛒</span><span>Add to Cart • $199.99</span></button></div></div>",
+    "tick": "3b08d9bdfa58a0d6",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:input[checkbox]",
+        [],
+        "a5011504b924e839"
+      ],
+      [
+        "1:input[checkbox]",
+        [],
+        "a020c9a732b5cd76"
+      ],
+      [
+        "2:input[text]",
+        [],
+        "bc6e535471e4e41a"
+      ],
+      [
+        "3:select",
+        [],
+        "843ee047f110e56c"
+      ],
+      [
+        "4:button",
+        [],
+        "3b08d9bdfa58a0d6"
+      ],
+      [
+        "5:button",
+        [],
+        "cb4e75b481e4490a"
+      ],
+      [
+        "6:button",
+        [],
+        "2f10014ba8e5601e"
+      ]
+    ]
+  }
+}

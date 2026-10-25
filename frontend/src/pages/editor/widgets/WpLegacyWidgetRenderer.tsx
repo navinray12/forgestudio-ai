@@ -1,5 +1,6 @@
 import React from "react";
 import type { EditorElement } from "../types";
+import { sanitizeHtml } from "../../../utils/sanitizeHtml";
 
 export const WpLegacyWidgetRenderer: React.FC<{ el: EditorElement }> = ({ el }) => {
   const widgetType = el.wpWidgetType || "calendar";
@@ -129,7 +130,7 @@ export const WpLegacyWidgetRenderer: React.FC<{ el: EditorElement }> = ({ el }) 
           <div
             className="prose prose-sm text-xs text-slate-700 max-w-none"
             dangerouslySetInnerHTML={{
-              __html: el.wpWidgetContent || "<p>Custom HTML WordPress Widget Content</p>"
+              __html: sanitizeHtml(el.wpWidgetContent || "<p>Custom HTML WordPress Widget Content</p>")
             }}
           />
         );

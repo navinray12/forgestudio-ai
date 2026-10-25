@@ -18,15 +18,16 @@ export function useGlobalElements() {
     try {
       const data = GlobalElementService.getGlobalElements();
       setGlobalElements(data);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load Global Elements.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load Global Elements.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchGlobalElements();
+    const timer = window.setTimeout(fetchGlobalElements, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchGlobalElements]);
 
   const filteredGlobalElements = useMemo(() => {
@@ -46,8 +47,8 @@ export function useGlobalElements() {
       const created = GlobalElementService.createGlobalElement(payload);
       setGlobalElements((prev) => [...prev, created]);
       return created;
-    } catch (err: any) {
-      setError(err?.message || "Failed to create Global Element.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create Global Element.");
       throw err;
     }
   };
@@ -58,8 +59,8 @@ export function useGlobalElements() {
       const updated = GlobalElementService.updateGlobalElement(id, payload);
       setGlobalElements((prev) => prev.map((item) => (item.id === id ? updated : item)));
       return updated;
-    } catch (err: any) {
-      setError(err?.message || "Failed to update Global Element.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to update Global Element.");
       throw err;
     }
   };
@@ -69,8 +70,8 @@ export function useGlobalElements() {
     try {
       GlobalElementService.deleteGlobalElement(id);
       setGlobalElements((prev) => prev.filter((item) => item.id !== id));
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete Global Element.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to delete Global Element.");
       throw err;
     }
   };

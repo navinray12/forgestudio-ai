@@ -1,0 +1,940 @@
+{
+  "resolveForgeLink": [
+    {
+      "resolvedUrl": "#",
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "#",
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "#features",
+      "isAnchor": true,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "#",
+      "isAnchor": true,
+      "isExternal": false,
+      "isUnsafe": true
+    },
+    {
+      "resolvedUrl": "#",
+      "isAnchor": true,
+      "isExternal": false,
+      "isUnsafe": true
+    },
+    {
+      "resolvedUrl": "https://example.com/x?y=1",
+      "isAnchor": false,
+      "isExternal": true,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "mailto:hi@example.com",
+      "isAnchor": false,
+      "isExternal": true,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "tel:+123",
+      "isAnchor": false,
+      "isExternal": true,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about#team",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about?ref=nav",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/pricing",
+      "targetPage": {
+        "id": "pricing",
+        "name": "Pricing",
+        "slug": "pricing"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "#",
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/",
+      "targetPage": {
+        "id": "home",
+        "name": "Home",
+        "slug": "/",
+        "isHome": true
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/site/site-1/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/unknown-page",
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    },
+    {
+      "resolvedUrl": "/about",
+      "targetPage": {
+        "id": "about",
+        "name": "About Us",
+        "slug": "/about"
+      },
+      "isAnchor": false,
+      "isExternal": false,
+      "isUnsafe": false
+    }
+  ],
+  "isSafeShareUrl": [
+    true,
+    true,
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true
+  ],
+  "getEmbedVideoUrl": [
+    "https://www.youtube.com/embed/abc123?autoplay=1&rel=0",
+    "https://www.youtube.com/embed/abc123?autoplay=1&rel=0",
+    "https://player.vimeo.com/video/123456?autoplay=1",
+    "https://example.com/video.mp4",
+    "",
+    "not a url"
+  ],
+  "getCurrentResolvedPageUrl": [
+    "http://localhost:3000/",
+    "http://localhost:3000/about",
+    "http://localhost:3000/",
+    "http://localhost:3000/"
+  ],
+  "resolveButtonHref": [
+    [
+      "/about",
+      "/about"
+    ],
+    [
+      "/about",
+      "/"
+    ],
+    [
+      "/",
+      "/"
+    ],
+    [
+      "https://example.com",
+      "https://example.com"
+    ],
+    [
+      "#contact",
+      "#contact"
+    ],
+    [
+      "/",
+      "/"
+    ]
+  ],
+  "getLinkedPageStatus": [
+    [
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      },
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      }
+    ],
+    [
+      {
+        "isLinkedToPage": true,
+        "pageExists": true,
+        "pageName": "About Us",
+        "pageSlug": "/about"
+      },
+      {
+        "isLinkedToPage": true,
+        "pageExists": false
+      }
+    ],
+    [
+      {
+        "isLinkedToPage": true,
+        "pageExists": false
+      },
+      {
+        "isLinkedToPage": true,
+        "pageExists": false
+      }
+    ],
+    [
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      },
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      }
+    ],
+    [
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      },
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      }
+    ],
+    [
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      },
+      {
+        "isLinkedToPage": false,
+        "pageExists": true
+      }
+    ]
+  ],
+  "getSocialShareUrl": [
+    "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2&quote=Hello%20%26%20bye",
+    "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fexample.com%2Fp",
+    "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fexample.com",
+    "https://twitter.com/intent/tweet?url=https%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2&text=Hello%20%26%20bye&hashtags=x%2Cy",
+    "https://twitter.com/intent/tweet?url=https%3A%2F%2Fexample.com%2Fp",
+    "https://twitter.com/intent/tweet?url=https%3A%2F%2Fexample.com",
+    "https://example.com/p?a=1&b=2",
+    "https://example.com/p",
+    "https://example.com",
+    "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2",
+    "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.com%2Fp",
+    "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.com",
+    "https://api.whatsapp.com/send?text=Hello%20%26%20bye%0Ahttps%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2",
+    "https://api.whatsapp.com/send?text=https%3A%2F%2Fexample.com%2Fp",
+    "https://api.whatsapp.com/send?text=https%3A%2F%2Fexample.com",
+    "https://example.com/p?a=1&b=2",
+    "https://example.com/p",
+    "https://example.com",
+    "https://pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2&description=Hello%20%26%20bye",
+    "https://pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.com%2Fp",
+    "https://pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.com",
+    "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2&title=Hello%20%26%20bye",
+    "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.com%2Fp",
+    "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.com",
+    "mailto:?subject=Hello%20%26%20bye&body=Hello%20%26%20bye%0A%0Ahttps%3A%2F%2Fexample.com%2Fp%3Fa%3D1%26b%3D2",
+    "mailto:?subject=Check%20out%20this%20page!&body=https%3A%2F%2Fexample.com%2Fp",
+    "mailto:?subject=Check%20out%20this%20page!&body=https%3A%2F%2Fexample.com",
+    "https://example.com/p?a=1&b=2",
+    "https://example.com/p",
+    "https://example.com",
+    "https://example.com/p?a=1&b=2",
+    "https://example.com/p",
+    "https://example.com",
+    "https://example.com/p?a=1&b=2",
+    "https://example.com/p",
+    "https://example.com"
+  ],
+  "resolveShareDestinationUrl": [
+    "http://localhost:3000/about",
+    "http://localhost:3000/",
+    "https://example.com/post",
+    "https://example.com/post",
+    "http://localhost:3000/about",
+    "http://localhost:3000/"
+  ],
+  "resolveShareAction": [
+    {
+      "network": "facebook",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "twitter",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://twitter.com/intent/tweet?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "x",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "linkedin",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.linkedin.com/sharing/share-offsite/?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "whatsapp",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://api.whatsapp.com/send?text=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "telegram",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "pinterest",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://pinterest.com/pin/create/button/?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "reddit",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.reddit.com/submit?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "email",
+      "actionType": "email",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "mailto:?subject=Check%20out%20this%20page!&body=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": true,
+      "isPageNavigation": false
+    },
+    {
+      "network": "copy-link",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "native",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "unknown",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "facebook",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fexample.com%2Fpost&quote=Hello",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "twitter",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://twitter.com/intent/tweet?url=https%3A%2F%2Fexample.com%2Fpost&text=Hello&hashtags=a%2Cb",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "x",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://example.com/post",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "linkedin",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.com%2Fpost",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "whatsapp",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://api.whatsapp.com/send?text=Hello%0Ahttps%3A%2F%2Fexample.com%2Fpost",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "telegram",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://example.com/post",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "pinterest",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.com%2Fpost&description=Hello",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "reddit",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.com%2Fpost&title=Hello",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "email",
+      "actionType": "email",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "mailto:?subject=Hello&body=Hello%0A%0Ahttps%3A%2F%2Fexample.com%2Fpost",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": true,
+      "isPageNavigation": false
+    },
+    {
+      "network": "copy-link",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://example.com/post",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "native",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://example.com/post",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "unknown",
+      "actionType": "share",
+      "targetUrl": "https://example.com/post",
+      "shareUrl": "https://example.com/post",
+      "target": "_blank",
+      "shareText": "Hello",
+      "hashtags": "a,b",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "facebook",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "twitter",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://twitter.com/intent/tweet?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "x",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "linkedin",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.linkedin.com/sharing/share-offsite/?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "whatsapp",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://api.whatsapp.com/send?text=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "telegram",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "pinterest",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://pinterest.com/pin/create/button/?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "reddit",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "https://www.reddit.com/submit?url=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "email",
+      "actionType": "email",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "mailto:?subject=Check%20out%20this%20page!&body=http%3A%2F%2Flocalhost%3A3000%2Fabout",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": true,
+      "isPageNavigation": false
+    },
+    {
+      "network": "copy-link",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "native",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    },
+    {
+      "network": "unknown",
+      "actionType": "share",
+      "targetUrl": "http://localhost:3000/about",
+      "shareUrl": "http://localhost:3000/about",
+      "target": "_blank",
+      "shareText": "",
+      "hashtags": "",
+      "isCopyAction": false,
+      "isEmailAction": false,
+      "isPageNavigation": false
+    }
+  ],
+  "NETWORK_BRAND_COLORS": {
+    "facebook": {
+      "bg": "#1877F2",
+      "text": "#ffffff",
+      "hoverBg": "#0d65d9"
+    },
+    "twitter": {
+      "bg": "#000000",
+      "text": "#ffffff",
+      "hoverBg": "#1a1a1a"
+    },
+    "linkedin": {
+      "bg": "#0A66C2",
+      "text": "#ffffff",
+      "hoverBg": "#084e96"
+    },
+    "whatsapp": {
+      "bg": "#25D366",
+      "text": "#ffffff",
+      "hoverBg": "#1da851"
+    },
+    "instagram": {
+      "bg": "#E4405F",
+      "text": "#ffffff",
+      "hoverBg": "#c13584"
+    },
+    "pinterest": {
+      "bg": "#E60023",
+      "text": "#ffffff",
+      "hoverBg": "#ad001a"
+    },
+    "reddit": {
+      "bg": "#FF4500",
+      "text": "#ffffff",
+      "hoverBg": "#cc3700"
+    },
+    "email": {
+      "bg": "#EA4335",
+      "text": "#ffffff",
+      "hoverBg": "#c5221f"
+    },
+    "copy": {
+      "bg": "#475569",
+      "text": "#ffffff",
+      "hoverBg": "#334155"
+    },
+    "custom": {
+      "bg": "#2563eb",
+      "text": "#ffffff",
+      "hoverBg": "#1d4ed8"
+    }
+  },
+  "renderSocialNetworkIcon": [
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><circle cx=\"18\" cy=\"5\" r=\"3\"></circle><circle cx=\"6\" cy=\"12\" r=\"3\"></circle><circle cx=\"18\" cy=\"19\" r=\"3\"></circle><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"></line><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"></line></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.7a1.62 1.62 0 1 0 0 3.24 1.62 1.62 0 0 0 0-3.24z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.964 9.964 0 0 0 1.333 4.993L2 22l5.233-1.237a9.98 9.98 0 0 0 4.779 1.221h.004c5.505 0 9.988-4.478 9.989-9.985A9.985 9.985 0 0 0 12.012 2zm.004 16.541h-.003a8.28 8.28 0 0 1-4.223-1.163l-.303-.18-3.137.742.827-3.051-.197-.313a8.27 8.27 0 0 1-1.272-4.436c0-4.568 3.718-8.285 8.288-8.285 2.215 0 4.296.863 5.862 2.43 1.566 1.566 2.428 3.648 2.427 5.862 0 4.569-3.717 8.286-8.287 8.286z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><circle cx=\"18\" cy=\"5\" r=\"3\"></circle><circle cx=\"6\" cy=\"12\" r=\"3\"></circle><circle cx=\"18\" cy=\"19\" r=\"3\"></circle><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"></line><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"></line></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.367 18.618 0 12.017 0z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.192-.491.957 0 1.73.774 1.73 1.73 0 .741-.47 1.37-1.128 1.616.015.176.024.355.024.536 0 2.709-3.158 4.908-7.054 4.908-3.895 0-7.053-2.199-7.053-4.908 0-.174.008-.348.022-.519C4.12 13.36 3.666 12.738 3.666 12c0-.956.774-1.73 1.73-1.73.473 0 .899.19 1.21.503 1.189-.844 2.83-1.401 4.639-1.482l.987-4.63 3.39.715a1.248 1.248 0 0 1 1.388-.632zM9.54 13.064c-.66 0-1.196.536-1.196 1.196 0 .66.536 1.196 1.196 1.196.66 0 1.196-.536 1.196-1.196 0-.66-.536-1.196-1.196-1.196zm4.92 0c-.66 0-1.196.536-1.196 1.196 0 .66.536 1.196 1.196 1.196.66 0 1.196-.536 1.196-1.196 0-.66-.536-1.196-1.196-1.196zm-4.39 3.935a.394.394 0 0 0-.276.674c.78.78 2.05.992 3.197.992 1.147 0 2.417-.212 3.197-.992a.395.395 0 0 0-.558-.558c-.593.593-1.636.78-2.639.78-1.003 0-2.046-.187-2.639-.78a.392.392 0 0 0-.282-.116z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z\"></path></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><circle cx=\"18\" cy=\"5\" r=\"3\"></circle><circle cx=\"6\" cy=\"12\" r=\"3\"></circle><circle cx=\"18\" cy=\"19\" r=\"3\"></circle><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"></line><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"></line></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><circle cx=\"18\" cy=\"5\" r=\"3\"></circle><circle cx=\"6\" cy=\"12\" r=\"3\"></circle><circle cx=\"18\" cy=\"19\" r=\"3\"></circle><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"></line><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"></line></svg>",
+    "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><circle cx=\"18\" cy=\"5\" r=\"3\"></circle><circle cx=\"6\" cy=\"12\" r=\"3\"></circle><circle cx=\"18\" cy=\"19\" r=\"3\"></circle><line x1=\"8.59\" y1=\"13.51\" x2=\"15.42\" y2=\"17.49\"></line><line x1=\"15.41\" y1=\"6.51\" x2=\"8.59\" y2=\"10.49\"></line></svg>"
+  ],
+  "DEFAULT_LOOP_ITEMS": [
+    {
+      "id": "post-1",
+      "title": "The Future of Headless Architecture & Design Systems",
+      "slug": "future-of-headless-architecture",
+      "excerpt": "Explore how composable frontend architectures and modern design systems empower agile product teams to ship faster.",
+      "date": "Sep 24, 2026",
+      "author": "Elena Rostova",
+      "featuredImage": "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80",
+      "category": "Architecture",
+      "categorySlug": "architecture",
+      "tags": [
+        "tech",
+        "cloud",
+        "headless"
+      ],
+      "postType": "post"
+    },
+    {
+      "id": "post-2",
+      "title": "Mastering Atomic Loops & Composable Query Engines",
+      "slug": "mastering-atomic-loops-query-engines",
+      "excerpt": "A deep dive into declarative dynamic token bindings, responsive grid compilation, and client-side taxonomy filtering.",
+      "date": "Sep 20, 2026",
+      "author": "Marcus Vance",
+      "featuredImage": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80",
+      "category": "Development",
+      "categorySlug": "development",
+      "tags": [
+        "design-systems",
+        "tech",
+        "react"
+      ],
+      "postType": "post"
+    },
+    {
+      "id": "post-3",
+      "title": "Scaling Multi-Tenant Headless WordPress Deployments",
+      "slug": "scaling-multitenant-wordpress",
+      "excerpt": "Best practices for enterprise ACF fields synchronization, high-concurrency multisite REST endpoints, and edge caching.",
+      "date": "Sep 15, 2026",
+      "author": "Sophia Chen",
+      "featuredImage": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80",
+      "category": "WordPress",
+      "categorySlug": "wordpress",
+      "tags": [
+        "wordpress",
+        "cms",
+        "multisite"
+      ],
+      "postType": "post"
+    },
+    {
+      "id": "post-4",
+      "title": "Design Tokens in Production: Bridging Figma and Code",
+      "slug": "design-tokens-in-production",
+      "excerpt": "How automated pipeline syncing transforms color, typography, and spacing variables directly into reusable CSS primitives.",
+      "date": "Sep 10, 2026",
+      "author": "David Miller",
+      "featuredImage": "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=800&auto=format&fit=crop&q=80",
+      "category": "Design",
+      "categorySlug": "design",
+      "tags": [
+        "design-systems",
+        "figma",
+        "css"
+      ],
+      "postType": "post"
+    },
+    {
+      "id": "post-5",
+      "title": "Micro-Frontends & Isomorphic Routing at Scale",
+      "slug": "micro-frontends-isomorphic-routing",
+      "excerpt": "Deconstruct monolithic single-page applications into isolated, independently deployable feature blocks with zero downtime.",
+      "date": "Sep 5, 2026",
+      "author": "Elena Rostova",
+      "featuredImage": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+      "category": "Architecture",
+      "categorySlug": "architecture",
+      "tags": [
+        "tech",
+        "frontend",
+        "scale"
+      ],
+      "postType": "post"
+    },
+    {
+      "id": "post-6",
+      "title": "Accessibility-First Component Architecture in 2026",
+      "slug": "accessibility-first-component-architecture",
+      "excerpt": "Implementing strict WCAG 2.2 AAA keyboard navigation, focus traps, and screen-reader announcements seamlessly.",
+      "date": "Aug 29, 2026",
+      "author": "Alex Morgan",
+      "featuredImage": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80",
+      "category": "Development",
+      "categorySlug": "development",
+      "tags": [
+        "a11y",
+        "react",
+        "ui"
+      ],
+      "postType": "post"
+    }
+  ]
+}

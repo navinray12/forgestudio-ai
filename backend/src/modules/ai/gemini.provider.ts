@@ -60,8 +60,8 @@ export class GeminiProvider implements AiProvider {
         );
       }
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        console.error(`[GEMINI ERROR ${response.status}]:`, errorText);
+        // Provider bodies may contain credentials, prompts, and private content.
+        console.error(`[GEMINI ERROR ${response.status}]`);
         if (response.status === 401 || response.status === 403) {
           throw new AppError("AI provider authentication failed", 401, "AI_AUTH_ERROR");
         }

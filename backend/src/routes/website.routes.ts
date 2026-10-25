@@ -29,6 +29,11 @@ import {
   updateCookieConsentHandler,
 } from "../controllers/website.controller.js";
 import {
+  getPublicCustomPostTypesHandler,
+  getPublicCustomEntriesHandler,
+  getPublicSingleCustomEntryHandler,
+} from "../controllers/customPostType.controller.js";
+import {
   getMailerConfigHandler,
   saveMailerConfigHandler,
   testMailerConnectionHandler,
@@ -204,6 +209,9 @@ const router = Router();
 
 // Public endpoint for published websites (Unauthenticated, Comment 7 & 8)
 router.get("/public/:id", getPublicWebsiteHandler);
+router.get("/public/:id/cpt", getPublicCustomPostTypesHandler);
+router.get("/public/:id/cpt/:cptSlug/entries", getPublicCustomEntriesHandler);
+router.get("/public/:id/cpt/:cptSlug/entries/:entrySlug", getPublicSingleCustomEntryHandler);
 
 // Public webhook endpoint for WordPress events (HMAC signature protected)
 router.post("/:id/wordpress/webhook", handleWordPressWebhook);

@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "repository": "navinray12/forgestudio-ai",
+  "sourceBase": "66dfc6da62b70ec79ddb2d71227b1305d56440f4",
+  "patchSha256": "99318dbecfcb9891dc611072b3dd2d3e52c1cee1f1c028d72b3af66a362c742d",
+  "files": [
+    {
+      "path": "backend/scripts/verify-workspace-refresh.cjs",
+      "before": "393607b5f80626ddf3bae8f0865617291eb88d64",
+      "after": "e5e4c72e80b2f7c15f5469c4a806511ec7d9bc12",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/src/app.ts",
+      "before": "499455b020d5fb12b513e9951661eb2f37f98f13",
+      "after": "5db23be22fe3e5eaaef0eb5dc613cc9c011aa743",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/src/modules/collaboration/collaborationEngine.service.ts",
+      "before": "29753e2481cbcb4440f0efb08267eb51ef27882d",
+      "after": "2d33048cbb72ae70da510f1a7f45763390e2f7cf",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/src/services/cli/forgeCli.service.ts",
+      "before": "7dbadeb2601caff4f33f311c418c6533b33728fc",
+      "after": "da04529adb0f7aa980d62b84c4551b36b0d6de03",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/src/services/generator/fullStackGenerator.service.ts",
+      "before": "67389d56a0171fd2b1198d9d19a29f0fd87531e0",
+      "after": "d96bda852feecef555223c3389c86d3f61750ca2",
+      "mode": "100644"
+    },
+    {
+      "path": "frontend/src/features/developer-workspace/services/loadSiteSnapshot.ts",
+      "before": "245011d0bb9e7f5ff6a55f5ca876dc1eff8419ae",
+      "after": "245011d0bb9e7f5ff6a55f5ca876dc1eff8419ae",
+      "mode": "100644"
+    },
+    {
+      "path": "frontend/src/features/developer-workspace/services/workspaceRefreshPolicy.ts",
+      "before": "f0c3987939b5461283e9dd32b268c5949dd7de80",
+      "after": "f0c3987939b5461283e9dd32b268c5949dd7de80",
+      "mode": "100644"
+    },
+    {
+      "path": "frontend/src/pages/editor/WebsiteEditor.tsx",
+      "before": "92db6409ff4f3dc591f946c4579b61a2591c0b2f",
+      "after": "6d7b9cc18fb0079f3b7a8958ba3ad69c315e4ffe",
+      "mode": "100644"
+    },
+    {
+      "path": "frontend/src/pages/published/PublishedSite.tsx",
+      "before": "096744a5519c8cfe514be520512cd5f5961cd83b",
+      "after": "bdbdfaf946e6eb7c837544199df627c6138c655c",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/scripts/verify-page-registration.cjs",
+      "before": "ff0efa624214e7ae7c3bd96ae707c5ee2844afa0",
+      "after": "ee88366551b4cdbc8a87e0fc7b3e682f406e457c",
+      "mode": "100644"
+    },
+    {
+      "path": "backend/scripts/test-typescript-api.cjs",
+      "before": "b43814690f01f0998bdcd3229879f6b7a74bb336",
+      "after": "b43814690f01f0998bdcd3229879f6b7a74bb336",
+      "mode": "100644"
+    }
+  ],
+  "scope": "Frontend refresh/persistence boundary and existing backend contract repairs. Not a full-stack generator or complete blueprint exit.",
+  "supplementalPatchSha256": "a40490d9dc4658bc30a3cb605618c0991d2914388e0008a49b4734a433aa449b"
+}

@@ -18,29 +18,33 @@ interface PerformanceSettingsPanelProps {
     onChange: (newSettings: PerformanceSettings) => void;
 }
 
-export default function PerformanceSettingsPanel({
-    settings,
-    onChange,
-}: PerformanceSettingsPanelProps) {
-    const toggle = (key: keyof PerformanceSettings) => {
-        onChange({ ...settings, [key]: !settings[key] });
-    };
-
-    const OptionRow = ({
+function OptionRow({
         label,
         desc,
         id,
         active,
-        tag
+        tag,
+        onToggle,
     }: {
         label: string;
         desc: string;
         id: keyof PerformanceSettings;
         active: boolean;
         tag: string;
-    }) => (
+        onToggle: (id: keyof PerformanceSettings) => void;
+    }) { return (
         <div
-            onClick={() => toggle(id)}
+            role="switch"
+            tabIndex={0}
+            aria-checked={active}
+            aria-label={label}
+            onClick={() => onToggle(id)}
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onToggle(id);
+                }
+            }}
             className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${active
                     ? "border-emerald-500 bg-emerald-50 shadow-sm"
                     : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -66,11 +70,21 @@ export default function PerformanceSettingsPanel({
                 </p>
             </div>
         </div>
-    );
+    ); }
+
+export default function PerformanceSettingsPanel({
+    settings,
+    onChange,
+}: PerformanceSettingsPanelProps) {
+    const toggle = (key: keyof PerformanceSettings) => {
+        onChange({ ...settings, [key]: !settings[key] });
+    };
+
 
     return (
         <div className="space-y-3 pt-1">
             <OptionRow
+                onToggle={toggle}
                 label="Flatten Render DOM"
                 desc="Removes purely decorative nesting layouts during the final static generation build."
                 active={!!settings.f351_flattenDom}
@@ -78,6 +92,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-351"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Lazy Load Media"
                 desc="Automatically injects loading='lazy' onto all below-the-fold canvas images and iframes."
                 active={!!settings.f352_lazyImages}
@@ -85,6 +100,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-352"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Minify Page Styles"
                 desc="Strips whitespace and comments out of the extracted CSS payload bounds."
                 active={!!settings.f353_minifyCss}
@@ -92,6 +108,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-353"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Minify JS Outputs"
                 desc="Compresses custom JS blocks using Acorn parsing routines prior to publish."
                 active={!!settings.f354_minifyJs}
@@ -99,6 +116,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-354"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Defer Injected Scripts"
                 desc="Forces non-blocking renders by deferring user-provided HEAD script evaluations."
                 active={!!settings.f355_deferScripts}
@@ -106,6 +124,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-355"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Font Display Swap"
                 desc="Prevents FOIT by rendering custom Google Fonts with display: swap architecture."
                 active={!!settings.f356_fontDisplaySwap}
@@ -113,6 +132,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-356"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Auto Critical CSS"
                 desc="Generates and inlines critical path styles into the page header strictly."
                 active={!!settings.f357_criticalCss}
@@ -120,6 +140,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-357"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Component Memory Cache"
                 desc="Dramatically speeds up Server Render speeds for repetitive component fragments."
                 active={!!settings.f358_elementCache}
@@ -127,6 +148,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-358"
             />
             <OptionRow
+                onToggle={toggle}
                 label="Brotli SEO Compression"
                 desc="Serves pre-compressed payloads to search engine web crawlers dynamically."
                 active={!!settings.f359_seoCompression}
@@ -134,6 +156,7 @@ export default function PerformanceSettingsPanel({
                 tag="F-359"
             />
             <OptionRow
+                onToggle={toggle}
                 label="WebP Media Conversion"
                 desc="Transforms primitive Image formats into lightweight modern formats seamlessly."
                 active={!!settings.f360_webpConversion}

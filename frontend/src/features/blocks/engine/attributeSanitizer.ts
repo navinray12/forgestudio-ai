@@ -21,13 +21,13 @@ export function validateAndCleanCssClasses(input: string): ClassValidationResult
   const errors: string[] = [];
   const classes = input.trim().split(/\s+/);
   const validClasses: string[] = [];
-  const invalidCharRegex = /[^a-zA-Z0-9_\-]/;
+  const invalidCharRegex = /[^a-zA-Z0-9_-]/;
 
   for (const cls of classes) {
     if (!cls) continue;
     if (invalidCharRegex.test(cls)) {
       errors.push(`Invalid CSS class name "${cls}": contains disallowed characters.`);
-      const cleanedCls = cls.replace(/[^a-zA-Z0-9_\-]/g, "");
+      const cleanedCls = cls.replace(/[^a-zA-Z0-9_-]/g, "");
       if (cleanedCls) validClasses.push(cleanedCls);
     } else {
       validClasses.push(cls);
@@ -49,7 +49,7 @@ export function normalizeHtmlAnchor(input: string): string {
     .trim()
     .replace(/^#+/, "")
     .toLowerCase()
-    .replace(/[^a-z0-9_\-]/g, "-")
+    .replace(/[^a-z0-9_-]/g, "-")
     .replace(/-+/g, "-");
 }
 

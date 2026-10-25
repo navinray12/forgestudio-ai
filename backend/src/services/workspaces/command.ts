@@ -58,6 +58,7 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
         return JSON.parse(encoded) as R;
       }, { isolationLevel: "Serializable", maxWait: 2000, timeout: 5000 });
     } catch (error) {
+      // Errors can carry SQL values and private payloads; do not print them.
       const failure = error as { code?: string; meta?: { code?: string } };
       const conflict = isRetryableTransactionConflict(error);
       if (conflict && attempt < 2) {

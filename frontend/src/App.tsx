@@ -164,6 +164,9 @@ function SignupRoute() {
   if (user && invitationPath) return <Navigate to={invitationPath} replace />;
   if (user) {
     switch (user.role) {
+      case "PLATFORM_ADMIN":
+        return <Navigate to="/platform-control" replace />;
+
       case "SUPER_ADMIN":
         return (
           <Navigate
@@ -275,6 +278,10 @@ function App() {
             path="/site/:websiteId/:pageSlug"
             element={<PublishedSite />}
           />
+          <Route
+            path="/site/:websiteId/:cptSlug/:entrySlug"
+            element={<PublishedSite />}
+          />
 
           {/* ================= AUTHENTICATED DRAFT PREVIEW ================= */}
           <Route
@@ -293,9 +300,14 @@ function App() {
               </RoleRoute>
             }
           />
-
-          {/* ================= PLATFORM CONTROL (separate auth audience/cookie) ================= */}
-          <Route path="/platform-control" element={<PlatformControlPage />} />
+          <Route
+            path="/preview/site/:websiteId/:cptSlug/:entrySlug"
+            element={
+              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN"]}>
+                <PublishedSite isPreviewMode={true} />
+              </RoleRoute>
+            }
+          />
 
           {/* ================= ROOT ================= */}
 

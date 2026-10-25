@@ -3,7 +3,7 @@ import {
   ArrowLeft, ChevronDown, Monitor, Tablet, Smartphone, Undo, Redo,
   Eye, Rocket, Save, RefreshCw, Sparkles, Code2, FileText, Palette,
   MessageSquare, MoreHorizontal, Layers, Check, Lock, Plus, History,
-  Search, Globe, Layers2, Copy, Trash2, ArrowUp, ArrowDown, Puzzle
+  Search, Globe, Layers2, Copy, Trash2, ArrowUp, ArrowDown, Puzzle, Maximize
 } from "lucide-react";
 import type { DeveloperModalMode } from "./DeveloperModal";
 
@@ -20,6 +20,8 @@ interface EditorTopHeaderProps {
   onSelectDevice: (device: "desktop" | "tablet" | "mobile") => void;
   zoomLevel: number;
   onSelectZoom: (zoom: number) => void;
+  canvasTheme?: "light" | "dark";
+  onToggleCanvasTheme?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -30,6 +32,8 @@ interface EditorTopHeaderProps {
   onSave: () => Promise<any> | void;
   saving: boolean;
   autosaveText?: string;
+  statusContent?: React.ReactNode;
+  onOpenReplaceTemplate?: () => void;
   onOpenDevModal: (mode: DeveloperModalMode | null) => void;
   devModalMode: DeveloperModalMode | null;
   onOpenAiAssistant: () => void;
@@ -73,6 +77,8 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
   onSelectDevice,
   zoomLevel,
   onSelectZoom,
+  canvasTheme,
+  onToggleCanvasTheme,
   onUndo,
   onRedo,
   canUndo,
@@ -83,6 +89,8 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
   onSave,
   saving,
   autosaveText,
+  statusContent,
+  onOpenReplaceTemplate,
   onOpenDevModal,
   devModalMode,
   onOpenAiAssistant,
@@ -164,6 +172,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
           </span>
         </button>
 
+        {onOpenAddPageModal && <button type="button" aria-label="Add New Page" title="Add New Page" onClick={onOpenAddPageModal} className="w-7 h-7 rounded-lg text-purple-300 hover:bg-[#24263f] flex items-center justify-center"><Plus className="w-3.5 h-3.5" /></button>}
         {/* Vertical subtle divider */}
         <div className="h-5 w-px bg-[#26283d] shrink-0 hidden sm:block" />
 
@@ -176,6 +185,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
             onClick={() => setIsPageSelectorOpen(!isPageSelectorOpen)}
             className="flex flex-col text-left cursor-pointer hover:opacity-90 transition bg-transparent border-0 p-0"
             aria-label="Switch page or add page presets"
+            title="Switch Active Page or Manage Site Pages"
             aria-expanded={isPageSelectorOpen}
           >
             <div className="flex items-center gap-2">
@@ -267,6 +277,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
                       <button
                         key={preset.path}
                         type="button"
+                        title={`Create or switch to ${preset.name} page`}
                         onClick={() => {
                           setIsPageSelectorOpen(false);
                           onQuickCreatePage(preset.name, preset.path);
@@ -309,6 +320,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
               onClick={() => setIsScopeDropdownOpen(!isScopeDropdownOpen)}
               className="h-7 px-2 text-[11px] font-semibold text-slate-300 bg-[#1a1b2d] hover:bg-[#24263f] rounded-lg border border-[#272942] transition flex items-center gap-1 cursor-pointer"
               title="Theme Builder Scope (Edit Header, Footer, Templates)"
+              aria-label="Switch Canvas Scope"
             >
               <span>{scopeOptions.find((s) => s.mode === canvasMode)?.icon || "📄"}</span>
               <span className="capitalize">{scopeOptions.find((s) => s.mode === canvasMode)?.label || "Page"}</span>
@@ -362,7 +374,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
                 ? "bg-[#282a46] text-purple-300 shadow-xs"
                 : "text-slate-400 hover:text-white"
             }`}
-            title="Desktop Breakpoint (1025px+)"
+            title="Desktop View"
             aria-label="Desktop View"
           >
             <Monitor className="w-3.5 h-3.5" />
@@ -376,7 +388,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
                 ? "bg-[#282a46] text-purple-300 shadow-xs"
                 : "text-slate-400 hover:text-white"
             }`}
-            title="Tablet Breakpoint (768px – 1024px)"
+            title="Tablet View"
             aria-label="Tablet View"
           >
             <Tablet className="w-3.5 h-3.5" />
@@ -390,13 +402,18 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
                 ? "bg-[#282a46] text-purple-300 shadow-xs"
                 : "text-slate-400 hover:text-white"
             }`}
-            title="Mobile Breakpoint (<= 767px)"
+            title="Mobile View"
             aria-label="Mobile View"
           >
             <Smartphone className="w-3.5 h-3.5" />
           </button>
         </div>
 
+        {onToggleCanvasTheme && (
+          <button type="button" title="Toggle Dynamic Canvas Theme (☀️ Light / 🌙 Dark)" aria-label="Toggle canvas theme" aria-pressed={canvasTheme === "dark"} onClick={onToggleCanvasTheme} className="w-8 h-8 rounded-lg bg-[#1a1b2d] border border-[#272942] flex items-center justify-center">
+            {canvasTheme === "dark" ? "🌙" : "☀️"}
+          </button>
+        )}
         {/* Zoom Controls Dropdown: 100% ˇ */}
         <div className="relative">
           <button
@@ -512,12 +529,15 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
         )}
 
         {/* Autosave status text */}
-        {autosaveText && (
+        {statusContent ?? (autosaveText && (
           <span className="text-[10px] text-slate-400 hidden xl:inline">
             {autosaveText}
           </span>
-        )}
+        ))}
 
+        <button type="button" aria-label="Save" title="Save (Ctrl+S)" disabled={saving} onClick={() => { void onSave(); }} className="w-8 h-8 rounded-lg bg-[#1a1b2d] border border-[#272942] flex items-center justify-center disabled:opacity-40">
+          {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        </button>
         {/* Undo Button */}
         <button
           type="button"
@@ -564,11 +584,18 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
               : "bg-[#1a1b2d] hover:bg-[#24263f] border-[#272942] text-slate-200 hover:text-white"
           }`}
           title="Toggle Canvas Preview (Ctrl+P)"
+          aria-label={isPreview ? "Exit Preview" : "Preview"}
         >
           <Eye className="w-3.5 h-3.5" />
           <span>Preview</span>
         </button>
 
+        <button type="button" aria-label="Developer Code Workspace" title="Open Developer Code Workspace" onClick={onNavigateWorkspace} className="w-8 h-8 rounded-lg bg-[#1a1b2d] border border-[#272942] flex items-center justify-center">
+          <Code2 className="w-3.5 h-3.5 text-purple-300" />
+        </button>
+        <button type="button" aria-label="Toggle Full Screen Canvas" title="Toggle Full Screen Canvas" onClick={onToggleFullScreenCanvas} className="w-8 h-8 rounded-lg bg-[#1a1b2d] border border-[#272942] flex items-center justify-center">
+          <Maximize className="w-3.5 h-3.5" />
+        </button>
         {/* Publish Button: Publish ➔ */}
         <button
           type="button"
@@ -578,6 +605,7 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
         >
           <span>Publish</span>
           <Rocket className="w-3.5 h-3.5" />
+          {publishing.status === "PUBLISHED" && <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" aria-label="Published" />}
         </button>
 
         {/* Secondary Tools Menu (Preserving 100% of Existing Tools) */}
@@ -613,6 +641,11 @@ export const EditorTopHeader: React.FC<EditorTopHeaderProps> = ({
                 <span className="text-[10px] text-slate-500">Ctrl+S</span>
               </button>
 
+              {onOpenReplaceTemplate && (
+                <button type="button" className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#23253c]" onClick={() => { setIsMoreToolsOpen(false); onOpenReplaceTemplate(); }}>
+                  Replace Template
+                </button>
+              )}
               {/* Quick Search / Command Finder */}
               {onOpenFinder && (
                 <button

@@ -699,6 +699,9 @@ describe("5b. a page-convention file saved in the workspace", () => {
     expect(page.elements).toHaveLength(1);
     expect(page.elements[0].children.map((c: any) => c.content)).toEqual(["Simple pricing"]);
     expect(sourceOf(project.id, "src/pages/PricingPage.tsx")).toContain("Simple pricing");
+    // Register a static page without ever deleting or claiming its original hand-written source.
+    expect(sourceOf(project.id, "src/pages/Pricing.tsx")).toContain("Simple pricing");
+    expect(fileAt(project.id, "src/pages/Pricing.tsx")?.isGenerated).toBe(false);
     expect(sourceOf(project.id, "src/routes/AppRoutes.tsx")).toContain(`<Route path="/pricing" element={<PricingPage />} />`);
     assertProjectIsCoherent(project.id, "react");
   });
