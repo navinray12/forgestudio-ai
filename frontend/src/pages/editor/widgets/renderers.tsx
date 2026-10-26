@@ -1,3 +1,77 @@
+import { useEffect, useRef, useState } from "react";
+import { submissionKeyFor, type SubmissionKeySlot } from "../../../utils/submissionKey";
+import {
+  Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
+  ChevronDown, ChevronRight, Layers, Type, Image as ImageIcon, Box, Grid,
+  Sliders, Palette, FileText, Globe, Code, Play, Check, X, Move, Lock, Unlock,
+  HelpCircle, ExternalLink, RefreshCw, Database, Server, Cpu, HardDrive, Key,
+  Mail, MessageSquare, Phone, User, Calendar, MapPin, Search, Star, Share2,
+  AlertCircle, Info, Download, Upload, Zap, Shield, Sparkles, Layout, Compass,
+  Terminal, ShieldCheck, StickyNote, FormInput, Link as LinkIcon, Navigation, ArrowRight, Menu
+} from "lucide-react";
+import {
+  FacebookEmbedBoxIcon,
+  FacebookCommentsBoxIcon,
+  PayPalButtonBoxIcon,
+  StripeButtonBoxIcon,
+  LottieBoxIcon,
+  MegaMenuBoxIcon,
+  OffCanvasBoxIcon,
+  IconRenderer
+} from "./icons";
+import { sanitizeSvg } from "../../../utils/svgSanitizer";
+
+// ==========================================
+// Types & Interfaces
+// ==========================================
+
+import { useWooCommerce } from "../../../context/WooCommerceContext";
+
+
+import type {
+  ElementType,
+  EditorElement,
+  ElementStyles,
+  ContainerLayout,
+  DeviceMode,
+  SlideItem,
+  FormFieldItem,
+  NavMenuItem,
+  NavSubmenuItem,
+  PricingPlan,
+  PricePlanFeature,
+  PriceListItem,
+  GalleryImageItem,
+  TestimonialItem,
+  ReviewItem,
+  LoopCarouselItem,
+  PlaylistItem,
+  MediaCarouselItem,
+  ImageCarouselItem,
+  ShareNetworkType,
+  ShareNetworkItem,
+  ShareActionType,
+  MegaMenuItem,
+  PostItem,
+  PageConfig,
+  MegaMenuColumn,
+  MegaMenuColumnLink,
+  SiteProduct,
+  ProductAddonItem
+} from "../types";
+import {
+  resolveDynamicTokens,
+  resolveTokensInTree
+} from "../types";
+import {
+  resolveImageUrl,
+  getEffectiveStyle,
+  getMergedStyles,
+  getMergedLayout
+} from "../utils";
+import { resolveInternalLink } from "../utils/pageManagerService";
+import { PRESET_SECTION_TEMPLATES } from "../defaults";
+
 // --- Renderers and helpers moved to ./renderers/ (verbatim; re-exported for compatibility) ---
 export { resolveForgeLink } from "./renderers/links";
 export type { ResolveForgeLinkOptions, ResolvedForgeLink } from "./renderers/links";

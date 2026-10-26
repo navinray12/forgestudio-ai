@@ -30,9 +30,6 @@ export const VALID_TRANSITIONS: Record<LeadStage, LeadStage[]> = {
 };
 
 export interface LeadNotification {
-  runAt?: Date;
-  /** Distinguishes multiple destinations of the same notification type. */
-  key?: string;
   /** Existing durable job types: WEBHOOK_RETRY delivers webhooks, FORM_NOTIFICATION_EMAIL sends site email. */
   type: "WEBHOOK_RETRY" | "FORM_NOTIFICATION_EMAIL";
   payload: Record<string, unknown>;
@@ -135,9 +132,9 @@ export async function acceptSubmission(input: SubmissionInput): Promise<Submissi
       for (const notification of input.notifications ?? []) {
         await client.query(
           `INSERT INTO background_jobs (id, type, payload, status, attempts, "maxAttempts", "runAt", "idempotencyKey", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid(), $1, $2::jsonb, 'QUEUED', 0, 5, $4, $3, now(), now())`,
+           VALUES (gen_random_uuid(), $1, $2::jsonb, 'QUEUED', 0, 5, now(), $3, now(), now())`,
           [notification.type, JSON.stringify({ ...notification.payload, leadId: lead.id, submissionId: submission.id }),
-            `lead:${lead.id}:${notification.type}${notification.key ? `:${notification.key}` : ""}`, notification.runAt || new Date()]
+            `lead:${lead.id}:${notification.type}`]
         );
       }
       return { submissionId: submission.id, leadId: lead.id, acceptedAt: new Date(submission.createdAt).toISOString(), replayed: false };

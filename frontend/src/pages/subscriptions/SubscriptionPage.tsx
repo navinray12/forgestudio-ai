@@ -1,134 +1,465 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, LoaderCircle, RefreshCw, Sparkles, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { HeaderUserDropdown } from "../../components/HeaderUserDropdown";
-import "./SubscriptionPage.css";
 
-interface Plan { id: string; name: string; slug: string; price: number; currency: string; billingInterval: string; websiteLimit: number; storageLimitMb: number; aiCreditLimit: number; features?: string[] | Record<string, unknown>; isActive: boolean }
-interface SubscriptionInfo { id: string; status: string; currentPeriodStart?: string; currentPeriodEnd?: string; plan: Plan }
-interface Invoice { id: string; amount: number; currency: string; status: string; invoiceNumber: string; createdAt: string }
+interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  currency: string;
+  billingInterval: string;
+  websiteLimit: number;
+  storageLimitMb: number;
+  aiCreditLimit: number;
+  features?: string[] | Record<string, unknown>;
+  isActive: boolean;
+}
 
-const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
+interface SubscriptionInfo {
+  id: string;
+  status: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  plan: Plan;
 }
-function featureList(plan: Plan) {
-  if (Array.isArray(plan.features)) return plan.features;
-  if (plan.features && typeof plan.features === "object") {
-    return Object.entries(plan.features).map(([key, value]) => `${key}: ${String(value)}`);
-  }
-  return [];
-}
-function displayName(plan: Plan, index: number) {
-  if (plan.price === 0 || plan.slug === "free") return "Starter Plan";
-  if (index === 1) return "Creator Plan";
-  return plan.name;
-}
-function priceLabel(plan: Plan) {
-  return plan.price === 0 ? "Free" : new Intl.NumberFormat(undefined, {
-    style: "currency", currency: plan.currency, maximumFractionDigits: 2,
-  }).format(plan.price);
-}
-function annualPlan(plan: Plan) {
-  return ["year", "annual", "yearly"].includes(plan.billingInterval.toLowerCase());
+
+interface Invoice {
+  id: string;
+  planId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  invoiceNumber: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  createdAt: string;
 }
 
 export default function SubscriptionPage() {
-  const planRequestInFlight = useRef(false);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [billingAnnual, setBillingAnnual] = useState(false);
-  const [audience, setAudience] = useState<"teams" | "agencies">("teams");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const planRequestInFlight = useRef(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [step, setStep] = useState<"plans" | "payment" | "success">("plans");
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
 
-  async function load(showRefresh = false) {
-    setError("");
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem("token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const defaultPlans: Plan[] = [
+    {
+      id: "free-tier",
+      name: "Starter (Free)",
+      slug: "free",
+      price: 0,
+      currency: "USD",
+      billingInterval: "month",
+      websiteLimit: 3,
+      storageLimitMb: 500,
+      aiCreditLimit: 50,
+      features: [
+        "Up to 3 Active Websites",
+        "50 AI Generation Credits / month",
+        "Responsive Drag-and-Drop Builder",
+        "Standard Global CDN Hosting",
+        "Community Support",
+      ],
+      isActive: true,
+    },
+    {
+      id: "pro-tier",
+      name: "Professional",
+      slug: "professional",
+      price: 29,
+      currency: "USD",
+      billingInterval: "month",
+      websiteLimit: 15,
+      storageLimitMb: 10000,
+      aiCreditLimit: 500,
+      features: [
+        "Up to 15 Active Websites",
+        "500 AI Generation & Design Credits",
+        "Custom Code & Full AST Preview Sandbox",
+        "Custom Domains & SSL Certificates",
+        "Priority High-Speed Rendering",
+        "Export Complete Source Bundles",
+      ],
+      isActive: true,
+    },
+    {
+      id: "agency-tier",
+      name: "Agency & Enterprise",
+      slug: "agency",
+      price: 79,
+      currency: "USD",
+      billingInterval: "month",
+      websiteLimit: 50,
+      storageLimitMb: 50000,
+      aiCreditLimit: 2000,
+      features: [
+        "Unlimited / 50 Client Websites",
+        "2,000 AI Credits + Claude 3.7 & Stitch",
+        "White-label Branding & Custom Domain",
+        "Team Role-Based Access Control",
+        "Granular Permission Management",
+        "24/7 Dedicated Priority SLA",
+      ],
+      isActive: true,
+    },
+  ];
+
+  const fetchData = async () => {
     try {
-      const headers = authHeaders();
-      const [plansResponse, currentResponse, invoicesResponse] = await Promise.all([
-        fetch(`${apiUrl}/api/v1/subscriptions/plans`, { credentials: "include", headers }),
-        fetch(`${apiUrl}/api/v1/subscriptions/current`, { credentials: "include", headers }),
-        fetch(`${apiUrl}/api/v1/subscriptions/invoices`, { credentials: "include", headers }),
-      ]);
-      const plansData = await plansResponse.json().catch(() => null);
-      const currentData = await currentResponse.json().catch(() => null);
-      const invoicesData = await invoicesResponse.json().catch(() => null);
-      if (!plansResponse.ok || !plansData || plansData.success === false || !Array.isArray(plansData?.data?.plans)) {
-        throw new Error(plansData?.detail || plansData?.message || plansData?.error?.message || "Unable to load plans.");
+      setLoading(true);
+      setError("");
+
+      const authHeaders = getAuthHeaders();
+
+      // 1. Fetch current subscription
+      try {
+        const subRes = await fetch(`${apiUrl}/api/v1/subscriptions/current`, {
+          credentials: "include",
+          headers: { ...authHeaders },
+        });
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          if (subData?.data?.subscription) {
+            setSubscription(subData.data.subscription);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not retrieve current subscription:", e);
       }
-      setPlans(plansData.data.plans);
-      if (!currentResponse.ok || !currentData || currentData.success === false) {
-        throw new Error(currentData?.detail || currentData?.message || currentData?.error?.message || "Unable to load your current subscription.");
+
+      // 2. Fetch all active plans
+      try {
+        const plansRes = await fetch(`${apiUrl}/api/v1/subscriptions/plans`, {
+          credentials: "include",
+          headers: { ...authHeaders },
+        });
+        if (plansRes.ok) {
+          const plansData = await plansRes.json();
+          if (plansData?.data?.plans && Array.isArray(plansData.data.plans) && plansData.data.plans.length > 0) {
+            setPlans(plansData.data.plans);
+          } else {
+            setPlans(defaultPlans);
+          }
+        } else {
+          setPlans(defaultPlans);
+        }
+      } catch {
+        setPlans(defaultPlans);
       }
-      setSubscription(currentData?.data?.subscription || null);
-      if (!invoicesResponse.ok || !invoicesData || invoicesData.success === false) {
-        throw new Error(invoicesData?.detail || invoicesData?.message || invoicesData?.error?.message || "Unable to load billing history.");
+
+      // 3. Fetch invoices
+      try {
+        const invRes = await fetch(`${apiUrl}/api/v1/subscriptions/invoices`, {
+          credentials: "include",
+          headers: { ...authHeaders },
+        });
+        if (invRes.ok) {
+          const invData = await invRes.json();
+          if (invData?.data?.invoices && Array.isArray(invData.data.invoices)) {
+            setInvoices(invData.data.invoices);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not retrieve invoices:", e);
       }
-      setInvoices(Array.isArray(invoicesData?.data?.invoices) ? invoicesData.data.invoices : []);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Unable to load subscription plans.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load subscription information.");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }
-  useEffect(() => { void load(); }, []);
-  // The catalog owns prices and intervals. Never synthesize an annual discount.
-  const visiblePlans = useMemo(() => plans.filter((plan) => plan.isActive && (
-    plan.price === 0 || (billingAnnual ? annualPlan(plan) : ["month", "monthly"].includes(plan.billingInterval.toLowerCase()))
-  )).sort((a, b) => a.price - b.price), [plans, billingAnnual]);
+  };
 
-  async function selectPlan(plan: Plan) {
-    if (planRequestInFlight.current || subscription?.plan.slug === plan.slug) return;
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSelectPlan = async (plan: Plan) => {
+    if (planRequestInFlight.current || subscription?.plan?.slug === plan.slug) return;
     planRequestInFlight.current = true;
-    setBusySlug(plan.slug);
+    setActionBusy(plan.slug);
     setError("");
     setSuccess("");
+
     try {
-      const response = await fetch(`${apiUrl}/api/v1/subscriptions/select`, {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+      const authHeaders = getAuthHeaders();
+      const res = await fetch(`${apiUrl}/api/v1/subscriptions/select`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        credentials: "include",
         body: JSON.stringify({ planSlug: plan.slug }),
       });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data || data.success === false) {
-        throw new Error(data?.detail || data?.message || data?.error?.message || "Unable to change plan.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data?.success === false) {
+        throw new Error(data?.message || data?.error?.message || "Failed to select plan.");
       }
-      const updated = data?.data?.subscription as SubscriptionInfo | undefined;
-      if (!updated?.id || typeof updated.status !== "string" || updated.plan?.slug !== plan.slug) {
-        throw new Error("The billing service returned an incomplete subscription.");
-      }
-      setSubscription(updated);
-      setSuccess(`Subscription updated. Status: ${updated.status}.`);
-      setStep("success");
-      await load(true);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Unable to change plan.");
+
+      setSuccess(`Plan changed to ${plan.name} successfully!`);
+      await fetchData();
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Could not complete plan update.");
     } finally {
       planRequestInFlight.current = false;
-      setBusySlug(null);
+      setActionBusy(null);
     }
+  };
+
+  const parseFeatures = (features: Plan["features"]): string[] => {
+    if (Array.isArray(features)) return features.map((feature) => String(feature));
+    if (typeof features === "object" && features !== null) {
+      return Object.entries(features).map(([k, v]) => `${k}: ${v}`);
+    }
+    return [
+      "Responsive visual design editor",
+      "Custom components & CSS styling",
+      "Full export & publishing tools",
+      "Fast global CDN delivery"
+    ];
+  };
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-slate-400 font-semibold text-sm">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <span>Loading subscription plans…</span>
+        </div>
+      </main>
+    );
   }
-  if (loading) return <main className="plans-screen plans-loading"><LoaderCircle className="plans-spinner" size={20} /><span>Loading plans...</span></main>;
-  if (step === "payment" && selectedPlan) return <main className="plans-screen"><header className="plans-topbar"><Link to="/dashboard" className="plans-brand">web studio <span>Pro</span></Link><div className="plans-top-actions"><Link to="/dashboard" className="plans-back"><ArrowLeft size={14} /> Dashboard</Link><HeaderUserDropdown /></div></header><div className="plans-content"><div className="plans-heading"><div><h1>Choose the Perfect Plan for You</h1><p>Review your plan and confirm the change using your account billing service.</p></div></div><h2 className="payment-heading">Confirm plan</h2>{error && <div role="alert" className="plans-message plans-error">{error}</div>}<section className="payment-summary"><div><small>Your selected plan</small><h2>{displayName(selectedPlan, visiblePlans.indexOf(selectedPlan))}</h2><p>{annualPlan(selectedPlan) ? "Annual billing" : "Monthly billing"}</p></div><strong>{priceLabel(selectedPlan)}<small> / {selectedPlan.billingInterval || "month"}</small></strong><div className="payment-line"><span>Plan access and limits</span><b>{selectedPlan.websiteLimit || "Unlimited"} sites</b></div><div className="payment-line"><span>AI credits</span><b>{selectedPlan.aiCreditLimit.toLocaleString()} monthly</b></div><div className="payment-line total"><span>Total for this account plan</span><b>{priceLabel(selectedPlan)}</b></div></section><div className="payment-panels"><section className="payment-panel"><h3>Payment details</h3><p>Your payment provider and payment method are managed by the configured billing service.</p><div className="payment-placeholder">{selectedPlan.price === 0 ? "No payment is required for the Starter plan." : "Payment verification is required before this paid plan can be activated."}</div></section><section className="payment-panel"><h3>Invoices</h3>{invoices.length === 0 ? <p>No invoices recorded yet.</p> : invoices.slice(0, 4).map((invoice) => <div className="payment-invoice" key={invoice.id}><span>{new Date(invoice.createdAt).toLocaleDateString()}</span><b>{invoice.currency === "INR" ? "₹" : "$"}{invoice.amount.toLocaleString()}</b></div>)}</section></div><div className="payment-actions"><button className="payment-cancel" disabled={busySlug !== null} onClick={() => { setSelectedPlan(null); setStep("plans"); }}>Cancel</button><button className="payment-next" disabled={busySlug !== null} onClick={() => void selectPlan(selectedPlan)}>{busySlug === selectedPlan.slug ? "Confirming..." : "Confirm plan"}</button></div></div></main>;
-  if (step === "success" && subscription) return <main className="plans-screen"><header className="plans-topbar"><Link to="/dashboard" className="plans-brand">web studio <span>Pro</span></Link><div className="plans-top-actions"><Link to="/dashboard" className="plans-back"><ArrowLeft size={14} /> Dashboard</Link><HeaderUserDropdown /></div></header><div className="success-screen"><div className="success-check"><Check size={34} /></div><h1>Subscription updated</h1><p>Your billing status is {subscription.status}. Access depends on your subscription status and billing period.</p>{error && <div role="alert" className="plans-message plans-error">{error}</div>}<div className="success-actions"><Link to="/dashboard" className="payment-next">Go to Dashboard <ArrowLeft size={14} /></Link><button className="payment-cancel" onClick={() => { setStep("plans"); setSelectedPlan(null); }}>Manage Plan</button></div><section className="success-card"><div className="success-plan"><strong>{subscription.plan.name}</strong><span>{subscription.status} · {subscription.currentPeriodStart ? new Date(subscription.currentPeriodStart).toLocaleDateString() : "Not provided"}</span><Check size={17} /></div><div className="success-details"><div><small>Plan</small><b>{subscription.plan.name}</b></div><div><small>Billing status</small><b>{subscription.status}</b></div><div><small>Payment details</small><b>Managed by billing provider</b></div><div><small>Next period</small><b>{subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : "Managed by provider"}</b></div></div><div className="success-paid">Account plan updated successfully</div></section></div></main>;
-  return <main className="plans-screen">
-    <header className="plans-topbar"><Link to="/dashboard" className="plans-brand">web studio <span>Pro</span></Link><div className="plans-top-actions"><Link to="/dashboard" className="plans-back"><ArrowLeft size={14} /> Dashboard</Link><HeaderUserDropdown /></div></header>
-    <div className="plans-content"><div className="plans-heading"><div><h1>Choose the Perfect Plan for You</h1><p>Choose a plan that will help you create professional websites with ForgeStudio quickly and easily. Suitable for personal projects, teamwork and large-scale content.</p></div><button className="plans-refresh" onClick={() => void load(true)} aria-label="Refresh plans"><RefreshCw size={15} className={refreshing ? "plans-spin" : ""} /></button></div>
-      {error && <div className="plans-message plans-error">{error}<button onClick={() => setError("")} aria-label="Dismiss error"><X size={15} /></button></div>}{success && <div className="plans-message plans-success">{success}<button onClick={() => setSuccess("")} aria-label="Dismiss success"><X size={15} /></button></div>}
-      <div className="plans-controls"><div className="plans-tabs"><button className={audience === "teams" ? "active" : ""} onClick={() => setAudience("teams")}>For in-house teams</button><button className={audience === "agencies" ? "active" : ""} onClick={() => setAudience("agencies")}>For freelancers &amp; agencies</button></div><div className="billing-toggle"><button className={!billingAnnual ? "active" : ""} onClick={() => setBillingAnnual(false)}>Monthly</button><button className={billingAnnual ? "active" : ""} onClick={() => setBillingAnnual(true)}>Annual</button></div></div>
-      <section className="plans-grid" aria-label="Available subscription plans">{visiblePlans.map((plan, index) => { const current = subscription?.plan.slug === plan.slug; const features = featureList(plan); return <article className={`plan-card ${index === 1 ? "featured" : ""} ${current ? "current" : ""}`} key={plan.id}>{index === 1 && <div className="popular-badge"><Sparkles size={11} /> Popular</div>}<div className="plan-card-body"><div className="plan-card-title"><div><h2>{displayName(plan, index)}</h2><p>{audience === "agencies" ? "Flexible tools for teams managing multiple client sites." : index === 0 ? "Beginners who want to explore ForgeStudio without commitment." : "Freelancers or small teams that need more flexibility and scale."}</p></div>{current && <span className="current-badge">Current</span>}</div><div className="plan-price"><strong>{priceLabel(plan)}</strong>{plan.price > 0 && <span>/{plan.billingInterval || "month"}</span>}</div><button className={`plan-cta ${index === 1 ? "gradient" : ""}`} disabled={current || busySlug !== null} onClick={() => { setSelectedPlan(plan); setStep("payment"); setError(""); }}>{current ? "Active plan" : plan.price === 0 ? "Switch to Starter" : "Upgrade"}</button><div className="plan-divider" /><h3>Plan limits</h3><ul className="plan-limits"><li><Check size={13} />{plan.websiteLimit ? `${plan.websiteLimit} site${plan.websiteLimit === 1 ? "" : "s"}` : "Unlimited sites"}</li><li><Check size={13} />{plan.aiCreditLimit.toLocaleString()} monthly AI credits</li><li><Check size={13} />{plan.storageLimitMb >= 1000 ? `${Math.round(plan.storageLimitMb / 1000)} GB storage` : `${plan.storageLimitMb} MB storage`}</li></ul><h3>Everything in {index === 0 ? "Starter" : index === 1 ? "Starter" : "Creator"} Plus...</h3><ul className="plan-features">{features.map((feature) => <li key={feature}><Check size={13} />{feature}</li>)}</ul></div></article>; })}</section>
-      {visiblePlans.length === 0 && <div className="plans-empty">No active plans are available for this billing interval. Please refresh or contact support.</div>}
-      <section className="invoice-section"><div className="invoice-heading"><div><h2>Billing history</h2><p>Invoices recorded for your account.</p></div><button onClick={() => void load(true)}>Refresh</button></div>{invoices.length === 0 ? <div className="invoice-empty">No invoices recorded yet.</div> : <div className="invoice-list">{invoices.map((invoice) => <div className="invoice-row" key={invoice.id}><span>{invoice.invoiceNumber}</span><span>{new Date(invoice.createdAt).toLocaleDateString()}</span><span>{invoice.currency === "INR" ? "₹" : "$"}{invoice.amount.toLocaleString()}</span><b>{invoice.status}</b></div>)}</div>}</section>
-    </div></main>;
+
+  const currentSlug = subscription?.plan?.slug || "free";
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12">
+      <div className="mx-auto max-w-6xl space-y-8">
+        {/* Top Navigation Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+            >
+              <span>←</span>
+              <span>Back to Dashboard</span>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black text-white">Subscription & Plans</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Manage your tier, quotas, resource limits, and invoices</p>
+            </div>
+          </div>
+
+          {subscription && (
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl">
+              <span className="text-xs text-slate-400">Current Tier:</span>
+              <span className="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
+                {subscription.plan?.name || "Free"}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse ml-1" />
+            </div>
+          )}
+        </div>
+
+        {/* Alerts */}
+        {error && (
+          <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-4 text-xs font-semibold text-red-300 flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button onClick={() => setError("")} className="text-red-400 hover:text-red-200">✕</button>
+          </div>
+        )}
+        {success && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-4 text-xs font-semibold text-emerald-300 flex items-center justify-between">
+            <span>✔ {success}</span>
+            <button onClick={() => setSuccess("")} className="text-emerald-400 hover:text-emerald-200">✕</button>
+          </div>
+        )}
+
+        {/* Current Plan Overview Card */}
+        {subscription && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Plan Status</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                    subscription.status === "ACTIVE" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  }`}>
+                    {subscription.status}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Website Quota</span>
+                <div className="mt-1 text-lg font-black text-white">
+                  {subscription.plan?.websiteLimit ? `${subscription.plan.websiteLimit} Websites` : "Unlimited"}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">AI Credits</span>
+                <div className="mt-1 text-lg font-black text-indigo-400">
+                  {subscription.plan?.aiCreditLimit || 0} Credits
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Storage Limit</span>
+                <div className="mt-1 text-lg font-black text-white">
+                  {subscription.plan?.storageLimitMb || 100} MB
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Plans Catalog Grid */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-white">Choose Your Plan</h2>
+            <p className="text-xs text-slate-400">Select a tier suited to your workflow and scale</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans.map((p) => {
+              const isCurrent = currentSlug === p.slug;
+              const featList = parseFeatures(p.features);
+
+              return (
+                <div
+                  key={p.id}
+                  className={`flex flex-col justify-between rounded-2xl border p-6 transition duration-200 ${
+                    isCurrent
+                      ? "border-indigo-500 bg-indigo-950/20 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-950/50"
+                      : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-white">{p.name}</h3>
+                      {isCurrent && (
+                        <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300 border border-indigo-500/40">
+                          Current Plan
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-white">
+                        {p.price === 0 ? "Free" : `${p.currency === "INR" ? "₹" : "$"}${p.price}`}
+                      </span>
+                      {p.price > 0 && (
+                        <span className="text-xs text-slate-400">/{p.billingInterval || "month"}</span>
+                      )}
+                    </div>
+
+                    <div className="mt-6 space-y-2.5 border-t border-slate-800/80 pt-4 text-xs text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span>{p.websiteLimit ? `Up to ${p.websiteLimit} Websites` : "Unlimited Websites"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span>{p.aiCreditLimit || 0} AI Generation Credits</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span>{p.storageLimitMb || 100} MB Cloud Asset Storage</span>
+                      </div>
+                      {featList.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 text-slate-400">
+                          <span className="text-indigo-400 font-bold">✓</span>
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      disabled={isCurrent || actionBusy !== null}
+                      onClick={() => handleSelectPlan(p)}
+                      className={`w-full rounded-xl py-2.5 text-xs font-bold transition shadow-sm cursor-pointer ${
+                        isCurrent
+                          ? "bg-slate-800 text-slate-400 cursor-default"
+                          : "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-50"
+                      }`}
+                    >
+                      {actionBusy === p.slug
+                        ? "Updating..."
+                        : isCurrent
+                        ? "Active Plan"
+                        : p.price === 0
+                        ? "Switch to Free"
+                        : `Upgrade to ${p.name}`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Past Invoices & History */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-white">Billing History & Invoices</h3>
+            <button
+              onClick={fetchData}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {invoices.length === 0 ? (
+            <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 p-8 text-center text-xs text-slate-500">
+              No past invoices cataloged yet. Invoices will automatically appear here when billing events are recorded.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-800">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="border-b border-slate-800 bg-slate-900/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Invoice</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 bg-slate-950/30">
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-slate-900/40 transition">
+                      <td className="px-4 py-3 font-mono font-bold text-slate-200">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3 text-slate-400">
+                        {new Date(inv.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-white">
+                        {inv.currency === "INR" ? "₹" : "$"}{inv.amount.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-300 border border-emerald-500/30">
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
 }

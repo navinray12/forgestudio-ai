@@ -649,7 +649,7 @@
             "fetch",
             "http://localhost:5000/api/forms/submit",
             "POST",
-            "{\"integrationTokens\":{},\"websiteId\":\"site-1\",\"formId\":\"f-form\",\"formName\":\"Website Form\",\"fields\":{},\"data\":{},\"honeypotValue\":\"\"}"
+            "{\"websiteId\":\"site-1\",\"formId\":\"f-form\",\"formName\":\"Website Form\",\"fields\":{},\"data\":{},\"honeypotValue\":\"\"}"
           ]
         ],
         "9420469353c23e94"

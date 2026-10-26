@@ -6,7 +6,6 @@ import { enqueueDurableJob } from "../services/jobs/durable-job.js";
 import { pgPool, prisma } from "../config/prisma.js";
 import { startPromptCleanup } from "../modules/ai/prompt-cleanup-scheduler.js";
 import { runDesignExecution } from "../modules/ai/design/pipeline.js";
-import { dispatchWorkspaceInvitationEmail } from "../services/workspaces/invitation-delivery.service.js";
 
 console.log("[Worker] Forge background worker initializing...");
 
@@ -29,13 +28,6 @@ registerJobHandler("FILE_SCAN", async (payload) => {
 });
 
 let stopping=false;
-let invitationDispatch: Promise<unknown> | null = null;
-function dispatchInvitationEmails() {
-  if (stopping || invitationDispatch) return;
-  invitationDispatch = dispatchWorkspaceInvitationEmail()
-    .catch(() => console.error("workspace-invitation-email-dispatch-failed"))
-    .finally(() => { invitationDispatch = null; });
-}
 async function dispatchOutbox() {
   if(stopping) return;
   const events=await leaseOutboxBatch(25,30);
@@ -63,16 +55,11 @@ startJobWorker(Number(process.env.JOB_WORKER_INTERVAL_MS || 1000));
 console.log("[Worker] Queue connected and polling for background jobs.");
 console.log("[Worker] Worker ready.");
 const promptCleanup = startPromptCleanup({ onFailure: () => console.error("ai-prompt-cleanup-failed") });
-const reportOutboxFailure = () => console.error("outbox-dispatch-failed");
-const outboxTimer=setInterval(()=>{void dispatchOutbox().catch(reportOutboxFailure);},Number(process.env.OUTBOX_INTERVAL_MS||1000));
-void dispatchOutbox().catch(reportOutboxFailure);
-const invitationTimer = setInterval(dispatchInvitationEmails, 1000);
-dispatchInvitationEmails();
+const outboxTimer=setInterval(()=>{void dispatchOutbox().catch(error=>console.error("outbox-dispatch-failed",error));},Number(process.env.OUTBOX_INTERVAL_MS||1000));
+void dispatchOutbox();
 
 async function shutdown(signal:string){
   if(stopping) return; stopping=true; clearInterval(outboxTimer);
-  clearInterval(invitationTimer);
-  await invitationDispatch;
   await stopJobWorker();
   console.log(`[Worker] Worker shutdown gracefully on signal: ${signal}`);
   await promptCleanup.stop();

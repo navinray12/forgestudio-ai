@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { identityRequest, startManagedLogin, type IdentityCapabilities } from "./identity-api";
-import { cancelInvitationManagedAuthentication, invitationAuthLink, invitationReturnFromAuth, markInvitationManagedAuthentication } from "../workspaces/invitation-context";
 
 export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
   const [capabilities, setCapabilities] = useState<IdentityCapabilities | null>(null);
@@ -13,7 +12,6 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
   const request = useRef<AbortController | null>(null);
   const submitLock = useRef(false);
   useEffect(() => {
-    if (!invitationReturnFromAuth(window.location.search)) cancelInvitationManagedAuthentication();
     mounted.current = true; const abort = new AbortController();
     identityRequest<{ data: IdentityCapabilities }>("/capabilities", undefined, abort.signal)
       .then(result => setCapabilities(result.data))
@@ -60,29 +58,20 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
     if (!challenge) return;
     void perform(async signal => {
       await identityRequest(`/${mode}/verify-otp`, { userId: challenge.userId, otp: code, channel: "EMAIL" }, signal);
-      window.location.assign(invitationReturnFromAuth(window.location.search) || "/dashboard");
+      window.location.assign("/dashboard");
     });
-  }
-  async function managedLogin() {
-    const invitationPath = invitationReturnFromAuth(window.location.search);
-    if (invitationPath && !markInvitationManagedAuthentication(window.location.search))
-      throw new Error("Your browser could not save the invitation. Allow session storage or reopen the email link after sign-in.");
-    try { await startManagedLogin(); }
-    catch (error) { if (invitationPath) cancelInvitationManagedAuthentication(); throw error; }
   }
   const title = mode === "signup" ? "Create your account" : "Sign in to Forge";
   return <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
     <section className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-8 shadow-xl" aria-labelledby="identity-title">
       <p className="text-sm uppercase tracking-widest text-blue-300">Forge Studio</p>
-      <h1 id="identity-title" className="mt-2 text-3xl font-semibold">{challenge ? capabilities?.verificationDelivery === "LOCAL_FILE" ? "Your verification code" : "Check your email" : title}</h1>
-      <p className="mt-3 text-sm text-slate-300">{challenge ? capabilities?.verificationDelivery === "LOCAL_FILE"
-        ? "Open the configured local verification file on this computer for your code. Email delivery is also attempted. Enter the code below."
-        : "Enter the single-use code in this same browser. Do not share it." :
+      <h1 id="identity-title" className="mt-2 text-3xl font-semibold">{challenge ? "Check your email" : title}</h1>
+      <p className="mt-3 text-sm text-slate-300">{challenge ? "Enter the single-use code in this same browser. Do not share it." :
         "Your organization and workspace permissions are checked after sign-in."}</p>
       {error && <div role="alert" className="my-4 rounded border border-red-400 p-3">{error}</div>}
       {!capabilities && !error && <p role="status" className="my-6">Loading sign-in options…</p>}
       {!challenge && capabilities?.managed && <button className="mt-6 w-full rounded bg-blue-600 p-3 font-medium disabled:opacity-50"
-        disabled={busy} onClick={() => void perform(managedLogin)}>Continue with identity provider</button>}
+        disabled={busy} onClick={() => void perform(() => startManagedLogin())}>Continue with identity provider</button>}
       {!challenge && capabilities?.local && <form onSubmit={credentials} className="mt-6 space-y-4">
         <p className="text-xs text-amber-200">Local development sign-in. Production uses the configured identity provider.</p>
         {mode === "signup" && <label className="block">Full name<input required name="name" autoComplete="name" minLength={2} maxLength={120}
@@ -113,7 +102,7 @@ export function AuthenticationPage({ mode }: { mode: "login" | "signup" }) {
         <button type="button" disabled={busy} onClick={() => { setChallenge(null); setCode(""); setError(""); }} className="underline">Start again</button>
       </form>}
       {capabilities && !capabilities.local && !capabilities.managed && <p role="alert" className="mt-6">Sign-in is not configured. Contact the platform operator.</p>}
-      {!challenge && capabilities?.local && <p className="mt-6 text-sm"><a className="underline" href={invitationAuthLink(mode === "login" ? "signup" : "login", window.location.search)}>
+      {!challenge && capabilities?.local && <p className="mt-6 text-sm"><a className="underline" href={mode === "login" ? "/signup" : "/login"}>
         {mode === "login" ? "Create an account" : "Already have an account? Sign in"}</a></p>}
       <p className="mt-6 text-xs text-slate-400">Account recovery and multi-factor enrollment are managed by your identity provider.</p>
     </section>

@@ -1,5 +1,5 @@
 const api = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/v1/auth`;
-export interface IdentityCapabilities { local: boolean; managed: boolean; phone: boolean; verificationDelivery?: "EMAIL" | "LOCAL_FILE" }
+export interface IdentityCapabilities { local: boolean; managed: boolean; phone: boolean }
 export interface AccountSession { id: string; createdAt: string; expiresAt: string; lastUsedAt: string | null; authMethod: string; current: boolean }
 export async function identityRequest<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${api}${path}`, { method: body === undefined ? "GET" : "POST",

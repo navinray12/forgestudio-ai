@@ -1,34 +1,9 @@
 import { Router } from "express";
 import { requireAuth } from "../../../middlewares/auth.middleware.js";
-import { billingProfile } from "../billing-profile.service.js";
-import { requirePrivilegedMutation } from "../../../middlewares/privileged-mutation.js";
 import { assignOrganizationSeat, getOrganizationBilling, listOrganizationPlans, reserveUsage, settleUsageReservation, startOrganizationCheckout } from "../billing.service.js";
 
 const router = Router({ mergeParams: true });
-import { billingDashboard, billingPortal } from "../dashboard.service.js";
 router.use(requireAuth);
-router.get("/dashboard", async (req, res, next) => {
-  try { res.setHeader("Cache-Control", "private, no-store"); res.json({ success: true, ...await billingDashboard(organizationId(req), res.locals.user.id) }); } catch (error) { next(error); }
-});
-router.post("/portal", requirePrivilegedMutation, async (req, res, next) => {
-  try {
-    if (req.get("X-Forge-Intent") !== "billing-portal") return res.status(403).json({ success: false, message: "Billing command header required" });
-    res.setHeader("Cache-Control", "private, no-store"); return res.json({ success: true, ...await billingPortal(organizationId(req), res.locals.user.id) });
-  } catch (error) { next(error); }
-});
-
-router.get("/profile", async (req, res, next) => {
-  try { res.setHeader("Cache-Control", "no-store"); res.json({ success: true, profile: await billingProfile(organizationId(req), res.locals.user.id) }); }
-  catch (error) { next(error); }
-});
-router.put("/profile", requirePrivilegedMutation, async (req, res, next) => {
-  try {
-    if (req.get("X-Forge-Intent") !== "billing-profile") return res.status(403).json({ success: false, message: "Billing command header is required" });
-    if (!req.body || typeof req.body !== "object") return res.status(400).json({ success: false, message: "Billing profile is required" });
-    res.setHeader("Cache-Control", "no-store");
-    return res.json({ success: true, profile: await billingProfile(organizationId(req), res.locals.user.id, req.body) });
-  } catch (error) { next(error); }
-});
 
 function organizationId(req: { params: Record<string, unknown> }) {
   return String(req.params.organizationId || "");

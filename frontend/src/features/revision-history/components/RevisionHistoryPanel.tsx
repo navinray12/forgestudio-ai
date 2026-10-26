@@ -355,7 +355,6 @@ export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
 
                           <button
                             type="button"
-                            data-testid="prompt-restore-card-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               promptRestore(rev);
@@ -425,7 +424,6 @@ export const RevisionHistoryPanel: React.FC<RevisionHistoryPanelProps> = ({
               </button>
               <button
                 type="button"
-                data-testid="confirm-restore-modal-submit"
                 onClick={() => confirmRestore(onRestore)}
                 className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 active:scale-95 transition"
               >

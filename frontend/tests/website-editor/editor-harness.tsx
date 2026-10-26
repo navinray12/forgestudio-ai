@@ -132,7 +132,7 @@ export async function flush(rounds = 10, owner = generation) {
   }
 }
 
-export async function mountEditor(site: unknown = siteFixture(), routes: Route_[] = [], { waitForLoad = true, initialPanel = "elements" }: { waitForLoad?: boolean; initialPanel?: "elements" | "pages" } = {}) {
+export async function mountEditor(site: unknown = siteFixture(), routes: Route_[] = [], { waitForLoad = true } = {}) {
   const owner = generation;
   installPolyfills();
   const consoleErrors: string[] = [];
@@ -146,12 +146,6 @@ export async function mountEditor(site: unknown = siteFixture(), routes: Route_[
   if (waitForLoad) {
     await waitFor(() => expect(view.container.querySelector("[data-el-id]")).not.toBeNull(), { timeout: 10000 });
     await flush(10, owner);
-    // These interaction suites exercise the widget palette. The redesigned product starts on Pages,
-    // so enter Elements explicitly rather than changing the product's default or relaxing assertions.
-    if (initialPanel === "elements") {
-      fireEvent.click(view.getByRole("button", { name: "Elements" }));
-      await flush(2, owner);
-    }
   }
   const canvasEl = (id: string) => view.container.querySelector<HTMLElement>(`[data-el-id="${id}"]`);
   const canvasIds = () => [...view.container.querySelectorAll<HTMLElement>("[data-el-id]")].map((n) => n.getAttribute("data-el-id"));

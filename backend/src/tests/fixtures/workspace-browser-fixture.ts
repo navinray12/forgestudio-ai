@@ -2,7 +2,6 @@ import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
 import { prisma, pgPool } from "../../config/prisma.js";
 import { createTenantWorkspace } from "../../services/workspaces/workspace-api.service.js";
-import { applyWorkspaceEmailFixtureMigration } from "../migration-fixture.js";
 
 // This is an explicit fixture writer, never imported by an application entry point.
 const database = new URL(process.env.DATABASE_URL ?? "invalid:");
@@ -19,7 +18,6 @@ try {
   for (const name of ["20260928090000_workspace_command_journal", "20260928122000_workspace_lifecycle", "20260928140000_document_concurrency"]) {
     await pgPool.query(await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"));
   }
-  await applyWorkspaceEmailFixtureMigration();
   const plan = await prisma.subscriptionPlan.create({ data: {
     name: "Browser fixture free plan", slug: "free", price: 0, websiteLimit: 20,
     features: [], isActive: true,

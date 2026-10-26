@@ -21,7 +21,7 @@ import { revisionHistoryService } from "../../features/revision-history";
 import { DesignAssistant } from "../../features/ai/DesignAssistant";
 import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
 import "../../features/editor-access/save-authorized-website";
-import { AutosaveStatusIndicator, useAutosave } from "../../features/autosave";
+import { useAutosave } from "../../features/autosave";
 import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
 import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
 import { createDocumentSaveCoordinator } from "../../features/editor-access/document-save-coordinator";
@@ -29,9 +29,6 @@ import { ContentOnlyInspector } from "./components/ContentOnlyInspector";
 import { ExperimentManagerModal } from "./components/experiments/ExperimentManagerModal";
 import { useCanvasPresence } from "../../features/collaboration/hooks/useCanvasPresence";
 import { WooCommerceProvider } from "../../context/WooCommerceContext";
-import { EditorTopHeader } from "./components/EditorTopHeader";
-import { EditorLeftRail, type LeftRailActiveItem } from "./components/EditorLeftRail";
-import { DesignTokensPanel } from "./inspector/DesignTokensPanel";
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
@@ -39,14 +36,59 @@ import { forgeProjectService } from "../../features/developer-workspace/services
 import { syncAcknowledgedSave } from "../../features/developer-workspace/services/canvasSourceSync";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Monitor, Smartphone, Tablet, Undo, Redo, Save, Eye, Settings, Plus, Trash2, Copy,
-  ChevronDown, ChevronRight, Layers, Type, Image as ImageIcon, Box, Grid,
-  Sliders, Palette, FileText, Globe, Code, Play, Check, X, Move, Lock, Unlock,
-  HelpCircle, ExternalLink, RefreshCw, Database, Server, Cpu, HardDrive, Key,
-  Mail, MessageSquare, Phone, User, Calendar, MapPin, Search, Star, Share2,
-  AlertCircle, Info, Download, Upload, Zap, Shield, Sparkles, Layout, Compass,
-  Terminal, ShieldCheck, StickyNote, FormInput, Link as LinkIcon, Navigation, ArrowRight, Menu,
-  ArrowLeft, Keyboard, Code2, Rocket, History as HistoryIcon, Home
+  Tablet,
+  Undo,
+  Redo,
+  Save,
+  Settings,
+  Trash2,
+  Copy,
+  ChevronRight,
+  Type,
+  Image as ImageIcon,
+  Box,
+  Grid,
+  Sliders,
+  Palette,
+  Globe,
+  Code,
+  Play,
+  Check,
+  X,
+  Move,
+  Lock,
+  Unlock,
+  HelpCircle,
+  ExternalLink,
+  Database,
+  Server,
+  Cpu,
+  HardDrive,
+  Mail,
+  Phone,
+  User,
+  Calendar,
+  MapPin,
+  Search,
+  Star,
+  Share2,
+  AlertCircle,
+  Info,
+  Download,
+  Upload,
+  Zap,
+  Shield,
+  Layout,
+  Compass,
+  Terminal,
+  ShieldCheck,
+  StickyNote,
+  FormInput,
+  Link as LinkIcon,
+  Navigation,
+  ArrowRight,
+  Menu,
+  Keyboard,
 } from "lucide-react";
 
 // ==========================================
@@ -61,10 +103,9 @@ import { type SiteProduct } from "./types";
 import { IconRenderer } from "./widgets/icons";
 import {
   UniversalIconControls,
-  triggerImagePicker,
 } from "./inspector/DynamicWidgetInspectors";
 import { MediaLightboxModal } from "../../components/MediaLightboxModal";
-import { MotionInteractionInspector } from "./inspector";
+import "./inspector";
 import { FontPickerModal } from "../../components/FontPickerModal";
 import { FontPickerControl } from "../../components/FontPickerControl";
 import { FontService } from "../../features/fonts/FontService";
@@ -354,7 +395,7 @@ export default function WebsiteEditor() {
   const [activeCanvasMode, setActiveCanvasMode] = useState<"page" | "popup">("page");
   const [activePopupId, setActivePopupId] = useState<string | null>(null);
   const [devModalMode, setDevModalMode] = useState<DeveloperModalMode | null>(null);
-  const [activeSidebarTab, setActiveSidebarTab] = useState<string>("style");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<string>("widgets");
   const [pageCss, setPageCss] = useState<string>("");
 
   const handleSelectPopupForEdit = (popup: any) => {
@@ -699,11 +740,8 @@ export default function WebsiteEditor() {
     if (!id) {
       setSelectedId(null);
       setSelectedIds([]);
-      setInspectorViewMode("tokens");
       return;
     }
-
-    setInspectorViewMode("element");
 
     if (e && (e.ctrlKey || e.metaKey)) {
       setSelectedIds((prev) => {
@@ -768,17 +806,6 @@ export default function WebsiteEditor() {
   const [collapsedContainers, setCollapsedContainers] = useState<Record<string, boolean>>({});
   const [structureSearchQuery, setStructureSearchQuery] = useState("");
 
-  // PDF UI Redesign State (Zoom, Left Rail, Sub-Tabs, Inspector Mode)
-  const [zoomLevel, setZoomLevel] = useState<number>(100);
-  const [leftRailTab, setLeftRailTab] = useState<LeftRailActiveItem>("pages");
-  const [sidebarSubTab, setSidebarSubTab] = useState<"pages" | "blocks" | "assets">("pages");
-  const [inspectorViewMode, setInspectorViewMode] = useState<"element" | "tokens">("tokens");
-  // Imports, duplication and widget insertion also select elements without a canvas click.
-  useEffect(() => {
-    setInspectorViewMode(selectedId ? "element" : "tokens");
-  }, [selectedId]);
-  const [isLayersCollapsed, setIsLayersCollapsed] = useState<boolean>(false);
-
 
   // Element Manager & Widget Visibility State
   const [disabledWidgets, setDisabledWidgets] = useState<ElementType[]>(() => {
@@ -802,11 +829,7 @@ export default function WebsiteEditor() {
     const mode = startParams.get("start");
     if (mode !== "ai" && mode !== "template") return;
     if (mode === "ai") setIsDesignAssistantOpen(true);
-    else {
-      setLeftSidebarTab("templates");
-      setSidebarSubTab("blocks");
-      setLeftRailTab("templates");
-    }
+    else setLeftSidebarTab("templates");
     const remaining = new URLSearchParams(startParams);
     remaining.delete("start");
     setStartParams(remaining, { replace: true });
@@ -3007,76 +3030,92 @@ export default function WebsiteEditor() {
 
   return (
     <WooCommerceProvider websiteId={websiteId}>
-    <div className="flex h-screen flex-col overflow-hidden bg-[#0e0f19] text-slate-100 font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f1f5f9] text-slate-800 font-sans">
       {/* ========================================== */}
-      {/* Top Header Bar (PDF Exact Redesign)        */}
+      {/* Top Header Bar */}
       {/* ========================================== */}
       {!isFullScreenCanvas && (
-        <EditorTopHeader
-          website={website}
-          activePage={pages.find((p) => p.id === activePageId) || { id: activePageId || "home", name: pageSettings.title || "Summer Sale Landing", slug: pageSettings.slug || "/" }}
-          pages={pages}
-          homePageId={homePageId}
-          onSwitchPage={(id) => handleSwitchEditingPage(id)}
-          onOpenPageManager={() => setIsPageManagerModalOpen(true)}
-          onQuit={handleQuitEditor}
-          publishing={publishing}
-          activeDevice={activeDevice}
-          onSelectDevice={(device) => setActiveDevice(device)}
-          zoomLevel={zoomLevel}
-          onSelectZoom={(zoom) => setZoomLevel(zoom)}
-          canvasTheme={canvasTheme}
-          onToggleCanvasTheme={() => setCanvasTheme((theme) => theme === "light" ? "dark" : "light")}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < history.length - 1}
-          isPreview={isPreview}
-          onTogglePreview={() => setIsPreview(!isPreview)}
-          onOpenPublishModal={() => setIsPublishModalOpen(true)}
-          onSave={handleSave}
-          saving={saving}
-          statusContent={<>
-            {saveMessage && <span role="status" aria-live="polite" className={saveMessage.startsWith("Save failed") ? "text-xs text-red-400" : "text-xs text-emerald-400"}>{saveMessage}</span>}
-            {errorMessage && <span role="alert" className="text-xs text-red-400">{errorMessage}</span>}
-            {userAccess.canEditContent && <AutosaveStatusIndicator status={autosaveStatus} lastSavedAt={autosaveLastSavedAt} errorMessage={autosaveError} />}
-          </>}
-          onOpenReplaceTemplate={userAccess.canEditDesign ? handleOpenReplaceTemplate : undefined}
-          onOpenDevModal={(mode) => setDevModalMode(mode)}
-          devModalMode={devModalMode}
-          onOpenAiAssistant={() => setIsUnifiedAiOpen(true)}
-          onOpenSeoModal={() => setIsSeoModalOpen(true)}
-          onOpenExperimentModal={() => setIsExperimentModalOpen(true)}
-          onOpenVariablesModal={() => setIsVariablesModalOpen(true)}
-          onOpenClassModal={() => setIsClassModalOpen(true)}
-          isDesignNotesOpen={isDesignNotesOpen}
-          onToggleDesignNotes={() => setIsDesignNotesOpen(!isDesignNotesOpen)}
-          isFullScreenCanvas={isFullScreenCanvas}
-          onToggleFullScreenCanvas={() => setIsFullScreenCanvas(!isFullScreenCanvas)}
-          canvasPeers={canvasPeers}
-          isRestrictedMode={isRestrictedMode}
-          onNavigateWorkspace={async () => {
-            if (userAccess.canEditContent) {
-              const saved = await handleSave();
-              if (!saved) return;
-            }
-            navigate(`/workspace/website/${websiteId}`);
-          }}
-          onOpenRevisionHistory={() => setIsRevisionHistoryOpen(true)}
-          onOpenFinder={() => setIsFinderOpen(true)}
-          onOpenPopupManager={() => setIsPopupManagerOpen(true)}
-          onOpenMultilingual={() => setIsMultilingualModalOpen(true)}
-          onOpenAddPageModal={userAccess.canEditDesign ? () => setIsAddPageModalOpen(true) : undefined}
-          onQuickCreatePage={userAccess.canEditDesign ? handleQuickCreateOrSwitchPage : undefined}
-          canvasMode={canvasMode}
-          onSwitchCanvasMode={handleSwitchCanvasMode}
-          selectedElementId={selectedId}
-          onReorderElement={handleReorderElement}
-          onCopyElement={(id) => handleCopyElement(id)}
-          onDuplicateElement={(id) => handleDuplicateElement(id)}
-          onSaveAsComponent={handleSaveAsComponent}
-          onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
-        />
+        <header
+          className={`relative w-full h-13 shrink-0 flex items-center justify-between px-3 md:px-4 shadow-md transition overflow-x-auto ${userPreferences.themeMode === "light"
+            ? "bg-white border-b border-slate-200 text-slate-800"
+            : "bg-[#0b1329] text-white"
+            }`}
+        >
+          {/* 1. Left Region: Brand / Back / Breadcrumb & Page Selector */}
+          {/* See shell/header/headerLeftRegion (moved verbatim) */}
+          {renderHeaderLeftRegion({
+            activePageId,
+            canvasMode,
+            handleQuickCreateOrSwitchPage,
+            handleQuitEditor,
+            handleSwitchCanvasMode,
+            handleSwitchEditingPage,
+            homePageId,
+            isPageSelectorOpen,
+            isScopeDropdownOpen,
+            pages,
+            scopeDropdownRef,
+            setIsAddPageModalOpen,
+            setIsPageManagerModalOpen,
+            setIsPageSelectorOpen,
+            setIsScopeDropdownOpen,
+            setNewPageName,
+            setNewPageSlug,
+            website,
+          })}
+
+          {/* 2. Center Region: Viewport Switcher */}
+          {/* See shell/header/headerCenterRegion (moved verbatim) */}
+          {renderHeaderCenterRegion({
+            activeDevice,
+            setActiveDevice,
+          })}
+
+          {/* 3. Right Region: Compact Tools, History, Primary Actions */}
+          {/* See shell/header/headerRightRegion (moved verbatim) */}
+          {renderHeaderRightRegion({
+            autosaveError,
+            autosaveLastSavedAt,
+            autosaveStatus,
+            canvasPeers,
+            canvasTheme,
+            devModalMode,
+            errorMessage,
+            handleCopyElement,
+            handleDuplicateElement,
+            handleOpenReplaceTemplate,
+            handleRedo,
+            handleReorderElement,
+            handleSave,
+            handleSaveAsComponent,
+            handleUndo,
+            history,
+            historyIndex,
+            isDesignNotesOpen,
+            isFullScreenCanvas,
+            isPreview,
+            isRestrictedMode,
+            navigate,
+            publishing,
+            saveMessage,
+            saving,
+            selectedId,
+            setCanvasTheme,
+            setDevModalMode,
+            setIsClassModalOpen,
+            setIsDesignNotesOpen,
+            setIsExperimentModalOpen,
+            setIsFinderOpen,
+            setIsFullScreenCanvas,
+            setIsPreview,
+            setIsPublishModalOpen,
+            setIsRevisionHistoryOpen,
+            setIsSeoModalOpen,
+            setIsVariablesModalOpen,
+            userAccess,
+            websiteId,
+          })}
+        </header>
       )}
 
       {/* ========================================== */}
@@ -3087,209 +3126,24 @@ export default function WebsiteEditor() {
         {/* Left Sidebar: ELEMENTS                     */}
         {/* ========================================== */}
         {!isPreview && !isFullScreenCanvas && (
-          <>
-            {/* Left Narrow Icon Rail matching PDF */}
-            <EditorLeftRail
-              activeItem={leftRailTab}
-              onSelectItem={(item) => {
-                setLeftRailTab(item);
-                if (item === "pages") {
-                  setSidebarSubTab("pages");
-                } else if (item === "blocks" || item === "elements") {
-                  setSidebarSubTab("blocks");
-                  setLeftSidebarTab("elements");
-                } else if (item === "templates") {
-                  setSidebarSubTab("blocks");
-                  setLeftSidebarTab("templates");
-                } else if (item === "navigator" || item === "atomic") {
-                  setSidebarSubTab("blocks");
-                  setLeftSidebarTab(item as any);
-                } else if (item === "ai") {
-                  setIsUnifiedAiOpen(true);
-                } else if (item === "settings") {
-                  handleSelectElement(null);
-                  setInspectorViewMode("tokens");
-                  setActiveSidebarTab("style");
-                }
-              }}
-              onAddClick={() => {
-                setLeftRailTab("elements");
-                setSidebarSubTab("blocks");
-                setLeftSidebarTab("elements");
-              }}
-            />
+          <aside className="w-64 md:w-72 shrink-0 border-r border-slate-200 bg-white p-3.5 overflow-y-auto shadow-sm flex flex-col">
+            {/* See shell/sidebar/sidebarTabBar (moved verbatim) */}
+            {renderSidebarTabBar({
+              leftSidebarTab,
+              setLeftSidebarTab,
+              t,
+            })}
 
-            {/* Expandable Sidebar Panel matching PDF */}
-            <aside className="w-[260px] md:w-[275px] shrink-0 border-r border-[#202235] bg-[#161726] p-3 overflow-y-auto shadow-sm flex flex-col text-slate-200 select-none">
-              {/* Top Sub-tabs: Pages | Blocks | Assets */}
-              <div className="flex items-center gap-1 bg-[#12131f] border border-[#23253b] p-1 rounded-xl mb-3 shrink-0">
-                {(["pages", "blocks", "assets"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => {
-                      setSidebarSubTab(tab);
-                      if (tab === "pages") {
-                        setLeftRailTab("pages");
-                      } else if (tab === "blocks") {
-                        setLeftRailTab("blocks");
-                        setLeftSidebarTab("elements");
-                      }
-                    }}
-                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg capitalize transition cursor-pointer ${
-                      sidebarSubTab === tab
-                        ? "bg-[#252740] text-purple-300 shadow-xs"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+            {isRestrictedMode ? (
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-center my-4 space-y-2">
+                <Lock className="w-6 h-6 text-amber-600 mx-auto" />
+                <span className="block text-xs font-bold text-amber-800">Widget Drawer Locked</span>
+                <p className="text-[11px] text-amber-700 leading-snug">
+                  Your Client Editor role allows editing text, images, and links directly on the canvas without adding new layout blocks.
+                </p>
               </div>
-
-              {/* PDF Pages & Layer View when Pages tab is active */}
-              {sidebarSubTab === "pages" && leftRailTab === "pages" ? (
-                <div className="space-y-4 mb-3">
-                  {/* SECTION 1: PAGES */}
-                  <div>
-                    <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                      <span>PAGES</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsPageManagerModalOpen(true)}
-                        className="text-purple-400 hover:text-purple-300 text-[10px] font-semibold cursor-pointer"
-                      >
-                        Manage
-                      </button>
-                    </div>
-                    <div className="space-y-1">
-                      {pages.map((p) => {
-                        const isHome = p.id === homePageId;
-                        const isActive = p.id === activePageId;
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => handleSwitchEditingPage(p.id)}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition cursor-pointer ${
-                              isActive
-                                ? "bg-[#252740] text-purple-200 font-bold border-l-2 border-purple-500 shadow-xs"
-                                : "text-slate-300 hover:bg-[#1d1f35] hover:text-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              {isHome ? <Home className="w-3.5 h-3.5 text-slate-400" /> : <Box className="w-3.5 h-3.5 text-slate-400" />}
-                              <span className="truncate">{p.name}</span>
-                            </div>
-                            {isHome && (
-                              <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 py-0.2 rounded font-bold">
-                                Home
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                      <button
-                        type="button"
-                        onClick={() => setIsPageManagerModalOpen(true)}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-purple-400 hover:text-purple-300 hover:bg-[#1d1f35] flex items-center gap-1.5 font-semibold transition cursor-pointer mt-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add page</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* SECTION 2: Layer */}
-                  <div className="pt-2 border-t border-[#23253b]">
-                    <div
-                      onClick={() => setIsLayersCollapsed(!isLayersCollapsed)}
-                      className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between cursor-pointer hover:text-slate-200 transition"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Layer</span>
-                      </div>
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isLayersCollapsed ? "-rotate-90" : ""}`} />
-                    </div>
-                    {!isLayersCollapsed && (
-                      <div className="space-y-1 max-h-60 overflow-y-auto">
-                        <div className="px-2 py-1 text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                          <span className="text-purple-400">•</span>
-                          <span>{pages.find(p => p.id === activePageId)?.name || "Homepage"}</span>
-                        </div>
-                        {elements.length === 0 ? (
-                          <div className="py-4 text-center text-xs text-slate-500 italic">
-                            No elements on canvas.
-                          </div>
-                        ) : (
-                          elements.map((el, idx) =>
-                            renderNavigatorTreeItem(el, 0, idx === elements.length - 1)
-                          )
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : sidebarSubTab === "assets" ? (
-                /* ASSETS & MEDIA UPLOADS DRAWER */
-                <div className="space-y-4">
-                  <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>MEDIA & ASSETS</span>
-                    <span className="text-[10px] text-purple-400 font-semibold">Uploads</span>
-                  </div>
-
-                  <input
-                    ref={importFileInputRef}
-                    type="file"
-                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.json,.svg"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleImportAsset(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => importFileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-purple-500/50 bg-[#1c1d30] p-3 text-xs font-bold text-purple-300 hover:border-purple-400 hover:bg-[#23253d] transition disabled:opacity-50 shadow-xs cursor-pointer"
-                  >
-                    <span>📁</span>
-                    <span>{isUploading ? "Uploading Asset..." : "Upload New Asset"}</span>
-                  </button>
-
-                  {uploadError && (
-                    <div className="p-2 rounded-lg bg-red-900/30 border border-red-700/50 text-[11px] text-red-300">
-                      {uploadError}
-                    </div>
-                  )}
-
-                  <div className="p-3 rounded-xl bg-[#131422] border border-[#23253b] space-y-2 text-xs text-slate-300">
-                    <span className="font-semibold text-slate-200 block text-[11px]">Supported formats</span>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Images (PNG, JPG, SVG, WebP, GIF), Videos, Icons and Audio. Maximum file size is 5MB.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => triggerImagePicker(() => {})}
-                      className="w-full mt-2 py-1.5 rounded-lg bg-[#202237] hover:bg-[#2a2c48] text-purple-300 text-xs font-semibold transition cursor-pointer"
-                    >
-                      Browse Media Lightbox 🖼️
-                    </button>
-                  </div>
-                </div>
-              ) : isRestrictedMode ? (
-                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-center my-4 space-y-2">
-                  <Lock className="w-6 h-6 text-amber-600 mx-auto" />
-                  <span className="block text-xs font-bold text-amber-800">Widget Drawer Locked</span>
-                  <p className="text-[11px] text-amber-700 leading-snug">
-                    Your Client Editor role allows editing text, images, and links directly on the canvas without adding new layout blocks.
-                  </p>
-                </div>
-              ) : leftSidebarTab === "elements" ? (
-                <div className="space-y-3">
+            ) : leftSidebarTab === "elements" ? (
+              <div className="space-y-3">
                 {/* Main Widget Library Search Input */}
                 {/* See shell/sidebar/widgetLibrarySearch (moved verbatim) */}
                 {renderWidgetLibrarySearch({
@@ -3364,7 +3218,6 @@ export default function WebsiteEditor() {
             )}
 
           </aside>
-          </>
         )}
 
         {/* ========================================== */}
@@ -3384,9 +3237,8 @@ export default function WebsiteEditor() {
             e.dataTransfer.dropEffect = draggingId ? "move" : "copy";
           }}
           onDrop={(e) => (isRestrictedMode ? undefined : handleDropElement(e, null, "after"))}
-          className={`relative flex flex-1 justify-center items-start overflow-y-auto overflow-x-auto min-w-0 max-w-full ${
-            canvasTheme === "dark" ? "bg-[#090a13] text-slate-100" : "bg-[#0d0e17]"
-          } p-4 sm:p-8 box-border`}
+          className={`relative flex flex-1 justify-center items-start overflow-y-auto overflow-x-auto min-w-0 max-w-full ${canvasTheme === "dark" ? "bg-slate-950 text-slate-100" : "bg-[#f1f5f9]"
+            } p-4 sm:p-8 box-border`}
         >
           {/* Dynamic Hover Styles Block (F-036) */}
           <style dangerouslySetInnerHTML={{ __html: generateElementsHoverCSS(elements, activeDevice) }} />
@@ -3418,14 +3270,10 @@ export default function WebsiteEditor() {
                 : undefined,
               backgroundSize: userPreferences.gridOverlay ? "20px 20px" : undefined,
               width: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "520px" : "100%",
-              maxWidth: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "min(520px, 90%)" : "1200px",
-              transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
-              transformOrigin: "top center",
-              transition: "transform 0.15s ease-out, width 0.3s ease-in-out",
+              maxWidth: activeDevice === "mobile" ? "380px" : activeDevice === "tablet" ? "min(520px, 90%)" : "100%",
             }}
-            className={`relative min-h-[750px] h-auto shrink-0 my-2 rounded-2xl border border-[#23253b] p-6 sm:p-8 pb-20 box-border overflow-x-hidden ${
-              activeDevice !== "desktop" ? "ring-1 ring-purple-500/40 shadow-2xl" : "shadow-xl"
-            }`}
+            className={`relative transition-all duration-300 ease-in-out min-h-[750px] h-auto shrink-0 my-2 rounded-2xl border border-slate-200 p-6 sm:p-8 pb-20 box-border overflow-x-hidden ${activeDevice !== "desktop" ? "ring-1 ring-slate-300 shadow-md" : "shadow-sm"
+              }`}
           >
             {/* Global Design Tokens / CSS Variables (Comment 14) */}
             {/* See canvas/canvasThemeStyle (moved verbatim) */}
@@ -3496,91 +3344,10 @@ export default function WebsiteEditor() {
         {/* Right Sidebar: SETTINGS & STYLING           */}
         {/* ========================================== */}
         {!isPreview && (
-          <aside className="w-[340px] md:w-[360px] shrink-0 border-l border-[#202235] bg-[#161726] p-4 overflow-y-auto shadow-sm flex flex-col text-slate-200 select-none">
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+          <aside className="w-80 shrink-0 border-l border-slate-200 bg-white p-5 overflow-y-auto shadow-sm">
+            <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
               {isRestrictedMode ? "CONTENT-ONLY SANDBOX" : "SETTINGS & STYLING"}
             </h2>
-            {/* Top Inspector Tabs matching PDF: Style | Animation | Advanced */}
-            <div className="flex items-center gap-1 bg-[#12131f] border border-[#23253b] p-1 rounded-xl mb-4 shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveSidebarTab("style")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  activeSidebarTab !== "animation" && activeSidebarTab !== "advanced"
-                    ? "bg-[#252740] text-purple-300 shadow-xs"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
-                }`}
-              >
-                Style
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSidebarTab("animation")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  activeSidebarTab === "animation"
-                    ? "bg-[#252740] text-purple-300 shadow-xs"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
-                }`}
-              >
-                Animation
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSidebarTab("advanced")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  activeSidebarTab === "advanced"
-                    ? "bg-[#252740] text-purple-300 shadow-xs"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1b2e]"
-                }`}
-              >
-                Advanced
-              </button>
-            </div>
-
-            {/* Mode Switcher when Element is selected: Element vs Tokens */}
-            {!isRestrictedMode && selectedElementAny && activeSidebarTab === "style" && (
-              <div className="flex items-center gap-1.5 p-1 bg-[#141524] border border-[#272942] rounded-lg mb-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setInspectorViewMode("element")}
-                  className={`flex-1 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                    inspectorViewMode === "element"
-                      ? "bg-purple-600/30 text-purple-200 border border-purple-500/50"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  ✦ Element
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInspectorViewMode("tokens")}
-                  className={`flex-1 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                    inspectorViewMode === "tokens"
-                      ? "bg-purple-600/30 text-purple-200 border border-purple-500/50"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  ❖ Design Tokens
-                </button>
-              </div>
-            )}
-
-            {/* PDF Design Tokens Panel when no element selected or when Tokens chosen */}
-            {!isRestrictedMode && (!selectedElementAny || inspectorViewMode === "tokens") && activeSidebarTab === "style" ? (
-              <DesignTokensPanel
-                globalSettings={globalSettings}
-                onUpdateGlobalSettings={setGlobalSettings}
-                globalVariables={globalVariables}
-                onSaveVariables={(updated) => setGlobalVariables(updated)}
-                onOpenFontManager={() => setIsFontPickerModalOpen(true)}
-                onOpenVariablesManager={() => setIsVariablesModalOpen(true)}
-                onOpenAccessibilityStatement={() => setIsStatementOpen(true)}
-                onSaveTokens={handleSave}
-                saving={saving}
-                canvasTheme={canvasTheme}
-                onToggleCanvasTheme={() => setCanvasTheme((t) => (t === "light" ? "dark" : "light"))}
-              />
-            ) : null}
 
             {isRestrictedMode ? (
               /* See inspector/restrictedModeInspector (moved verbatim) */ renderRestrictedModeInspector({
@@ -3594,66 +3361,7 @@ export default function WebsiteEditor() {
                   selectedIds,
                 })}
 
-                {activeSidebarTab === "animation" ? (
-                  selectedElementAny ? (
-                    <div className="space-y-4">
-                      <div className="px-1 text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5 pb-2 border-b border-[#23253b]">
-                        <span>✨ Motion & Interaction</span>
-                      </div>
-                      <MotionInteractionInspector
-                        selectedElement={selectedElementAny}
-                        updateSelectedProp={updateSelectedProp}
-                        updateSelectedStyle={updateSelectedStyle}
-                      />
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-[#23253b] bg-[#1a1b2d] p-6 text-center space-y-3 my-4">
-                      <div className="w-10 h-10 rounded-full bg-purple-900/30 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto text-lg">
-                        ✨
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-200">No Element Selected</h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Select an element on the canvas to configure entrance animations, hover transitions, and scroll effects.
-                      </p>
-                    </div>
-                  )
-                ) : activeSidebarTab === "advanced" ? (
-                  selectedElementAny ? (
-                    <div className="space-y-4">
-                      {/* Developer Options for Element (F-102, F-105 to F-109) */}
-                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4 text-slate-800">
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700">Custom CSS ID (F-105)</label>
-                          <input type="text" value={selectedElementAny.customId || ""} onChange={e => updateSelectedProp("customId", e.target.value)} placeholder="e.g. hero-section" className="w-full rounded border px-2 py-1.5 text-xs font-mono mt-1" />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700">Additional CSS Classes (F-106)</label>
-                          <input type="text" value={selectedElementAny.customClass || ""} onChange={e => updateSelectedProp("customClass", e.target.value)} placeholder="e.g. shadow-lg hover:shadow-xl" className="w-full rounded border px-2 py-1.5 text-xs font-mono mt-1" />
-                        </div>
-                        <hr className="border-slate-200" />
-                        <button onClick={() => setDevModalMode("element-css")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
-                          <span className="text-blue-500">{"</>"}</span> Edit Element CSS (F-102)
-                        </button>
-                        <button onClick={() => setDevModalMode("css-selectors")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
-                          <span className="text-pink-500">{""}</span> Edit Selectors & Pseudo (F-107)
-                        </button>
-                        <button onClick={() => setDevModalMode("custom-attributes")} className="w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center justify-center gap-2">
-                          <span className="text-emerald-500">{""}</span> Manage DOM Attributes (F-108 & F-109)
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-[#23253b] bg-[#1a1b2d] p-6 text-center space-y-3 my-4">
-                      <div className="w-10 h-10 rounded-full bg-purple-900/30 border border-purple-500/40 text-purple-300 flex items-center justify-center mx-auto text-lg">
-                        ⚙️
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-200">No Element Selected</h4>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Select an element on the canvas to configure custom CSS IDs, classes, DOM attributes, and developer selectors.
-                      </p>
-                    </div>
-                  )
-                ) : selectedElementAny && inspectorViewMode === "element" ? (
+                {selectedElementAny ? (
                   <div className="space-y-5">
                     {/* Element Type Header & Quick Actions */}
                     {/* See inspector/selected/elementTypeHeader (moved verbatim) */}
@@ -3792,7 +3500,9 @@ export default function WebsiteEditor() {
                       updateSelectedProp,
                       updateSelectedStyle,
                     })}
-                  {renderAdvancedInspectorBranch({
+                  </div>
+                ) : activeSidebarTab === "advanced" && selectedElementAny ? (
+                  /* See inspector/legacy/advancedInspectorBranch (moved verbatim; unreachable, preserved) */ renderAdvancedInspectorBranch({
                     activeDevice,
                     activeElementState,
                     apiUrl,
@@ -3826,8 +3536,7 @@ export default function WebsiteEditor() {
                     updateSelectedProp,
                     updateSelectedStyle,
                     uploadError,
-                  })}
-                  </div>
+                  })
                 ) : (
                   <div className="space-y-5">
                     {/* Page Settings Section (F-018 & F-019) */}
@@ -3916,12 +3625,7 @@ export default function WebsiteEditor() {
         setIsFinderOpen,
         setIsPreview,
         setIsShortcutsHelpOpen,
-        setLeftSidebarTab: (next) => {
-          const tab = typeof next === "function" ? next(leftSidebarTab) : next;
-          setLeftSidebarTab(tab);
-          setSidebarSubTab("blocks");
-          setLeftRailTab(tab === "templates" ? "templates" : "elements");
-        },
+        setLeftSidebarTab,
         setSelectedId,
         updatePreference,
         userPreferences,

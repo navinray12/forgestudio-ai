@@ -295,11 +295,9 @@ export async function sendSiteEmail(
     text?: string;
     fromName?: string;
     fromEmail?: string;
-    replyTo?: string;
-    requireDelivery?: boolean;
   }
 ) {
-  const { to, subject, html, text, fromName, fromEmail, replyTo } = payload;
+  const { to, subject, html, text, fromName, fromEmail } = payload;
   if (!to || !subject) {
     throw new AppError("Recipient and subject are required.", 400, "BAD_REQUEST");
   }
@@ -344,7 +342,6 @@ export async function sendSiteEmail(
   }
 
   if (!transporter) {
-    if (payload.requireDelivery) throw new AppError("Configure SMTP to deliver form notifications.", 503, "SMTP_NOT_CONFIGURED");
     console.warn(`[SiteMailer] No SMTP configured for site ${websiteId}, simulating dispatch.`);
     await recordDeliveryLog(websiteId, to, subject, "SIMULATED");
     return { status: "SIMULATED", message: "Email simulated: no SMTP transport configured." };
@@ -352,8 +349,7 @@ export async function sendSiteEmail(
 
   try {
     const info = await transporter.sendMail({
-      from: { name: senderName, address: senderEmail },
-      ...(replyTo ? { replyTo } : {}),
+      from: `"${senderName}" <${senderEmail}>`,
       to,
       subject,
       text: text || (html ? html.replace(/<[^>]*>/g, "") : ""),

@@ -12,7 +12,7 @@ import { AccountSessions } from "./application/account-sessions.js";
 // This is the identity composition root. Domain/application code knows only ports.
 export const identityStore = new PostgresIdentityStore();
 const delivery = process.env.FORGE_LOCAL_OTP_FILE
-  ? new LocalOtpDelivery(process.env.FORGE_LOCAL_OTP_FILE, new SmtpOtpDelivery())
+  ? new LocalOtpDelivery(process.env.FORGE_LOCAL_OTP_FILE)
   : new SmtpOtpDelivery();
 export const localAuthentication = new LocalAuthentication(identityStore,
   { hash: hashPassword, verify: verifyPassword }, delivery);

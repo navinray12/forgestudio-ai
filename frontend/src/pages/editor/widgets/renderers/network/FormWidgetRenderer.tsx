@@ -1,4 +1,3 @@
-import { integrationFormTokens } from "../../../../../features/integrations/PublishedIntegrations";
 /**
  * FormWidgetRenderer. Moved verbatim from widgets/renderers.tsx, which re-exports it for compatibility.
  */
@@ -167,7 +166,6 @@ export const FormWidgetRenderer = ({
       try {
         setIsSubmitting(true);
         const payload = {
-          integrationTokens: integrationFormTokens(e.currentTarget),
           websiteId,
           formId: el.id,
           formName: el.formTitle || el.content || "Website Form",

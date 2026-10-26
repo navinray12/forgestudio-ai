@@ -1,7 +1,6 @@
 import { registerJobHandler } from "./jobRunner.js";
 import { publishWebsite } from "../publishing.service.js";
 import { prisma } from "../../config/prisma.js";
-import { safeEgressRequest } from "../../platform/integrations/safe-egress.js";
 
 export function initJobHandlers() {
   // 1. SCHEDULED_PUBLISH Handler
@@ -68,8 +67,7 @@ export function initJobHandlers() {
       throw new Error("Missing url in WEBHOOK_RETRY payload");
     }
 
-    const res = await safeEgressRequest({
-      url,
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -77,13 +75,9 @@ export function initJobHandlers() {
         ...(headers || {}),
       },
       body: JSON.stringify(body || {}),
-      timeoutMs: 10000,
-      maxResponseBytes: 512 * 1024,
-      allowHttp: process.env.NODE_ENV !== "production",
-      allowedPorts: process.env.NODE_ENV === "production" ? [443] : [443, 80],
     });
 
-    if (res.status < 200 || res.status >= 300) {
+    if (!res.ok) {
       throw new Error(`Webhook endpoint returned HTTP ${res.status}`);
     }
 
@@ -93,12 +87,12 @@ export function initJobHandlers() {
   // 3b. FORM_NOTIFICATION_EMAIL: enqueued in the same transaction as the lead (blueprint §12).
   // A thrown error leaves the job for retry; an accepted SMTP handoff is not proof of inbox delivery.
   registerJobHandler("FORM_NOTIFICATION_EMAIL", async (payload) => {
-    const { websiteId, to, subject, html, fromName, fromEmail, replyTo, requireDelivery } = payload || {};
+    const { websiteId, to, subject, html, fromName } = payload || {};
     if (!websiteId || !to || !subject) {
       throw new Error("Missing websiteId, to or subject in FORM_NOTIFICATION_EMAIL payload");
     }
     const { sendSiteEmail } = await import("../siteMailer.service.js");
-    const result = await sendSiteEmail(websiteId, { to, subject, html, fromName, fromEmail, replyTo, requireDelivery });
+    const result = await sendSiteEmail(websiteId, { to, subject, html, fromName });
     return { status: "HANDED_TO_MAIL_SERVER", messageId: (result as any)?.messageId ?? null };
   });
 

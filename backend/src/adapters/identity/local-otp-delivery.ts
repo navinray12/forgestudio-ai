@@ -6,7 +6,7 @@ import type { IdentityDeliveryPort } from "../../platform/ports/identity-deliver
 /** Explicit local-only delivery for disposable development stacks. The code is
  * never returned to a browser or written to application logs. */
 export class LocalOtpDelivery implements IdentityDeliveryPort {
-  constructor(private readonly file: string, private readonly emailDelivery?: IdentityDeliveryPort) {
+  constructor(private readonly file: string) {
     const tempParent = resolve(tmpdir());
     const fileParent = resolve(dirname(file));
     if (process.env.NODE_ENV === "production" || process.env.FORGE_AUTH_MODE !== "local" || !isAbsolute(file) ||
@@ -18,9 +18,5 @@ export class LocalOtpDelivery implements IdentityDeliveryPort {
 
   async sendCode({ email, code, purpose }: { email: string; code: string; purpose: "LOGIN" | "SIGNUP" }) {
     await writeFile(this.file, JSON.stringify({ email, code, purpose, createdAt: new Date().toISOString() }), { mode: 0o600 });
-    if (this.emailDelivery) {
-      try { await this.emailDelivery.sendCode({ email, code, purpose }); }
-      catch { console.warn("[AUTH] Code delivered to the configured local file; email delivery unavailable."); }
-    }
   }
 }

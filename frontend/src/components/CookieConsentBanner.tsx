@@ -51,18 +51,11 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
         })
       );
     } catch {
-      // Do not acknowledge consent if it cannot be saved.
+      // Do not acknowledge consent if it cannot be persisted for this browser.
       setStorageError(true);
       return;
     }
-
-    // Consent was saved successfully.
     setStorageError(false);
-
-    // Notify other components that cookie consent has changed.
-    window.dispatchEvent(new Event("forge-cookie-consent"));
-
-    // Hide the banner only after consent is saved.
     setVisible(false);
   };
 

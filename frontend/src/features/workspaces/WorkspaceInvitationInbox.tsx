@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { workspaceRequest, WorkspaceRequestError } from "./workspace-api";
-import { notifyMembersChanged } from "./members-sync";
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 
 type Invitation = {
@@ -35,12 +34,12 @@ export function WorkspaceInvitationInbox({
 
   useEffect(() => {
     const controller = new AbortController();
+    setError("");
     workspaceRequest<{
       invitations: Invitation[];
     }>(apiUrl, "/invitations/inbox", { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
-          setError("");
           setItems(data.invitations || []);
         }
       })
@@ -79,7 +78,6 @@ export function WorkspaceInvitationInbox({
       if (!signal?.aborted) {
         keys.current.delete(item.id);
         setRefresh((value) => value + 1);
-        notifyMembersChanged(item.workspaceId);
         onJoined(item.workspaceId);
       }
     } catch (failure) {

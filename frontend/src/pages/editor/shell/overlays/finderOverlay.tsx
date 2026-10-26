@@ -56,8 +56,8 @@ export function renderFinderOverlay({
 }: FinderOverlayDeps): React.ReactNode {
   return (
       isFinderOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 px-4 backdrop-blur-sm" onClick={() => setIsFinderOpen(false)}>
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
             {/* Search Header Input */}
             <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 bg-slate-50/50">
               <span className="text-slate-400 text-lg">🔍</span>
@@ -67,10 +67,10 @@ export function renderFinderOverlay({
                 value={finderQuery}
                 onChange={(e) => setFinderQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  // Handle Escape once here; stop it before the window handler can close a second overlay.
+                  // Typing here is ignored by the window shortcut handler, so honour "Esc to close" locally
+                  // (shortcuts help, if also open, keeps priority as in the window handler).
                   if (e.key !== "Escape") return;
                   e.preventDefault();
-                  e.stopPropagation();
                   if (isShortcutsHelpOpen) setIsShortcutsHelpOpen(false);
                   else setIsFinderOpen(false);
                 }}

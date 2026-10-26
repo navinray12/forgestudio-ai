@@ -953,12 +953,6 @@ model WorkspaceCommandJournal {
 }
 
 model WorkspaceOutbox {
-  payload Json?
-  attempts Int @default(0)
-  availableAt DateTime @default(now()) @db.Timestamptz(6)
-  lockedUntil DateTime? @db.Timestamptz(6)
-  lockToken String? @db.Uuid
-  lastError String? @db.VarChar(100)
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @db.Uuid
   actorId String @db.Uuid
@@ -1227,12 +1221,7 @@ model WorkspaceInvitation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @db.Uuid
   workspaceId String @db.Uuid
-  recipientUserId String? @db.Uuid
-  invitedEmail String? @db.VarChar(254)
-  tokenHash String? @unique @db.Char(64)
-  emailStatus String @default("NONE") @db.VarChar(20)
-  emailQueuedAt DateTime? @db.Timestamptz(6)
-  emailSentAt DateTime? @db.Timestamptz(6)
+  recipientUserId String @db.Uuid
   invitedBy String @db.Uuid
   role String @db.VarChar(20)
   status String @default("PENDING") @db.VarChar(20)

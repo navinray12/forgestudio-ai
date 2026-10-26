@@ -2,10 +2,16 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { EditorElement } from "../types";
 
 /**
- * Owns the editor's single window shortcut listener and removes it on unmount.
- * Save uses the latest callback so page-setting edits cannot be saved from a stale render.
- * Ctrl/Cmd+K works while typing. Escape closes help, then Finder, then full-screen
- * before the typing guard; other editor shortcuts leave input fields alone.
+ * The editor's window keyboard shortcuts, moved verbatim from WebsiteEditor.tsx (same handler body,
+ * same dependency list, so the listener is registered and replaced exactly as before: one window
+ * keydown listener, replaced whenever a value in the dependency list changes, removed on unmount).
+ * Some dependencies (elements, history, historyIndex, isPreview, saving) are not read by the handler
+ * but are kept so the re-registration timing, and with it which render's callbacks the handler
+ * captures, is unchanged.
+ *
+ * Ctrl/Cmd+K toggles the finder even while typing; otherwise shortcuts are ignored in inputs,
+ * textareas and contentEditable. Escape closes help, then the finder, then full-screen. The finder's
+ * own search input handles Escape separately (WebsiteEditor.tsx).
  */
 export interface EditorShortcutsInput {
   selectedId: string | null;
@@ -79,25 +85,20 @@ export function useEditorShortcuts({
         return;
       }
 
+      if (isInput) return;
+
       if (e.key === "Escape") {
         if (isShortcutsHelpOpen) {
           e.preventDefault();
           setIsShortcutsHelpOpen(false);
-          return;
         } else if (isFinderOpen) {
           e.preventDefault();
           setIsFinderOpen(false);
-          return;
         } else if (isFullScreenCanvas) {
           e.preventDefault();
           setIsFullScreenCanvas(false);
-          return;
         }
-      }
-
-      if (isInput) return;
-
-      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
         setIsShortcutsHelpOpen((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {

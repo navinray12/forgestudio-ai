@@ -12,9 +12,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
-import UserDashboard from "./pages/dashboard/DashboardPage";
-import { invitationReturnFromAuth } from "./features/workspaces/invitation-context";
-import { InvitationAuthReturn } from "./features/workspaces/InvitationAuthReturn";
+import UserDashboard from "./pages/dashboard/UserDashboard";
 
 // Route-based code splitting for optimal initial bundle size and load performance
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
@@ -30,20 +28,12 @@ const SharedTemplatePreviewPage = lazy(() => import("./pages/templates/SharedTem
 const PublishedSite = lazy(() => import("./pages/published/PublishedSite"));
 const PlatformControlPage = lazy(() => import("./features/platform-control/PlatformControlPage"));
 const DatabaseStudioPage = lazy(() => import("./features/database-studio/pages/DatabaseStudioPage"));
-const WorkspaceInvitationPage = lazy(() => import("./features/workspaces/WorkspaceInvitationPage"));
-const WorkspaceHomePage = lazy(() => import("./features/workspaces/WorkspaceHomePage"));
 
 const TicketListPage = lazy(() => import("./features/support/pages/TicketList").then(m => ({ default: m.TicketListPage })));
 const CreateTicketPage = lazy(() => import("./features/support/pages/CreateTicket").then(m => ({ default: m.CreateTicketPage })));
 const TicketDetailsPage = lazy(() => import("./features/support/pages/TicketDetails").then(m => ({ default: m.TicketDetailsPage })));
 const SupportAdminViewPage = lazy(() => import("./features/support/pages/SupportAdminView").then(m => ({ default: m.SupportAdminViewPage })));
 const ForumPage = lazy(() => import("./features/forum/pages/ForumPage"));
-const SettingsAccountPage = lazy(() => import("./pages/settings/SettingsAccountPage"));
-const SettingsCommunityPage = lazy(() => import("./pages/settings/SettingsCommunityPage"));
-const SettingsNotificationPage = lazy(() => import("./pages/settings/SettingsNotificationPage"));
-const SettingsSecurityPage = lazy(() => import("./pages/settings/SettingsSecurityPage"));
-const SettingsHelpSupportPage = lazy(() => import("./pages/settings/SettingsHelpSupportPage"));
-const AiBuilderPage = lazy(() => import("./pages/ai/AiBuilderPage"));
 interface RoleRouteProps {
   allowedRoles: UserRole[];
   children: React.ReactNode;
@@ -110,8 +100,6 @@ function LoginRoute() {
     );
   }
 
-  const invitationPath = invitationReturnFromAuth(window.location.search);
-  if (user && invitationPath) return <Navigate to={invitationPath} replace />;
   if (user) {
     switch (user.role) {
       case "PLATFORM_ADMIN":
@@ -160,8 +148,6 @@ function SignupRoute() {
     );
   }
 
-  const invitationPath = invitationReturnFromAuth(window.location.search);
-  if (user && invitationPath) return <Navigate to={invitationPath} replace />;
   if (user) {
     switch (user.role) {
       case "PLATFORM_ADMIN":
@@ -258,8 +244,6 @@ function App() {
             path="/signup"
             element={<SignupRoute />}
           />
-          <Route path="/workspace-invitations/:invitationId" element={<WorkspaceInvitationPage />} />
-          <Route path="/dashboard/workspaces/:workspaceId" element={<WorkspaceHomePage />} />
 
           {/* ================= PUBLIC SHARED TEMPLATES ================= */}
 
@@ -321,11 +305,9 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <InvitationAuthReturn>
-                <RoleRoute allowedRoles={["USER"]}>
-                  <UserDashboard />
-                </RoleRoute>
-              </InvitationAuthReturn>
+              <RoleRoute allowedRoles={["USER"]}>
+                <UserDashboard />
+              </RoleRoute>
             }
           />
 
@@ -334,146 +316,6 @@ function App() {
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>
                 <SubscriptionPage />
-              </RoleRoute>
-            }
-          />
-
-          {/* ================= WEB STUDIO SETTINGS & COMMUNITY ================= */}
-          <Route
-            path="/settings"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsAccountPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/account"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsAccountPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/community"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsCommunityPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/community"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsCommunityPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/notifications"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsNotificationPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/notification"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsNotificationPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/notifications"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsNotificationPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/security"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsSecurityPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/security"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsSecurityPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/help-support"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsHelpSupportPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/support"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsHelpSupportPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/settings/help"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsHelpSupportPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/help"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <SettingsHelpSupportPage />
-              </RoleRoute>
-            }
-          />
-
-          {/* ================= AI WEBSITE BUILDER ================= */}
-          <Route
-            path="/ai"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/ai/builder"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/ai-builder"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/builder/ai"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
               </RoleRoute>
             }
           />
@@ -535,31 +377,8 @@ function App() {
           />
 
           <Route
-            path="/builder"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/editor"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <WebsiteEditor />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/builder/summer-sale"
-            element={
-              <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "TEAM_MEMBER", "SUPPORT_AGENT", "SUPPORT_MANAGER", "SUPPORT_ADMIN", "DEVELOPER", "AI_CONTENT_ADMIN"]}>
-                <AiBuilderPage />
-              </RoleRoute>
-            }
-          />
-          <Route
             path="/editor/:websiteId"
+
             element={
               <RoleRoute allowedRoles={["USER", "ADMIN", "SUPER_ADMIN"]}>
                 <WebsiteEditor />

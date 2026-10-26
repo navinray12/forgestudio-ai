@@ -166,17 +166,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
     onUpdatePages(updated);
   };
 
-  const handleMovePage = (pageId: string, direction: "up" | "down") => {
-    const currentIndex = pages.findIndex((p) => p.id === pageId);
-    if (currentIndex === -1) return;
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= pages.length) return;
-    const updated = [...pages];
-    const [moved] = updated.splice(currentIndex, 1);
-    updated.splice(targetIndex, 0, moved);
-    onUpdatePages(updated);
-  };
-
   const handlePromptDelete = (page: PageConfig) => {
     if (pages.length <= 1) {
       alert("Cannot delete the only remaining page.");
@@ -214,7 +203,7 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
   };
 
   return (
-    <div data-testid="page-manager-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fadeIn">
       <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
@@ -237,8 +226,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close Page Manager"
-            data-testid="close-page-manager-modal"
             className="text-slate-400 hover:text-white text-lg font-bold p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
           >
             ✕
@@ -335,7 +322,7 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
               No pages match "{searchQuery}".
             </div>
           ) : (
-            filteredPages.map((page, index) => {
+            filteredPages.map((page) => {
               const isHome = page.id === homePageId || page.isHome || page.slug === "/";
               const isActive = page.id === activePageId;
               const isEditing = editingPageId === page.id;
@@ -343,7 +330,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
               return (
                 <div
                   key={page.id}
-                  data-testid={`page-row-${page.slug.replace(/^\//, "") || "home"}`}
                   className={`rounded-xl border transition p-3.5 flex items-center justify-between gap-3 ${
                     isActive
                       ? "border-blue-500/50 bg-blue-950/20 shadow-xs"
@@ -358,7 +344,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-white"
-                          data-testid="page-edit-name-input"
                           placeholder="Page Name"
                         />
                         <input
@@ -374,7 +359,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          data-testid="page-edit-save-btn"
                           onClick={() => handleSaveEdit(page.id)}
                           className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold"
                         >
@@ -436,7 +420,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
 
                       <button
                         type="button"
-                        data-testid="page-rename-btn"
                         onClick={() => handleStartEdit(page)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
                         title="Rename page or edit slug"
@@ -456,7 +439,6 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
                       {!isHome && (
                         <button
                           type="button"
-                          data-testid="page-set-home-btn"
                           onClick={() => handleSetHome(page.id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
                           title="Set as Home page (/)"
@@ -466,40 +448,11 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
                       )}
 
                       {pages.length > 1 && (
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            type="button"
-                            data-testid="page-move-up-btn"
-                            onClick={() => handleMovePage(page.id, "up")}
-                            disabled={index === 0}
-                            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:text-slate-400 transition"
-                            title="Move page up"
-                            aria-label="Move page up"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            data-testid="page-move-down-btn"
-                            onClick={() => handleMovePage(page.id, "down")}
-                            disabled={index === filteredPages.length - 1}
-                            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:text-slate-400 transition"
-                            title="Move page down"
-                            aria-label="Move page down"
-                          >
-                            ↓
-                          </button>
-                        </div>
-                      )}
-
-                      {pages.length > 1 && (
                         <button
                           type="button"
-                          data-testid="page-delete-btn"
                           onClick={() => handlePromptDelete(page)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition"
                           title="Delete page"
-                          aria-label="Delete page"
                         >
                           🗑️
                         </button>

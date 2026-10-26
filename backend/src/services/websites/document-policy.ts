@@ -6,7 +6,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_NODES = 100_000;
 const MAX_DEPTH = 48;
 const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"]);
-const SERVER_DOCUMENT_KEYS = new Set(["publishedData", "publishing", "releases", "currentReleaseId", "deploymentHistory", "deployment", "backups", "backupPolicy", "hostingConfig", "customDomains", "scheduledPublish", "integrations", "formNotifications"]);
+const SERVER_DOCUMENT_KEYS = new Set(["publishedData", "publishing", "releases", "currentReleaseId", "deploymentHistory", "deployment", "backups", "backupPolicy", "hostingConfig", "customDomains", "scheduledPublish"]);
 const CONTENT_KEYS = new Set(["text", "title", "description", "buttonText", "imageUrl", "imageAlt", "videoUrl", "link", "url", "label", "placeholder", "htmlContent"]);
 const EPHEMERAL_KEYS = new Set(["lastSavedAt", "activePageId", "selectedElementId"]);
 

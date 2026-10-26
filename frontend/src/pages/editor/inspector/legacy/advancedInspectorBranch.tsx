@@ -44,9 +44,7 @@ export interface AdvancedInspectorBranchDeps {
 }
 
 /**
- * Extended widget controls, including developer options and panels for 42 element types.
- * The redesigned editor exposes these after the common Style controls; keep this module
- * so the UI redesign and the extracted renderer architecture share the same controls.
+ * Legacy "advanced" inspector (Branch B of the inspector ternary). UNREACHABLE and preserved unchanged: the editor only calls this when activeSidebarTab === "advanced" && selectedElementAny, which is never true in that position (the first branch already handles a selection, and setActiveSidebarTab is never called). Holds panels for 42 element types and 348 control labels (206 found nowhere else); kept for a separate product review.
  * Moved verbatim from WebsiteEditor.tsx's JSX return (lines 3537-10676 before the move). A plain
  * function, not a component: the editor calls it in the same child slot during its own render, so the
  * element tree, element identity, focus and handlers are unchanged.

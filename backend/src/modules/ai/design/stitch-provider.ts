@@ -25,8 +25,8 @@ export class StitchDesignProvider implements DesignProvider {
   }
   async generate(projectId: string, prompt: string) {
     try {
-      const tools = typeof this.client.listTools === "function" ? await this.client.listTools() : { tools: [] };
-      const tool = tools?.tools?.find((item: { name: string }) => item.name === "generate_screen_from_text");
+      const tools = await this.client.listTools();
+      const tool = tools.tools.find((item: { name: string }) => item.name === "generate_screen_from_text");
       const schema = tool?.inputSchema as {
         properties?: {
           modelId?: { enum?: string[] };
@@ -58,7 +58,14 @@ export class StitchDesignProvider implements DesignProvider {
           effectiveModel = this.model;
           console.log(`[STITCH] Using configured model: ${effectiveModel}`);
         } else if (modelIdEnum && modelIdEnum.length > 0) {
-          throw new AppError(`Configured Stitch model '${this.model}' is invalid. Currently supported models: ${modelIdEnum.join(", ")}`, 400, "AI_BAD_REQUEST");
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(`[STITCH] Configured model '${this.model}' is unsupported by live provider. Live supported models: [${modelIdEnum.join(", ")}]`);
+            const fallback = modelIdEnum.find(m => m !== "MODEL_ID_UNSPECIFIED") || modelIdEnum[0];
+            console.log(`[STITCH] Runtime model selected: ${fallback}`);
+            effectiveModel = fallback;
+          } else {
+            throw new AppError(`Configured Stitch model '${this.model}' is invalid. Currently supported models: ${modelIdEnum.join(", ")}`, 400, "AI_BAD_REQUEST");
+          }
         } else {
           effectiveModel = this.model;
         }

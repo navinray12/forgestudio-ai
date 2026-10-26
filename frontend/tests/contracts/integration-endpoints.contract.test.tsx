@@ -85,8 +85,6 @@ describe("backend route table read from source", () => {
     expect(integrationMounts).toEqual(["/api/v1/integrations"]);
     expect(uploadMounts).toEqual(["/api/v1/uploads", "/api/uploads"]);
     expect(BACKEND.map((r) => `${r.method} ${r.path}${r.auth ? " (auth)" : ""}`)).toEqual([
-      "GET /api/v1/integrations/sites/:websiteId/settings (auth)",
-      "PUT /api/v1/integrations/sites/:websiteId/settings (auth)",
       "POST /api/v1/integrations/paypal/create-order",
       "POST /api/v1/integrations/paypal/capture-order",
       "POST /api/v1/integrations/stripe/create-checkout-session",
