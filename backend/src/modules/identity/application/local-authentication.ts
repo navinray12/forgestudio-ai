@@ -96,7 +96,7 @@ export class LocalAuthentication {
     });
     try {
       await this.delivery.sendCode({ email, code, purpose });
-    } catch (deliveryError) {
+    } catch {
       await this.store.transaction(async tx => {
         await tx.lockUser(userId);
         const current = await tx.lockChallenge(row.id);

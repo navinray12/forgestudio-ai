@@ -7,7 +7,7 @@ import { resolveAnthropicWorkspaceId } from "./anthropic-workspace.js";
 export class AnthropicProvider implements AiProvider {
   readonly name = "anthropic";
   constructor(private readonly apiKey = process.env.ANTHROPIC_API_KEY,
-    readonly model: string = process.env.AI_MODEL_PLANNER ?? "",
+    readonly model: string = process.env.AI_MODEL_PLANNER || process.env.AI_CLAUDE_DESIGN_MODEL || "claude-3-5-sonnet-20241022",
     private readonly fetcher: typeof fetch = fetch) { }
 
   async generate(request: AiGenerationRequest): Promise<AiGenerationResult> {

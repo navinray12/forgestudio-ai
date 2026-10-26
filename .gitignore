@@ -34,4 +34,5 @@ backend/artifacts/
 test-results/
 playwright-report/
 backend/uploads/backups/
+backend/uploads/images/
 .backup*

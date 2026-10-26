@@ -35,6 +35,7 @@ export async function submitFormHandler(
     };
 
     const result = await processFormSubmission({
+      integrationTokens: req.body.integrationTokens,
       websiteId,
       formId,
       formName,

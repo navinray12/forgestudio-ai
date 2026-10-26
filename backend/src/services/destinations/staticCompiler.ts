@@ -98,7 +98,8 @@ export function compileCanonicalToStaticBundle(
       siteParts: websiteData.siteParts ? resolveTokensInTree(websiteData.siteParts, siteContext) : undefined,
     };
 
-    const fileName = resolvedPage.isHome ? "index.html" : `${resolvedPage.slug || resolvedPage.id}.html`;
+    const cleanSlug = (resolvedPage.slug || resolvedPage.id || "page").replace(/^\/+/, "");
+    const fileName = resolvedPage.isHome ? "index.html" : `${cleanSlug}.html`;
     const pageHtml = generatePageHtml(resolvedPage, resolvedWebsiteData, normalizedPages, compiledCss);
 
     files.push({

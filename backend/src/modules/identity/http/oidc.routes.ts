@@ -13,7 +13,8 @@ export function createOidcRouter(identity: OidcAuthentication | null = oidcAuthe
   const router = Router();
   router.get("/capabilities", (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    res.json({ success: true, data: { local: localAuthenticationEnabled(), managed: !!identity, phone: false } });
+    res.json({ success: true, data: { local: localAuthenticationEnabled(), managed: !!identity, phone: false,
+      ...(localAuthenticationEnabled() && process.env.FORGE_LOCAL_OTP_FILE ? { verificationDelivery: "LOCAL_FILE" } : {}) } });
   });
   router.post(["/oidc/start", "/oidc/link"], requireBrowserOrigin, async (req, res, next) => {
     if (!identity) throw new AppError("Managed sign-in is not configured.", 503, "IDENTITY_PROVIDER_UNAVAILABLE");

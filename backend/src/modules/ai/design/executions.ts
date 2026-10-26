@@ -29,9 +29,9 @@ export async function startDesignExecution(websiteId: string, actorId: string, r
       return scope;
     },
     execute: async (tx, { website }) => {
+      if (website.documentVersion !== write.expectedVersion) throw new AppError("Save or reload the website before generation", 412, "DOCUMENT_VERSION_CONFLICT");
       const config = parent ? designConfigSchema.parse(parent.providerSnapshot) : designConfig();
       if (config.provider === "stitch" && input.operation === "EDIT_DOCUMENT") throw new AppError("Stitch-only mode supports page generation", 422, "AI_UNSUPPORTED_OPERATION");
-      if (website.documentVersion !== write.expectedVersion) throw new AppError("Save or reload the website before generation", 412, "DOCUMENT_VERSION_CONFLICT");
       // Serialize workspace admission, bounding concurrent requests and reserved
       // provider calls. Reservations are conservative and not a claim of dollar cost.
       await tx.$queryRaw`SELECT id FROM workspaces WHERE id=${website.workspaceId}::uuid FOR UPDATE`;

@@ -94,6 +94,9 @@ export function UnifiedAiAssistant({
 
   // Fetch current website document version
   async function getCurrentVersion(): Promise<number> {
+    if (prepare) {
+      return await prepare();
+    }
     const res = await fetch(`${apiUrl}/api/websites/${websiteId}`, {
       credentials: "include",
       headers: { ...getAuthHeaders() },
@@ -125,7 +128,13 @@ export function UnifiedAiAssistant({
       const expectedVersion = await getCurrentVersion();
       const res = await fetch(`${apiUrl}/api/v1/ai/websites/${websiteId}/assistant`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `ast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          "If-Match": `"${websiteId}:document:${expectedVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({
           prompt: textToSubmit,
@@ -140,7 +149,13 @@ export function UnifiedAiAssistant({
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || data.success === false) {
-        throw new Error(data?.message || data?.error?.message || "AI action failed");
+        if (data?.code === "DOCUMENT_VERSION_CONFLICT") {
+          throw new Error("The website was updated concurrently. Please reload and try again.");
+        } else if (data?.code === "DOCUMENT_PRECONDITION_REQUIRED") {
+          throw new Error("Authoritative document version required. Please reload the website.");
+        } else {
+          throw new Error(data?.detail || data?.error?.message || data?.message || "AI action failed");
+        }
       }
 
       if (data.result?.changeset) {
@@ -215,15 +230,32 @@ export function UnifiedAiAssistant({
     setError(null);
 
     try {
+      const commandKey = `apply:${changeset.id}:${Date.now()}`;
+      if (apply) {
+        await apply(changeset, commandKey);
+        setSuccessMessage("Changes applied successfully to your website!");
+        setChangeset(null);
+        setTimeout(() => {
+          onApplied();
+        }, 700);
+        return;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": commandKey,
+          "If-Match": `"${websiteId}:document:${changeset.expectedDocumentVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
 
       const applyResult = await res.json().catch(() => null);
-      if (!res.ok || applyResult?.success === false) {
-        throw new Error(applyResult?.message || applyResult?.error?.message || "Failed to apply changeset");
+      if (!res.ok || !applyResult || applyResult.success === false) {
+        throw new Error(applyResult?.detail || applyResult?.message || applyResult?.error?.message || "Failed to apply changeset");
       }
 
       setSuccessMessage("Changes applied successfully to your website!");
@@ -245,7 +277,11 @@ export function UnifiedAiAssistant({
     try {
       const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
         method: "POST",
-        headers: { ...getAuthHeaders() },
+        headers: {
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `cancel:${changeset.id}:${Date.now()}`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
       const cancelResult = await res.json().catch(() => null);

@@ -10,7 +10,7 @@ import * as lifecycle from "../services/workspaces/lifecycle.service.js";
 import * as invites from "../services/workspaces/invitation.service.js";
 import workspaceRouter from "../routes/tenant-workspace.routes.js";
 import {errorMiddleware} from "../middlewares/error.middleware.js";
-import { fixtureHasMigration } from "./migration-fixture.js";
+import { fixtureHasMigration, applyWorkspaceEmailFixtureMigration } from "./migration-fixture.js";
 
 export async function runWorkspaceLifecycleContracts(t:TestContext) {
  // Only the parent suite's explicitly guarded disposable database reaches here.
@@ -27,6 +27,7 @@ export async function runWorkspaceLifecycleContracts(t:TestContext) {
      ALTER TABLE workspaces DROP COLUMN IF EXISTS "lifecycleStatus", DROP COLUMN IF EXISTS version, DROP COLUMN IF EXISTS "archivedAt"`);
    await pgPool.query(readFileSync("prisma/migrations/20260928122000_workspace_lifecycle/migration.sql","utf8"));
  }
+ await applyWorkspaceEmailFixtureMigration();
  const createUser=(name:string)=>prisma.user.create({data:{fullName:name,email:`${randomUUID()}@example.test`,emailVerified:true,status:"ACTIVE"}});
  const owner=await createUser("Lifecycle owner"), recipient=await createUser("Invited recipient"), stranger=await createUser("Other recipient");
  const created=await workspaces.createTenantWorkspace(owner.id,{name:"Lifecycle"},"lifecycle-create-1");

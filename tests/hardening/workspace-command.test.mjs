@@ -31,7 +31,7 @@ async function fixture({auditFailure=false,journalFailure=false,conflicts=0}={})
   }};
   const {workspaceCommand}=await loadTypeScript('backend/src/services/workspaces/command.ts',{
     '../../config/prisma.js':{prisma},
-    '../../config/ensure-schema.js':{ensureDatabaseTables:async()=>{}},
+    '../../config/ensure-schema.js':{ensureDatabaseTables:async()=>assert.fail('Unit tests must not perform schema recovery')},
   });
   const input={actorId:'actor',operation:'WORKSPACE_CREATED',key:'test-key-123',payload:{name:'Engineering'},
     authorize:async()=>{if(!allowed)throw new Error('membership revoked');return {organizationId:'organization'};},
@@ -76,4 +76,11 @@ test('REL-001: conflict retry budget is finite',async()=>{
 for(const key of ['',null,'a','x'.repeat(129),'invalid key'])test(`API-003: rejects invalid idempotency key ${typeof key}`,async()=>{
   const f=await fixture();await assert.rejects(f.workspaceCommand({...f.input,key}),{code:'IDEMPOTENCY_KEY_REQUIRED'});
   assert.equal(f.attempts(),0);
+});
+
+test('invitation schema errors require a migration without runtime DDL recovery',async()=>{
+  const f=await fixture();
+  await assert.rejects(f.workspaceCommand({...f.input,operation:'WORKSPACE_INVITATION_CREATED',
+    execute:async()=>{throw Object.assign(new Error('fixture missing column'),{code:'P2022'});}}),{code:'MIGRATION_REQUIRED'});
+  assert.equal(f.attempts(),1); assert.equal(f.state().changes,0);
 });
