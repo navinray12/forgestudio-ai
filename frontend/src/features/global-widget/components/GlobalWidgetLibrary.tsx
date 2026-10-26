@@ -36,8 +36,8 @@ export const GlobalWidgetLibrary: React.FC<GlobalWidgetLibraryProps> = ({
     try {
       await removeWidget(deleteCandidate.id);
       setDeleteCandidate(null);
-    } catch (err: any) {
-      setDeleteError(err?.message || "Unable to delete Global Widget.");
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Unable to delete Global Widget.");
     } finally {
       setIsDeleting(false);
     }

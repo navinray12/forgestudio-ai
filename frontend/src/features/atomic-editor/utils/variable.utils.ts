@@ -4,12 +4,15 @@ import type { VariableType } from "../types/variables.types";
  * Formats a raw variable name into a clean CSS custom property key e.g. "--primary-color"
  */
 export function formatVariableKey(name: string): string {
+  // Normalize the name separately from the CSS custom-property prefix.
+  // Collapsing hyphens after prefixing can accidentally create ---primary.
   const clean = name
     .trim()
     .toLowerCase()
+    .replace(/^-+/, "")
     .replace(/[^a-z0-9-_]/g, "-")
     .replace(/-+/g, "-");
-  return clean.startsWith("--") ? clean : `--${clean}`;
+  return `--${clean}`;
 }
 
 /**
@@ -52,7 +55,7 @@ export async function copyVariableReference(key: string): Promise<boolean> {
       await navigator.clipboard.writeText(ref);
       return true;
     }
-  } catch (e) {
+  } catch {
     // Fallback if clipboard API is restricted
   }
   return false;

@@ -23,4 +23,24 @@ export async function cancelDesignHandler(req: Request, res: Response, next: Nex
 export async function retryDesignHandler(req: Request, res: Response, next: NextFunction) {
   try { const id = String(req.params.executionId), row = await authorizedExecution(id, res.locals.user.id); res.status(202).json(await retryDesignExecution(id, res.locals.user.id, documentWriteContext(req, row.websiteId))); } catch (error) { next(error); }
 }
-export function designCapabilitiesHandler(_req: Request, res: Response) { res.setHeader("Cache-Control", "no-store"); res.json({ design: designAvailability() }); }
+import { getPlatformCapabilityMatrix } from "../modules/ai/provider-routing.js";
+
+export function designCapabilitiesHandler(_req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
+  const hasOpenAi = Boolean(process.env.OPENAI_API_KEY);
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasStitch = Boolean(process.env.STITCH_API_KEY);
+  const anyConfigured = hasOpenAi || hasGemini || hasAnthropic || hasStitch;
+  res.json({
+    design: designAvailability(),
+    capabilities: getPlatformCapabilityMatrix(),
+    providers: {
+      openai: hasOpenAi,
+      gemini: hasGemini,
+      anthropic: hasAnthropic,
+      stitch: hasStitch,
+    },
+    available: anyConfigured,
+  });
+}

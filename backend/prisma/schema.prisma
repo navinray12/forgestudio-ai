@@ -953,6 +953,12 @@ model WorkspaceCommandJournal {
 }
 
 model WorkspaceOutbox {
+  payload Json?
+  attempts Int @default(0)
+  availableAt DateTime @default(now()) @db.Timestamptz(6)
+  lockedUntil DateTime? @db.Timestamptz(6)
+  lockToken String? @db.Uuid
+  lastError String? @db.VarChar(100)
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @db.Uuid
   actorId String @db.Uuid
@@ -1221,7 +1227,12 @@ model WorkspaceInvitation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @db.Uuid
   workspaceId String @db.Uuid
-  recipientUserId String @db.Uuid
+  recipientUserId String? @db.Uuid
+  invitedEmail String? @db.VarChar(254)
+  tokenHash String? @unique @db.Char(64)
+  emailStatus String @default("NONE") @db.VarChar(20)
+  emailQueuedAt DateTime? @db.Timestamptz(6)
+  emailSentAt DateTime? @db.Timestamptz(6)
   invitedBy String @db.Uuid
   role String @db.VarChar(20)
   status String @default("PENDING") @db.VarChar(20)
@@ -2051,4 +2062,21 @@ model BenchmarkRunRecord {
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("forge_benchmark_runs")
+}
+
+/// Durable ApplicationSpec revisions (blueprint v2.1 §33.1/33.3, WP-17/WP-20). The forge_projects
+/// foreign key and check constraints are migration-owned SQL.
+model ForgeApplicationSpecRevision {
+  applicationId  String   @db.VarChar(120)
+  revision       Int
+  parentRevision Int
+  projectId      String   @db.Uuid
+  tenantId       String   @db.VarChar(120)
+  digest         String   @db.Char(64)
+  spec           Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([applicationId, revision], map: "forge_appspec_revision_pk")
+  @@index([projectId, applicationId, revision(sort: Desc)], map: "forge_appspec_project_idx")
+  @@map("forge_application_spec_revisions")
 }

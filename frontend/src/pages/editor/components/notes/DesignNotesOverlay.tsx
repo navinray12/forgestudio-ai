@@ -14,6 +14,10 @@ export interface DesignNoteItem {
   createdAt: string;
 }
 
+// The API origin (VITE_API_URL, else the local backend), as the other editor callers use: a relative
+// /api URL resolves against the frontend's own origin, which has no /api proxy (Phase 7C).
+const DESIGN_NOTES_API = `${(import.meta as any).env?.VITE_API_URL || "http://localhost:5000"}/api/design-notes`;
+
 interface DesignNotesOverlayProps {
   websiteId: string;
   activeElementId?: string | null;
@@ -37,7 +41,7 @@ export const DesignNotesOverlay: React.FC<DesignNotesOverlayProps> = ({
     if (!websiteId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/design-notes?websiteId=${websiteId}`, {
+      const res = await fetch(`${DESIGN_NOTES_API}?websiteId=${websiteId}`, {
         credentials: "include",
       });
       if (res.ok) {
@@ -62,7 +66,7 @@ export const DesignNotesOverlay: React.FC<DesignNotesOverlayProps> = ({
     if (!newContent.trim() || !websiteId) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/design-notes", {
+      const res = await fetch(DESIGN_NOTES_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -87,8 +91,8 @@ export const DesignNotesOverlay: React.FC<DesignNotesOverlayProps> = ({
   const handleToggleResolve = async (noteId: string, currentResolved: boolean) => {
     try {
       const endpoint = currentResolved
-        ? `/api/design-notes/${noteId}/reopen`
-        : `/api/design-notes/${noteId}/resolve`;
+        ? `${DESIGN_NOTES_API}/${noteId}/reopen`
+        : `${DESIGN_NOTES_API}/${noteId}/resolve`;
       const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
@@ -105,7 +109,7 @@ export const DesignNotesOverlay: React.FC<DesignNotesOverlayProps> = ({
 
   const handleDeleteNote = async (noteId: string) => {
     try {
-      const res = await fetch(`/api/design-notes/${noteId}`, {
+      const res = await fetch(`${DESIGN_NOTES_API}/${noteId}`, {
         method: "DELETE",
         credentials: "include",
       });

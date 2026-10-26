@@ -40,25 +40,33 @@ export default function NotesPanel({ isOpen, onClose, websiteId, apiUrl, selecte
     const [filter, setFilter] = useState<"ALL" | "OPEN" | "RESOLVED" | "ELEMENT">("ALL");
 
     useEffect(() => {
-        if (isOpen) {
-            fetchNotes();
-        }
-    }, [isOpen, websiteId]);
+        if (!isOpen) return;
 
-    const fetchNotes = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${apiUrl}/api/design-notes?websiteId=${websiteId}`, { credentials: "include" });
-            const data = await res.json();
-            if (res.ok && data.notes) {
-                setNotes(data.notes);
+        const controller = new AbortController();
+        const fetchNotes = async () => {
+            try {
+                const res = await fetch(`${apiUrl}/api/design-notes?websiteId=${encodeURIComponent(websiteId)}`, {
+                    credentials: "include",
+                    signal: controller.signal,
+                });
+                if (!res.ok) throw new Error(`Failed to load design notes (HTTP ${res.status})`);
+                const data: { notes?: Note[] } = await res.json();
+                if (!controller.signal.aborted) setNotes(data.notes ?? []);
+            } catch (err) {
+                if (!controller.signal.aborted) console.error(err);
+            } finally {
+                if (!controller.signal.aborted) setLoading(false);
             }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        };
+
+        // Schedule the initial loading state outside the synchronous effect.
+        void Promise.resolve().then(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            void fetchNotes();
+        });
+        return () => controller.abort();
+    }, [isOpen, websiteId, apiUrl]);
 
     const handleAddNote = async () => {
         if (!newNoteContent.trim()) return;
@@ -76,7 +84,7 @@ export default function NotesPanel({ isOpen, onClose, websiteId, apiUrl, selecte
             });
             const data = await res.json();
             if (res.ok && data.note) {
-                setNotes([data.note, ...notes]);
+                setNotes(previous => [data.note, ...previous]);
                 setNewNoteContent("");
             }
         } catch (err) {
@@ -95,7 +103,7 @@ export default function NotesPanel({ isOpen, onClose, websiteId, apiUrl, selecte
             });
             const data = await res.json();
             if (res.ok && data.note) {
-                setNotes(notes.map(n => n.id === id ? data.note : n));
+                setNotes(previous => previous.map(n => n.id === id ? data.note : n));
             }
         } catch (err) {
             console.error(err);
@@ -110,7 +118,7 @@ export default function NotesPanel({ isOpen, onClose, websiteId, apiUrl, selecte
                 credentials: "include",
             });
             if (res.ok) {
-                setNotes(notes.filter(n => n.id !== id));
+                setNotes(previous => previous.filter(n => n.id !== id));
             }
         } catch (err) {
             console.error(err);

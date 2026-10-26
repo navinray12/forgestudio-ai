@@ -185,7 +185,13 @@ export async function updateWebsiteHandler(
     // reported alongside it rather than hidden.
     let codeSync: Awaited<ReturnType<typeof syncBridgedProjectForWebsite>> = null;
     if (req.body && req.body.editorData !== undefined) {
-      codeSync = await syncBridgedProjectForWebsite(websiteId, { id: user.id }, { snapshot: false });
+      try {
+        codeSync = await syncBridgedProjectForWebsite(websiteId, { id: user.id }, { snapshot: false });
+      } catch {
+        // A successful document commit must not be reported as an HTTP failure
+        // because optional generated-source synchronization is unavailable.
+        codeSync = { synced: false, stale: true, error: "Source synchronization unavailable", projectId: "" };
+      }
     }
 
     return res.status(200).json({

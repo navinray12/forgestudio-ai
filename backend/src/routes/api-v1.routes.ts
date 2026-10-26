@@ -13,10 +13,19 @@ import {
   rollbackDeploymentV1Handler,
 } from "../controllers/api-v1.controller.js";
 
+import {
+  getPublicCustomPostTypesHandler,
+  getPublicCustomEntriesHandler,
+  getPublicSingleCustomEntryHandler,
+} from "../controllers/customPostType.controller.js";
+
 const router = Router();
 
-// 1. Unauthenticated Public Runtime Route
+// 1. Unauthenticated Public Runtime Routes
 router.get("/websites/public/:id", getPublicWebsiteHandler);
+router.get("/websites/public/:id/cpt", getPublicCustomPostTypesHandler);
+router.get("/websites/public/:id/cpt/:cptSlug/entries", getPublicCustomEntriesHandler);
+router.get("/websites/public/:id/cpt/:cptSlug/entries/:entrySlug", getPublicSingleCustomEntryHandler);
 
 // 2. Authenticated Public API v1 Routes
 const v1Auth = [authenticateApiV1];

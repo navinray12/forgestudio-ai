@@ -1,0 +1,1170 @@
+{
+  "empty pages": {
+    "value": {
+      "pages": [],
+      "newArray": true,
+      "identity": []
+    }
+  },
+  "single page, active": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        }
+      ]
+    }
+  },
+  "multi-page, middle page active": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "multi-page, first page active": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "isHome": true,
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "active page id not present": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode header: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode footer: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode single: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode archive: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode 404: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "canvas mode search-results: no merge": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "aboutEl",
+              "type": "heading",
+              "content": "aboutEl",
+              "styles": {}
+            }
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "empty title and path fall back to the page name and slug": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "",
+            "path": ""
+          }
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "undefined title and path fall back": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Name about",
+          "slug": "/about",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {}
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "extra pageSettings keys are carried": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "T",
+          "slug": "/p",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "T",
+            "path": "/p",
+            "seoTitle": "S",
+            "noindex": true
+          }
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "page without name or slug": {
+    "value": {
+      "pages": [
+        {
+          "id": "about",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "",
+            "path": ""
+          },
+          "name": "(undefined)",
+          "slug": "(undefined)"
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        }
+      ]
+    }
+  },
+  "page with its own pageSettings is replaced by the editor's": {
+    "value": {
+      "pages": [
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        }
+      ]
+    }
+  },
+  "legacy single home page": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          },
+          "isHome": true
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        }
+      ]
+    }
+  },
+  "duplicate ids: every match is merged": {
+    "value": {
+      "pages": [
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        },
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        },
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/home",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "empty canvas elements": {
+    "value": {
+      "pages": [
+        {
+          "id": "home",
+          "name": "Name home",
+          "slug": "/",
+          "elements": [
+            {
+              "id": "homeEl",
+              "type": "heading",
+              "content": "homeEl",
+              "styles": {}
+            }
+          ],
+          "isHome": true
+        },
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [],
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        },
+        {
+          "id": "contact",
+          "name": "Name contact",
+          "slug": "/contact",
+          "elements": [
+            {
+              "id": "contactEl",
+              "type": "heading",
+              "content": "contactEl",
+              "styles": {}
+            }
+          ]
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        },
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        },
+        {
+          "sameAsInput": true,
+          "elementsByRef": false,
+          "pageSettingsByRef": false
+        }
+      ]
+    }
+  },
+  "page extra fields (customCss, isHome) are kept": {
+    "value": {
+      "pages": [
+        {
+          "id": "about",
+          "name": "Edited Title",
+          "slug": "/edited",
+          "elements": [
+            {
+              "id": "canvas1",
+              "type": "heading",
+              "content": "canvas1",
+              "styles": {}
+            },
+            {
+              "id": "canvas2",
+              "type": "heading",
+              "content": "canvas2",
+              "styles": {}
+            }
+          ],
+          "customCss": ".x{}",
+          "isHome": false,
+          "seo": {
+            "a": 1
+          },
+          "pageSettings": {
+            "title": "Edited Title",
+            "path": "/edited",
+            "description": "d"
+          }
+        }
+      ],
+      "newArray": true,
+      "identity": [
+        {
+          "sameAsInput": false,
+          "elementsByRef": true,
+          "pageSettingsByRef": true
+        }
+      ]
+    }
+  }
+}

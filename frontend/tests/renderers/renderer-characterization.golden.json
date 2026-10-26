@@ -1,0 +1,902 @@
+{
+  "slides": {
+    "markup": "<div class=\"flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 text-center bg-slate-50/50\"><p class=\"text-sm font-bold text-slate-600\">No Slides Created</p><p class=\"text-xs text-slate-400 mt-1\">Use the right properties panel to add slide items.</p></div>",
+    "tick": "504ac01904af8fc9",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "form": {
+    "markup": "<div class=\"flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center bg-slate-50/50\"><div class=\"flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 mb-3\"><svg class=\"h-6 w-6\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"></path><polyline points=\"14 2 14 8 20 8\"></polyline></svg></div><p class=\"text-base font-bold text-slate-700\">Empty Form Widget</p><p class=\"text-xs text-slate-400 mt-1\">Use the properties panel on the right to add form fields.</p></div>",
+    "tick": "724c29564eec4a3e",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "login": {
+    "markup": "<div class=\"w-full max-w-md mx-auto rounded-3xl p-6 sm:p-10 shadow-xl border transition-all duration-300\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(241, 245, 249); box-sizing: border-box;\"><div class=\"text-center mb-8\"><div class=\"mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-3 shadow-xs\"><svg class=\"h-6 w-6\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4\"></path><polyline points=\"10 17 15 12 10 7\"></polyline><line x1=\"15\" y1=\"12\" x2=\"3\" y2=\"12\"></line></svg></div><h3 class=\"text-xl sm:text-2xl font-black text-slate-900 tracking-tight\">Welcome Back</h3><p class=\"mt-2 text-xs sm:text-sm text-slate-500 font-normal leading-relaxed\">Sign in to your account to access your workspace.</p></div><div class=\"space-y-3 mb-6\"><button type=\"button\" class=\"flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white py-3 px-4 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:border-slate-300 active:scale-98 cursor-pointer\"><svg class=\"h-4 w-4\" viewBox=\"0 0 24 24\"><path fill=\"#EA4335\" d=\"M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.4 8.9 5 12 5z\"></path><path fill=\"#4285F4\" d=\"M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z\"></path><path fill=\"#FBBC05\" d=\"M5.3 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.6 7.4C.6 9.4 0 11.6 0 14s.6 4.6 1.6 6.6l3.7-2.9z\"></path><path fill=\"#34A853\" d=\"M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.4-6.7-5.3L1.6 16C3.5 19.8 7.4 23 12 23z\"></path></svg><span>Continue with Google</span></button><div class=\"relative flex items-center justify-center my-4\"><div class=\"w-full border-t border-slate-200\"></div><span class=\"absolute bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider\">Or sign in with email</span></div></div><form class=\"space-y-4\"><div><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">Email Address</label><div class=\"relative flex items-center\"><span class=\"absolute left-4 text-slate-400 pointer-events-none\"><svg class=\"h-4 w-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z\"></path><polyline points=\"22,6 12,13 2,6\"></polyline></svg></span><input required=\"\" placeholder=\"name@example.com\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 pl-11 pr-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 hover:border-slate-300\" type=\"email\" value=\"\"></div></div><div><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">Password</label><div class=\"relative flex items-center\"><span class=\"absolute left-4 text-slate-400 pointer-events-none\"><svg class=\"h-4 w-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\" ry=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg></span><input required=\"\" placeholder=\"••••••••\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 pl-11 pr-11 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 hover:border-slate-300\" type=\"password\" value=\"\"><button type=\"button\" class=\"absolute right-4 text-slate-400 hover:text-slate-600 transition cursor-pointer\" title=\"Show password\"><svg class=\"h-4 w-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div><div class=\"flex items-center justify-between pt-1 text-xs\"><label class=\"flex items-center gap-2 font-medium text-slate-700 cursor-pointer\"><input class=\"h-4 w-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer\" type=\"checkbox\"><span>Remember me</span></label><a href=\"#\" class=\"font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer\">Forgot password?</a></div><div class=\"pt-2\"><button type=\"submit\" class=\"group flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 text-xs sm:text-sm font-extrabold shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] cursor-pointer\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\"><span>Sign In</span><svg class=\"h-4 w-4 transition-transform duration-300 group-hover:translate-x-1\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg></button></div></form></div>",
+    "tick": "1af0d7deedf65dcb",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "1af0d7deedf65dcb"
+      ],
+      [
+        "1:input[email]",
+        [],
+        "e9655319d21d2175"
+      ],
+      [
+        "2:input[password]",
+        [],
+        "0ae9dae74273069b"
+      ],
+      [
+        "3:button",
+        [],
+        "91e42c5dfa21c917"
+      ],
+      [
+        "4:input[checkbox]",
+        [],
+        "1af0d7deedf65dcb"
+      ],
+      [
+        "5:a",
+        [],
+        "1af0d7deedf65dcb"
+      ],
+      [
+        "6:button",
+        [],
+        "1af0d7deedf65dcb"
+      ]
+    ]
+  },
+  "nav-menu": {
+    "markup": "<nav class=\"w-full flex justify-start relative transition-all\" style=\"box-sizing: border-box;\"><div class=\"flex sm:hidden items-center justify-between p-2 w-full\"><span class=\"text-xs font-bold text-slate-700\">Navigation Menu</span><button type=\"button\" class=\"p-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition cursor-pointer\">☰</button></div><ul class=\"flex w-full hidden sm:flex flex-row items-center justify-start wrap relative\" style=\"gap: 24px; position: relative; min-height: 44px;\"><li class=\"group list-none  \" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"/\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: rgba(37, 99, 235, 0.1); color: rgb(37, 99, 235); font-size: 14px; font-weight: 600; text-transform: none;\"><span>Home</span></a></li><li class=\"group list-none  \" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"/about\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: transparent; color: rgb(51, 65, 85); font-size: 14px; font-weight: 600; text-transform: none;\"><span>About Us</span></a></li></ul></nav>",
+    "tick": "adf84f8b121cab48",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "811a34d39e254cbf"
+      ],
+      [
+        "1:a",
+        [
+          [
+            "onNavigatePage",
+            "home"
+          ]
+        ],
+        "adf84f8b121cab48"
+      ],
+      [
+        "2:a",
+        [
+          [
+            "onNavigatePage",
+            "about"
+          ]
+        ],
+        "03515c849b08169e"
+      ]
+    ]
+  },
+  "animated-headline": {
+    "markup": "<h2 class=\"w-full break-words tracking-tight leading-tight select-none\" style=\"font-size: 32px; font-weight: 800; color: rgb(15, 23, 42); text-align: center;\"><span class=\"mr-2\">Build Websites That Are</span><span class=\"inline-block rounded-md px-1.5 py-0.5\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\"><span class=\"animate-pulse font-mono ml-0.5\">|</span></span><span class=\"ml-2\">With ForgeStudio</span></h2>",
+    "tick": "c988a264486305f4",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "price-table": {
+    "markup": "<div class=\"grid w-full grid-cols-1 md:grid-cols-3\" style=\"gap: 24px;\"><div class=\"relative flex flex-col justify-between p-6 transition-all duration-300 shadow-md hover:shadow-lg border\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 24px;\"><div class=\"flex flex-col text-center items-center\"><div class=\"mb-4 w-full\"><h3 class=\"text-xl font-bold text-slate-900\">Starter</h3><p class=\"mt-1 text-xs text-slate-500 leading-relaxed\">Essential tools for personal projects &amp; freelancers.</p></div><div class=\"mb-6 flex items-baseline gap-1 border-b border-slate-100 pb-6 w-full justify-center\"><span class=\"text-4xl font-extrabold text-slate-900 tracking-tight\">$19</span><span class=\"text-xs font-medium text-slate-500\">/ month</span></div><ul class=\"mb-8 space-y-3 w-full text-left\"><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">5 Projects included</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">10GB SSD Storage</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">Basic Analytics</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400\">✕</div><span class=\"text-slate-400 line-through\">Custom Domain</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400\">✕</div><span class=\"text-slate-400 line-through\">24/7 Dedicated Support</span></li></ul></div><div class=\"w-full flex justify-stretch\"><a href=\"#\" class=\"rounded-xl py-3 px-5 text-center text-xs font-bold transition-all duration-200 cursor-pointer block select-none shadow-sm hover:shadow active:scale-[0.98] w-full\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\">Start Free Trial</a></div></div><div class=\"relative flex flex-col justify-between p-6 transition-all duration-300 shadow-2xl ring-2 scale-[1.02] z-10\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(37, 99, 235); border-radius: 24px;\"><div class=\"absolute -top-3.5 left-1/2 -translate-x-1/2 z-20\"><span class=\"inline-block rounded-full px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md\" style=\"background-color: rgb(37, 99, 235);\">MOST POPULAR</span></div><div class=\"flex flex-col text-center items-center\"><div class=\"mb-4 w-full\"><h3 class=\"text-xl font-bold text-slate-900\">Professional</h3><p class=\"mt-1 text-xs text-slate-500 leading-relaxed\">Best for growing teams &amp; expanding SaaS startups.</p></div><div class=\"mb-6 flex items-baseline gap-1 border-b border-slate-100 pb-6 w-full justify-center\"><span class=\"text-4xl font-extrabold text-slate-900 tracking-tight\">$49</span><span class=\"text-xs font-medium text-slate-500\">/ month</span></div><ul class=\"mb-8 space-y-3 w-full text-left\"><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgba(37, 99, 235, 0.094); color: rgb(37, 99, 235);\">✓</div><span class=\"font-medium text-slate-700\">Unlimited Projects</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgba(37, 99, 235, 0.094); color: rgb(37, 99, 235);\">✓</div><span class=\"font-medium text-slate-700\">100GB SSD Storage</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgba(37, 99, 235, 0.094); color: rgb(37, 99, 235);\">✓</div><span class=\"font-medium text-slate-700\">Advanced Analytics &amp; Reports</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgba(37, 99, 235, 0.094); color: rgb(37, 99, 235);\">✓</div><span class=\"font-medium text-slate-700\">Custom Domain &amp; SSL</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgba(37, 99, 235, 0.094); color: rgb(37, 99, 235);\">✓</div><span class=\"font-medium text-slate-700\">Priority Support</span></li></ul></div><div class=\"w-full flex justify-stretch\"><a href=\"#\" class=\"rounded-xl py-3 px-5 text-center text-xs font-bold transition-all duration-200 cursor-pointer block select-none shadow-sm hover:shadow active:scale-[0.98] w-full\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\">Get Pro Now</a></div></div><div class=\"relative flex flex-col justify-between p-6 transition-all duration-300 shadow-md hover:shadow-lg border\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 24px;\"><div class=\"flex flex-col text-center items-center\"><div class=\"mb-4 w-full\"><h3 class=\"text-xl font-bold text-slate-900\">Enterprise</h3><p class=\"mt-1 text-xs text-slate-500 leading-relaxed\">Advanced security, custom SLA, and dedicated scale.</p></div><div class=\"mb-6 flex items-baseline gap-1 border-b border-slate-100 pb-6 w-full justify-center\"><span class=\"text-4xl font-extrabold text-slate-900 tracking-tight\">$99</span><span class=\"text-xs font-medium text-slate-500\">/ month</span></div><ul class=\"mb-8 space-y-3 w-full text-left\"><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">Unlimited Everything</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">1TB High Speed Storage</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">Custom Analytics &amp; Export</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">Multi-Region Cloud Hosting</span></li><li class=\"flex items-center gap-2.5 text-xs\"><div class=\"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold\" style=\"background-color: rgb(236, 253, 245); color: rgb(5, 150, 105);\">✓</div><span class=\"font-medium text-slate-700\">24/7 Dedicated Account Manager</span></li></ul></div><div class=\"w-full flex justify-stretch\"><a href=\"#\" class=\"rounded-xl py-3 px-5 text-center text-xs font-bold transition-all duration-200 cursor-pointer block select-none shadow-sm hover:shadow active:scale-[0.98] w-full\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\">Contact Sales</a></div></div></div>",
+    "tick": "0fe8562b330b1ee5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "0fe8562b330b1ee5"
+      ],
+      [
+        "1:a",
+        [],
+        "0fe8562b330b1ee5"
+      ],
+      [
+        "2:a",
+        [],
+        "0fe8562b330b1ee5"
+      ]
+    ]
+  },
+  "price-list": {
+    "markup": "<div class=\"w-full flex flex-col text-left\" style=\"gap: 20px;\"><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><img alt=\"Signature Espresso Blend\" class=\"h-full w-full object-cover transition-transform duration-300 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\">Signature Espresso Blend</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$4.50</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Freshly roasted double shot arabica blend with velvety microfoam.</p></div></div><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><img alt=\"Haircut &amp; Precision Styling\" class=\"h-full w-full object-cover transition-transform duration-300 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\">Haircut &amp; Precision Styling</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$35.00</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Precision scissor cut, wash, scalp massage, and hot towel finish.</p></div></div><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><img alt=\"Web Design &amp; UX Sprint\" class=\"h-full w-full object-cover transition-transform duration-300 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\">Web Design &amp; UX Sprint</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$499.00</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Custom responsive website design with SEO optimization &amp; CMS integration.</p></div></div><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><img alt=\"Organic Facial Treatment\" class=\"h-full w-full object-cover transition-transform duration-300 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\">Organic Facial Treatment</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$85.00</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Deep cleansing facial treatment with organic botanicals &amp; anti-aging serum.</p></div></div></div>",
+    "tick": "77905ceaa4668823",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "gallery": {
+    "markup": "<div class=\"grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3\" style=\"gap: 16px;\"><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Modern Architecture\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1513694203232-719a280e022f?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Modern Minimalist Architecture</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Interior Living Room\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Scandinavian Living Space</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Office Workspace\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Bright Collaborative Workspace</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"City Skyscraper\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Glass Highrise Skyscraper</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Alpine Nature Landscape\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Serene Alpine Lake Reflection</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Green Botanical Decor\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1545241047-6083a3684587?w=600&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Botanical Plant Oasis</p></div></div></div></div>",
+    "tick": "ee638c476549137b",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "flip-box": {
+    "markup": "<div class=\"group relative w-full cursor-pointer\" style=\"height: 320px; perspective: 1000px;\"><div class=\"relative h-full w-full shadow-lg transition-transform duration-500\" style=\"transform-style: preserve-3d; transition-duration: 0.6s; transform: none; border-radius: 20px;\"><div class=\"absolute inset-0 flex flex-col items-center justify-center p-6 text-center shadow-md overflow-hidden\" style=\"background: linear-gradient(135deg, rgb(30, 41, 59) 0%, rgb(15, 23, 42) 100%); color: rgb(255, 255, 255); backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(0deg); border-radius: 20px;\"><div class=\"text-4xl mb-4 drop-shadow-sm\">🚀</div><h3 class=\"text-xl font-bold tracking-tight mb-2 leading-tight\">Interactive Solutions</h3><p class=\"text-xs opacity-90 leading-relaxed max-w-xs\">Hover or tap to flip card and explore custom features.</p><div class=\"mt-4 inline-flex items-center gap-1 text-[11px] font-semibold opacity-75\"><span>Hover to reveal</span><span>→</span></div></div><div class=\"absolute inset-0 flex flex-col items-center justify-center p-6 text-center shadow-md overflow-hidden\" style=\"background: linear-gradient(135deg, rgb(79, 70, 229) 0%, rgb(124, 58, 237) 100%); color: rgb(255, 255, 255); backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: rotateY(180deg); border-radius: 20px;\"><h3 class=\"text-xl font-bold tracking-tight mb-2 leading-tight\">Ready to Start?</h3><p class=\"text-xs opacity-90 leading-relaxed max-w-xs mb-5\">Join thousands of creators building high-converting websites.</p><a href=\"#\" class=\"inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs font-bold shadow-md transition hover:scale-105 active:scale-95\" style=\"background-color: rgb(255, 255, 255); color: rgb(79, 70, 229);\">Get Started Now</a></div></div></div>",
+    "tick": "f04e0b3ab0008694",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "f04e0b3ab0008694"
+      ]
+    ]
+  },
+  "cta": {
+    "markup": "<div class=\"w-full p-6 sm:p-8 md:p-10 shadow-xl transition-all border relative overflow-hidden text-center flex flex-col items-center justify-center\" style=\"background: linear-gradient(135deg, rgb(15, 23, 42) 0%, rgb(30, 41, 59) 100%); border-color: rgba(255, 255, 255, 0.1); border-radius: 24px; color: rgb(255, 255, 255);\"><div class=\"space-y-3 max-w-xl relative z-10 flex flex-col items-center\"><div class=\"text-4xl mb-1\">⚡</div><h2 class=\"text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight\">Boost Your Conversions Today</h2><p class=\"text-sm opacity-85 leading-relaxed max-w-md\">Start your 14-day free trial. No credit card required. Cancel anytime.</p><div class=\"pt-3\"><a href=\"#\" class=\"inline-flex items-center justify-center px-7 py-3.5 text-sm font-bold shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer\" style=\"background: linear-gradient(135deg, rgb(225, 29, 72) 0%, rgb(190, 18, 60) 100%); color: rgb(255, 255, 255); border-radius: 12px;\">Claim Your Free Trial →</a></div></div></div>",
+    "tick": "5eb9d8ea963920f4",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "5eb9d8ea963920f4"
+      ]
+    ]
+  },
+  "media-carousel": {
+    "markup": "<div class=\"w-full flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed border-cyan-200 bg-cyan-50/40 text-center\"><div class=\"h-12 w-12 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-xl mb-3 shadow-xs\">🎡</div><h4 class=\"text-sm font-bold text-slate-800\">Media Carousel</h4><p class=\"text-xs text-slate-500 max-w-xs mt-1\">No media items added yet. Use \"+ Add Image\" or \"+ Add Video\" in the Inspector Panel to populate your carousel.</p></div>",
+    "tick": "990843c1ebd4eb9c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "testimonial-carousel": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none\" style=\"cursor: grab;\"><div class=\"overflow-hidden w-full py-3 px-1\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 20px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 flex flex-col justify-between p-6 shadow-md hover:shadow-xl border border-slate-200/80 transition-all duration-300 relative group/card\" style=\"width: calc(1 * (100% - 0px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"absolute top-4 right-5 text-4xl font-serif text-slate-200 pointer-events-none select-none\">“</div><div><div class=\"flex items-center gap-0.5 mb-3\"><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span></div><p class=\"text-xs sm:text-sm font-medium leading-relaxed mb-6 italic opacity-90\">\"ForgeStudio transformed how we launch client sites. What used to take weeks now takes hours with incredible quality!\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100\"><img alt=\"Sarah Jenkins\" class=\"h-10 w-10 rounded-full object-cover border border-slate-200 shrink-0 pointer-events-none\" src=\"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"min-w-0\"><h5 class=\"text-xs sm:text-sm font-bold tracking-tight truncate\">Sarah Jenkins</h5><p class=\"text-[11px] opacity-75 truncate\">VP of Product, TechScale Inc.</p></div></div></div><div class=\"shrink-0 flex flex-col justify-between p-6 shadow-md hover:shadow-xl border border-slate-200/80 transition-all duration-300 relative group/card\" style=\"width: calc(1 * (100% - 0px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"absolute top-4 right-5 text-4xl font-serif text-slate-200 pointer-events-none select-none\">“</div><div><div class=\"flex items-center gap-0.5 mb-3\"><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span></div><p class=\"text-xs sm:text-sm font-medium leading-relaxed mb-6 italic opacity-90\">\"The visual editor and element customization options are second to none. Our conversion rates increased by 42%.\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100\"><img alt=\"Marcus Vance\" class=\"h-10 w-10 rounded-full object-cover border border-slate-200 shrink-0 pointer-events-none\" src=\"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"min-w-0\"><h5 class=\"text-xs sm:text-sm font-bold tracking-tight truncate\">Marcus Vance</h5><p class=\"text-[11px] opacity-75 truncate\">Founder &amp; CEO, GrowthFlow</p></div></div></div><div class=\"shrink-0 flex flex-col justify-between p-6 shadow-md hover:shadow-xl border border-slate-200/80 transition-all duration-300 relative group/card\" style=\"width: calc(1 * (100% - 0px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"absolute top-4 right-5 text-4xl font-serif text-slate-200 pointer-events-none select-none\">“</div><div><div class=\"flex items-center gap-0.5 mb-3\"><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span></div><p class=\"text-xs sm:text-sm font-medium leading-relaxed mb-6 italic opacity-90\">\"Extremely intuitive UI, lightning-fast rendering, and fantastic pre-built components. A absolute game changer!\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100\"><img alt=\"Elena Rostova\" class=\"h-10 w-10 rounded-full object-cover border border-slate-200 shrink-0 pointer-events-none\" src=\"https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"min-w-0\"><h5 class=\"text-xs sm:text-sm font-bold tracking-tight truncate\">Elena Rostova</h5><p class=\"text-[11px] opacity-75 truncate\">Head of Design, Studio Craft</p></div></div></div></div></div><button type=\"button\" class=\"absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Previous Testimonial\"><span class=\"text-base font-bold\">‹</span></button><button type=\"button\" class=\"absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Next Testimonial\"><span class=\"text-base font-bold\">›</span></button><div class=\"flex items-center justify-center gap-1.5 mt-3\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-emerald-600\" title=\"Go to testimonial 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to testimonial 2\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to testimonial 3\"></button></div></div>",
+    "tick": "54dfa6941e507eb7",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "9bf283ed2ad83a94"
+      ],
+      [
+        "1:button",
+        [],
+        "54dfa6941e507eb7"
+      ],
+      [
+        "2:button",
+        [],
+        "a6676952c517d4e4"
+      ],
+      [
+        "3:button",
+        [],
+        "54dfa6941e507eb7"
+      ],
+      [
+        "4:button",
+        [],
+        "9bf283ed2ad83a94"
+      ]
+    ]
+  },
+  "loop-carousel": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none py-2\"><div class=\"flex flex-col items-center justify-center p-8 border-2 border-dashed border-purple-300 bg-purple-50/50 rounded-2xl text-center\"><span class=\"text-2xl mb-1\">🔁</span><h4 class=\"text-sm font-bold text-purple-900\">Empty Loop Carousel</h4><p class=\"text-xs text-purple-600 max-w-xs mt-1\">Add items in the Properties Inspector to populate this loop carousel.</p></div></div>",
+    "tick": "9a0f17cd5d171ca8",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "countdown": {
+    "markup": "<div class=\"w-full flex flex-wrap items-center justify-center\" style=\"gap: 16px;\"><div class=\"flex min-w-[76px] flex-col items-center justify-center p-3.5 border shadow-xs transition-transform hover:-translate-y-0.5\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 16px;\"><span class=\"font-extrabold font-mono tracking-tight leading-none\" style=\"color: rgb(15, 23, 42); font-size: 32px;\">01</span><span class=\"font-bold tracking-wider mt-1.5\" style=\"color: rgb(100, 116, 139); font-size: 11px; text-transform: uppercase;\">Days</span></div><div class=\"flex min-w-[76px] flex-col items-center justify-center p-3.5 border shadow-xs transition-transform hover:-translate-y-0.5\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 16px;\"><span class=\"font-extrabold font-mono tracking-tight leading-none\" style=\"color: rgb(15, 23, 42); font-size: 32px;\">00</span><span class=\"font-bold tracking-wider mt-1.5\" style=\"color: rgb(100, 116, 139); font-size: 11px; text-transform: uppercase;\">Hours</span></div><div class=\"flex min-w-[76px] flex-col items-center justify-center p-3.5 border shadow-xs transition-transform hover:-translate-y-0.5\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 16px;\"><span class=\"font-extrabold font-mono tracking-tight leading-none\" style=\"color: rgb(15, 23, 42); font-size: 32px;\">00</span><span class=\"font-bold tracking-wider mt-1.5\" style=\"color: rgb(100, 116, 139); font-size: 11px; text-transform: uppercase;\">Minutes</span></div><div class=\"flex min-w-[76px] flex-col items-center justify-center p-3.5 border shadow-xs transition-transform hover:-translate-y-0.5\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); border-radius: 16px;\"><span class=\"font-extrabold font-mono tracking-tight leading-none\" style=\"color: rgb(15, 23, 42); font-size: 32px;\">00</span><span class=\"font-bold tracking-wider mt-1.5\" style=\"color: rgb(100, 116, 139); font-size: 11px; text-transform: uppercase;\">Seconds</span></div></div>",
+    "tick": "c3a0a02852bf1848",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "blockquote": {
+    "markup": "<figure class=\"w-full transition-all text-left border-l-4 pl-5 py-2\" style=\"border-left-color: rgb(99, 102, 241);\"><div class=\"mb-3 flex justify-start\"><svg class=\"h-8 w-8 opacity-80\" fill=\"currentColor\" viewBox=\"0 0 24 24\" style=\"color: rgb(99, 102, 241);\"><path d=\"M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z\"></path></svg></div><blockquote class=\"leading-relaxed font-medium italic\" style=\"color: rgb(30, 41, 59); font-size: 1.125rem;\">\"Quote\"</blockquote><figcaption class=\"mt-3 flex flex-col items-start\"><span class=\"font-semibold tracking-wide\" style=\"color: rgb(71, 85, 105); font-size: 0.875rem;\">— Steve Jobs</span><span class=\"text-xs text-slate-400 font-normal mt-0.5\">Co-founder, Apple Inc.</span></figcaption></figure>",
+    "tick": "cfd4f2417a130782",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "reviews": {
+    "markup": "<div class=\"w-full transition-all\"><div class=\"mb-4 flex justify-start\"><button type=\"button\" class=\"flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-amber-600 active:scale-95 cursor-pointer\"><span>★</span><span>+ Write a Review</span></button></div><div class=\"rounded-xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500\">No customer reviews configured. Click \"+ Write a Review\" above or use the inspector panel to add review items.</div></div>",
+    "tick": "c36775e75799158a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "ea4d29abde450965"
+      ]
+    ]
+  },
+  "code-highlight": {
+    "markup": "<div class=\"w-full flex justify-start transition-all\"><div class=\"w-full max-w-4xl rounded-2xl border shadow-sm overflow-hidden font-mono\" style=\"background-color: rgb(15, 23, 42); color: rgb(248, 250, 252); border-color: rgb(51, 65, 85);\"><div class=\"flex items-center justify-between px-4 py-2.5 border-b\" style=\"border-color: rgb(51, 65, 85); background-color: rgba(0, 0, 0, 0.15);\"><div class=\"flex items-center gap-2\"><span class=\"h-3 w-3 rounded-full bg-red-500/80 inline-block\"></span><span class=\"h-3 w-3 rounded-full bg-amber-500/80 inline-block\"></span><span class=\"h-3 w-3 rounded-full bg-emerald-500/80 inline-block\"></span><span class=\"ml-2 text-xs font-bold uppercase tracking-wider opacity-75\">typescript</span></div><button type=\"button\" class=\"flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-white/10 hover:bg-white/20 transition cursor-pointer\"><span>📋 Copy</span></button></div><div class=\"p-4 overflow-x-auto\" style=\"font-size: 0.85rem;\"><pre class=\"font-mono leading-relaxed\"><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">1</span><span class=\"table-cell font-mono whitespace-pre\">// Welcome to ForgeStudio Code Highlight</span></div><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">2</span><span class=\"table-cell font-mono whitespace-pre\">function greet(name: string): string {</span></div><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">3</span><span class=\"table-cell font-mono whitespace-pre\">  return `Hello, ${name}!`;</span></div><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">4</span><span class=\"table-cell font-mono whitespace-pre\">}</span></div><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">5</span><span class=\"table-cell font-mono whitespace-pre\"> </span></div><div class=\"table-row\"><span class=\"table-cell select-none pr-4 text-right opacity-35 font-mono text-[0.8em]\">6</span><span class=\"table-cell font-mono whitespace-pre\">console.log(greet(\"Developer\"));</span></div></pre></div></div></div>",
+    "tick": "c9fa25b3657870c2",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [
+          [
+            "clipboard.writeText",
+            "// Welcome to ForgeStudio Code Highlight\nfunction greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet(\"Developer\"));"
+          ]
+        ],
+        "2ec059f69b17892c"
+      ]
+    ]
+  },
+  "share-buttons": {
+    "markup": "<div style=\"width: 100%; box-sizing: border-box;\" class=\"w-full flex justify-start relative select-none\"><div class=\"flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-6 text-center bg-slate-50/50 w-full\"><p class=\"text-xs font-bold text-slate-600\">No Active Share Buttons</p><p class=\"text-[10px] text-slate-400 mt-1\">Use the properties inspector to add or enable social share buttons.</p></div></div>",
+    "tick": "de2c7ef48a716961",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "audio-playlist": {
+    "markup": "<div class=\"w-full rounded-2xl p-5 shadow-xl transition-all relative\" style=\"background-color: rgb(15, 23, 42); color: rgb(255, 255, 255);\"><audio src=\"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\"></audio><div class=\"flex items-center justify-between border-b border-white/10 pb-4 mb-4\"><div><span class=\"text-[10px] font-bold uppercase tracking-wider flex items-center gap-1\" style=\"color: rgb(56, 189, 248);\">🎵 Audio Player</span><h4 class=\"text-sm font-bold mt-0.5\">01. Ambient Solar Echoes</h4><p class=\"text-xs text-white/70\">ForgeStudio Soundscapes</p></div><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs font-bold transition cursor-pointer\">⏮</button><button type=\"button\" class=\"h-10 w-10 rounded-full flex items-center justify-center text-slate-900 font-bold transition shadow-md hover:scale-105 active:scale-95 cursor-pointer\" style=\"background-color: rgb(56, 189, 248);\">▶</button><button type=\"button\" class=\"h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs font-bold transition cursor-pointer\">⏭</button></div></div><div class=\"space-y-1.5 max-h-48 overflow-y-auto pr-1\"><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition bg-white/15 border border-white/20 font-bold\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">1</span><span class=\"text-xs truncate\">01. Ambient Solar Echoes</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">06:12</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">2</span><span class=\"text-xs truncate\">02. Deep Focus Flow</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">07:05</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">3</span><span class=\"text-xs truncate\">03. Midnight Synthesizer</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">05:48</span></div></div></div>",
+    "tick": "48f229aff9367a08",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "6ad68d048e954a5c"
+      ],
+      [
+        "1:button",
+        [
+          [
+            "media.play",
+            "audio"
+          ]
+        ],
+        "eb786ccd75113d69"
+      ],
+      [
+        "2:button",
+        [],
+        "842b1628ac723c6f"
+      ]
+    ]
+  },
+  "nested-tabs": {
+    "markup": "<div class=\"w-full flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm\"><div class=\"flex flex-col gap-4\"><div class=\"flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3\"><button type=\"button\" class=\"px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer bg-blue-600 text-white shadow-sm\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-layers lucide-layers-3 shrink-0 w-3.5 h-3.5\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"></path><path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"></path><path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"></path></svg><span>Tab 1</span></button><button type=\"button\" class=\"px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-sparkles lucide-stars shrink-0 w-3.5 h-3.5\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"></path><path d=\"M20 2v4\"></path><path d=\"M22 4h-4\"></path><circle cx=\"4\" cy=\"20\" r=\"2\"></circle></svg><span>Tab 2</span></button><button type=\"button\" class=\"px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-settings shrink-0 w-3.5 h-3.5\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg><span>Tab 3</span></button></div><div class=\"flex-1 p-4 rounded-xl bg-slate-50 border border-slate-200/60 min-h-[120px]\"><h4 class=\"text-xs font-bold text-slate-800 uppercase tracking-wider mb-2\">Tab 1 Content</h4><p class=\"text-xs text-slate-600 leading-relaxed\">Tab panel active content. Drop container elements or widgets inside this tab panel from the editor canvas.</p></div></div></div>",
+    "tick": "f7ed705d6e353faf",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "f7ed705d6e353faf"
+      ],
+      [
+        "1:button",
+        [],
+        "e84c45dce082080f"
+      ],
+      [
+        "2:button",
+        [],
+        "25083401117d9957"
+      ]
+    ]
+  },
+  "nested-accordion": {
+    "markup": "<div class=\"w-full flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm\"><div class=\"rounded-xl border border-slate-200 overflow-hidden transition-all bg-white\"><button type=\"button\" class=\"w-full flex items-center justify-between px-4 py-3 text-left transition cursor-pointer bg-blue-50/80 text-blue-900 font-bold\"><div class=\"flex items-center gap-2.5\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-circle-question-mark lucide-help-circle lucide-circle-help shrink-0 w-4 h-4 text-blue-600\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"></path><path d=\"M12 17h.01\"></path></svg><span class=\"text-xs\">1. What features are included in ForgeStudio?</span></div><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down w-4 h-4 text-slate-400 transition-transform duration-200 rotate-180 text-blue-600\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button><div class=\"p-4 bg-white border-t border-slate-200/60 text-xs text-slate-600 leading-relaxed animate-in fade-in duration-150\">Accordion panel expandable body. Place text, buttons, forms, or child canvas elements inside this section.</div></div><div class=\"rounded-xl border border-slate-200 overflow-hidden transition-all bg-white\"><button type=\"button\" class=\"w-full flex items-center justify-between px-4 py-3 text-left transition cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 font-semibold\"><div class=\"flex items-center gap-2.5\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-database shrink-0 w-4 h-4 text-blue-600\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\"></ellipse><path d=\"M3 5V19A9 3 0 0 0 21 19V5\"></path><path d=\"M3 12A9 3 0 0 0 21 12\"></path></svg><span class=\"text-xs\">2. How does document persistence work?</span></div><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down w-4 h-4 text-slate-400 transition-transform duration-200\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div><div class=\"rounded-xl border border-slate-200 overflow-hidden transition-all bg-white\"><button type=\"button\" class=\"w-full flex items-center justify-between px-4 py-3 text-left transition cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 font-semibold\"><div class=\"flex items-center gap-2.5\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-code shrink-0 w-4 h-4 text-blue-600\" style=\"color: currentcolor; display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><path d=\"m16 18 6-6-6-6\"></path><path d=\"m8 6-6 6 6 6\"></path></svg><span class=\"text-xs\">3. Can I export clean React or HTML code?</span></div><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down w-4 h-4 text-slate-400 transition-transform duration-200\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div></div>",
+    "tick": "6c7e9d30e1039800",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "a5876c08112f30fe"
+      ],
+      [
+        "1:button",
+        [],
+        "6169c33f2ecc572e"
+      ],
+      [
+        "2:button",
+        [],
+        "fd653cf383352ff8"
+      ]
+    ]
+  },
+  "off-canvas": {
+    "markup": "<div class=\"w-full flex justify-start transition-all\"><button type=\"button\" class=\"inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-xs transition hover:shadow-md active:scale-95 cursor-pointer\" style=\"background-color: rgb(15, 23, 42); color: rgb(255, 255, 255);\"><svg class=\"h-6 w-6 text-amber-600\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" stroke-width=\"2\"></rect><path stroke-width=\"2\" stroke-linecap=\"round\" d=\"M15 3v18\"></path></svg><span>Open Panel</span></button></div>",
+    "tick": "8c4170902f571e54",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "73c2e1cfe4879eee"
+      ]
+    ]
+  },
+  "search-bar": {
+    "markup": "<div class=\"w-full relative select-none\"><form class=\"flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm transition hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20\"><span class=\"pl-2 text-base text-slate-400 shrink-0\">🔍</span><input placeholder=\"Search site content, pages &amp; items...\" class=\"w-full bg-transparent px-2 py-1 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none\" type=\"text\" value=\"\"><button type=\"submit\" class=\"shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 cursor-pointer\">Search</button></form></div>",
+    "tick": "c2bd860e111ed0bd",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:input[text]",
+        [],
+        "14b98bb1f83a6d23"
+      ],
+      [
+        "1:button",
+        [],
+        "c2bd860e111ed0bd"
+      ]
+    ]
+  },
+  "icon-library": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><div class=\"inline-flex items-center justify-center transition-transform hover:scale-105\" style=\"background-color: transparent; border-radius: 8px; padding: 8px;\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"36\" height=\"36\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-star shrink-0\" style=\"color: rgb(37, 99, 235); display: inline-block; vertical-align: middle; transition: transform 0.15s ease, color 0.15s ease;\" aria-hidden=\"true\"><path d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"></path></svg></div></div>",
+    "tick": "ee3470e149c72d9a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "custom-svg": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><div class=\"inline-flex items-center justify-center transition-transform hover:scale-105\" style=\"width: 64px; height: 64px; color: rgb(2, 132, 199);\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M13 2L3 14h9l-1 8 10-12h-9l1-8z\"></path></svg></div></div>",
+    "tick": "ca797c743711f89e",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "toc": {
+    "markup": "<div class=\"w-full rounded-2xl border p-5 shadow-xs transition-all duration-300 backdrop-blur-xs\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240); text-align: left;\"><div class=\"flex items-center justify-between gap-2 border-b pb-3 mb-3 select-none\" style=\"border-color: rgba(226, 232, 240, 0.627);\"><div class=\"flex items-center gap-2.5\"><div class=\"flex h-7 w-7 items-center justify-center rounded-lg shadow-xs\" style=\"background-color: rgba(37, 99, 235, 0.082); color: rgb(37, 99, 235);\"><svg class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2.5\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 6h16M4 12h10M4 18h14\"></path></svg></div><div class=\"flex flex-col text-left\"><h3 class=\"font-bold text-sm tracking-tight leading-none\" style=\"color: rgb(15, 23, 42); font-size: 15px; font-weight: 700;\">Table of Contents</h3><span class=\"text-[10px] font-semibold text-slate-400 mt-1\">2 Sections</span></div></div><button type=\"button\" class=\"flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer\" title=\"Collapse Table of Contents\"><svg class=\"h-4 w-4 transition-transform duration-200 rotate-0\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19 9l-7 7-7-7\"></path></svg></button></div><nav class=\"flex flex-col relative\" style=\"gap: 6px;\"><button type=\"button\" class=\"group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs transition-all duration-150 text-left cursor-pointer font-normal hover:bg-slate-100/70\" style=\"margin-left: 14px; color: rgb(51, 65, 85); background-color: transparent; font-size: 13px;\"><span class=\"h-1.5 w-1.5 rounded-full shrink-0 transition-transform group-hover:scale-110 opacity-60\" style=\"background-color: rgb(51, 65, 85);\"></span><span class=\"truncate flex-1 tracking-tight\">Intro</span></button><button type=\"button\" class=\"group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs transition-all duration-150 text-left cursor-pointer font-normal hover:bg-slate-100/70\" style=\"margin-left: 14px; color: rgb(51, 65, 85); background-color: transparent; font-size: 13px;\"><span class=\"h-1.5 w-1.5 rounded-full shrink-0 transition-transform group-hover:scale-110 opacity-60\" style=\"background-color: rgb(51, 65, 85);\"></span><span class=\"truncate flex-1 tracking-tight\">Details</span></button></nav></div>",
+    "tick": "95f018936738a2ca",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "6884c4cccc3cca63"
+      ],
+      [
+        "1:button",
+        [],
+        "df9ab4237e72160d"
+      ],
+      [
+        "2:button",
+        [],
+        "b73d03a974d772ba"
+      ]
+    ]
+  },
+  "mega-menu": {
+    "markup": "<div class=\"w-full flex justify-center transition-all\"><nav class=\"relative w-full max-w-6xl rounded-2xl border border-slate-200 shadow-sm font-sans\" style=\"background-color: rgb(255, 255, 255); color: rgb(15, 23, 42);\"><div class=\"flex items-center justify-center w-full px-6 py-3 gap-6\"><button type=\"button\" class=\"sm:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer\">☰</button><ul class=\"hidden sm:flex items-center justify-center w-full gap-1 sm:gap-4 text-xs font-semibold relative\" style=\"position: relative; min-height: 40px;\"><li class=\"py-2 px-3 rounded-lg hover:bg-slate-100/70 transition select-none cursor-pointer\" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"flex items-center gap-1.5\"><span>Products</span><span class=\"text-[10px] opacity-60\">▼</span></a></li><li class=\"py-2 px-3 rounded-lg hover:bg-slate-100/70 transition select-none cursor-pointer\" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"flex items-center gap-1.5\"><span>Resources</span><span class=\"text-[10px] opacity-60\">▼</span></a></li><li class=\"py-2 px-3 rounded-lg hover:bg-slate-100/70 transition select-none cursor-pointer\" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#pricing\" target=\"_self\" class=\"flex items-center gap-1.5\"><span>Pricing</span></a></li></ul></div></nav></div>",
+    "tick": "b1709ce609ef5d26",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "39c4ae6f1db37d3d"
+      ],
+      [
+        "1:a",
+        [],
+        "b1709ce609ef5d26"
+      ],
+      [
+        "2:a",
+        [],
+        "b1709ce609ef5d26"
+      ],
+      [
+        "3:a",
+        [],
+        "b1709ce609ef5d26"
+      ]
+    ]
+  },
+  "paypal": {
+    "markup": "<div class=\"w-full flex flex-col justify-start text-left transition-all\"><div class=\"inline-flex justify-start text-left\"><button type=\"button\" class=\"inline-flex items-center font-sans shadow-xs transition-all duration-200 cursor-pointer hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed rounded-full px-6 py-3 text-sm gap-2 font-bold\" style=\"background-color: rgb(255, 196, 57); color: rgb(0, 48, 135);\"><svg class=\"h-6 w-6 text-blue-800\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.72a.767.767 0 01.758-.646h6.848c2.42 0 4.287.525 5.253 1.562.909.975 1.173 2.378.784 4.17-.48 2.208-1.782 3.865-3.666 4.665-.776.33-1.682.502-2.695.51h-2.12a.767.767 0 00-.758.647l-1.39 8.249a.63.63 0 01-.622.506z\"></path></svg><span>Pay Now with PayPal</span><span class=\"text-[11px] opacity-85 font-mono ml-0.5\">($19.99)</span></button></div></div>",
+    "tick": "4fb4614851a8d64a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [
+          [
+            "fetch",
+            "http://localhost:5000/api/v1/integrations/paypal/create-order",
+            "POST",
+            "{\"amount\":\"19.99\",\"currency\":\"USD\",\"itemName\":\"Digital Product\",\"itemDescription\":\"\",\"quantity\":1,\"env\":\"sandbox\"}"
+          ],
+          [
+            "fetch",
+            "http://localhost:5000/api/v1/integrations/paypal/capture-order",
+            "POST",
+            "{\"orderId\":\"orderprobe1\"}"
+          ]
+        ],
+        "10d465ee92fcb768"
+      ]
+    ]
+  },
+  "wc-product-title": {
+    "markup": "<h1 class=\"font-extrabold text-2xl tracking-tight text-slate-900\" id=\"wc-title-r-wct\">Aura Pro Wireless Headphones</h1>",
+    "tick": "49083a29d52d938d",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "wc-add-to-cart": {
+    "markup": "<button type=\"button\" aria-label=\"Add Aura Pro Wireless Headphones to cart\" class=\"inline-flex items-center justify-center gap-2.5 rounded-xl px-6 py-3.5 font-bold text-white shadow-md transition-all active:scale-95 cursor-pointer bg-slate-900 hover:bg-slate-800\"><span class=\"text-base\">🛒</span><span>Add to Cart</span></button>",
+    "tick": "776c92aa2c9d663a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "dd086e394d7a1105"
+      ]
+    ]
+  },
+  "wc-cart": {
+    "markup": "<div class=\"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5\"><div class=\"flex items-center justify-between border-b border-slate-100 pb-3\"><h3 class=\"font-extrabold text-base text-slate-900 flex items-center gap-2\"><span>🛒</span> Shopping Cart</h3><button type=\"button\" class=\"text-xs text-rose-600 font-bold hover:underline cursor-pointer\">Clear Cart</button></div><div class=\"space-y-3\"><div class=\"flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100\"><div class=\"flex items-center gap-3\"><img alt=\"Aura Pro Wireless Headphones\" class=\"h-12 w-12 rounded-lg object-cover\" src=\"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800\"><div><h4 class=\"font-bold text-xs text-slate-900\">Aura Pro Wireless Headphones</h4><span class=\"text-xs text-slate-500\">$199.99</span></div></div><div class=\"flex items-center gap-3\"><div class=\"flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white\"><button type=\"button\" class=\"px-2 py-1 text-xs font-bold hover:bg-slate-100 cursor-pointer\">-</button><span class=\"px-2 py-1 text-xs font-bold text-slate-900\">1</span><button type=\"button\" class=\"px-2 py-1 text-xs font-bold hover:bg-slate-100 cursor-pointer\">+</button></div><button type=\"button\" class=\"text-rose-500 text-xs font-bold cursor-pointer\">✕</button></div></div><div class=\"flex gap-2 pt-2\"><input placeholder=\"Coupon Code\" class=\"px-3 py-2 text-xs rounded-xl border border-slate-300 flex-1 font-mono uppercase\" type=\"text\" value=\"\"><button type=\"button\" style=\"background-color: rgb(79, 70, 229); color: rgb(255, 255, 255);\" class=\"px-4 py-2 text-xs font-bold rounded-xl shadow-xs cursor-pointer hover:opacity-95\">Apply</button></div><div class=\"border-t border-slate-200 pt-3 space-y-1.5 text-xs\"><div class=\"flex justify-between text-slate-600\"><span>Subtotal:</span><span>$199.99</span></div><div class=\"flex justify-between text-slate-600\"><span>Estimated Shipping:</span><span class=\"text-emerald-600 font-bold\">FREE</span></div><div class=\"flex justify-between font-extrabold text-sm text-slate-900 pt-2 border-t border-slate-100\"><span>Total:</span><span class=\"text-emerald-600\">$199.99</span></div></div></div></div>",
+    "tick": "fd1c4392753adc3f",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "fd1c4392753adc3f"
+      ],
+      [
+        "1:button",
+        [],
+        "fd1c4392753adc3f"
+      ],
+      [
+        "2:button",
+        [],
+        "fd1c4392753adc3f"
+      ],
+      [
+        "3:button",
+        [],
+        "fd1c4392753adc3f"
+      ],
+      [
+        "4:input[text]",
+        [],
+        "a312cd0dfbad289f"
+      ],
+      [
+        "5:button",
+        [],
+        "fd1c4392753adc3f"
+      ]
+    ]
+  },
+  "slides+items": {
+    "markup": "<div class=\"relative overflow-hidden rounded-2xl shadow-lg transition-all select-none\" style=\"width: 100%; height: 450px; background-color: rgb(15, 23, 42); box-sizing: border-box;\"><div class=\"absolute inset-0 transition-all duration-700 ease-in-out opacity-100 z-10 translate-x-0 pointer-events-auto\" style=\"background-size: cover; background-position: center center; background-color: rgb(15, 23, 42);\"><div class=\"absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30\"></div><div class=\"relative z-20 flex h-full flex-col justify-center px-8 sm:px-14 py-10 items-center text-center\"><div class=\"max-w-2xl\"><h2 class=\"text-2xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md\">One</h2><p class=\"mt-3 text-xs sm:text-base text-slate-200 leading-relaxed font-normal drop-shadow-xs max-w-xl\">First</p></div></div></div><div class=\"absolute inset-0 transition-all duration-700 ease-in-out opacity-0 z-0 translate-x-8 pointer-events-none\" style=\"background-image: url(&quot;https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&amp;q=80&quot;); background-size: cover; background-position: center center; background-color: rgb(15, 23, 42);\"><div class=\"absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30\"></div><div class=\"relative z-20 flex h-full flex-col justify-center px-8 sm:px-14 py-10 items-center text-center\"><div class=\"max-w-2xl\"><h2 class=\"text-2xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md\">New Slide Heading</h2><p class=\"mt-3 text-xs sm:text-base text-slate-200 leading-relaxed font-normal drop-shadow-xs max-w-xl\">Enter your compelling slide subtitle or feature description here.</p><div class=\"mt-6 flex items-center justify-center\"><a href=\"#\" class=\"inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-bold text-slate-900 shadow-xl transition-all duration-300 hover:bg-slate-100 hover:scale-105 active:scale-95 cursor-pointer\"><span>Explore Now</span><svg class=\"h-4 w-4 text-slate-800\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg></a></div></div></div></div><div class=\"absolute inset-0 transition-all duration-700 ease-in-out opacity-0 z-0 translate-x-8 pointer-events-none\" style=\"background-image: url(&quot;https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&amp;q=80&quot;); background-size: cover; background-position: center center; background-color: rgb(15, 23, 42);\"><div class=\"absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/30\"></div><div class=\"relative z-20 flex h-full flex-col justify-center px-8 sm:px-14 py-10 items-center text-center\"><div class=\"max-w-2xl\"><h2 class=\"text-2xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md\">New Slide Heading</h2><p class=\"mt-3 text-xs sm:text-base text-slate-200 leading-relaxed font-normal drop-shadow-xs max-w-xl\">Enter your compelling slide subtitle or feature description here.</p><div class=\"mt-6 flex items-center justify-center\"><a href=\"#\" class=\"inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-bold text-slate-900 shadow-xl transition-all duration-300 hover:bg-slate-100 hover:scale-105 active:scale-95 cursor-pointer\"><span>Explore Now</span><svg class=\"h-4 w-4 text-slate-800\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg></a></div></div></div></div><button type=\"button\" class=\"absolute left-3 top-1/2 z-40 -translate-y-1/2 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition hover:bg-black/80 hover:scale-110 active:scale-95 shadow-lg border border-white/20 cursor-pointer\" title=\"Previous Slide\"><svg class=\"h-5 w-5 pointer-events-none\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><polyline points=\"15 18 9 12 15 6\"></polyline></svg></button><button type=\"button\" class=\"absolute right-3 top-1/2 z-40 -translate-y-1/2 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition hover:bg-black/80 hover:scale-110 active:scale-95 shadow-lg border border-white/20 cursor-pointer\" title=\"Next Slide\"><svg class=\"h-5 w-5 pointer-events-none\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><polyline points=\"9 18 15 12 9 6\"></polyline></svg></button><div class=\"absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/40 backdrop-blur-md px-3.5 py-1.5 border border-white/10\"><button type=\"button\" class=\"h-2.5 rounded-full transition-all duration-300 cursor-pointer w-7 bg-white\" title=\"Go to slide 1\"></button><button type=\"button\" class=\"h-2.5 rounded-full transition-all duration-300 cursor-pointer w-2.5 bg-white/40 hover:bg-white/80\" title=\"Go to slide 2\"></button><button type=\"button\" class=\"h-2.5 rounded-full transition-all duration-300 cursor-pointer w-2.5 bg-white/40 hover:bg-white/80\" title=\"Go to slide 3\"></button></div></div>",
+    "tick": "9f347b1521ee53e4",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "ab6a3516040eb396"
+      ],
+      [
+        "1:a",
+        [],
+        "ab6a3516040eb396"
+      ],
+      [
+        "2:button",
+        [],
+        "4ddc9272847978da"
+      ],
+      [
+        "3:button",
+        [],
+        "9f347b1521ee53e4"
+      ],
+      [
+        "4:button",
+        [],
+        "ab6a3516040eb396"
+      ],
+      [
+        "5:button",
+        [],
+        "9f347b1521ee53e4"
+      ],
+      [
+        "6:button",
+        [],
+        "4ddc9272847978da"
+      ]
+    ]
+  },
+  "form+fields": {
+    "markup": "<form class=\"w-full rounded-3xl p-6 sm:p-10 shadow-xl border transition-all duration-300\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(241, 245, 249); box-sizing: border-box;\"><input style=\"display: none; opacity: 0; position: absolute; top: -9999px; left: -9999px;\" tabindex=\"-1\" autocomplete=\"off\" type=\"text\" value=\"\" name=\"_fs_hp_check\"><div class=\"mb-6\"><h3 class=\"text-xl sm:text-3xl font-black text-slate-900 tracking-tight\">Get in Touch</h3><p class=\"mt-2 text-xs sm:text-sm text-slate-500 font-normal leading-relaxed max-w-xl\">Fill out the form below and our team will get back to you within 24 hours.</p></div><div class=\"grid grid-cols-1 sm:grid-cols-2\" style=\"gap: 16px;\"><div class=\"sm:col-span-2 col-span-1 flex flex-col\"><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">New Field</label><div class=\"relative flex items-center\"><input placeholder=\"Enter value...\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 hover:border-slate-300\" type=\"text\" value=\"\"></div></div><div class=\"sm:col-span-2 col-span-1 flex flex-col\"><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">New Field</label><div class=\"relative flex items-center\"><input placeholder=\"Enter value...\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 hover:border-slate-300\" type=\"text\" value=\"\"></div></div><div class=\"col-span-1 sm:col-span-2 pt-6 flex items-center gap-3\"><button type=\"submit\" class=\"group inline-flex items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 text-xs sm:text-sm font-extrabold shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 w-full\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\"><span>Send Message</span><svg class=\"h-4 w-4 transition-transform duration-300 group-hover:translate-x-1\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg></button></div></div></form>",
+    "tick": "fdd9266b92418ef2",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:input[text]",
+        [],
+        "89ccc5101a535f17"
+      ],
+      [
+        "1:input[text]",
+        [],
+        "93996dbbdc3105e7"
+      ],
+      [
+        "2:input[text]",
+        [],
+        "93996dbbdc3105e7"
+      ],
+      [
+        "3:button",
+        [
+          [
+            "fetch",
+            "http://localhost:5000/api/forms/submit",
+            "POST",
+            "{\"integrationTokens\":{},\"websiteId\":\"site-1\",\"formId\":\"f-form\",\"formName\":\"Website Form\",\"fields\":{},\"data\":{},\"honeypotValue\":\"\"}"
+          ]
+        ],
+        "9420469353c23e94"
+      ]
+    ]
+  },
+  "nav-menu+items": {
+    "markup": "<nav class=\"w-full flex justify-start relative transition-all\" style=\"box-sizing: border-box;\"><div class=\"flex sm:hidden items-center justify-between p-2 w-full\"><span class=\"text-xs font-bold text-slate-700\">Navigation Menu</span><button type=\"button\" class=\"p-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition cursor-pointer\">☰</button></div><ul class=\"flex w-full hidden sm:flex flex-row items-center justify-start wrap relative\" style=\"gap: 24px; position: relative; min-height: 44px;\"><li class=\"group list-none  \" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: rgba(37, 99, 235, 0.1); color: rgb(37, 99, 235); font-size: 14px; font-weight: 600; text-transform: none;\"><span>New Link</span></a></li><li class=\"group list-none  \" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: rgba(37, 99, 235, 0.1); color: rgb(37, 99, 235); font-size: 14px; font-weight: 600; text-transform: none;\"><span>New Link</span></a></li></ul></nav>",
+    "tick": "2a2767bbb67bcfbf",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "91d0e1f33907f936"
+      ],
+      [
+        "1:a",
+        [],
+        "2a2767bbb67bcfbf"
+      ],
+      [
+        "2:a",
+        [],
+        "2a2767bbb67bcfbf"
+      ]
+    ]
+  },
+  "price-list+items": {
+    "markup": "<div class=\"w-full flex flex-col text-left\" style=\"gap: 20px;\"><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><span class=\"text-xl\">✨</span></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\"><span class=\"text-sm\">✨</span>New Service Item 1</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$25.00</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Description of product or service offering.</p></div></div><div class=\"flex items-start gap-3.5 group\"><div class=\"relative shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/80 shadow-xs flex items-center justify-center\" style=\"width: 48px; height: 48px;\"><span class=\"text-xl\">✨</span></div><div class=\"flex-1 min-w-0\"><div class=\"flex items-baseline justify-between gap-2\"><span class=\"font-bold text-sm sm:text-base tracking-tight shrink-0 flex items-center gap-1.5\" style=\"color: rgb(15, 23, 42);\"><span class=\"text-sm\">✨</span>New Service Item 2</span><div class=\"flex-1 mx-1.5 self-center\" style=\"border-bottom-width: 1px; border-bottom-style: dotted; border-color: rgb(203, 213, 225);\"></div><span class=\"inline-block shrink-0 font-extrabold text-xs sm:text-sm px-2.5 py-0.5 rounded-full tracking-tight shadow-2xs\" style=\"color: rgb(37, 99, 235); background-color: rgb(239, 246, 255);\">$25.00</span></div><p class=\"mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2\">Description of product or service offering.</p></div></div></div>",
+    "tick": "d05539cc375b5fd3",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "media-carousel+items": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none\" style=\"cursor: grab;\"><div class=\"overflow-hidden w-full py-2\"><div class=\"flex transition-transform ease-out\" style=\"gap: 16px; transition-duration: 500ms; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 group/card relative overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px; background-color: rgb(15, 23, 42);\"><div class=\"w-full overflow-hidden relative aspect-16/9\"><img alt=\"Media Image\" class=\"w-full h-full transition-transform duration-500 group-hover/card:scale-105 pointer-events-none\" style=\"object-fit: cover;\" loading=\"lazy\" src=\"https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 left-2.5 z-10\"><span class=\"inline-flex items-center gap-1 rounded-full bg-slate-900/85 px-2 py-0.5 text-[9px] font-bold text-slate-200 backdrop-blur shadow-xs border border-slate-700/40\"><span>📷</span> IMAGE</span></div><div class=\"absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-85 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 text-white\"><h5 class=\"text-xs font-bold text-white drop-shadow line-clamp-1\">New Media Slide</h5><p class=\"text-[11px] font-medium text-slate-200 drop-shadow line-clamp-2 mt-0.5\">Slide caption text...</p><span class=\"text-[9px] text-cyan-300 font-semibold mt-1 flex items-center gap-1\"><span>🔍 Click to View Image</span></span></div></div></div><div class=\"shrink-0 group/card relative overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px; background-color: rgb(15, 23, 42);\"><div class=\"w-full overflow-hidden relative aspect-16/9\"><img alt=\"Media Image\" class=\"w-full h-full transition-transform duration-500 group-hover/card:scale-105 pointer-events-none\" style=\"object-fit: cover;\" loading=\"lazy\" src=\"https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute top-2.5 left-2.5 z-10\"><span class=\"inline-flex items-center gap-1 rounded-full bg-slate-900/85 px-2 py-0.5 text-[9px] font-bold text-slate-200 backdrop-blur shadow-xs border border-slate-700/40\"><span>📷</span> IMAGE</span></div><div class=\"absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-85 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 text-white\"><h5 class=\"text-xs font-bold text-white drop-shadow line-clamp-1\">New Media Slide</h5><p class=\"text-[11px] font-medium text-slate-200 drop-shadow line-clamp-2 mt-0.5\">Slide caption text...</p><span class=\"text-[9px] text-cyan-300 font-semibold mt-1 flex items-center gap-1\"><span>🔍 Click to View Image</span></span></div></div></div></div></div><button type=\"button\" class=\"absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Previous Slide\"><span class=\"text-base font-bold\">‹</span></button><button type=\"button\" class=\"absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Next Slide\"><span class=\"text-base font-bold\">›</span></button><div class=\"flex items-center justify-center gap-1.5 mt-3\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-cyan-600\" title=\"Go to slide 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to slide 2\"></button></div></div>",
+    "tick": "4d05f812ddfed2d5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "4d05f812ddfed2d5"
+      ],
+      [
+        "1:button",
+        [],
+        "4d05f812ddfed2d5"
+      ],
+      [
+        "2:button",
+        [],
+        "b2045062c8eb6d34"
+      ],
+      [
+        "3:button",
+        [],
+        "4d05f812ddfed2d5"
+      ]
+    ]
+  },
+  "testimonial-carousel+items": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none\" style=\"cursor: grab;\"><div class=\"overflow-hidden w-full py-3 px-1\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 20px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 flex flex-col justify-between p-6 shadow-md hover:shadow-xl border border-slate-200/80 transition-all duration-300 relative group/card\" style=\"width: calc(1 * (100% - 0px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"absolute top-4 right-5 text-4xl font-serif text-slate-200 pointer-events-none select-none\">“</div><div><div class=\"flex items-center gap-0.5 mb-3\"><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span></div><p class=\"text-xs sm:text-sm font-medium leading-relaxed mb-6 italic opacity-90\">\"Outstanding experience! The results exceeded our expectations.\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100\"><div class=\"h-10 w-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shrink-0\">A</div><div class=\"min-w-0\"><h5 class=\"text-xs sm:text-sm font-bold tracking-tight truncate\">Alex Morgan</h5><p class=\"text-[11px] opacity-75 truncate\">Creative Director</p></div></div></div><div class=\"shrink-0 flex flex-col justify-between p-6 shadow-md hover:shadow-xl border border-slate-200/80 transition-all duration-300 relative group/card\" style=\"width: calc(1 * (100% - 0px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"absolute top-4 right-5 text-4xl font-serif text-slate-200 pointer-events-none select-none\">“</div><div><div class=\"flex items-center gap-0.5 mb-3\"><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span><span class=\"text-sm\" style=\"color: rgb(245, 158, 11);\">★</span></div><p class=\"text-xs sm:text-sm font-medium leading-relaxed mb-6 italic opacity-90\">\"Outstanding experience! The results exceeded our expectations.\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100\"><div class=\"h-10 w-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shrink-0\">A</div><div class=\"min-w-0\"><h5 class=\"text-xs sm:text-sm font-bold tracking-tight truncate\">Alex Morgan</h5><p class=\"text-[11px] opacity-75 truncate\">Creative Director</p></div></div></div></div></div><button type=\"button\" class=\"absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Previous Testimonial\"><span class=\"text-base font-bold\">‹</span></button><button type=\"button\" class=\"absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Next Testimonial\"><span class=\"text-base font-bold\">›</span></button><div class=\"flex items-center justify-center gap-1.5 mt-3\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-emerald-600\" title=\"Go to testimonial 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to testimonial 2\"></button></div></div>",
+    "tick": "f272b6e4ceffc9db",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "f272b6e4ceffc9db"
+      ],
+      [
+        "1:button",
+        [],
+        "f272b6e4ceffc9db"
+      ],
+      [
+        "2:button",
+        [],
+        "2b5d94b3aeefa6e9"
+      ],
+      [
+        "3:button",
+        [],
+        "f272b6e4ceffc9db"
+      ]
+    ]
+  },
+  "loop-carousel+items": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none py-2\"><div class=\"overflow-hidden w-full py-1\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 20px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 flex flex-col justify-between p-5 shadow-sm border border-slate-200/80 transition duration-200 hover:shadow-md hover:-translate-y-1\" style=\"width: calc(0.3333333333333333 * (100% - 40px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"mb-1.5\"><span class=\"inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-700\">FEATURE</span></div><h3 class=\"text-sm font-bold leading-snug mb-1\">New Card Item #1</h3><p class=\"text-xs opacity-75 line-clamp-2 mb-3\">Add details for this loop carousel slide.</p><a href=\"#\" class=\"mt-auto inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-purple-700 transition\">Learn More</a></div><div class=\"shrink-0 flex flex-col justify-between p-5 shadow-sm border border-slate-200/80 transition duration-200 hover:shadow-md hover:-translate-y-1\" style=\"width: calc(0.3333333333333333 * (100% - 40px)); background-color: rgb(255, 255, 255); border-radius: 16px; color: rgb(30, 41, 59);\"><div class=\"mb-1.5\"><span class=\"inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-700\">FEATURE</span></div><h3 class=\"text-sm font-bold leading-snug mb-1\">New Card Item #2</h3><p class=\"text-xs opacity-75 line-clamp-2 mb-3\">Add details for this loop carousel slide.</p><a href=\"#\" class=\"mt-auto inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-purple-700 transition\">Learn More</a></div></div></div></div>",
+    "tick": "60a03b00d63f82a9",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "60a03b00d63f82a9"
+      ],
+      [
+        "1:a",
+        [],
+        "60a03b00d63f82a9"
+      ]
+    ]
+  },
+  "reviews+items": {
+    "markup": "<div class=\"w-full transition-all\"><div class=\"mb-4 flex justify-start\"><button type=\"button\" class=\"flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-amber-600 active:scale-95 cursor-pointer\"><span>★</span><span>+ Write a Review</span></button></div><div class=\"grid gap-4\" style=\"grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));\"><div class=\"flex flex-col justify-between rounded-2xl border p-5 shadow-xs transition hover:shadow-md text-left items-start\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240);\"><div class=\"flex flex-col text-left items-start w-full\"><div class=\"flex items-center gap-1 mb-3 justify-start\"><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg></div><p class=\"text-xs sm:text-sm text-slate-700 leading-relaxed font-normal mb-4 italic\">\"Outstanding quality! Exceeded all expectations.\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100 w-full justify-start\"><div class=\"h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100\"><img alt=\"Alex Morgan\" class=\"h-full w-full object-cover\" src=\"https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&amp;q=80\"></div><div class=\"flex flex-col text-left items-start\"><div class=\"flex items-center gap-1.5\"><span class=\"text-xs font-bold text-slate-900\">Alex Morgan</span><span class=\"inline-flex items-center text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full\" title=\"Verified Customer Review\">✓ Verified</span></div><span class=\"text-[11px] font-medium text-slate-500\">Verified Purchaser</span></div></div></div><div class=\"flex flex-col justify-between rounded-2xl border p-5 shadow-xs transition hover:shadow-md text-left items-start\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(226, 232, 240);\"><div class=\"flex flex-col text-left items-start w-full\"><div class=\"flex items-center gap-1 mb-3 justify-start\"><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg><svg class=\"h-4 w-4\" fill=\"#f59e0b\" viewBox=\"0 0 20 20\"><path d=\"M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z\"></path></svg></div><p class=\"text-xs sm:text-sm text-slate-700 leading-relaxed font-normal mb-4 italic\">\"Outstanding quality! Exceeded all expectations.\"</p></div><div class=\"flex items-center gap-3 pt-3 border-t border-slate-100 w-full justify-start\"><div class=\"h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100\"><img alt=\"Alex Morgan\" class=\"h-full w-full object-cover\" src=\"https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&amp;q=80\"></div><div class=\"flex flex-col text-left items-start\"><div class=\"flex items-center gap-1.5\"><span class=\"text-xs font-bold text-slate-900\">Alex Morgan</span><span class=\"inline-flex items-center text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full\" title=\"Verified Customer Review\">✓ Verified</span></div><span class=\"text-[11px] font-medium text-slate-500\">Verified Purchaser</span></div></div></div></div></div>",
+    "tick": "08f78092cce60bb5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "13e49026ed54b09d"
+      ]
+    ]
+  },
+  "share-buttons+items": {
+    "markup": "<div style=\"width: 100%; box-sizing: border-box;\" class=\"w-full flex justify-start relative select-none\"><div class=\"space-y-1.5 w-full\"><div class=\"flex w-full flex-row flex-wrap\" style=\"gap: 10px; justify-content: flex-start; align-items: center;\"><a href=\"https://facebook.com\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"inline-flex items-center gap-2 rounded-lg font-semibold transition shadow-xs hover:opacity-90 active:scale-95 cursor-pointer\" style=\"padding: 8px 16px; font-size: 13px; background-color: rgb(24, 119, 242); color: rgb(255, 255, 255); border: 1px solid transparent; border-radius: 8px; text-decoration: none;\" title=\"Facebook (https://facebook.com)\" aria-label=\"Facebook\"><svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z\"></path></svg><span>Facebook</span></a><a href=\"https://facebook.com\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"inline-flex items-center gap-2 rounded-lg font-semibold transition shadow-xs hover:opacity-90 active:scale-95 cursor-pointer\" style=\"padding: 8px 16px; font-size: 13px; background-color: rgb(24, 119, 242); color: rgb(255, 255, 255); border: 1px solid transparent; border-radius: 8px; text-decoration: none;\" title=\"Facebook (https://facebook.com)\" aria-label=\"Facebook\"><svg class=\"h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\"><path d=\"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z\"></path></svg><span>Facebook</span></a></div></div></div>",
+    "tick": "54568e7cad30b932",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "54568e7cad30b932"
+      ],
+      [
+        "1:a",
+        [],
+        "54568e7cad30b932"
+      ]
+    ]
+  },
+  "audio-playlist+items": {
+    "markup": "<div class=\"w-full rounded-2xl p-5 shadow-xl transition-all relative\" style=\"background-color: rgb(15, 23, 42); color: rgb(255, 255, 255);\"><audio src=\"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\"></audio><div class=\"flex items-center justify-between border-b border-white/10 pb-4 mb-4\"><div><span class=\"text-[10px] font-bold uppercase tracking-wider flex items-center gap-1\" style=\"color: rgb(56, 189, 248);\">🎵 Audio Player</span><h4 class=\"text-sm font-bold mt-0.5\">01. Ambient Solar Echoes</h4><p class=\"text-xs text-white/70\">ForgeStudio Soundscapes</p></div><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs font-bold transition cursor-pointer\">⏮</button><button type=\"button\" class=\"h-10 w-10 rounded-full flex items-center justify-center text-slate-900 font-bold transition shadow-md hover:scale-105 active:scale-95 cursor-pointer\" style=\"background-color: rgb(56, 189, 248);\">▶</button><button type=\"button\" class=\"h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs font-bold transition cursor-pointer\">⏭</button></div></div><div class=\"space-y-1.5 max-h-48 overflow-y-auto pr-1\"><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition bg-white/15 border border-white/20 font-bold\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">1</span><span class=\"text-xs truncate\">01. Ambient Solar Echoes</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">06:12</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">2</span><span class=\"text-xs truncate\">02. Deep Focus Flow</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">07:05</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">3</span><span class=\"text-xs truncate\">03. Midnight Synthesizer</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">05:48</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">4</span><span class=\"text-xs truncate\">New Custom Audio Track</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">03:30</span></div><div class=\"flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition hover:bg-white/5 opacity-80\"><div class=\"flex items-center gap-2.5 truncate\"><span class=\"text-xs font-mono opacity-60\">5</span><span class=\"text-xs truncate\">New Custom Audio Track</span></div><span class=\"text-[11px] font-mono opacity-60 ml-2\">03:30</span></div></div></div>",
+    "tick": "d46c1c64f4345ec0",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "fd847f1bfec39eb7"
+      ],
+      [
+        "1:button",
+        [
+          [
+            "media.play",
+            "audio"
+          ]
+        ],
+        "989818a902b7ad3b"
+      ],
+      [
+        "2:button",
+        [],
+        "5d86d4d8ffd25aef"
+      ]
+    ]
+  },
+  "gallery+items": {
+    "markup": "<div class=\"grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3\" style=\"gap: 16px;\"><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"One\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://example.com/1.jpg\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">One</p></div></div></div><div class=\"flex flex-col group cursor-pointer\"><div class=\"relative w-full overflow-hidden bg-slate-100 border border-slate-200/60 shadow-xs transition-all duration-300 aspect-square hover:scale-105\" style=\"border-radius: 16px;\"><img alt=\"Two\" class=\"h-full w-full object-cover transition-transform duration-300\" src=\"https://example.com/2.jpg\"><div class=\"absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/60 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-xs\"><svg class=\"h-3.5 w-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7\"></path></svg></div><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3 text-white transition-opacity duration-300 opacity-90 group-hover:opacity-100\"><p class=\"text-xs font-semibold tracking-wide drop-shadow-sm leading-tight\">Two</p></div></div></div></div>",
+    "tick": "78bb887d28facc94",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "nav-menu+items@editor": {
+    "markup": "<nav class=\"w-full flex justify-start relative transition-all\" style=\"box-sizing: border-box;\"><div class=\"flex sm:hidden items-center justify-between p-2 w-full\"><span class=\"text-xs font-bold text-slate-700\">Navigation Menu</span><button type=\"button\" class=\"p-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition cursor-pointer\">☰</button></div><ul class=\"flex w-full hidden sm:flex flex-row items-center justify-start wrap relative\" style=\"gap: 24px; position: relative; min-height: 44px;\"><li class=\"group list-none  cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-400/80 rounded-xl\" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: rgba(37, 99, 235, 0.1); color: rgb(37, 99, 235); font-size: 14px; font-weight: 600; text-transform: none;\"><span>New Link</span></a></li><li class=\"group list-none  cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-400/80 rounded-xl\" style=\"position: relative; z-index: 10; transition: all 0.15s ease-out;\"><a href=\"#\" target=\"_self\" class=\"inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 transition-all duration-200 cursor-pointer select-none \" style=\"background-color: rgba(37, 99, 235, 0.1); color: rgb(37, 99, 235); font-size: 14px; font-weight: 600; text-transform: none;\"><span>New Link</span></a></li></ul></nav>",
+    "tick": "1a2b0fb6bedc45f6",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "6681ad6dc74f4293"
+      ],
+      [
+        "1:a",
+        [],
+        "1a2b0fb6bedc45f6"
+      ],
+      [
+        "2:a",
+        [],
+        "1a2b0fb6bedc45f6"
+      ]
+    ]
+  },
+  "form+fields@editor": {
+    "markup": "<form class=\"w-full rounded-3xl p-6 sm:p-10 shadow-xl border transition-all duration-300\" style=\"background-color: rgb(255, 255, 255); border-color: rgb(241, 245, 249); box-sizing: border-box;\"><input style=\"display: none; opacity: 0; position: absolute; top: -9999px; left: -9999px;\" tabindex=\"-1\" autocomplete=\"off\" type=\"text\" value=\"\" name=\"_fs_hp_check\"><div class=\"mb-6\"><h3 class=\"text-xl sm:text-3xl font-black text-slate-900 tracking-tight\">Get in Touch</h3><p class=\"mt-2 text-xs sm:text-sm text-slate-500 font-normal leading-relaxed max-w-xl\">Fill out the form below and our team will get back to you within 24 hours.</p></div><div class=\"grid grid-cols-1 sm:grid-cols-2\" style=\"gap: 16px;\"><div class=\"sm:col-span-2 col-span-1 flex flex-col\"><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">New Field</label><div class=\"relative flex items-center\"><input placeholder=\"Enter value...\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 hover:border-slate-300\" type=\"text\" value=\"\"></div></div><div class=\"sm:col-span-2 col-span-1 flex flex-col\"><label class=\"block text-xs font-bold text-slate-700 mb-1.5 tracking-wide\">New Field</label><div class=\"relative flex items-center\"><input placeholder=\"Enter value...\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-200 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 hover:border-slate-300\" type=\"text\" value=\"\"></div></div><div class=\"col-span-1 sm:col-span-2 pt-6 flex items-center gap-3\"><button type=\"submit\" class=\"group inline-flex items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 text-xs sm:text-sm font-extrabold shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 w-full\" style=\"background-color: rgb(37, 99, 235); color: rgb(255, 255, 255);\"><span>Send Message</span><svg class=\"h-4 w-4 transition-transform duration-300 group-hover:translate-x-1\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line><polyline points=\"12 5 19 12 12 19\"></polyline></svg></button></div></div></form>",
+    "tick": "fdd9266b92418ef2",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:input[text]",
+        [],
+        "89ccc5101a535f17"
+      ],
+      [
+        "1:input[text]",
+        [],
+        "93996dbbdc3105e7"
+      ],
+      [
+        "2:input[text]",
+        [],
+        "93996dbbdc3105e7"
+      ],
+      [
+        "3:button",
+        [],
+        "9420469353c23e94"
+      ]
+    ]
+  }
+}

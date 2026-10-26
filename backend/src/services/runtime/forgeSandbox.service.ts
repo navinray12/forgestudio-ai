@@ -199,7 +199,18 @@ export async function materializeProjectWorkspace(projectId: string): Promise<st
 }
 
 /**
- * Execute a command inside the isolated project sandbox
+ * Check if a verified container/VM isolation runtime (Docker/gVisor/Firecracker) is configured.
+ */
+export function isVerifiedIsolationAvailable(): boolean {
+  const runtime = (process.env.FORGE_CONTAINER_RUNTIME || "").toLowerCase();
+  return runtime === "docker" || runtime === "gvisor" || runtime === "firecracker";
+}
+
+/**
+ * Execute a command inside the isolated project sandbox.
+ * Enforces isolation verification: tenant commands are prevented from executing
+ * unsafely on the application host unless verified container isolation is present,
+ * or explicitly enabled for local development with strict secret filtering.
  */
 export async function executeInSandbox(params: {
   projectId: string;
@@ -228,6 +239,19 @@ export async function executeInSandbox(params: {
     throw new AppError("Invalid working directory: Sandbox path escape forbidden", 400, "SANDBOX_PATH_ESCAPE");
   }
 
+  // SEC-02: Prevent tenant commands from executing unsafely on the application host
+  const hasIsolation = isVerifiedIsolationAvailable();
+  const allowUnsafeDev = process.env.NODE_ENV !== "production" &&
+    (process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "true" || process.env.FORGE_ALLOW_UNSAFE_HOST_EXECUTION === "1");
+
+  if (!hasIsolation && !allowUnsafeDev) {
+    throw new AppError(
+      "Host command execution is disabled: verified container isolation is not configured. Tenant commands cannot execute on the application host.",
+      403,
+      "ISOLATION_UNAVAILABLE"
+    );
+  }
+
   // Materialize project files to disk sandbox workspace
   const workspaceDir = await materializeProjectWorkspace(projectId);
   const resolvedCwd = path.resolve(workspaceDir, cwd.replace(/^\//, ""));
@@ -238,19 +262,41 @@ export async function executeInSandbox(params: {
   const runtimeSession = await getOrCreateRuntimeSession(projectId, "ephemeral");
   const processId = `proc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  // Construct sanitized environment
+  // Strict minimal environment allowlist - DO NOT inherit host secrets (...process.env)
+  const SAFE_HOST_ENV_KEYS = [
+    "PATH", "Path", "PATHEXT", "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE",
+    "LANG", "LC_ALL", "TERM", "COLORTERM", "SYSTEMROOT", "COMSPEC"
+  ];
+  const hostSafeEnv: Record<string, string> = {};
+  for (const key of SAFE_HOST_ENV_KEYS) {
+    if (process.env[key] !== undefined) {
+      hostSafeEnv[key] = process.env[key]!;
+    }
+  }
+
   const sanitizedEnv: Record<string, string> = {
-    ...process.env,
+    ...hostSafeEnv,
     NODE_ENV: "development",
     PORT: "5173",
     FORGE_PROJECT_ID: projectId,
-    FORGE_SANDBOX: "1",
+    FORGE_SANDBOX_ISOLATED: hasIsolation ? "true" : "false",
     ...env,
   };
 
-  // Mask host cloud metadata credentials from sandbox process env
-  delete sanitizedEnv["AWS_SECRET_ACCESS_KEY"];
-  delete sanitizedEnv["GOOGLE_APPLICATION_CREDENTIALS"];
+  // Strip all potential sensitive credentials/tokens from environment
+  const FORBIDDEN_ENV_PATTERNS = [
+    /SECRET/i, /KEY/i, /TOKEN/i, /PASSWORD/i, /DATABASE/i, /PRISMA/i,
+    /POSTGRES/i, /STRIPE/i, /AWS/i, /GOOGLE/i, /SMTP/i, /COOKIE/i, /AUTH/i
+  ];
+  for (const key of Object.keys(sanitizedEnv)) {
+    if (key === "FORGE_PROJECT_ID" || key === "FORGE_SANDBOX_ISOLATED") continue;
+    for (const pattern of FORBIDDEN_ENV_PATTERNS) {
+      if (pattern.test(key)) {
+        delete sanitizedEnv[key];
+        break;
+      }
+    }
+  }
 
   const proc: SandboxProcess = {
     id: processId,
@@ -367,7 +413,7 @@ export async function executeInSandbox(params: {
       data: {
         projectId,
         userId: userId || null,
-        actionType: "SANDBOX_COMMAND",
+        actionType: hasIsolation ? "SANDBOX_COMMAND" : "UNISOLATED_HOST_COMMAND",
         command: fullCommand,
         exitCode: execResult.exitCode,
         durationMs,
@@ -430,6 +476,7 @@ export function getSandboxProcess(processId: string): SandboxProcess | null {
 }
 
 export const forgeSandboxService = {
+  isVerifiedIsolationAvailable,
   getOrCreateRuntimeSession,
   executeInSandbox,
   terminateSandboxProcess,

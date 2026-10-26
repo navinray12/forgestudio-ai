@@ -34,14 +34,22 @@ export function createLocalIdentityRouter(service: LocalAuthentication = localAu
     const result = await service.beginSignup(input.identifier, input.fullName, input.password, req.ip ?? "unknown");
     res.cookie(AUTH_CHALLENGE_COOKIE, result.secret, AUTH_CHALLENGE_OPTIONS);
     await service.sendCode(result.secret, result.user.id, "SIGNUP");
-    res.status(201).json({ success: true, requireOtp: true, data: { userId: result.user.id, email: result.user.email } });
+    res.status(201).json({
+      success: true,
+      requireOtp: true,
+      data: { userId: result.user.id, email: result.user.email },
+    });
   });
   for (const [prefix, purpose] of [["login", "LOGIN"], ["signup", "SIGNUP"]] as const) {
     for (const action of ["send-otp", "resend-otp"]) {
       router.post(`/${prefix}/${action}`, async (req, res) => {
         const input = challenge.parse(req.body);
         await service.sendCode(req.cookies?.[AUTH_CHALLENGE_COOKIE], input.userId, purpose);
-        res.json({ success: true, requireOtp: true, message: "Code accepted for delivery." });
+        res.json({
+          success: true,
+          requireOtp: true,
+          message: "Code accepted for delivery.",
+        });
       });
     }
     router.post(`/${prefix}/verify-otp`, async (req, res) => {

@@ -57,6 +57,8 @@ export interface WriteFileOptions {
   content: string;
   encoding?: "utf-8" | "base64";
   expectedVersion?: number;
+  /** Fail if the path exists, including a soft-deleted source file. */
+  requireAbsent?: boolean;
   isGenerated?: boolean;
   isProtected?: boolean;
   authorId?: string;
@@ -193,6 +195,11 @@ export async function writeFile(
   });
 
   if (existing) {
+    // A generation that preflighted an absent path must never overwrite or
+    // restore a file created by an intervening editor (including soft-deleted files).
+    if (options.requireAbsent) {
+      throw new AppError("A file was created or restored after the generation preflight", 409, "CONCURRENCY_CONFLICT");
+    }
     // Check if file is deleted
     if (existing.deletedAt) {
       // Re-create / un-delete file

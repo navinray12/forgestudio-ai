@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { Type, Search, RotateCcw } from 'lucide-react';
+import React from 'react';
+import { Search, RotateCcw } from 'lucide-react';
 import { FontService } from '../features/fonts/FontService';
-import { FontRegistry } from '../features/fonts/FontRegistry';
 
 interface FontPickerControlProps {
   label?: string;

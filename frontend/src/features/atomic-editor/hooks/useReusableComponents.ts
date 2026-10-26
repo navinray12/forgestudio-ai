@@ -18,15 +18,16 @@ export function useReusableComponents() {
     try {
       const data = ReusableComponentService.getComponents();
       setComponents(data);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load Reusable Components.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to load Reusable Components.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchComponents();
+    const timer = window.setTimeout(fetchComponents, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchComponents]);
 
   const filteredComponents = useMemo(() => {
@@ -46,8 +47,8 @@ export function useReusableComponents() {
       const created = ReusableComponentService.createComponent(payload);
       setComponents((prev) => [...prev, created]);
       return created;
-    } catch (err: any) {
-      setError(err?.message || "Failed to create Reusable Component.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create Reusable Component.");
       throw err;
     }
   };
@@ -58,8 +59,8 @@ export function useReusableComponents() {
       const updated = ReusableComponentService.updateComponent(id, payload);
       setComponents((prev) => prev.map((item) => (item.id === id ? updated : item)));
       return updated;
-    } catch (err: any) {
-      setError(err?.message || "Failed to update Reusable Component.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to update Reusable Component.");
       throw err;
     }
   };
@@ -70,8 +71,8 @@ export function useReusableComponents() {
       const duplicated = ReusableComponentService.duplicateComponent(id);
       setComponents((prev) => [...prev, duplicated]);
       return duplicated;
-    } catch (err: any) {
-      setError(err?.message || "Failed to duplicate Reusable Component.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to duplicate Reusable Component.");
       throw err;
     }
   };
@@ -81,8 +82,8 @@ export function useReusableComponents() {
     try {
       ReusableComponentService.deleteComponent(id);
       setComponents((prev) => prev.filter((item) => item.id !== id));
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete Reusable Component.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to delete Reusable Component.");
       throw err;
     }
   };

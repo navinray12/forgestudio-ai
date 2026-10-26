@@ -1,0 +1,7 @@
+﻿export type NotificationSettings={enabled:boolean;timing:'immediately'|'hour'|'day';senderName:string;senderEmail:string;recipients:string[];sendToSubmitter:boolean;subject:string;replyTo:string};
+export type FormSummary={id:string;name:string;submissions:number;lastSubmission:string|null};
+export type FormsDashboard={settings:NotificationSettings;smtpConfigured:boolean;configured:boolean;forms:FormSummary[]};
+export type FormEntry={id:string;data:Record<string,unknown>;createdAt:string};
+export const emptyNotifications:NotificationSettings={enabled:true,timing:'immediately',senderName:'ForgeStudio Forms',senderEmail:'no-reply@forgestudio.io',recipients:[],sendToSubmitter:false,subject:'New form submission on {{siteName}} — {{formName}}',replyTo:'no-reply@forgestudio.io'};
+const api=import.meta.env.VITE_API_URL||'http://localhost:5000';
+export async function formsRequest<T>(path:string,options:{method?:string;body?:unknown;signal?:AbortSignal}={}):Promise<T>{const response=await fetch(`${api}${path}`,{method:options.method||'GET',credentials:'include',cache:'no-store',signal:options.signal||AbortSignal.timeout(15000),headers:{...(options.body?{'Content-Type':'application/json','X-Forge-Intent':'form-notifications'}:{})},body:options.body?JSON.stringify(options.body):undefined});const data=await response.json().catch(()=>null);if(!response.ok||!data?.success)throw new Error(data?.error?.message||data?.message||'Unable to load form settings.');return data;}

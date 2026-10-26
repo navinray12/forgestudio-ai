@@ -7,14 +7,36 @@ import { AppError } from "../../utils/app-error.js";
 const DEFAULT_MAX=2*1024*1024;
 const DEFAULT_TIMEOUT=10000;
 
+/** IPv4 address carried by an IPv4-mapped (::ffff:0:0/96) or NAT64 (64:ff9b::/96) IPv6 address, in any notation. */
+function embeddedIPv4(v6:string):string|null{
+  let s=v6;
+  const dotted=/(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(s);
+  if(dotted){
+    const [p,q,r,t]=dotted.slice(1).map(Number);
+    s=s.slice(0,dotted.index)+`${((p<<8)|q).toString(16)}:${((r<<8)|t).toString(16)}`;
+  }
+  const [head,tail]=s.split("::");
+  const hp=head?head.split(":"):[];
+  const tp=tail?tail.split(":"):[];
+  const groups=tail===undefined?hp:[...hp,...Array(Math.max(0,8-hp.length-tp.length)).fill("0"),...tp];
+  if(groups.length!==8) return null;
+  const g=groups.map(x=>parseInt(x,16));
+  const mapped=g.slice(0,5).every(x=>x===0)&&g[5]===0xffff;
+  const nat64=g[0]===0x64&&g[1]===0xff9b&&g.slice(2,6).every(x=>x===0);
+  if(!mapped&&!nat64) return null;
+  return `${g[6]>>8}.${g[6]&255}.${g[7]>>8}.${g[7]&255}`;
+}
+
 function isBlockedAddress(address:string){
   const version=net.isIP(address);
   if(version===4){
     const [a,b]=address.split(".").map(Number);
-    return a===0||a===10||a===127||(a===100&&b>=64&&b<=127)||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||a>=224;
+    return a===0||a===10||a===127||(a===100&&b>=64&&b<=127)||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||(a===198&&(b===18||b===19))||a>=224;
   }
   if(version===6){
     const v=address.toLowerCase();
+    const embedded=embeddedIPv4(v);
+    if(embedded) return isBlockedAddress(embedded);
     return v==="::"||v==="::1"||v.startsWith("fc")||v.startsWith("fd")||/^fe[89ab]/.test(v)||v.startsWith("ff")||
       v.startsWith("::ffff:127.")||v.startsWith("::ffff:10.")||v.startsWith("::ffff:192.168.");
   }
@@ -52,7 +74,7 @@ export async function resolveSafeDestination(raw:string, options:{allowHttp?:boo
 }
 
 export async function safeEgressRequest(input:{
-  url:string;method?:"GET"|"POST"|"PUT"|"PATCH"|"DELETE";
+  url:string;method?:"GET"|"HEAD"|"POST"|"PUT"|"PATCH"|"DELETE";
   headers?:Record<string,string>;body?:Buffer|string;timeoutMs?:number;maxResponseBytes?:number;
   allowedPorts?:number[];allowHttp?:boolean;
 }):Promise<{status:number;headers:http.IncomingHttpHeaders;body:Buffer}>{

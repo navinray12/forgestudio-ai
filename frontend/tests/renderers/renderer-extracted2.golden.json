@@ -1,0 +1,329 @@
+{
+  "nested-carousel": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none\"><div class=\"flex flex-col items-center justify-center p-8 border-2 border-dashed border-indigo-300 bg-indigo-50/50 rounded-2xl text-center\"><span class=\"text-2xl mb-1\">🎠</span><h4 class=\"text-sm font-bold text-indigo-900\">Empty Nested Carousel</h4><p class=\"text-xs text-indigo-600 max-w-xs mt-1\">Add slide containers to display nested elements inside this carousel.</p></div></div>",
+    "tick": "3cdacfdd5678d626",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "nested-carousel+children": {
+    "markup": "<div class=\"w-full relative group overflow-hidden select-none\"><div class=\"overflow-hidden w-full py-2 px-1\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 20px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 relative transition-all duration-300\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><div data-probe-child=\"c1\"></div></div><div class=\"shrink-0 relative transition-all duration-300\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><div data-probe-child=\"c2\"></div></div><div class=\"shrink-0 relative transition-all duration-300\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><div data-probe-child=\"c3\"></div></div></div></div><button type=\"button\" class=\"absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-indigo-900/80 hover:bg-indigo-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Previous Slide\"><span class=\"text-base font-bold\">‹</span></button><button type=\"button\" class=\"absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-indigo-900/80 hover:bg-indigo-900 text-white flex items-center justify-center backdrop-blur shadow-lg transition-all z-20 cursor-pointer hover:scale-110\" title=\"Next Slide\"><span class=\"text-base font-bold\">›</span></button><div class=\"flex items-center justify-center gap-1.5 mt-3 z-20 relative\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-indigo-600\" title=\"Go to slide 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to slide 2\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Go to slide 3\"></button></div></div>",
+    "tick": "af69d8383c41d933",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "86058a7e28d1da3c"
+      ],
+      [
+        "1:button",
+        [],
+        "a3d5f46f08dbff13"
+      ],
+      [
+        "2:button",
+        [],
+        "af69d8383c41d933"
+      ],
+      [
+        "3:button",
+        [],
+        "a3d5f46f08dbff13"
+      ],
+      [
+        "4:button",
+        [],
+        "86058a7e28d1da3c"
+      ]
+    ]
+  },
+  "basic-media-carousel": {
+    "markup": "<div class=\"w-full relative transition-all\"><div class=\"relative overflow-hidden w-full\"><div class=\"flex transition-transform duration-300 ease-out\" style=\"gap: 12px; transform: translateX(-0%);\"><div class=\"relative flex-shrink-0 group overflow-hidden bg-slate-900 border border-slate-200/50 shadow-sm\" style=\"width: calc(0.5 * (100% - 12px)); border-radius: 12px; height: 220px;\"><img alt=\"Alpine Lake\" class=\"w-full h-full object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-3 text-white\"><span class=\"text-[10px] font-bold uppercase tracking-wider text-blue-300 flex items-center gap-1\">📷 Image</span><h5 class=\"text-xs font-bold leading-tight line-clamp-1\">Alpine Lake</h5><p class=\"text-[10px] text-slate-300 line-clamp-1\">Serene Nature</p></div></div><div class=\"relative flex-shrink-0 group overflow-hidden bg-slate-900 border border-slate-200/50 shadow-sm\" style=\"width: calc(0.5 * (100% - 12px)); border-radius: 12px; height: 220px;\"><img alt=\"Demo Video\" class=\"w-full h-full object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><div class=\"absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-3 text-white\"><span class=\"text-[10px] font-bold uppercase tracking-wider text-blue-300 flex items-center gap-1\">🎬 Video</span><h5 class=\"text-xs font-bold leading-tight line-clamp-1\">Demo Video</h5><p class=\"text-[10px] text-slate-300 line-clamp-1\">Product Overview</p></div></div></div></div></div>",
+    "tick": "acdeaec739812537",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "basic-media-carousel+items": {
+    "markup": "<div class=\"w-full relative transition-all\"><div class=\"relative overflow-hidden w-full\"><div class=\"flex transition-transform duration-300 ease-out\" style=\"gap: 12px; transform: translateX(-0%);\"><div class=\"relative flex-shrink-0 group overflow-hidden bg-slate-900 border border-slate-200/50 shadow-sm\" style=\"width: calc(0.5 * (100% - 12px)); border-radius: 12px; height: 220px;\"><img alt=\"One\" class=\"w-full h-full object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://example.com/1.jpg\"><div class=\"absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-3 text-white\"><span class=\"text-[10px] font-bold uppercase tracking-wider text-blue-300 flex items-center gap-1\">📷 Image</span><h5 class=\"text-xs font-bold leading-tight line-clamp-1\">One</h5><p class=\"text-[10px] text-slate-300 line-clamp-1\">First</p></div></div><div class=\"relative flex-shrink-0 group overflow-hidden bg-slate-900 border border-slate-200/50 shadow-sm\" style=\"width: calc(0.5 * (100% - 12px)); border-radius: 12px; height: 220px;\"><img alt=\"Two\" class=\"w-full h-full object-cover group-hover:scale-105 transition-transform duration-300\" src=\"https://www.youtube.com/watch?v=abc123\"><div class=\"absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-3 text-white\"><span class=\"text-[10px] font-bold uppercase tracking-wider text-blue-300 flex items-center gap-1\">🎬 Video</span><h5 class=\"text-xs font-bold leading-tight line-clamp-1\">Two</h5><p class=\"text-[10px] text-slate-300 line-clamp-1\">Second</p></div></div></div></div></div>",
+    "tick": "72a22ad6c3d8d2df",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "image-carousel": {
+    "markup": "<div class=\"w-full flex flex-col justify-center text-center relative group select-none transition-all\"><div class=\"relative w-full overflow-hidden rounded-2xl\"><div class=\"overflow-hidden w-full py-1 cursor-grab active:cursor-grabbing\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 16px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"#\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"Abstract Visual Art\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&amp;fit=crop&amp;w=800&amp;q=80\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Modern Visuals</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Abstract Geometry</p></div></a></div><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"#\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"Digital Workspace\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&amp;fit=crop&amp;w=800&amp;q=80\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Workspace</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Clean Digital Workspace</p></div></a></div><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"#\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"Responsive Motion\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&amp;fit=crop&amp;w=800&amp;q=80\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Interactive Motion</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Dynamic Motion</p></div></a></div></div></div><button type=\"button\" class=\"absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-md transition-all z-20 cursor-pointer hover:scale-110 active:scale-95\" title=\"Previous Image\"><span class=\"text-lg font-bold leading-none\">‹</span></button><button type=\"button\" class=\"absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-md transition-all z-20 cursor-pointer hover:scale-110 active:scale-95\" title=\"Next Image\"><span class=\"text-lg font-bold leading-none\">›</span></button></div><div class=\"flex items-center justify-center gap-1.5 mt-3.5 z-20 relative\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-blue-600 shadow-xs\" title=\"Jump to slide 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Jump to slide 2\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Jump to slide 3\"></button></div></div>",
+    "tick": "410118c39dfe3239",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "c624308e577d33df"
+      ],
+      [
+        "1:a",
+        [],
+        "c624308e577d33df"
+      ],
+      [
+        "2:a",
+        [],
+        "c624308e577d33df"
+      ],
+      [
+        "3:button",
+        [],
+        "410118c39dfe3239"
+      ],
+      [
+        "4:button",
+        [],
+        "81bb75579c298db5"
+      ],
+      [
+        "5:button",
+        [],
+        "c624308e577d33df"
+      ],
+      [
+        "6:button",
+        [],
+        "81bb75579c298db5"
+      ],
+      [
+        "7:button",
+        [],
+        "410118c39dfe3239"
+      ]
+    ]
+  },
+  "image-carousel+items": {
+    "markup": "<div class=\"w-full flex flex-col justify-center text-center relative group select-none transition-all\"><div class=\"relative w-full overflow-hidden rounded-2xl\"><div class=\"overflow-hidden w-full py-1 cursor-grab active:cursor-grabbing\"><div class=\"flex transition-transform duration-500 ease-out\" style=\"gap: 16px; transform: translateX(calc(-0% - 0px + 0px));\"><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"https://example.com/a\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"A\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://example.com/a.jpg\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Alpha</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Alpha</p></div></a></div><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"#\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"B\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://example.com/b.jpg\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Bravo</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Bravo</p></div></a></div><div class=\"shrink-0 flex flex-col overflow-hidden relative shadow-xs transition duration-300 hover:shadow-md group/slide\" style=\"width: calc(1 * (100% - 0px)); border-radius: 16px;\"><a href=\"#\" class=\"block w-full relative overflow-hidden aspect-[16/10]\"><img alt=\"C\" class=\"h-full w-full transition-transform duration-500 group-hover/slide:scale-105\" style=\"object-fit: cover;\" src=\"https://example.com/c.jpg\"><div class=\"absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 text-white text-left\"><h4 class=\"text-xs font-bold leading-tight drop-shadow\">Charlie</h4><p class=\"text-[11px] text-slate-200 opacity-90 line-clamp-1 mt-0.5\">Charlie</p></div></a></div></div></div><button type=\"button\" class=\"absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-md transition-all z-20 cursor-pointer hover:scale-110 active:scale-95\" title=\"Previous Image\"><span class=\"text-lg font-bold leading-none\">‹</span></button><button type=\"button\" class=\"absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur shadow-md transition-all z-20 cursor-pointer hover:scale-110 active:scale-95\" title=\"Next Image\"><span class=\"text-lg font-bold leading-none\">›</span></button></div><div class=\"flex items-center justify-center gap-1.5 mt-3.5 z-20 relative\"><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-6 bg-blue-600 shadow-xs\" title=\"Jump to slide 1\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Jump to slide 2\"></button><button type=\"button\" class=\"h-2 rounded-full transition-all duration-300 cursor-pointer w-2 bg-slate-300 hover:bg-slate-400\" title=\"Jump to slide 3\"></button></div></div>",
+    "tick": "03ded97a3f6a945c",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:a",
+        [],
+        "8c856331ac134ec0"
+      ],
+      [
+        "1:a",
+        [],
+        "8c856331ac134ec0"
+      ],
+      [
+        "2:a",
+        [],
+        "8c856331ac134ec0"
+      ],
+      [
+        "3:button",
+        [],
+        "03ded97a3f6a945c"
+      ],
+      [
+        "4:button",
+        [],
+        "52eb46aeaa5d1ef4"
+      ],
+      [
+        "5:button",
+        [],
+        "8c856331ac134ec0"
+      ],
+      [
+        "6:button",
+        [],
+        "52eb46aeaa5d1ef4"
+      ],
+      [
+        "7:button",
+        [],
+        "03ded97a3f6a945c"
+      ]
+    ]
+  },
+  "template": {
+    "markup": "<div class=\"w-full transition-all\"><div class=\"rounded-2xl border-2 border-dashed border-purple-300 bg-purple-50/50 p-6 text-center shadow-2xs\"><div class=\"mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-600 mb-3\"><svg class=\"h-6 w-6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\"></rect><line x1=\"3\" y1=\"9\" x2=\"21\" y2=\"9\"></line><line x1=\"9\" y1=\"21\" x2=\"9\" y2=\"9\"></line></svg></div><h4 class=\"text-sm font-bold text-purple-950 mb-1\">Reusable Template Widget</h4><p class=\"text-xs text-purple-700/80 mb-4 max-w-md mx-auto\">Select a saved reusable component or choose from built-in section templates to insert into your layout.</p><div class=\"flex flex-wrap justify-center gap-2\"><button type=\"button\" class=\"flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:border-purple-400 hover:bg-purple-50 transition shadow-2xs\"><span>✨</span><span>Hero Section</span></button><button type=\"button\" class=\"flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:border-purple-400 hover:bg-purple-50 transition shadow-2xs\"><span>📌</span><span>Features Grid</span></button><button type=\"button\" class=\"flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:border-purple-400 hover:bg-purple-50 transition shadow-2xs\"><span>🚀</span><span>Call to Action Banner</span></button><button type=\"button\" class=\"flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:border-purple-400 hover:bg-purple-50 transition shadow-2xs\"><span>💬</span><span>Testimonials Carousel</span></button><button type=\"button\" class=\"flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:border-purple-400 hover:bg-purple-50 transition shadow-2xs\"><span>🏷️</span><span>Pricing Table Section</span></button></div></div></div>",
+    "tick": "eb88b39de51d1edf",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [
+          [
+            "onSelectTemplate",
+            "y-tpl",
+            null,
+            "hero"
+          ]
+        ],
+        "eb88b39de51d1edf"
+      ],
+      [
+        "1:button",
+        [
+          [
+            "onSelectTemplate",
+            "y-tpl",
+            null,
+            "features"
+          ]
+        ],
+        "eb88b39de51d1edf"
+      ],
+      [
+        "2:button",
+        [
+          [
+            "onSelectTemplate",
+            "y-tpl",
+            null,
+            "cta"
+          ]
+        ],
+        "eb88b39de51d1edf"
+      ],
+      [
+        "3:button",
+        [
+          [
+            "onSelectTemplate",
+            "y-tpl",
+            null,
+            "testimonials"
+          ]
+        ],
+        "eb88b39de51d1edf"
+      ],
+      [
+        "4:button",
+        [
+          [
+            "onSelectTemplate",
+            "y-tpl",
+            null,
+            "pricing"
+          ]
+        ],
+        "eb88b39de51d1edf"
+      ]
+    ]
+  },
+  "template+preset": {
+    "markup": "<div class=\"w-full transition-all\"><div class=\"relative group border border-purple-200/80 bg-purple-50/20 rounded-2xl p-4\"><div class=\"flex items-center justify-between border-b border-purple-200/60 pb-2 mb-3\"><div class=\"flex items-center gap-2\"><span class=\"flex h-6 w-6 items-center justify-center rounded-md bg-purple-100 text-xs text-purple-700 font-bold\">🧩</span><span class=\"text-xs font-bold text-purple-900\">Template: Hero</span></div><button type=\"button\" class=\"text-[10px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-md transition shadow-2xs\" title=\"Expand this template into editable elements\">⚡ Unpack to Canvas</button></div><div class=\"text-xs text-slate-600\"><div class=\"bg-white rounded-xl border border-slate-200 p-3 shadow-2xs\"><div class=\"text-xs font-medium text-slate-800\">Master Component: container</div></div></div></div></div>",
+    "tick": "9df25a6a124a291a",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [
+          [
+            "onUnpackTemplate",
+            "y-tpl2"
+          ]
+        ],
+        "9df25a6a124a291a"
+      ]
+    ]
+  },
+  "import-asset": {
+    "markup": "<div class=\"w-full relative rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/30 p-6 text-center transition hover:border-blue-500 hover:bg-blue-50/60\"><input accept=\"image/*,video/*,audio/*,.pdf,.doc,.docx,.json\" class=\"hidden\" type=\"file\"><div class=\"flex flex-col items-center justify-center gap-2 cursor-pointer\"><div class=\"flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 text-xl font-bold\">📁</div><h4 class=\"text-sm font-bold text-slate-800\">Import Asset / Upload File</h4><p class=\"text-xs text-slate-500 max-w-xs\">Click to browse or drop images, vectors, videos &amp; document assets here.</p></div></div>",
+    "tick": "ed38e312dceb7eb7",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "import-asset+image": {
+    "markup": "<div class=\"w-full relative rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/30 p-6 text-center transition hover:border-blue-500 hover:bg-blue-50/60\"><input accept=\"image/*,video/*,audio/*,.pdf,.doc,.docx,.json\" class=\"hidden\" type=\"file\"><div class=\"flex flex-col items-center justify-center gap-3\"><img alt=\"Asset\" class=\"max-h-48 rounded-xl object-contain shadow-md\" src=\"https://example.com/asset.png\"></div></div>",
+    "tick": "ca30d45b5a90d5b0",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "favorite-widgets": {
+    "markup": "<div class=\"w-full rounded-2xl border border-amber-300 bg-amber-50/40 p-5 shadow-sm transition hover:border-amber-400\"><div class=\"flex items-center justify-between border-b border-amber-200/80 pb-3 mb-4\"><div class=\"flex items-center gap-2\"><span class=\"flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500 text-white text-base shadow-sm\">⭐</span><div><h3 class=\"text-sm font-bold text-amber-950\">Favorite Widgets &amp; Quick Access</h3><p class=\"text-[11px] font-medium text-amber-700/80\">Pinned website widgets and custom components</p></div></div><span class=\"rounded-full bg-amber-200/80 px-2.5 py-1 text-[10px] font-extrabold text-amber-900 uppercase tracking-wider\">4 Pinned Items</span></div><div class=\"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3\"><div class=\"flex items-center gap-2.5 rounded-xl border border-amber-200 bg-white p-3 shadow-xs hover:border-amber-400 hover:shadow-sm transition\"><span class=\"text-xl\">🔤</span><div class=\"overflow-hidden\"><span class=\"block text-xs font-bold text-slate-800 capitalize truncate\">heading</span><span class=\"block text-[9px] font-semibold text-amber-600\">Favorite Widget</span></div></div><div class=\"flex items-center gap-2.5 rounded-xl border border-amber-200 bg-white p-3 shadow-xs hover:border-amber-400 hover:shadow-sm transition\"><span class=\"text-xl\">📝</span><div class=\"overflow-hidden\"><span class=\"block text-xs font-bold text-slate-800 capitalize truncate\">text</span><span class=\"block text-[9px] font-semibold text-amber-600\">Favorite Widget</span></div></div><div class=\"flex items-center gap-2.5 rounded-xl border border-amber-200 bg-white p-3 shadow-xs hover:border-amber-400 hover:shadow-sm transition\"><span class=\"text-xl\">🔘</span><div class=\"overflow-hidden\"><span class=\"block text-xs font-bold text-slate-800 capitalize truncate\">button</span><span class=\"block text-[9px] font-semibold text-amber-600\">Favorite Widget</span></div></div><div class=\"flex items-center gap-2.5 rounded-xl border border-amber-200 bg-white p-3 shadow-xs hover:border-amber-400 hover:shadow-sm transition\"><span class=\"text-xl\">🖼️</span><div class=\"overflow-hidden\"><span class=\"block text-xs font-bold text-slate-800 capitalize truncate\">image</span><span class=\"block text-[9px] font-semibold text-amber-600\">Favorite Widget</span></div></div></div></div>",
+    "tick": "f0504c0144eb52f7",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "dynamic-lightbox": {
+    "markup": "<div class=\"w-full transition-all\"><button class=\"w-full py-3 px-6 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-md hover:bg-slate-800 transition active:scale-98 flex items-center justify-center gap-2 cursor-pointer\"><span>🔍 Open Dynamic Lightbox</span><span class=\"text-xs bg-slate-800 text-blue-400 px-2 py-0.5 rounded-full font-mono\">3 items</span></button></div>",
+    "tick": "39fba23dac7d8226",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "d129fc6555f443de"
+      ]
+    ]
+  },
+  "dynamic-lightbox+items": {
+    "markup": "<div class=\"w-full transition-all\"><button class=\"w-full py-3 px-6 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-md hover:bg-slate-800 transition active:scale-98 flex items-center justify-center gap-2 cursor-pointer\"><span>Open</span><span class=\"text-xs bg-slate-800 text-blue-400 px-2 py-0.5 rounded-full font-mono\">3 items</span></button></div>",
+    "tick": "133a2544328693e5",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": [
+      [
+        "0:button",
+        [],
+        "b9479b5c5877a0e1"
+      ]
+    ]
+  },
+  "loop-grid": {
+    "markup": "<div id=\"y-lg\" data-widget-type=\"loop-grid\" class=\"w-full select-none\" style=\"margin-top: 16px; margin-bottom: 16px; background-color: transparent;\"><div class=\"fs-loop-grid fs-cols-3 grid\" style=\"grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;\"><article data-loop-item-index=\"0\" data-modulo=\"0\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"The Future of Headless Architecture &amp; Design Systems\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">Architecture</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Sep 24, 2026</span><span>•</span><span>By Elena Rostova</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">The Future of Headless Architecture &amp; Design Systems</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">Explore how composable frontend architectures and modern design systems empower agile product teams to ship faster.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"1\" data-modulo=\"1\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Mastering Atomic Loops &amp; Composable Query Engines\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">Development</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Sep 20, 2026</span><span>•</span><span>By Marcus Vance</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Mastering Atomic Loops &amp; Composable Query Engines</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">A deep dive into declarative dynamic token bindings, responsive grid compilation, and client-side taxonomy filtering.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"2\" data-modulo=\"0\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Scaling Multi-Tenant Headless WordPress Deployments\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">WordPress</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Sep 15, 2026</span><span>•</span><span>By Sophia Chen</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Scaling Multi-Tenant Headless WordPress Deployments</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">Best practices for enterprise ACF fields synchronization, high-concurrency multisite REST endpoints, and edge caching.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"3\" data-modulo=\"1\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Design Tokens in Production: Bridging Figma and Code\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">Design</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Sep 10, 2026</span><span>•</span><span>By David Miller</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Design Tokens in Production: Bridging Figma and Code</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">How automated pipeline syncing transforms color, typography, and spacing variables directly into reusable CSS primitives.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"4\" data-modulo=\"0\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Micro-Frontends &amp; Isomorphic Routing at Scale\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">Architecture</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Sep 5, 2026</span><span>•</span><span>By Elena Rostova</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Micro-Frontends &amp; Isomorphic Routing at Scale</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">Deconstruct monolithic single-page applications into isolated, independently deployable feature blocks with zero downtime.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"5\" data-modulo=\"1\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Accessibility-First Component Architecture in 2026\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&amp;auto=format&amp;fit=crop&amp;q=80\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">Development</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>Aug 29, 2026</span><span>•</span><span>By Alex Morgan</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Accessibility-First Component Architecture in 2026</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">Implementing strict WCAG 2.2 AAA keyboard navigation, focus traps, and screen-reader announcements seamlessly.</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article></div></div>",
+    "tick": "fd62235dec8ad065",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  },
+  "loop-grid+posts@editor": {
+    "markup": "<div id=\"y-lg2\" data-widget-type=\"loop-grid\" class=\"w-full select-none\" style=\"margin-top: 16px; margin-bottom: 16px; background-color: transparent;\"><div class=\"fs-loop-grid fs-cols-2 grid\" style=\"grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;\"><article data-loop-item-index=\"0\" data-modulo=\"0\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"Second post\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"/img/2.png\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">tips</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>2026-01-02</span><span>•</span><span>By Bob</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">Second post</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">World</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article><article data-loop-item-index=\"1\" data-modulo=\"1\" class=\"group flex flex-col h-full\"><div class=\"flex flex-col flex-1 overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-slate-200 bg-white shadow-xs\"><div class=\"relative h-48 w-full overflow-hidden bg-slate-100\"><img alt=\"First post\" class=\"h-full w-full object-cover transition-transform duration-500 group-hover:scale-105\" src=\"/img/1.png\"><span class=\"absolute top-3 left-3 rounded-full bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold tracking-wider text-white uppercase shadow-sm\">news</span></div><div class=\"flex flex-1 flex-col p-5\"><div class=\"mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400\"><span>2026-01-01</span><span>•</span><span>By Ada</span></div><h3 class=\"text-base font-bold text-slate-900 leading-snug group-hover:text-blue-600 transition mb-2\">First post</h3><p class=\"text-xs text-slate-500 leading-relaxed flex-1 line-clamp-3 mb-4\">Hello</p><div class=\"pt-3 border-t border-slate-100 flex items-center justify-between mt-auto\"><span class=\"inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform\">Read Article <span>→</span></span></div></div></div></article></div></div>",
+    "tick": "f15753d481f89d5d",
+    "cleanup": {
+      "pendingTimers": 0,
+      "leakedWindowListeners": []
+    },
+    "trace": []
+  }
+}

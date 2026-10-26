@@ -217,7 +217,7 @@ export const PRESET_SECTION_TEMPLATES: Record<
 
 
 // DEFAULT ELEMENT FACTORY FUNCTION
-export function createDefaultElement(type: ElementType): EditorElement {
+export function createDefaultElement(type: ElementType, options: { priceTablePreset?: "classic" | "advanced" } = {}): EditorElement {
   const id = generateId();
   const navDefault = getNavigationDefaultElement(type, id);
   if (navDefault) return navDefault;
@@ -893,6 +893,7 @@ export function createDefaultElement(type: ElementType): EditorElement {
         },
       };
     case "price-table":
+      if (options.priceTablePreset === "advanced") return createAdvancedPriceTableDefault(id);
       return {
         id,
         type: "price-table",
@@ -2118,7 +2119,75 @@ export function createDefaultElement(type: ElementType): EditorElement {
         styles: { color: "#eab308", fontSize: "18px", marginBottom: "8px" }
       };
 
-    case "price-table":
+    case "nested-tabs":
+      return {
+        id,
+        type: "nested-tabs",
+        content: "Nested Tabs Container",
+        tabsOrientation: "horizontal",
+        tabsActiveIndex: 0,
+        tabsItems: [
+          { id: `tab_${Date.now()}_1`, title: "Tab 1", icon: "layers" },
+          { id: `tab_${Date.now()}_2`, title: "Tab 2", icon: "sparkles" },
+          { id: `tab_${Date.now()}_3`, title: "Tab 3", icon: "settings" },
+        ],
+        children: [],
+        styles: {
+          width: "100%",
+          marginTop: "16px",
+          marginBottom: "16px",
+          paddingTop: "16px",
+          paddingRight: "16px",
+          paddingBottom: "16px",
+          paddingLeft: "16px",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        },
+      };
+
+    case "nested-accordion":
+      return {
+        id,
+        type: "nested-accordion",
+        content: "Nested Accordion",
+        accordionAllowMultiple: false,
+        accordionActiveIds: [`acc_${Date.now()}_1`],
+        accordionItems: [
+          { id: `acc_${Date.now()}_1`, title: "1. What features are included in ForgeStudio?", icon: "help-circle" },
+          { id: `acc_${Date.now()}_2`, title: "2. How does document persistence work?", icon: "database" },
+          { id: `acc_${Date.now()}_3`, title: "3. Can I export clean React or HTML code?", icon: "code" },
+        ],
+        children: [],
+        styles: {
+          width: "100%",
+          marginTop: "16px",
+          marginBottom: "16px",
+          paddingTop: "12px",
+          paddingRight: "12px",
+          paddingBottom: "12px",
+          paddingLeft: "12px",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        },
+      };
+
+    default:
+      return {
+        id,
+        type,
+        content: "Element",
+        styles: {
+          marginTop: "8px",
+          marginBottom: "8px",
+        },
+      };
+  }
+}
+
+/** Preserves the advanced pricing-table preset without shadowing the classic switch case. */
+export function createAdvancedPriceTableDefault(id: string = generateId()): EditorElement {
       return {
         id,
         type: "price-table",
@@ -2214,72 +2283,6 @@ export function createDefaultElement(type: ElementType): EditorElement {
           paddingLeft: "16px",
         },
       };
-
-    case "nested-tabs":
-      return {
-        id,
-        type: "nested-tabs",
-        content: "Nested Tabs Container",
-        tabsOrientation: "horizontal",
-        tabsActiveIndex: 0,
-        tabsItems: [
-          { id: `tab_${Date.now()}_1`, title: "Tab 1", icon: "layers" },
-          { id: `tab_${Date.now()}_2`, title: "Tab 2", icon: "sparkles" },
-          { id: `tab_${Date.now()}_3`, title: "Tab 3", icon: "settings" },
-        ],
-        children: [],
-        styles: {
-          width: "100%",
-          marginTop: "16px",
-          marginBottom: "16px",
-          paddingTop: "16px",
-          paddingRight: "16px",
-          paddingBottom: "16px",
-          paddingLeft: "16px",
-          backgroundColor: "#ffffff",
-          borderRadius: "16px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-        },
-      };
-
-    case "nested-accordion":
-      return {
-        id,
-        type: "nested-accordion",
-        content: "Nested Accordion",
-        accordionAllowMultiple: false,
-        accordionActiveIds: [`acc_${Date.now()}_1`],
-        accordionItems: [
-          { id: `acc_${Date.now()}_1`, title: "1. What features are included in ForgeStudio?", icon: "help-circle" },
-          { id: `acc_${Date.now()}_2`, title: "2. How does document persistence work?", icon: "database" },
-          { id: `acc_${Date.now()}_3`, title: "3. Can I export clean React or HTML code?", icon: "code" },
-        ],
-        children: [],
-        styles: {
-          width: "100%",
-          marginTop: "16px",
-          marginBottom: "16px",
-          paddingTop: "12px",
-          paddingRight: "12px",
-          paddingBottom: "12px",
-          paddingLeft: "12px",
-          backgroundColor: "#ffffff",
-          borderRadius: "16px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-        },
-      };
-
-    default:
-      return {
-        id,
-        type,
-        content: "Element",
-        styles: {
-          marginTop: "8px",
-          marginBottom: "8px",
-        },
-      };
-  }
 }
 
 // ==========================================

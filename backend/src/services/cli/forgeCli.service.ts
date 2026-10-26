@@ -237,17 +237,6 @@ Flags:
         break;
       }
 
-      // 18.9 forge preview
-      case "preview": {
-        const projId = options.projectId || (await getFirstProjectId());
-        resultData = {
-          previewUrl: `https://${projId}.preview.forge.live`,
-          status: "ACTIVE",
-        };
-        stdout = `Preview active at https://${projId}.preview.forge.live`;
-        break;
-      }
-
       // 18.10 forge deploy
       case "deploy": {
         const projId = options.projectId || (await getFirstProjectId());
@@ -858,7 +847,7 @@ Flags:
             hostPort: 3000,
           });
           resultData = { run };
-          const ports = Object.entries(run.portBindings).map(([container, host]) => `${host} -> ${container}`).join(", ");
+          const ports = Object.entries(run.portBindings || {}).map(([container, host]) => `${host} -> ${container}`).join(", ");
           stdout = `Container started: ${run.id} [ports: ${ports || "none"}]`;
         } else if (subCommand === "list" || !subCommand) {
           const runs = await dockerfileGeneratorService.listContainers(projId);

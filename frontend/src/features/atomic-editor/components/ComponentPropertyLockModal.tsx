@@ -20,7 +20,11 @@ export const ComponentPropertyLockModal: React.FC<ComponentPropertyLockModalProp
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   useEffect(() => {
+    // Defer form reset and cancel stale resets when the target changes.
+    const resetId = window.setTimeout(() => {
     setSelectedKeys(initialAllowedKeys);
+    }, 0);
+    return () => window.clearTimeout(resetId);
   }, [initialAllowedKeys, isOpen]);
 
   if (!isOpen || !component) return null;

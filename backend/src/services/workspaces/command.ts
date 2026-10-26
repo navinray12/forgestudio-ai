@@ -58,7 +58,7 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
         return JSON.parse(encoded) as R;
       }, { isolationLevel: "Serializable", maxWait: 2000, timeout: 5000 });
     } catch (error) {
-      console.error("[WORKSPACE-COMMAND CAUGHT ERROR]:", error);
+      // Errors can carry SQL values and private payloads; do not print them.
       const failure = error as { code?: string; meta?: { code?: string } };
       const conflict = isRetryableTransactionConflict(error);
       if (conflict && attempt < 2) {
@@ -73,16 +73,16 @@ export async function workspaceCommand<C extends Scope, R extends Result>(input:
       const msg = String((error as any)?.message || "");
       const isMissingTable = (failure.code === "P2010" && failure.meta?.code === "42P01") ||
         failure.code === "P2021" || failure.code === "P2022" || msg.includes("does not exist") || msg.includes("42P01") || msg.includes("42703");
-      if (isMissingTable && attempt === 0) {
+      if (isMissingTable && attempt === 0 && !input.operation.startsWith("WORKSPACE_INVITATION_")) {
         try {
           await ensureDatabaseTables();
           continue;
         } catch (e) {
-          console.error("[ENSURE-TABLES FAILED ON RETRY]:", e);
+          console.error("workspace-schema-recovery-failed");
         }
       }
       if (isMissingTable) {
-        console.error("[WORKSPACE-COMMAND MIGRATION_REQUIRED REASON]:", error);
+        console.error("workspace-migration-required");
         throw new AppError("Workspace database schema migration is required. Please run 'npm run db:migrate'.", 503, "MIGRATION_REQUIRED");
       }
       throw error;

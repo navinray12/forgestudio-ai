@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import type { CreateClassPayload } from "../types/classes.types";
+import type { ElementStyles } from "../../../pages/editor/WebsiteEditor";
 import type { ExportedClassItem, ClassConflictItem } from "../types/classExportImport.types";
 import { useClasses } from "../hooks/useClasses";
 import { exportClassesToJson, parseAndValidateClassesJson, detectClassConflicts } from "../utils/classExportImport.utils";
@@ -93,7 +94,7 @@ export const ClassesPanel: React.FC = () => {
 
   const handleFormSubmit = async (payload: {
     name: string;
-    styles: Record<string, any>;
+    styles: Partial<ElementStyles>;
     description?: string;
     isGlobal: boolean;
   }) => {
@@ -288,9 +289,7 @@ export const ClassesPanel: React.FC = () => {
         <div className="grid grid-cols-1 gap-2.5 overflow-y-auto max-h-[500px] pr-0.5">
           {filteredClasses.map((c) => {
             const isGlob = Boolean(c.isGlobal || c.scope === "global");
-            const definedRulesCount = Object.keys(c.styles || {}).filter(
-              (k) => (c.styles as any)[k] !== undefined
-            ).length;
+            const definedRulesCount = Object.values(c.styles || {}).filter((value) => value !== undefined).length;
 
             return (
               <div

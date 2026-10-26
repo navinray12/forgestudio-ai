@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { publicIntegrationSettings } from "./integrations/site-integrations.service.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
 import { getWebsiteById } from "./website.service.js";
@@ -445,6 +446,7 @@ export async function publishWebsite(
 
     // Construct immutable candidate snapshot
     const candidateSnapshot = {
+      integrations: publicIntegrationSettings(rawEditorData.integrations),
       version: nextVersion,
       homePageId: candidateData.homePageId || "",
       elements: canonicalPageElements,
@@ -487,6 +489,8 @@ export async function publishWebsite(
       const updatedEditorData = {
         ...candidateData,
         ...candidateSnapshot,
+        integrations: rawEditorData.integrations,
+        formNotifications: rawEditorData.formNotifications,
         publishedData: candidateSnapshot,
         publishing: publishingMeta,
       };
@@ -523,6 +527,8 @@ export async function publishWebsite(
       const updatedEditorData = {
         ...candidateData,
         ...candidateSnapshot,
+        integrations: rawEditorData.integrations,
+        formNotifications: rawEditorData.formNotifications,
         publishedData: candidateSnapshot,
         publishing: publishingMeta,
       };
@@ -553,6 +559,8 @@ export async function publishWebsite(
       const updatedEditorData = {
         ...candidateData,
         ...candidateSnapshot,
+        integrations: rawEditorData.integrations,
+        formNotifications: rawEditorData.formNotifications,
         publishedData: candidateSnapshot,
         publishing: publishingMeta,
       };
@@ -583,6 +591,8 @@ export async function publishWebsite(
       const updatedEditorData = {
         ...candidateData,
         ...candidateSnapshot,
+        integrations: rawEditorData.integrations,
+        formNotifications: rawEditorData.formNotifications,
         publishedData: candidateSnapshot,
         publishing: publishingMeta,
       };

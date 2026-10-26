@@ -42,6 +42,7 @@ export async function loadTypeScript(relativePath, mocks = {}, globals = {}) {
       return synthetic(specifier, await import(specifier));
     }
     if (specifier === 'zod') return synthetic(specifier, await import('../../backend/node_modules/zod/index.js'));
+    if (specifier === 'dotenv/config') return synthetic(specifier, {});
     if (!specifier.startsWith('.')) throw new Error(`Unmocked package import: ${specifier}`);
     return source(resolve(dirname(parent.identifier), specifier));
   });

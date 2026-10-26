@@ -1,0 +1,333 @@
+diff --git a/backend/src/app.ts b/backend/src/app.ts
+index 499455b..5db23be 100644
+--- a/backend/src/app.ts
++++ b/backend/src/app.ts
+@@ -80,7 +80,6 @@ import { dataRoutes, sdkRoutes } from "./modules/data-platform/data-layer/data.r
+ import projectRoutes from "./routes/project.routes.js";
+ import codeIntelligenceRoutes from "./routes/codeIntelligence.routes.js";
+ import knowledgeGraphRoutes from "./routes/knowledgeGraph.routes.js";
+-import designSystemRoutes from "./routes/designSystem.routes.js";
+ import hostedRoutes from "./routes/hosted.routes.js";
+ 
+ 
+diff --git a/backend/src/modules/collaboration/collaborationEngine.service.ts b/backend/src/modules/collaboration/collaborationEngine.service.ts
+index 29753e2..2d33048 100644
+--- a/backend/src/modules/collaboration/collaborationEngine.service.ts
++++ b/backend/src/modules/collaboration/collaborationEngine.service.ts
+@@ -429,9 +429,13 @@ export class CollaborationEngineService {
+    * Heartbeat / register user session
+    */
+   async heartbeatSession(projectId: string, userId: string, data?: any): Promise<any> {
++    const user = await db.user.findUnique({ where: { id: userId }, select: { fullName: true } });
++    if (!user) throw new AppError("Authenticated collaborator not found", 401, "UNAUTHENTICATED");
+     return this.updatePresence({
+       projectId,
+       userId,
++      name: user.fullName || "Collaborator",
++      color: `#${crypto.createHash("sha256").update(userId).digest("hex").slice(0, 6)}`,
+       socketId: data?.socketId || userId,
+       status: "ONLINE",
+       activeFile: data?.activeFile,
+diff --git a/backend/src/services/cli/forgeCli.service.ts b/backend/src/services/cli/forgeCli.service.ts
+index 7dbadeb..da04529 100644
+--- a/backend/src/services/cli/forgeCli.service.ts
++++ b/backend/src/services/cli/forgeCli.service.ts
+@@ -827,7 +827,7 @@ Flags:
+         } else {
+           const graph = await monorepoDiscoveryService.discoverMonorepo(projId);
+           resultData = { graph };
+-          stdout = `Monorepo Workspaces (${graph.manager}):\n` +
++          stdout = `Monorepo Workspaces (${graph.packages.length} packages):\n` +
+             graph.packages.map((p: any) => `* [${p.type}] ${p.name} -> ${p.path}`).join("\n");
+         }
+         break;
+@@ -852,12 +852,12 @@ Flags:
+             hostPort: 3000,
+           });
+           resultData = { run };
+-          stdout = `Container started: ${run.id} [port: ${run.hostPort} -> ${run.containerPort}]`;
++          stdout = `Container started: ${run.id} [port bindings: ${JSON.stringify(run.portBindings)}]`;
+         } else if (subCommand === "list" || !subCommand) {
+           const runs = await dockerfileGeneratorService.listContainers(projId);
+           resultData = { runs };
+           stdout = `Running Containers (${runs.length}):\n` +
+-            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port: ${r.hostPort} [status: ${r.status}]`).join("\n");
++            runs.map((r: any) => `* ${r.containerName} (${r.imageTag}) port bindings: ${JSON.stringify(r.portBindings)} [status: ${r.status}]`).join("\n");
+         } else if (subCommand === "stop") {
+           const runId = subArgs[0];
+           if (!runId) throw new AppError("Run ID required: forge container stop <runId>", 400, "INVALID_INPUT");
+@@ -876,7 +876,7 @@ Flags:
+         if (subCommand === "validate") {
+           const validation = await dockerfileGeneratorService.validateInfrastructure(projId);
+           resultData = { validation };
+-          stdout = `Infrastructure Validation:\n* Valid: ${validation.valid}\n* Errors (${validation.errors.length}): ${validation.errors.join(", ") || "None"}\n* Warnings (${validation.warnings.length}): ${validation.warnings.join(", ") || "None"}`;
++          stdout = `Infrastructure Validation:\n* Valid: ${validation.isValid}\n* Syntax errors (${validation.syntaxErrors.length}): ${validation.syntaxErrors.join(", ") || "None"}\n* Dangerous configurations (${validation.dangerousConfigs.length}): ${validation.dangerousConfigs.join(", ") || "None"}\n* Detected secret references: ${validation.detectedSecrets.length}`;
+         } else if (subCommand === "kubernetes") {
+           const manifests = await dockerfileGeneratorService.generateKubernetesManifests(projId, {
+             serviceName: "web",
+diff --git a/backend/src/services/generator/fullStackGenerator.service.ts b/backend/src/services/generator/fullStackGenerator.service.ts
+index 67389d5..d96bda8 100644
+--- a/backend/src/services/generator/fullStackGenerator.service.ts
++++ b/backend/src/services/generator/fullStackGenerator.service.ts
+@@ -77,8 +77,8 @@ export class FullStackGeneratorService {
+     else if (framework === "fullstack") templateId = "react-vite"; // base react with backend api endpoints
+ 
+     const scaffoldRes = await projectTemplateService.scaffoldTemplate(projectId, templateId, {
+-      projectName,
+-      authorId,
++      customVariables: { name: projectName },
++      userId: authorId,
+     });
+ 
+     // 3. For fullstack, enrich with server routes if needed
+@@ -115,7 +115,7 @@ app.listen(PORT, () => {
+         authorId,
+         reason: "Full-stack Node/Express API entrypoint",
+       });
+-      scaffoldRes.filesWritten += 1;
++      scaffoldRes.filesCreated.push("server/index.ts");
+     }
+ 
+     await recordAuditLog({
+@@ -125,7 +125,7 @@ app.listen(PORT, () => {
+       details: {
+         framework,
+         strategy,
+-        filesCreated: scaffoldRes.filesWritten,
++        filesCreated: scaffoldRes.filesCreated.length,
+         aiAttemptFailed,
+       },
+     });
+@@ -135,7 +135,7 @@ app.listen(PORT, () => {
+       projectId,
+       framework,
+       strategy,
+-      filesCreated: scaffoldRes.filesWritten,
++      filesCreated: scaffoldRes.filesCreated.length,
+       manifestUpdated: true,
+       diagnostics,
+     };
+diff --git a/frontend/src/pages/editor/WebsiteEditor.tsx b/frontend/src/pages/editor/WebsiteEditor.tsx
+index 92db640..6d7b9cc 100644
+--- a/frontend/src/pages/editor/WebsiteEditor.tsx
++++ b/frontend/src/pages/editor/WebsiteEditor.tsx
+@@ -22,6 +22,7 @@ import { DesignAssistant } from "../../features/ai/DesignAssistant";
+ import { UnifiedAiAssistant } from "../../features/ai/UnifiedAiAssistant";
+ import { DocumentSaveError } from "../../features/editor-access/save-authorized-website";
+ import { useAutosave, AutosaveStatusIndicator } from "../../features/autosave";
++import { decideWorkspaceRefresh } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
+ import { AtomicEditor, GlobalElementService, ReusableComponentService } from "../../features/atomic-editor";
+ import { publishingService } from "../../features/publishing/services/publishingService";
+ import { useComponentAccess } from "../../features/permissions/hooks/useComponentAccess";
+@@ -2130,6 +2131,7 @@ export default function WebsiteEditor() {
+   // Real-Time Workspace Synchronization: listen for Code Workspace updates
+   const activePageIdRef = useRef(activePageId);
+   activePageIdRef.current = activePageId;
++  const workspaceReloadSequence = useRef(0);
+   const hasUnsavedRef = useRef(hasUnsavedDocumentChanges);
+   hasUnsavedRef.current = hasUnsavedDocumentChanges;
+   const websiteDocVerRef = useRef(website?.documentVersion ?? 1);
+@@ -2137,19 +2139,23 @@ export default function WebsiteEditor() {
+ 
+   const reloadWebsiteFromWorkspace = useCallback(async (forced = false) => {
+     if (!websiteId) return;
++    const requestSequence = ++workspaceReloadSequence.current;
+     try {
+       const loadedSite = await loadAuthorizedWebsite(apiUrl, websiteId, AbortSignal.timeout(15000));
+-      if (!loadedSite) return;
++      if (!loadedSite || requestSequence !== workspaceReloadSequence.current) return;
+ 
+       const serverVer = loadedSite.documentVersion ?? 1;
+-      if (!forced && serverVer <= websiteDocVerRef.current) return;
++      const decision = decideWorkspaceRefresh(serverVer, websiteDocVerRef.current, hasUnsavedRef.current, forced);
++      if (decision === "invalid" || decision === "stale") return;
+ 
+-      if (hasUnsavedRef.current && !forced) {
++      if (decision === "dirty") {
+         setSaveMessage(`Code Workspace updated (v${serverVer}). Save or switch pages to merge.`);
+         setTimeout(() => setSaveMessage(""), 5000);
+         return;
+       }
+ 
++      // Advance synchronously so a delayed response cannot roll this snapshot back.
++      websiteDocVerRef.current = serverVer;
+       documentWriter.initialize(serverVer);
+       setWebsite(loadedSite);
+ 
+@@ -2257,6 +2263,7 @@ export default function WebsiteEditor() {
+     document.addEventListener("visibilitychange", handleVisibilityChange);
+ 
+     return () => {
++      ++workspaceReloadSequence.current;
+       channel?.close();
+       window.removeEventListener("storage", handleStorage);
+       window.removeEventListener("focus", handleFocus);
+diff --git a/frontend/src/pages/published/PublishedSite.tsx b/frontend/src/pages/published/PublishedSite.tsx
+index 096744a..bdbdfaf 100644
+--- a/frontend/src/pages/published/PublishedSite.tsx
++++ b/frontend/src/pages/published/PublishedSite.tsx
+@@ -11,6 +11,8 @@ import {
+ import type { EditorElement, Breakpoint } from "../editor/types";
+ import { resolveDynamicTokens } from "../editor/types";
+ import type { PopupConfig } from "../../types/popup.types";
++import { readPreviewCommand } from "../../features/developer-workspace/services/workspaceRefreshPolicy";
++import { loadSiteSnapshot } from "../../features/developer-workspace/services/loadSiteSnapshot";
+ 
+ const BackgroundSlideshow: React.FC<{ urls: string[]; interval?: number }> = ({ urls, interval }) => {
+     const [index, setIndex] = useState(0);
+@@ -840,6 +842,7 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
+         ));
+ 
+     const [loading, setLoading] = useState(true);
++    const [reloadTick, setReloadTick] = useState(0);
+     const [errorMessage, setErrorMessage] = useState("");
+     const [elements, setElements] = useState<EditorElement[]>([]);
+     const [pages, setPages] = useState<PageConfig[]>([]);
+@@ -919,44 +922,29 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
+ 
+     useEffect(() => {
+         if (!websiteId) return;
++        const controller = new AbortController();
++        let active = true;
+ 
+         const fetchWebsite = async () => {
+             try {
+                 setLoading(true);
+-                let res: Response;
+-                if (isPreview) {
+-                    res = await fetch(`${apiUrl}/api/websites/${websiteId}`, { credentials: "include" });
+-                    if (!res.ok) {
+-                        res = await fetch(`${apiUrl}/api/v1/websites/${websiteId}`, { credentials: "include" });
+-                    }
+-                    if (!res.ok) {
+-                        res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
+-                    }
+-                } else {
+-                    res = await fetch(`${apiUrl}/api/v1/websites/public/${websiteId}`);
+-                    if (!res.ok && res.status !== 404) {
+-                        const fallback = await fetch(`${apiUrl}/api/websites/public/${websiteId}`);
+-                        if (fallback.ok) res = fallback;
+-                    }
+-                }
+-                const data = await res.json();
+-
+-                if (!res.ok) throw new Error(data?.message || "This website is unavailable.");
+-
+-                const site = data.website || data;
++                setErrorMessage("");
++                const site = await loadSiteSnapshot(apiUrl, websiteId, isPreview, controller.signal);
++                // Aborted/obsolete requests may resolve anyway (custom transports/tests).
++                if (!active || controller.signal.aborted) return;
+                 let rawEditorData = site?.editorData;
+                 if (typeof rawEditorData === "string") {
+                     try {
+                         rawEditorData = JSON.parse(rawEditorData);
+                     } catch (_e) {
+-                        rawEditorData = {};
++                        throw new Error("The saved website document is invalid.");
+                     }
+                 }
+                 const editorData = isPreview 
+                     ? (rawEditorData || {}) 
+                     : (rawEditorData?.publishedData || rawEditorData || {});
+ 
+-                if (editorData?.siteParts) setSitePartsState(editorData.siteParts);
++                setSitePartsState(editorData?.siteParts ?? null);
+                 const loadedSiteParts = editorData?.siteParts;
+ 
+                 if (editorData?.pages && editorData.pages.length > 0) {
+@@ -1000,30 +988,37 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
+                     setPages([defaultPage]);
+                     setActivePageId("home");
+                     setElements(editorData.elements);
++                } else {
++                    setPages([]);
++                    setElements([]);
++                    setActivePageId("home");
+                 }
+-                if (editorData?.popups) setPopups(editorData.popups);
+-                if (editorData?.breakpoints) setBreakpoints(editorData.breakpoints);
+-                if (editorData?.globalSettings) setGlobalSettings(editorData.globalSettings);
+-                if (editorData?.globalVariables) setGlobalVariables(editorData.globalVariables);
+-                if (editorData?.globalClasses) setGlobalClasses(editorData.globalClasses);
+-                if (site?.customCodeSnippets) setCustomCodeSnippets(site.customCodeSnippets);
+-                if (site?.status) setSiteStatus(site.status);
+-                if (site?.themeLocationRules) _setThemeRules(site.themeLocationRules);
+-                if (editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent) {
+-                    setCookieConsentConfig(editorData.siteSettings?.cookieConsent || editorData.cookieConsent);
+-                }
+-                if (site?.editorData?.experiments) {
+-                    setExperiments(site.editorData.experiments);
+-                }
++                setPopups(editorData?.popups || []);
++                setBreakpoints(editorData?.breakpoints || DEFAULT_BREAKPOINTS);
++                setGlobalSettings(editorData?.globalSettings || {});
++                setGlobalVariables(editorData?.globalVariables || []);
++                setGlobalClasses(editorData?.globalClasses || []);
++                setCustomCodeSnippets(site?.customCodeSnippets || []);
++                setSiteStatus(site?.status || "DRAFT");
++                _setThemeRules(site?.themeLocationRules || []);
++                setCookieConsentConfig(editorData?.siteSettings?.cookieConsent || editorData?.cookieConsent || null);
++                setExperiments(isPreview ? [] : (rawEditorData?.experiments || []));
+ 
+             } catch (_err: any) {
++                if (!active || controller.signal.aborted) return;
+                 setErrorMessage("This website is unavailable.");
++                setElements([]);
++                setPages([]);
++                setCustomCodeSnippets([]);
++                setExperiments([]);
++                setSitePartsState(null);
+             } finally {
+-                setLoading(false);
++                if (active && !controller.signal.aborted) setLoading(false);
+             }
+         };
+-        fetchWebsite();
+-    }, [websiteId, apiUrl, pageSlug]);
++        void fetchWebsite();
++        return () => { active = false; controller.abort(); };
++    }, [websiteId, apiUrl, pageSlug, isPreview, reloadTick]);
+ 
+     // Phase 3 Subsystem 2: A/B Split Testing & Impression Telemetry
+     useEffect(() => {
+@@ -1101,29 +1096,33 @@ function PublishedSite({ isPreviewMode }: { isPreviewMode?: boolean } = {}) {
+                     type: "forge:preview:route-changed",
+                     route: isHome ? "/" : `/${cleanSlug}`,
+                     pageId: page.id,
+-                }, "*");
++                }, window.location.origin);
+             }
+         }
+     };
+ 
+     useEffect(() => {
+         const handleParentMessage = (e: MessageEvent) => {
+-            if (e.data?.type === "forge:preview:set-route") {
+-                const target = e.data.route;
++            const command = readPreviewCommand(e, {
++                parent: window.parent, self: window, origin: window.location.origin, isPreview,
++            });
++            if (!command) return;
++            if (command.type === "route") {
++                const target = command.route;
+                 if (!target || !pages || pages.length === 0) return;
+                 const matched = findTargetPage(pages, target);
+                 if (matched && matched.id !== activePageId) {
+                     setActivePageId(matched.id);
+                     setElements(matched.elements || []);
+                 }
+-            } else if (e.data?.type === "forge:preview:reload") {
+-                fetchWebsite();
++            } else if (command.type === "reload") {
++                setReloadTick((value) => value + 1);
+             }
+         };
+ 
+         window.addEventListener("message", handleParentMessage);
+         return () => window.removeEventListener("message", handleParentMessage);
+-    }, [pages, activePageId]);
++    }, [pages, activePageId, isPreview]);
+ 
+     useEffect(() => {
+         const handlePopState = () => {

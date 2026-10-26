@@ -128,12 +128,13 @@ export const revisionHistoryService = {
 
     try {
       localStorage.setItem(`${STORAGE_PREFIX}${websiteId}`, JSON.stringify(updated));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to write revision to storage:", error);
       throw new Error(
-        error?.name === "QuotaExceededError"
+        error instanceof DOMException && error.name === "QuotaExceededError"
           ? "Storage limit exceeded. Unable to save revision snapshot."
-          : "Failed to persist revision snapshot to local storage."
+          : "Failed to persist revision snapshot to local storage.",
+        { cause: error }
       );
     }
 

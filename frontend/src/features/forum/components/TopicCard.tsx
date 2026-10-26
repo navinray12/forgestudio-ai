@@ -1,6 +1,6 @@
 import React from "react";
 import type { ForumTopic } from "../types/forum.types";
-import { MessageSquare, Eye, Pin, Lock, CheckCircle2, Bookmark, Globe, Building2 } from "lucide-react";
+import { MessageSquare, Eye, Pin, Lock, CheckCircle2, Building2 } from "lucide-react";
 
 interface TopicCardProps {
   topic: ForumTopic;
@@ -15,6 +15,14 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, onSelect }) => {
   return (
     <div
       onClick={() => onSelect(topic)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(topic);
+        }
+      }}
+      role="button"
+      tabIndex={0}
       className="group relative bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/90 hover:border-slate-700/90 rounded-2xl p-4 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-4">

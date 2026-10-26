@@ -1,0 +1,53 @@
+name: Workspace refresh regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/pages/editor/WebsiteEditor.tsx'
+      - 'frontend/src/pages/published/PublishedSite.tsx'
+      - 'frontend/src/features/editor-access/**'
+      - 'frontend/src/features/developer-workspace/services/**'
+      - 'backend/src/services/compiler/**'
+      - 'backend/src/modules/collaboration/collaborationEngine.service.ts'
+      - 'backend/src/services/generator/fullStackGenerator.service.ts'
+      - 'backend/scripts/verify-workspace-refresh.cjs'
+      - 'backend/scripts/test-typescript-api.cjs'
+      - 'backend/scripts/verify-page-registration.cjs'
+      - 'backend/package*.json'
+      - 'frontend/package*.json'
+      - '.github/workflows/workspace-build-repair.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: workspace-refresh-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install committed dependencies without install hooks
+        run: |
+          npm ci --prefix backend --ignore-scripts
+          npm ci --prefix frontend --ignore-scripts
+      - name: Strict refresh and access helper types
+        run: node frontend/node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --moduleResolution bundler --module ESNext --lib ES2022,DOM frontend/src/features/developer-workspace/services/workspaceRefreshPolicy.ts frontend/src/features/developer-workspace/services/loadSiteSnapshot.ts
+      - name: Actual source and effect regressions with explicit test doubles
+        shell: bash
+        run: NODE_PATH="$PWD/backend/node_modules" node --test backend/scripts/verify-page-registration.cjs backend/scripts/verify-workspace-refresh.cjs 2>&1 | tee "$RUNNER_TEMP/workspace-regression.tap"
+      - name: Report full blueprint progress separately
+        run: node backend/scripts/report-blueprint-progress.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: workspace-refresh-regression-${{ github.sha }}
+          path: ${{ runner.temp }}/workspace-regression.tap
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useMemo } from "react";
 import { Sparkles, Wand2, Palette, Layout, FileText, Code2, Play, Search, BookOpen, CheckCircle2, AlertCircle, X, ChevronRight, RefreshCw, Zap } from "lucide-react";
 import { DesignAssistant } from "./DesignAssistant";
 
@@ -43,7 +43,6 @@ export function UnifiedAiAssistant({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [detectedIntent, setDetectedIntent] = useState<string>("Smart Action");
 
   // Changeset state
   const [changeset, setChangeset] = useState<any>(null);
@@ -61,30 +60,30 @@ export function UnifiedAiAssistant({
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
 
   // Update intent indicator as user types
-  useEffect(() => {
+  const detectedIntent = useMemo(() => {
     const p = prompt.toLowerCase();
     if (p.includes("audit") || p.includes("analyze") || p.includes("accessibility")) {
-      setDetectedIntent("Site Audit");
+      return ("Site Audit");
     } else if (p.includes("seo") || p.includes("meta")) {
-      setDetectedIntent("SEO Metadata");
+      return ("SEO Metadata");
     } else if (p.includes("remove background") || p.includes("transparent")) {
-      setDetectedIntent("Background Removal");
+      return ("Background Removal");
     } else if (p.includes("image") || p.includes("photo") || p.includes("illustration")) {
-      setDetectedIntent("Image Generation");
+      return ("Image Generation");
     } else if (p.includes("code") || p.includes("script") || p.includes("html") || p.includes("css")) {
-      setDetectedIntent("Code Generation");
+      return ("Code Generation");
     } else if (p.includes("animate") || p.includes("motion") || p.includes("fade") || p.includes("slide")) {
-      setDetectedIntent("Animation");
+      return ("Animation");
     } else if (p.includes("container") || p.includes("grid") || p.includes("flex")) {
-      setDetectedIntent("Container / Layout");
+      return ("Container / Layout");
     } else if (p.includes("section") || p.includes("hero") || p.includes("pricing") || p.includes("testimonial")) {
-      setDetectedIntent("Section Generation");
+      return ("Section Generation");
     } else if (p.includes("rewrite") || p.includes("tone") || p.includes("shorten") || p.includes("expand")) {
-      setDetectedIntent("Content Refinement");
+      return ("Content Refinement");
     } else if (p.includes("design") || p.includes("stitch") || p.includes("claude") || p.includes("full site")) {
-      setDetectedIntent("Full Design Pipeline");
+      return ("Full Design Pipeline");
     } else {
-      setDetectedIntent("Smart Assistant");
+      return ("Smart Assistant");
     }
   }, [prompt]);
 
@@ -95,13 +94,26 @@ export function UnifiedAiAssistant({
 
   // Fetch current website document version
   async function getCurrentVersion(): Promise<number> {
+    if (prepare) {
+      return await prepare();
+    }
     const res = await fetch(`${apiUrl}/api/websites/${websiteId}`, {
       credentials: "include",
       headers: { ...getAuthHeaders() },
     });
     if (!res.ok) throw new Error("Could not load latest website state");
-    const data = await res.json();
-    return Number(data.website.documentVersion);
+    const data = await res.json().catch(() => null);
+    const rawVersion = data?.website?.documentVersion;
+    const version = Number(rawVersion);
+    if (
+      (typeof rawVersion !== "number" && typeof rawVersion !== "string") ||
+      (typeof rawVersion === "string" && rawVersion.trim() === "") ||
+      !Number.isSafeInteger(version) ||
+      version < 0
+    ) {
+      throw new Error("Website version is missing or invalid. Reload the editor and try again.");
+    }
+    return version;
   }
 
   // Handle Assistant Submit
@@ -116,7 +128,13 @@ export function UnifiedAiAssistant({
       const expectedVersion = await getCurrentVersion();
       const res = await fetch(`${apiUrl}/api/v1/ai/websites/${websiteId}/assistant`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `ast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          "If-Match": `"${websiteId}:document:${expectedVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({
           prompt: textToSubmit,
@@ -129,25 +147,37 @@ export function UnifiedAiAssistant({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error?.message || "AI action failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.success === false) {
+        if (data?.code === "DOCUMENT_VERSION_CONFLICT") {
+          throw new Error("The website was updated concurrently. Please reload and try again.");
+        } else if (data?.code === "DOCUMENT_PRECONDITION_REQUIRED") {
+          throw new Error("Authoritative document version required. Please reload the website.");
+        } else {
+          throw new Error(data?.detail || data?.error?.message || data?.message || "AI action failed");
+        }
       }
 
       if (data.result?.changeset) {
         setChangeset(data.result.changeset);
-        setSuccessMessage(`Changeset generated for ${data.intent.replace(/_/g, " ")}. Review and apply below.`);
+        setSuccessMessage(`Changeset generated for ${typeof data.intent === "string" ? data.intent.replace(/_/g, " ") : "your request"}. Review and apply below.`);
       } else if (data.intent === "ANALYZE_SITE") {
+        if (!data.result || typeof data.result !== "object" || Array.isArray(data.result)) {
+          throw new Error("The audit service returned no valid audit result.");
+        }
         setAuditResult(data.result);
         setActiveTab("audit");
       } else if (data.intent === "GENERATE_CODE") {
+        if (!data.result || typeof data.result !== "object" || Array.isArray(data.result)) {
+          throw new Error("The code generator returned no valid result.");
+        }
         setCodeResult(data.result);
         setActiveTab("code");
       } else {
-        setSuccessMessage(`Action completed: ${data.intent ? data.intent.replace(/_/g, " ") : "Request processed"}`);
+        setSuccessMessage(`Action completed: ${typeof data.intent === "string" ? data.intent.replace(/_/g, " ") : "Request processed"}`);
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setBusy(false);
     }
@@ -169,17 +199,25 @@ export function UnifiedAiAssistant({
           websiteId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || data.message || "Image generation failed");
-      if (data.url || data.imageUrl) {
-        setGeneratedImages((prev) => [data.url || data.imageUrl, ...prev]);
-        setSuccessMessage("Image generated successfully!");
-      } else if (data.images && Array.isArray(data.images)) {
-        setGeneratedImages((prev) => [...data.images, ...prev]);
-        setSuccessMessage("Images generated successfully!");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.success === false) {
+        throw new Error(data?.error?.message || data?.message || "Image generation failed");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to generate image");
+      const singleImage = [data.url, data.imageUrl].find(
+        (url): url is string => typeof url === "string" && url.trim().length > 0
+      );
+      const imageList: string[] = singleImage
+        ? [singleImage]
+        : Array.isArray(data.images)
+          ? data.images.filter((url: unknown): url is string => typeof url === "string" && url.trim().length > 0)
+          : [];
+      if (imageList.length === 0) {
+        throw new Error("Image generation returned no valid image URLs.");
+      }
+      setGeneratedImages((prev) => [...imageList, ...prev]);
+      setSuccessMessage(imageList.length === 1 ? "Image generated successfully!" : "Images generated successfully!");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate image");
     } finally {
       setBusy(false);
     }
@@ -192,15 +230,32 @@ export function UnifiedAiAssistant({
     setError(null);
 
     try {
+      const commandKey = `apply:${changeset.id}:${Date.now()}`;
+      if (apply) {
+        await apply(changeset, commandKey);
+        setSuccessMessage("Changes applied successfully to your website!");
+        setChangeset(null);
+        setTimeout(() => {
+          onApplied();
+        }, 700);
+        return;
+      }
+
       const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": commandKey,
+          "If-Match": `"${websiteId}:document:${changeset.expectedDocumentVersion}"`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || err.error?.message || "Failed to apply changeset");
+      const applyResult = await res.json().catch(() => null);
+      if (!res.ok || !applyResult || applyResult.success === false) {
+        throw new Error(applyResult?.detail || applyResult?.message || applyResult?.error?.message || "Failed to apply changeset");
       }
 
       setSuccessMessage("Changes applied successfully to your website!");
@@ -208,8 +263,8 @@ export function UnifiedAiAssistant({
       setTimeout(() => {
         onApplied();
       }, 700);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "The request failed");
     } finally {
       setBusy(false);
     }
@@ -220,15 +275,23 @@ export function UnifiedAiAssistant({
     if (!changeset?.id) return;
     setBusy(true);
     try {
-      await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
+      const res = await fetch(`${apiUrl}/api/v1/ai/changesets/${changeset.id}/cancel`, {
         method: "POST",
-        headers: { ...getAuthHeaders() },
+        headers: {
+          "X-Forge-Intent": "document-command",
+          "Idempotency-Key": `cancel:${changeset.id}:${Date.now()}`,
+          ...getAuthHeaders(),
+        },
         credentials: "include",
       });
+      const cancelResult = await res.json().catch(() => null);
+      if (!res.ok || cancelResult?.success === false) {
+        throw new Error(cancelResult?.message || cancelResult?.error?.message || "Failed to discard changeset");
+      }
       setChangeset(null);
       setSuccessMessage("Changeset discarded.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "The request failed");
     } finally {
       setBusy(false);
     }
@@ -626,20 +689,24 @@ export function UnifiedAiAssistant({
                 <div className="space-y-4">
                   <div className="flex items-center gap-5 rounded-2xl bg-slate-900/80 p-5 border border-slate-800">
                     <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white font-black text-2xl shadow-lg border border-emerald-400/30">
-                      {auditResult.score || 94}
+                      {typeof auditResult.score === "number" && Number.isFinite(auditResult.score) ? auditResult.score : "N/A"}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">Overall Audit Score: Excellent</h4>
-                      <p className="text-xs text-slate-300 mt-0.5">{auditResult.summary || "Tree structure meets high standards with zero critical accessibility failures."}</p>
+                      <h4 className="text-sm font-bold text-white">Overall Audit Score</h4>
+                      <p className="text-xs text-slate-300 mt-0.5">{typeof auditResult.summary === "string" && auditResult.summary.trim() ? auditResult.summary : "No audit summary was returned."}</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Detailed Findings:</h5>
-                    {(auditResult.findings || [
-                      { finding: "High-contrast color ratio validated", severity: "info", reason: "All body text meets minimum 4.5:1 ratio", recommendation: "No change needed" },
-                      { finding: "Image alt text verified", severity: "info", reason: "Standard images contain descriptive attributes", recommendation: "No change needed" },
-                    ]).map((f: any, i: number) => (
+                    {(!Array.isArray(auditResult.findings) || !auditResult.findings.some((finding: unknown) => finding !== null && typeof finding === "object" && !Array.isArray(finding))) && (
+                      <p className="text-xs text-slate-400">No detailed findings were returned by the audit service.</p>
+                    )}
+                    {(Array.isArray(auditResult.findings) ? auditResult.findings : [])
+                      .filter((finding: unknown): finding is Record<string, unknown> =>
+                        finding !== null && typeof finding === "object" && !Array.isArray(finding)
+                      )
+                      .map((f, i: number) => (
                       <div
                         key={i}
                         className={`rounded-xl border p-3.5 text-xs space-y-1 ${
@@ -651,11 +718,11 @@ export function UnifiedAiAssistant({
                         }`}
                       >
                         <div className="flex justify-between font-bold">
-                          <span>{f.finding}</span>
-                          <span className="uppercase text-[10px] font-mono">{f.severity}</span>
+                          <span>{typeof f.finding === "string" ? f.finding : "Finding details unavailable"}</span>
+                          <span className="uppercase text-[10px] font-mono">{typeof f.severity === "string" ? f.severity : "unknown"}</span>
                         </div>
-                        <p className="text-slate-400">{f.reason}</p>
-                        <p className="text-indigo-300 font-semibold">Recommendation: {f.recommendation}</p>
+                        <p className="text-slate-400">{typeof f.reason === "string" ? f.reason : "No reason was provided."}</p>
+                        <p className="text-indigo-300 font-semibold">Recommendation: {typeof f.recommendation === "string" ? f.recommendation : "No recommendation was provided."}</p>
                       </div>
                     ))}
                   </div>

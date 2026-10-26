@@ -10,7 +10,7 @@ export const FormFieldSettings: React.FC<FormFieldSettingsProps> = ({
   field,
   onUpdateField,
 }) => {
-  const handleChange = (key: keyof FormFieldConfig, value: any) => {
+  const handleChange = (key: keyof FormFieldConfig, value: FormFieldConfig[keyof FormFieldConfig]) => {
     onUpdateField({
       ...field,
       [key]: value,

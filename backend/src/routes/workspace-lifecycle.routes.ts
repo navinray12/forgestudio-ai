@@ -12,6 +12,8 @@ const id = z.string().uuid();
 const settings = z.object({ name: z.string().trim().min(1).max(100).optional(), settings: z.object({ locale: z.string().max(50).optional(), timeZone: z.string().max(100).optional() }).strict().optional() }).strict();
 const target = z.object({ userId: id }).strict();
 const member = z.object({ userId: id, role: z.enum(["ADMIN", "MEMBER"]) }).strict();
+const invite = z.union([member, z.object({ email: z.string().trim().toLowerCase().max(254).email(), role: z.enum(["ADMIN", "MEMBER"]) }).strict()]);
+const token = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 function parse<T>(schema: z.ZodType<T>, value: unknown): T { const parsed = schema.safeParse(value); if (!parsed.success)
     throw new AppError("Invalid workspace request", 400, "VALIDATION_ERROR"); return parsed.data; }
 function key(req: Request): string { if (req.get("X-Forge-Intent") !== "workspace-command")
@@ -28,6 +30,15 @@ router.get("/invitations/inbox", async (_req, res, next) => { try {
 catch (error) {
     next(error);
 } });
+router.post("/invitations/:invitationId/resolve", async (req, res, next) => {
+    try {
+        key(req);
+        const body = parse(z.object({ token }).strict(), req.body);
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.json({ success: true, ...await invitations.resolveWorkspaceInvitation(res.locals.user.id, parse(id, req.params.invitationId), body.token) });
+    } catch (error) { next(error); }
+});
 router.patch("/:id/settings", async (req, res, next) => {
     try {
         const workspaceId = parse(id, req.params.id);
@@ -77,8 +88,12 @@ catch (error) {
 } });
 router.post("/:id/invitations", async (req, res, next) => {
     try {
-        const body = parse(member, req.body);
-        res.status(201).json({ success: true, ...await invitations.inviteWorkspaceMember(res.locals.user.id, parse(id, req.params.id), body.userId, body.role, key(req)) });
+        const body = parse(invite, req.body);
+        const workspaceId = parse(id, req.params.id);
+        const result = "email" in body
+            ? await invitations.inviteWorkspaceMemberByEmail(res.locals.user.id, workspaceId, body.email, body.role, key(req))
+            : await invitations.inviteWorkspaceMember(res.locals.user.id, workspaceId, body.userId, body.role, key(req));
+        res.status(201).json({ success: true, ...result });
     }
     catch (error) {
         next(error);
@@ -86,8 +101,8 @@ router.post("/:id/invitations", async (req, res, next) => {
 });
 router.post("/:id/invitations/:invitationId/accept", async (req, res, next) => {
     try {
-        parse(z.object({}).strict(), req.body);
-        res.json({ success: true, ...await invitations.acceptWorkspaceInvitation(res.locals.user.id, parse(id, req.params.id), parse(id, req.params.invitationId), key(req)) });
+        const body = parse(z.object({ token: token.optional() }).strict(), req.body);
+        res.json({ success: true, ...await invitations.acceptWorkspaceInvitation(res.locals.user.id, parse(id, req.params.id), parse(id, req.params.invitationId), key(req), body.token) });
     }
     catch (error) {
         next(error);

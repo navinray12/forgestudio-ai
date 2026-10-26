@@ -22,8 +22,29 @@ export async function createPersonalWebsite(input: Input) {
     try {
       return await prisma.$transaction(async (tx) => {
         await requireActiveActor(tx, input.userId);
-        const subscription = await tx.userSubscription.findUnique({ where: { userId: input.userId }, include: { plan: true } });
-        if (!subscription) throw new AppError("Subscription provisioning is incomplete", 503, "SUBSCRIPTION_NOT_PROVISIONED");
+        let subscription = await tx.userSubscription.findUnique({ where: { userId: input.userId }, include: { plan: true } });
+        if (!subscription) {
+          // Idempotent auto-provisioning of default free plan for new user
+          let plan = await tx.subscriptionPlan.findUnique({ where: { slug: "free" } });
+          if (!plan) {
+            plan = await tx.subscriptionPlan.create({
+              data: {
+                name: "Free", slug: "free", price: 0, currency: "INR", billingInterval: "monthly",
+                websiteLimit: 1, storageLimitMb: 100, aiCreditLimit: 0,
+                features: ["1 Website", "Basic widgets", "Basic templates", "Preview", "HTML/CSS export"],
+                isActive: true,
+              },
+            });
+          }
+          subscription = await tx.userSubscription.create({
+            data: { userId: input.userId, planId: plan.id, status: "ACTIVE", currentPeriodStart: new Date(), currentPeriodEnd: null },
+            include: { plan: true },
+          });
+          await tx.auditLog.create({ data: {
+            userId: input.userId, action: "FREE_SUBSCRIPTION_PROVISIONED", targetResource: `subscription:${subscription.id}`,
+            details: { planId: plan.id, source: "auto-provision-on-website-create" },
+          } });
+        }
         const limit = requireSubscriptionAccess(subscription);
         if (await tx.website.count({ where: { userId: input.userId } }) >= limit) {
           throw new AppError("Your website limit has been reached", 403, "WEBSITE_LIMIT_EXCEEDED");

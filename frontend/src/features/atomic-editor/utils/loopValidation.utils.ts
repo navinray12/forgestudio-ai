@@ -9,12 +9,14 @@ export function validateStaticDataJson(rawJson: string): { isValid: boolean; err
   }
   try {
     const parsed = JSON.parse(rawJson);
-    if (!Array.isArray(parsed)) {
+    if (!Array.isArray(parsed) || !parsed.every((item: unknown) =>
+      item !== null && typeof item === "object" && !Array.isArray(item)
+    )) {
       return { isValid: false, error: "Static data must be a JSON array of objects (e.g. [{...}])." };
     }
     return { isValid: true };
-  } catch (err: any) {
-    return { isValid: false, error: `Invalid JSON syntax: ${err.message}` };
+  } catch (err: unknown) {
+    return { isValid: false, error: `Invalid JSON syntax: ${err instanceof Error ? err.message : "Invalid input"}` };
   }
 }
 

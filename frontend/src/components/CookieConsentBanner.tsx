@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Cookie, Shield, X } from "lucide-react";
+import { Cookie, X } from "lucide-react";
 
 export interface CookieConsentConfig {
   enabled?: boolean;
@@ -15,11 +15,11 @@ interface CookieConsentBannerProps {
 
 export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config }) => {
   const [visible, setVisible] = useState(false);
+  const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
     // If not explicitly enabled, do not render
     if (!config?.enabled) {
-      setVisible(false);
       return;
     }
 
@@ -31,7 +31,13 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
         return () => clearTimeout(timer);
       }
     } catch {
-      setVisible(false);
+      // Storage can be blocked by privacy settings; never assume consent.
+      // Schedule a UI update outside the effect body; never assume consent.
+      const timer = setTimeout(() => {
+        setVisible(true);
+        setStorageError(true);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [config?.enabled]);
 
@@ -44,7 +50,19 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
           version: "1.0",
         })
       );
-    } catch {}
+    } catch {
+      // Do not acknowledge consent if it cannot be saved.
+      setStorageError(true);
+      return;
+    }
+
+    // Consent was saved successfully.
+    setStorageError(false);
+
+    // Notify other components that cookie consent has changed.
+    window.dispatchEvent(new Event("forge-cookie-consent"));
+
+    // Hide the banner only after consent is saved.
     setVisible(false);
   };
 
@@ -68,6 +86,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ config
           : "bg-white/95 text-slate-800 border-slate-200 backdrop-blur-md"
       }`}
     >
+      {storageError && <p role="alert" className={`mb-2 text-xs ${config.theme === "light" ? "text-amber-800" : "text-amber-300"}`}>Browser storage is unavailable. Your cookie choice could not be saved.</p>}
       <div className="flex items-start gap-3">
         <div className={`p-2 rounded-xl shrink-0 ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
           <Cookie className="w-5 h-5" />
